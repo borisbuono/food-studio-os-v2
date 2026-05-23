@@ -1,17 +1,29 @@
 import Link from "next/link";
 
+const worlds = [
+  { href: "/develop", kicker: "Develop", title: "The craft", blurb: "Menu, recipes, costing, story \u2014 where every dish is built." },
+  { href: "/execute", kicker: "Execute", title: "Service", blurb: "Today\u2019s priorities, prep, cook mode, cleaning \u2014 the daily loop." },
+  { href: "/administrate", kicker: "Administrate", title: "The house", blurb: "Finance, decisions, team & schedule, the holding view." },
+];
+
 export default function Home() {
   return (
-    <main className="mx-auto max-w-xl px-6 py-16">
-      <p className="font-sans text-xs font-medium text-ember">Food Studios · v2 foundation</p>
-      <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">The house, on a clean foundation.</h1>
-      <p className="mt-4 max-w-md font-sans text-[17px] leading-relaxed text-ink-soft">
-        Next.js + TypeScript + Tailwind, reading the real Supabase database. This is the staging
-        rebuild — the live app stays untouched until this is at parity.
+    <main className="mx-auto max-w-xl px-6 py-14">
+      <p className="font-sans text-xs font-medium text-ember">Food Studios</p>
+      <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">The house is yours.</h1>
+      <p className="mt-4 max-w-md font-sans text-[16px] leading-relaxed text-ink-soft">
+        Three worlds \u2014 develop the craft, execute service, run the house.
       </p>
-      <Link href="/menu" className="mt-8 inline-block rounded-xl bg-ember px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">
-        Open the menu →
-      </Link>
+      <div className="mt-10 space-y-4">
+        {worlds.map((w) => (
+          <Link key={w.href} href={w.href} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
+            <p className="font-sans text-xs font-medium text-ember">{w.kicker}</p>
+            <h2 className="mt-1 font-serif text-2xl text-ink">{w.title}</h2>
+            <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">{w.blurb}</p>
+          </Link>
+        ))}
+      </div>
+      <p className="mt-12 font-mono text-[11px] text-clay">v2 foundation \u00b7 reading live Supabase data</p>
     </main>
   );
 }
