@@ -8,12 +8,12 @@ export default async function Develop() {
   const recipes = await supabase.from("recipes").select("*", { count: "exact", head: true });
   const cards = [
     { href: "/menu", kicker: "Menu", title: (menu.count ?? 0) + " dishes", blurb: "The sell-and-train page. Tap a dish for its full hub." },
-    { href: "/recipes", kicker: "Recipes", title: (recipes.count ?? 0) + " recipes", blurb: "The library \u2014 method, cost, story behind each dish." },
+    { href: "/recipes", kicker: "Recipes", title: (recipes.count ?? 0) + " recipes", blurb: "The library — method, cost, story behind each dish." },
   ];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">\u2190 home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Develop \u00b7 the craft</p>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-ember">Develop · the craft</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Build the menu</h1>
       <div className="mt-8 space-y-4">
         {cards.map((c) => (

@@ -8,8 +8,8 @@ export default async function Recipes() {
   const recipes: any[] = data || [];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/develop" className="font-sans text-sm text-ink-soft">\u2190 develop</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Recipes \u00b7 the library</p>
+      <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-ember">Recipes · the library</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{recipes.length} recipes</h1>
       <ul className="mt-8 divide-y divide-black/10">
         {recipes.map((r: any) => {
@@ -17,7 +17,7 @@ export default async function Recipes() {
           return (
             <li key={r.id} className="flex items-baseline justify-between gap-4 py-3">
               <span className="font-serif text-lg text-ink">{r.name}</span>
-              <span className="shrink-0 font-mono text-[13px] text-ink-soft">{r.cost_per_portion ? "\u20ac" + Number(r.cost_per_portion).toFixed(2) : "\u2013"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>
+              <span className="shrink-0 font-mono text-[13px] text-ink-soft">{r.cost_per_portion ? "€" + Number(r.cost_per_portion).toFixed(2) : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>
             </li>
           );
         })}

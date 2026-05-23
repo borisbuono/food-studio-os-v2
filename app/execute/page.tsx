@@ -7,14 +7,14 @@ export default async function Execute() {
   const tasks = await supabase.from("tasks").select("*", { count: "exact", head: true }).eq("is_active", true);
   const mep = await supabase.from("mep_dishes").select("*", { count: "exact", head: true }).eq("is_active", true);
   const cards = [
-    { kicker: "Today", title: "Today\u2019s priorities", blurb: "Clock in, your 4\u20135 priority preps, covers & special diets.", soon: true },
-    { kicker: "Prep \u00b7 MEP", title: (mep.count ?? 0) + " prep dishes", blurb: "Mise en place by station, checkable.", soon: true },
+    { kicker: "Today", title: "Today’s priorities", blurb: "Clock in, your 4–5 priority preps, covers & special diets.", soon: true },
+    { kicker: "Prep · MEP", title: (mep.count ?? 0) + " prep dishes", blurb: "Mise en place by station, checkable.", soon: true },
     { kicker: "Cleaning", title: (tasks.count ?? 0) + " tasks", blurb: "Daily / weekly / monthly, by station + dishwasher.", soon: true },
   ];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">\u2190 home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Execute \u00b7 service</p>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-ember">Execute · service</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The daily loop</h1>
       <div className="mt-8 space-y-4">
         {cards.map((c, n) => (

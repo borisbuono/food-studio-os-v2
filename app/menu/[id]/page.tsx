@@ -17,7 +17,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   if (!item) {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
-        <Link href="/menu" className="font-sans text-sm text-ink-soft">\u2190 menu</Link>
+        <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
         <p className="mt-8 font-serif text-2xl text-ink">Dish not found.</p>
       </main>
     );
@@ -42,27 +42,27 @@ export default async function DishHub({ params }: { params: { id: string } }) {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/menu" className="font-sans text-sm text-ink-soft">\u2190 menu</Link>
+      <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ember">{sec || "Dish"}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{item.name}</h1>
-      <p className="mt-2 font-mono text-[12px] text-clay">{price ? "\u20ac" + price : "no price"}{recipe ? " \u00b7 " + (recipe.portions || 0) + " portions base" : " \u00b7 no recipe linked yet"}</p>
+      <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
 
       {recipe ? (
         <div className="mt-6 rounded-xl bg-ember px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7]">
-          Cook mode \u2014 coming next
+          Cook mode — coming next
         </div>
       ) : (
         <div className="mt-6 rounded-xl border border-dashed border-black/20 px-5 py-4 font-sans text-[13px] text-clay">No recipe linked to this dish yet.</div>
       )}
 
-      <Row k="Margin" v={mg !== null ? mg + "% \u00b7 " + mgRead : mgRead} accent={mgColor} />
-      {cost !== null ? <Row k="Cost / portion" v={"\u20ac" + Number(cost).toFixed(2)} /> : null}
-      {allergens.length ? <Row k="Allergens" v={allergens.join(" \u00b7 ")} /> : null}
+      <Row k="Margin" v={mg !== null ? mg + "% · " + mgRead : mgRead} accent={mgColor} />
+      {cost !== null ? <Row k="Cost / portion" v={"€" + Number(cost).toFixed(2)} /> : null}
+      {allergens.length ? <Row k="Allergens" v={allergens.join(" · ")} /> : null}
 
       {pitch ? (
         <div className="mt-7">
           <p className="font-sans text-xs font-medium text-clay">One-minute pitch</p>
-          <p className="mt-2 font-serif italic text-[16px] leading-relaxed text-ink-soft">\u201c{pitch}\u201d</p>
+          <p className="mt-2 font-serif italic text-[16px] leading-relaxed text-ink-soft">“{pitch}”</p>
         </div>
       ) : null}
 

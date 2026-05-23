@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 const worlds = [
-  { href: "/develop", kicker: "Develop", title: "The craft", blurb: "Menu, recipes, costing, story \u2014 where every dish is built." },
-  { href: "/execute", kicker: "Execute", title: "Service", blurb: "Today\u2019s priorities, prep, cook mode, cleaning \u2014 the daily loop." },
+  { href: "/develop", kicker: "Develop", title: "The craft", blurb: "Menu, recipes, costing, story — where every dish is built." },
+  { href: "/execute", kicker: "Execute", title: "Service", blurb: "Today’s priorities, prep, cook mode, cleaning — the daily loop." },
   { href: "/administrate", kicker: "Administrate", title: "The house", blurb: "Finance, decisions, team & schedule, the holding view." },
 ];
 
@@ -12,7 +12,7 @@ export default function Home() {
       <p className="font-sans text-xs font-medium text-ember">Food Studios</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">The house is yours.</h1>
       <p className="mt-4 max-w-md font-sans text-[16px] leading-relaxed text-ink-soft">
-        Three worlds \u2014 develop the craft, execute service, run the house.
+        Three worlds — develop the craft, execute service, run the house.
       </p>
       <div className="mt-10 space-y-4">
         {worlds.map((w) => (
@@ -23,7 +23,7 @@ export default function Home() {
           </Link>
         ))}
       </div>
-      <p className="mt-12 font-mono text-[11px] text-clay">v2 foundation \u00b7 reading live Supabase data</p>
+      <p className="mt-12 font-mono text-[11px] text-clay">v2 foundation · reading live Supabase data</p>
     </main>
   );
 }
