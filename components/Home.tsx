@@ -84,20 +84,22 @@ const UTOPIA_POINTS = [
 export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKey, EntityStats> }) {
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>("holdings");
+  const [userAccent, setUserAccent] = useState<string | null>(null);
   useEffect(() => {
     const r = localStorage.getItem("fs_role") as RoleKey | null;
     if (r && ROLES[r]) setRole(r);
     const e = localStorage.getItem("fs_entity") as EntityKey | null;
     if (e && statsByEntity[e]) setEntity(e);
+    setUserAccent(localStorage.getItem("fs_user_accent"));
   }, [statsByEntity]);
-  useEffect(() => { if (typeof document !== "undefined") document.documentElement.style.setProperty("--accent", ENTITY_ACCENT[entity]); }, [entity]);
+  useEffect(() => { if (typeof document !== "undefined") { const ua = localStorage.getItem("fs_user_accent"); document.documentElement.style.setProperty("--accent", ua || ENTITY_ACCENT[entity]); } }, [entity]);
   const chooseRole = (r: RoleKey) => { setRole(r); localStorage.setItem("fs_role", r); };
   const chooseEntity = (e: EntityKey) => { setEntity(e); localStorage.setItem("fs_entity", e); };
   const s = statsByEntity[entity];
   const cfg = ROLES[role];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12" style={{ ["--accent" as any]: ENTITY_ACCENT[entity] }}>
+    <main className="mx-auto max-w-xl px-6 py-12" style={{ ["--accent" as any]: userAccent || ENTITY_ACCENT[entity] }}>
       <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Home</p>
       <div className="mt-2"><BrandMark entity={entity} variant="full" tone="light" /></div>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>

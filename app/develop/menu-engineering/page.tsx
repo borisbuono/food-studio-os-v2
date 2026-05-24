@@ -7,10 +7,10 @@ const UT = "a0000000-0000-4000-8000-000000000001";
 const eur = (n: number) => "€" + n.toFixed(2);
 
 const CLASS: Record<string, { label: string; note: string; color: string }> = {
-  star: { label: "Star", note: "high margin · popular — protect & feature", color: "text-olive" },
-  plow: { label: "Plowhorse", note: "popular but low margin — re-engineer cost or price", color: "text-ochre" },
-  puzzle: { label: "Puzzle", note: "high margin · slow — promote, reposition, upsell", color: "text-tomato" },
-  dog: { label: "Dog", note: "low margin · slow — rework or cut", color: "text-clay" },
+  star: { label: "Star", note: "Sells well and pays well — protect it, put it front and centre.", color: "text-olive" },
+  plow: { label: "Plowhorse", note: "A favourite, but the margin is thin — trim the cost or gently lift the price.", color: "text-ochre" },
+  puzzle: { label: "Puzzle", note: "Makes good money but few order it — promote it, move it up the menu, get staff selling it.", color: "text-tomato" },
+  dog: { label: "Dog", note: "Low margin and slow — rework the dish, or retire it for something that earns.", color: "text-clay" },
 };
 
 export default async function MenuEngineering() {

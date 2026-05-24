@@ -9,7 +9,12 @@ import BrandMark from "@/components/BrandMark";
 export default function TopBar() {
   const [entity, setEntity] = useState<EntityKey>("holdings");
   useEffect(() => {
-    const read = () => { const e = localStorage.getItem("fs_entity") as EntityKey | null; if (e) { setEntity(e); document.documentElement.style.setProperty("--accent", ENTITY_ACCENT[e] || "#B8552E"); } };
+    const read = () => {
+      const e = localStorage.getItem("fs_entity") as EntityKey | null;
+      if (e) setEntity(e);
+      const ua = localStorage.getItem("fs_user_accent");
+      document.documentElement.style.setProperty("--accent", ua || (e ? ENTITY_ACCENT[e] : "") || "#B8552E");
+    };
     read();
     window.addEventListener("storage", read);
     window.addEventListener("focus", read);
