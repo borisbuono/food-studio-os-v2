@@ -41,16 +41,16 @@ export default async function Administrate() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Administrate · the house</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Administrate · the house</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Run the business</h1>
 
-      <p className="mt-8 font-sans text-xs font-medium text-ember">Holdings · temperature check</p>
+      <p className="mt-8 font-sans text-xs font-medium text-ochre">Holdings · temperature check</p>
       <div className="mt-3 space-y-4">
         {venueStats.map((v) => (
           <div key={v.id} className="rounded-2xl border border-black/10 bg-card p-6">
             <div className="flex items-baseline justify-between">
               <h2 className="font-serif text-2xl text-ink">{v.name}</h2>
-              {v.flag ? <span className="font-mono text-[10px] uppercase tracking-wide text-ember">{v.flag}</span> : <span className="font-mono text-[10px] uppercase tracking-wide text-olive">live</span>}
+              {v.flag ? <span className="font-mono text-[10px] uppercase tracking-wide text-ochre">{v.flag}</span> : <span className="font-mono text-[10px] uppercase tracking-wide text-olive">live</span>}
             </div>
             <div className="mt-4 grid grid-cols-4 gap-3">
               {[
@@ -68,19 +68,19 @@ export default async function Administrate() {
           </div>
         ))}
       </div>
-      <Link href="/administrate/holdings" className="mt-3 inline-block font-sans text-sm text-ember">Entity map →</Link>
+      <Link href="/administrate/holdings" className="mt-3 inline-block font-sans text-sm text-ochre">Entity map →</Link>
 
       <div className="mt-8 space-y-4">
         {cards.map((c, n) => c.href ? (
-          <Link key={n} href={c.href} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-            <p className="font-sans text-xs font-medium text-ember">{c.kicker}</p>
+          <Link key={n} href={c.href} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ochre/40">
+            <p className="font-sans text-xs font-medium text-ochre">{c.kicker}</p>
             <h2 className="mt-1 font-serif text-2xl text-ink">{c.title}</h2>
             <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">{c.blurb}</p>
           </Link>
         ) : (
           <div key={n} className="rounded-2xl border border-black/10 bg-card p-6">
             <div className="flex items-center justify-between">
-              <p className="font-sans text-xs font-medium text-ember">{c.kicker}</p>
+              <p className="font-sans text-xs font-medium text-ochre">{c.kicker}</p>
               <span className="font-mono text-[10px] uppercase tracking-wide text-clay">building next</span>
             </div>
             <h2 className="mt-1 font-serif text-2xl text-ink">{c.title}</h2>

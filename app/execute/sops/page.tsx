@@ -11,7 +11,7 @@ export default async function Sops() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Libro Azul · SOPs & HACCP</p>
+      <p className="mt-6 font-sans text-xs font-medium text-basil">Libro Azul · SOPs & HACCP</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">How we do it, correctly</h1>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The how-to that grounds the daily tasks. {plans.length} plans on record.</p>
 

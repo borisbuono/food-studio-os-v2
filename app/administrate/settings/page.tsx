@@ -19,7 +19,7 @@ export default async function Settings() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Settings · connections & skills</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Settings · connections & skills</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The plumbing</h1>
 
       <section className="mt-8">

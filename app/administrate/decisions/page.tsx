@@ -11,7 +11,7 @@ export default async function Decisions() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Decisions · inbox</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Decisions · inbox</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What needs a call</h1>
 
       <div className="mt-8 space-y-4">

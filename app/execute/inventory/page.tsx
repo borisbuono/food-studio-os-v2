@@ -13,7 +13,7 @@ export default async function Inventory() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Inventory</p>
+      <p className="mt-6 font-sans text-xs font-medium text-basil">Inventory</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length.toLocaleString("en-GB")} items on file</h1>
 
       {venues.map((v: any) => {
@@ -31,7 +31,7 @@ export default async function Inventory() {
                 {low.slice(0, 40).map((i: any, n: number) => (
                   <li key={n} className="flex items-baseline justify-between gap-4 py-2">
                     <span className="font-sans text-[15px] text-ink">{noEmoji(i.name)}</span>
-                    <span className="font-mono text-[12px] text-ember">{i.quantity_on_hand}/{i.reorder_threshold} {i.unit || ""}</span>
+                    <span className="font-mono text-[12px] text-basil">{i.quantity_on_hand}/{i.reorder_threshold} {i.unit || ""}</span>
                   </li>
                 ))}
               </ul>

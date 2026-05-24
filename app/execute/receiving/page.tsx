@@ -13,7 +13,7 @@ export default async function Receiving() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Receiving · stock movements</p>
+      <p className="mt-6 font-sans text-xs font-medium text-basil">Receiving · stock movements</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Recent movements</h1>
 
       <ul className="mt-8 divide-y divide-black/10 border-t border-black/10">
@@ -25,7 +25,7 @@ export default async function Receiving() {
                 <p className="font-serif text-[16px] text-ink">{noEmoji(name.get(m.inventory_item_id) || "Item")}</p>
                 <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{m.reason || "movement"}{m.movement_at ? " · " + String(m.movement_at).slice(0, 10) : ""}</p>
               </div>
-              <span className={"font-mono text-[13px] " + (q >= 0 ? "text-olive" : "text-ember")}>{q >= 0 ? "+" : ""}{q} {m.unit || ""}</span>
+              <span className={"font-mono text-[13px] " + (q >= 0 ? "text-olive" : "text-basil")}>{q >= 0 ? "+" : ""}{q} {m.unit || ""}</span>
             </li>
           );
         })}

@@ -10,7 +10,7 @@ export default async function Invoices() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Missing invoices</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Missing invoices</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Deliveries without an invoice</h1>
 
       {missing.length ? (
@@ -18,7 +18,7 @@ export default async function Invoices() {
           {missing.map((o: any, i: number) => (
             <li key={i} className="flex items-baseline justify-between py-3">
               <span className="font-sans text-[15px] text-ink">{o.order_date}</span>
-              <span className="font-mono text-[12px] text-ember">no invoice</span>
+              <span className="font-mono text-[12px] text-ochre">no invoice</span>
             </li>
           ))}
         </ul>

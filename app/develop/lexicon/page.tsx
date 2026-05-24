@@ -30,7 +30,7 @@ export default async function Lexicon() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Lexicon · the story layer</p>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">Lexicon · the story layer</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The knowledge behind the craft</h1>
 
       {dishes.length ? (

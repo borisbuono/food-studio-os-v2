@@ -19,7 +19,7 @@ export default async function Repricing() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Repricing</p>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">Repricing</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Price against target margin</h1>
 
       <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">

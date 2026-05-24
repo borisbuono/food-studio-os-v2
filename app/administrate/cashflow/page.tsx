@@ -11,7 +11,7 @@ export default async function CashFlow() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Cash flow</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Cash flow</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Money in</h1>
 
       {venues.map((v: any) => {

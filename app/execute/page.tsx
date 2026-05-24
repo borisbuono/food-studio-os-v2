@@ -10,51 +10,51 @@ export default async function Execute() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Execute · service</p>
+      <p className="mt-6 font-sans text-xs font-medium text-basil">Execute · service</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The daily loop</h1>
       <div className="mt-8 space-y-4">
-        <Link href="/execute/today" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Today</p>
+        <Link href="/execute/today" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Today</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Today’s priorities</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Your 4–5 priority preps, covers & cleaning due today.</p>
         </Link>
-        <Link href="/execute/prep" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Prep · MEP</p>
+        <Link href="/execute/prep" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Prep · MEP</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">{mep.count ?? 0} prep dishes</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Mise en place by station, with components.</p>
         </Link>
-        <Link href="/execute/cleaning" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Cleaning</p>
+        <Link href="/execute/cleaning" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Cleaning</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">{tasks.count ?? 0} cleaning tasks</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Daily & weekly schedule, by station.</p>
         </Link>
-        <Link href="/execute/sops" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Libro Azul · SOPs</p>
+        <Link href="/execute/sops" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Libro Azul · SOPs</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">{sops.count ?? 0} plans</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">HACCP plans and how-to that ground the tasks.</p>
         </Link>
-        <Link href="/execute/briefing" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Briefing</p>
+        <Link href="/execute/briefing" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Briefing</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Before service</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The morning division of work — who's doing what.</p>
         </Link>
-        <Link href="/execute/inventory" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Inventory</p>
+        <Link href="/execute/inventory" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Inventory</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Stock & reorder</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">What's on hand, what's below reorder.</p>
         </Link>
-        <Link href="/execute/receiving" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Receiving</p>
+        <Link href="/execute/receiving" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Receiving</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Stock movements</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Recent deliveries and usage.</p>
         </Link>
-        <Link href="/execute/bookings" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Bookings</p>
+        <Link href="/execute/bookings" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Bookings</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Reservations</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The book — covers, times, diets.</p>
         </Link>
-        <Link href="/execute/handover" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
-          <p className="font-sans text-xs font-medium text-ember">Handover</p>
+        <Link href="/execute/handover" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
+          <p className="font-sans text-xs font-medium text-basil">Handover</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Pass-down</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">What the next shift needs to know.</p>
         </Link>

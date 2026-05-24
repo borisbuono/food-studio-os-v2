@@ -12,7 +12,7 @@ export default async function Prep() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Prep · mise en place</p>
+      <p className="mt-6 font-sans text-xs font-medium text-basil">Prep · mise en place</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{dishes.length} prep dishes</h1>
       {rests.map((r: any) => {
         const rz = zones.filter((z: any) => z.restaurant_id === r.id && dishes.some((d: any) => d.zone_id === z.id));

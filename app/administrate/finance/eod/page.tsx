@@ -12,7 +12,7 @@ export default async function EodList() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">End-of-day reports</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">End-of-day reports</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{eod.length} reports</h1>
 
       <div className="mt-6 space-y-4">

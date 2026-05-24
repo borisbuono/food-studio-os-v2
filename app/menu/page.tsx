@@ -41,9 +41,9 @@ export default async function MenuPage() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Menu · live from database</p>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">Menu · live from database</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length} items</h1>
-      <a href="/m" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide text-ember">Guest menu →</a>
+      <a href="/m" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide text-tomato">Guest menu →</a>
 
       <h2 className="mt-12 font-serif text-2xl text-ink">Food</h2>
       {FOOD_ORDER.filter((s) => inSection(food, s).length).map((s) => (

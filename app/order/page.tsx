@@ -40,10 +40,10 @@ export default function Order() {
   if (stage === "sent") {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
-        <p className="font-sans text-xs font-medium text-ember">Order</p>
+        <p className="font-sans text-xs font-medium text-ochre">Order</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Draft ready for {noEmoji(provider?.name || "")}</h1>
         <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">{lines.length} lines · {eur(total)}. Sending to suppliers (via {provider?.whatsapp ? "WhatsApp" : provider?.email ? "email" : "their channel"}) connects with your confirm step — nothing has actually been sent.</p>
-        <button onClick={() => { setCart({}); setSel(null); setStage("build"); }} className="mt-6 rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Start another order</button>
+        <button onClick={() => { setCart({}); setSel(null); setStage("build"); }} className="mt-6 rounded-xl bg-ochre px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Start another order</button>
       </main>
     );
   }
@@ -52,7 +52,7 @@ export default function Order() {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
         <button onClick={() => setStage("build")} className="font-sans text-sm text-ink-soft">← edit order</button>
-        <p className="mt-6 font-sans text-xs font-medium text-ember">Review · {noEmoji(provider?.name || "")}</p>
+        <p className="mt-6 font-sans text-xs font-medium text-ochre">Review · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{lines.length} lines · {eur(total)}</h1>
         <ul className="mt-6 divide-y divide-black/10 border-y border-black/10">
           {lines.map((l) => (
@@ -63,7 +63,7 @@ export default function Order() {
           ))}
         </ul>
         <p className="mt-3 font-mono text-[11px] text-clay">{[provider?.delivery_schedule, provider?.cutoff_time ? "cutoff " + provider.cutoff_time : ""].filter(Boolean).join(" · ")}</p>
-        <button onClick={() => setStage("sent")} className="mt-6 w-full rounded-xl bg-ember px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">Prepare to send</button>
+        <button onClick={() => setStage("sent")} className="mt-6 w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">Prepare to send</button>
       </main>
     );
   }
@@ -72,7 +72,7 @@ export default function Order() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">New order</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">New order</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{provider ? noEmoji(provider.name) : "Choose a supplier"}</h1>
 
       {!provider ? (
@@ -89,7 +89,7 @@ export default function Order() {
         </ul>
       ) : (
         <>
-          <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ember">change supplier</button>
+          <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ochre">change supplier</button>
           <ul className="mt-5 divide-y divide-black/10 border-t border-black/10">
             {provProducts.map((p) => {
               const q = cart[p.id] || 0;
@@ -114,7 +114,7 @@ export default function Order() {
 
       {lines.length ? (
         <div className="sticky bottom-4 mt-6">
-          <button onClick={() => setStage("review")} className="flex w-full items-center justify-between rounded-xl bg-ember px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">
+          <button onClick={() => setStage("review")} className="flex w-full items-center justify-between rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">
             <span>Review order</span>
             <span className="font-mono text-[13px]">{lines.length} lines · {eur(total)}</span>
           </button>

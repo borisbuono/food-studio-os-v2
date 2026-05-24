@@ -45,12 +45,12 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">{sec || "Dish"}</p>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">{sec || "Dish"}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(item.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
 
       {recipe ? (
-        <Link href={`/recipes/${item.recipe_id}`} className="mt-6 block rounded-xl bg-ember px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">
+        <Link href={`/recipes/${item.recipe_id}`} className="mt-6 block rounded-xl bg-tomato px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">
           Open the recipe
         </Link>
       ) : (

@@ -19,11 +19,11 @@ export default async function Team() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ember">Team · HR & schedule</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
 
-      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
-        <p className="font-sans text-xs font-medium text-ember">Schedule</p>
+      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+        <p className="font-sans text-xs font-medium text-ochre">Schedule</p>
         <h2 className="mt-1 font-serif text-xl text-ink">Weekly rota</h2>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">{(shifts.count ?? 0) === 0 ? "Browse by week — FOH / BOH, by zone." : (shifts.count + " shifts scheduled.")}</p>
       </Link>
