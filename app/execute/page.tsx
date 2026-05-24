@@ -7,57 +7,46 @@ export default async function Execute() {
   const tasks = await supabase.from("tasks").select("*", { count: "exact", head: true }).eq("is_active", true).eq("task_type", "cleaning");
   const mep = await supabase.from("mep_dishes").select("*", { count: "exact", head: true }).eq("is_active", true);
   const sops = await supabase.from("haccp_plans").select("*", { count: "exact", head: true });
+  const hubs = [
+    { title: "Service", items: [
+      { href: "/execute/today", label: "Today", blurb: "Clock-in, priority preps, covers, cleaning due." },
+      { href: "/execute/briefing", label: "Briefing", blurb: "Who's doing what before service." },
+      { href: "/execute/handover", label: "Handover", blurb: "Pass-down for the next shift." },
+    ]},
+    { title: "Kitchen", items: [
+      { href: "/execute/prep", label: "Prep · " + (mep.count ?? 0) + " dishes", blurb: "Mise en place by station, with components." },
+      { href: "/execute/cleaning", label: "Cleaning · " + (tasks.count ?? 0), blurb: "Daily & weekly schedule, by station." },
+      { href: "/execute/sops", label: "Libro Azul · " + (sops.count ?? 0) + " SOPs", blurb: "HACCP plans that ground the tasks." },
+    ]},
+    { title: "Stock", items: [
+      { href: "/execute/inventory", label: "Inventory", blurb: "What's on hand, what's below reorder." },
+      { href: "/execute/receiving", label: "Receiving", blurb: "Recent deliveries and usage." },
+      { href: "/order", label: "Order", blurb: "Place an order to a supplier." },
+    ]},
+    { title: "Front", items: [
+      { href: "/execute/bookings", label: "Bookings", blurb: "The book — covers, times, diets." },
+      { href: "/schedule", label: "Schedule", blurb: "Weekly rota, FOH / BOH." },
+    ]},
+  ];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Execute · service</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The daily loop</h1>
-      <div className="mt-8 space-y-4">
-        <Link href="/execute/today" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Today</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Today’s priorities</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Your 4–5 priority preps, covers & cleaning due today.</p>
-        </Link>
-        <Link href="/execute/prep" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Prep · MEP</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">{mep.count ?? 0} prep dishes</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Mise en place by station, with components.</p>
-        </Link>
-        <Link href="/execute/cleaning" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Cleaning</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">{tasks.count ?? 0} cleaning tasks</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Daily & weekly schedule, by station.</p>
-        </Link>
-        <Link href="/execute/sops" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Libro Azul · SOPs</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">{sops.count ?? 0} plans</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">HACCP plans and how-to that ground the tasks.</p>
-        </Link>
-        <Link href="/execute/briefing" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Briefing</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Before service</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The morning division of work — who's doing what.</p>
-        </Link>
-        <Link href="/execute/inventory" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Inventory</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Stock & reorder</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">What's on hand, what's below reorder.</p>
-        </Link>
-        <Link href="/execute/receiving" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Receiving</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Stock movements</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Recent deliveries and usage.</p>
-        </Link>
-        <Link href="/execute/bookings" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Bookings</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Reservations</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The book — covers, times, diets.</p>
-        </Link>
-        <Link href="/execute/handover" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-basil/40">
-          <p className="font-sans text-xs font-medium text-basil">Handover</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Pass-down</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">What the next shift needs to know.</p>
-        </Link>
+      <div className="mt-8 space-y-8">
+        {hubs.map((h) => (
+          <section key={h.title}>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-basil">{h.title}</p>
+            <div className="mt-2 divide-y divide-black/10 overflow-hidden rounded-2xl border border-black/10 bg-card">
+              {h.items.map((i) => (
+                <Link key={i.href} href={i.href} className="block px-5 py-4 transition hover:bg-paper-deep">
+                  <h2 className="font-serif text-[19px] text-ink">{i.label}</h2>
+                  <p className="mt-0.5 font-sans text-[13px] text-ink-soft">{i.blurb}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </main>
   );
