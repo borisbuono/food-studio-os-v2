@@ -33,7 +33,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
       <section className="relative flex min-h-[78vh] flex-col justify-between overflow-hidden px-7 pb-14 pt-14" style={{ background: "radial-gradient(140% 100% at 30% 0%, #2a1d16 0%, #1c130e 46%, #120c08 100%)" }}>
         <div className="flex items-center justify-between">
           <Link href="/recipes" className="font-serif text-[16px] text-[#F2ECDE]/70">‹</Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2ECDE]/50">Bistro Mondo</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2ECDE]/50">{r.restaurant || "Food Studios"}</span>
         </div>
         <div>
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.32em] text-amber">{kicker}</p>

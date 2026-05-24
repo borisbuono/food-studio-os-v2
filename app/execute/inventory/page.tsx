@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Inventory() {
   const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
-  const items = (await supabase.from("inventory_items").select("restaurant_id,name,unit,quantity_on_hand,reorder_threshold").order("name")).data || [];
+  const perVenue = await Promise.all((venues as any[]).map((v: any) => supabase.from("inventory_items").select("restaurant_id,name,unit,quantity_on_hand,reorder_threshold").eq("restaurant_id", v.id).order("name")));
+  const items = perVenue.flatMap((r: any) => r.data || []);
 
   const isLow = (i: any) => i.quantity_on_hand != null && i.reorder_threshold != null && Number(i.quantity_on_hand) <= Number(i.reorder_threshold);
 

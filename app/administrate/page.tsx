@@ -7,8 +7,9 @@ type Venue = { id: string; name: string };
 
 export default async function Administrate() {
   const venues: Venue[] = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
+  const invCounts: Record<string, number> = {};
+  for (const v of venues) { invCounts[v.id] = (await supabase.from("inventory_items").select("*", { count: "exact", head: true }).eq("restaurant_id", v.id)).count ?? 0; }
   const menuRows = (await supabase.from("menu_items").select("restaurant_id").eq("is_active", true)).data || [];
-  const invRows = (await supabase.from("inventory_items").select("restaurant_id")).data || [];
   const zoneRows = (await supabase.from("zones").select("id,restaurant_id")).data || [];
   const taskRows = (await supabase.from("tasks").select("zone_id").eq("is_active", true).eq("task_type", "cleaning")).data || [];
   const events = await supabase.from("sales_events").select("*", { count: "exact", head: true });
@@ -21,7 +22,7 @@ export default async function Administrate() {
 
   const venueStats = venues.map((v) => {
     const menu = count(menuRows, "restaurant_id", v.id);
-    const inv = count(invRows, "restaurant_id", v.id);
+    const inv = invCounts[v.id] ?? 0;
     const zones = count(zoneRows, "restaurant_id", v.id);
     const cleaning = taskRows.filter((t: any) => zoneToVenue.get(t.zone_id) === v.id).length;
     const flag = menu === 0 ? "Menu not loaded yet" : null;
