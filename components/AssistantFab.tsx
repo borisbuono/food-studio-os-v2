@@ -35,11 +35,18 @@ export default function AssistantFab() {
     else { setText(""); try { r.start(); setListening(true); } catch { /* already started */ } }
   };
 
-  const send = () => {
+  const send = async () => {
     const t = text.trim(); if (!t) return;
     if (listening) { recRef.current?.stop(); setListening(false); }
-    setLog((l) => [...l, { role: "you", text: t }, { role: "fs", text: "Captured. Turning this into an action — an order draft, a task, a note — connects when the assistant is wired up." }]);
     setText("");
+    setLog((l) => [...l, { role: "you", text: t }, { role: "fs", text: "…" }]);
+    try {
+      const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: t }) });
+      const d = await r.json();
+      setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "fs", text: d.reply || "…" }; return n; });
+    } catch {
+      setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "fs", text: "Couldn't reach the assistant — try again." }; return n; });
+    }
   };
 
   return (
