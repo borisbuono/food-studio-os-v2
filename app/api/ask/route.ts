@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SYSTEM = "You are the Food Studios assistant inside a restaurant operating system used by chefs, front-of-house and owners. Be concise, warm and practical. You can help draft supplier orders, explain food cost and margin, draft prep notes or tasks, and answer operational questions. You never send, post or purchase anything yourself — you produce a draft and a human confirms. Keep replies short (a few sentences) unless asked for detail.";
+const SYSTEM = "You are the Food Studios assistant inside a restaurant operating system used by chefs, front-of-house and owners. Be concise, warm and practical. You can help draft supplier orders, explain food cost and margin, draft prep notes or tasks, and answer operational questions. You never send, post or purchase anything yourself — you produce a draft and a human confirms. Keep replies short (a few sentences) unless asked for detail. When the user asks to place or draft an order, finish your reply with one line exactly: <order>[{\"name\":\"Oranges\",\"qty\":5,\"unit\":\"kg\"}]</order> listing the items as JSON (this line is parsed by the app, not shown to the user).";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -17,8 +17,11 @@ export async function POST(req: Request) {
       body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 400, system: SYSTEM, messages: [{ role: "user", content: message }] }),
     });
     const data = await r.json();
-    const reply = data?.content?.[0]?.text || data?.error?.message || "Sorry — I couldn't read a reply.";
-    return Response.json({ configured: true, reply });
+    let reply: string = data?.content?.[0]?.text || data?.error?.message || "Sorry — I couldn't read a reply.";
+    let order: any = null;
+    const m = typeof reply === "string" ? reply.match(/<order>([\s\S]*?)<\/order>/) : null;
+    if (m) { try { order = JSON.parse(m[1]); } catch {} reply = reply.replace(m[0], "").trim(); }
+    return Response.json({ configured: true, reply, order });
   } catch (e: any) {
     return Response.json({ configured: true, reply: "Assistant error: " + (e?.message || "unknown") });
   }

@@ -10,6 +10,7 @@ export default function AssistantFab() {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
   const [log, setLog] = useState<Msg[]>([]);
+  const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
   const recRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +45,7 @@ export default function AssistantFab() {
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: t }) });
       const d = await r.json();
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "fs", text: d.reply || "…" }; return n; });
+      if (Array.isArray(d.order) && d.order.length) setOrderDraft(d.order);
     } catch {
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "fs", text: "Couldn't reach the assistant — try again." }; return n; });
     }
@@ -72,6 +74,9 @@ export default function AssistantFab() {
             {text ? <p className="font-serif text-[17px] leading-relaxed text-ink">{text}</p> : null}
           </div>
 
+          {orderDraft ? (
+            <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/order"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#FCEFE7]">Open this order in Ordering →</button>
+          ) : null}
           <div className="border-t border-black/10 p-3">
             {mode === "type" ? (
               <div className="flex items-center gap-2">

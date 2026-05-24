@@ -16,6 +16,7 @@ export default function Order() {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [stage, setStage] = useState<"build" | "review" | "sent">("build");
   const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState<any[] | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -26,6 +27,7 @@ export default function Order() {
       setProviders(p.data || []);
       setProducts(pp.data || []);
       setLoading(false);
+      try { const dr = localStorage.getItem("fs_order_draft"); if (dr) setDraft(JSON.parse(dr)); } catch {}
     })();
   }, []);
 
@@ -74,6 +76,17 @@ export default function Order() {
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ochre">New order</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{provider ? noEmoji(provider.name) : "Choose a supplier"}</h1>
+
+      {draft && draft.length ? (
+        <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--accent)" }}>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--accent)" }}>Assistant draft</p>
+          <ul className="mt-1">
+            {draft.map((d: any, i: number) => <li key={i} className="font-serif text-[15px] text-ink">{d.qty} {d.unit} · {noEmoji(String(d.name || ""))}</li>)}
+          </ul>
+          <p className="mt-2 font-sans text-[12px] text-ink-soft">Pick the supplier below and add the matching products — these are the assistant's suggested lines, ready to confirm.</p>
+          <button onClick={() => { localStorage.removeItem("fs_order_draft"); setDraft(null); }} className="mt-2 font-mono text-[10px] uppercase tracking-wide text-clay">dismiss</button>
+        </div>
+      ) : null}
 
       {!provider ? (
         <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
