@@ -43,6 +43,7 @@ export default async function MenuPage() {
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ember">Menu · live from database</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length} items</h1>
+      <a href="/m" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide text-ember">Guest menu →</a>
 
       <h2 className="mt-12 font-serif text-2xl text-ink">Food</h2>
       {FOOD_ORDER.filter((s) => inSection(food, s).length).map((s) => (

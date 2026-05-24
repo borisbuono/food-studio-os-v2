@@ -20,6 +20,7 @@ export default async function Finance() {
       <div className="mt-4 flex gap-4 font-sans text-sm text-ember">
         <Link href="/administrate/cashflow">Cash flow →</Link>
         <Link href="/administrate/invoices">Missing invoices →</Link>
+        <Link href="/administrate/finance/eod">EOD reports →</Link>
       </div>
 
       {byVenue.map((v: any) => {
