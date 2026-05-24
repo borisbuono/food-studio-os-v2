@@ -25,7 +25,7 @@ export default function EightySixToggle({ id, initial }: { id: string; initial: 
       >
         {saving ? "Saving…" : on ? "86’d — tap to put back on the menu" : "Mark 86 — out of stock"}
       </button>
-      {err ? <p className="mt-2 font-mono text-[11px] text-ember">Couldn’t save — try again.</p> : null}
+      {err ? <p className="mt-2 font-mono text-[11px] text-ember">Saving needs sign-in — this is a preview of the action.</p> : null}
     </div>
   );
 }
