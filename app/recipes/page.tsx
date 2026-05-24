@@ -15,9 +15,11 @@ export default async function Recipes() {
         {recipes.map((r: any) => {
           const mg = r.menu_price && r.cost_per_portion ? Math.round((1 - r.cost_per_portion / r.menu_price) * 100) : null;
           return (
-            <li key={r.id} className="flex items-baseline justify-between gap-4 py-3">
-              <span className="font-serif text-lg text-ink">{r.name}</span>
-              <span className="shrink-0 font-mono text-[13px] text-ink-soft">{r.cost_per_portion ? "€" + Number(r.cost_per_portion).toFixed(2) : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>
+            <li key={r.id}>
+              <a href={"/recipes/" + r.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
+                <span className="font-serif text-lg text-ink">{r.name}</span>
+                <span className="shrink-0 font-mono text-[13px] text-ink-soft">{r.cost_per_portion ? "€" + Number(r.cost_per_portion).toFixed(2) : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>
+              </a>
             </li>
           );
         })}
