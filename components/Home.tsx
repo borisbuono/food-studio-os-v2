@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
-import AuthStatus from "@/components/AuthStatus";
 
 export type EntityStats = {
   label: string;
@@ -82,11 +81,9 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="font-serif text-3xl text-ink">Food Studios</p>
-        <AuthStatus />
-      </div>
-      <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{ENTITY_LABEL[entity]}{s.reportPeriod ? " · last report " + s.reportPeriod : entity === "holdings" ? " · latest per venue" : ""}</p>
+      <p className="font-sans text-xs font-medium text-ember">Home</p>
+      <h1 className="mt-1 font-serif text-3xl text-ink">{ENTITY_LABEL[entity]}</h1>
+      <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {ENTITY_ORDER.map((k) => (

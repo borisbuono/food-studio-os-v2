@@ -11,11 +11,7 @@ export default function AuthStatus() {
     return () => sub.subscription.unsubscribe();
   }, []);
   if (email) {
-    return (
-      <span className="font-mono text-[11px] text-clay">
-        {email} · <button onClick={() => supabaseBrowser.auth.signOut()} className="text-ember">sign out</button>
-      </span>
-    );
+    return <Link href="/account" className="font-mono text-[11px] text-ember">{email.split("@")[0]}</Link>;
   }
   return <Link href="/login" className="font-mono text-[11px] text-ember">Sign in</Link>;
 }
