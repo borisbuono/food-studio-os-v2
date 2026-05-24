@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
+import AuthStatus from "@/components/AuthStatus";
 
 export type HomeStats = {
   reportPeriod: string | null;
@@ -53,6 +54,7 @@ export default function Home({ stats }: { stats: HomeStats }) {
     <main className="mx-auto max-w-xl px-6 py-12">
       <p className="font-serif text-3xl text-ink">Food Studios</p>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{stats.reportPeriod ? "Bistro Mondo · last report " + stats.reportPeriod : "Bistro Mondo"}</p>
+      <div className="mt-2"><AuthStatus /></div>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(Object.keys(ROLES) as RoleKey[]).map((k) => (
