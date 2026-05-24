@@ -37,6 +37,8 @@ export default async function RecipePage({ params }: { params: { id: string } })
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(r.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{(r.portions || 0) + " portions base"}{r.menu_price ? " · €" + r.menu_price + " menu" : ""}</p>
 
+      <Link href={`/recipes/${r.id}/cook`} className="mt-6 block rounded-xl bg-ember px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">Cook mode</Link>
+
       {r.voice_statement ? (
         <div className="mt-7">
           <p className="font-sans text-xs font-medium text-clay">One-minute pitch</p>
