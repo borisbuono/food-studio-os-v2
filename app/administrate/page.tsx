@@ -12,6 +12,7 @@ export default async function Administrate() {
   const zoneRows = (await supabase.from("zones").select("id,restaurant_id")).data || [];
   const taskRows = (await supabase.from("tasks").select("zone_id").eq("is_active", true).eq("task_type", "cleaning")).data || [];
   const events = await supabase.from("sales_events").select("*", { count: "exact", head: true });
+  const providersCount = await supabase.from("providers").select("*", { count: "exact", head: true });
 
   const zoneToVenue = new Map<string, string>();
   zoneRows.forEach((z: any) => zoneToVenue.set(z.id, z.restaurant_id));
@@ -28,7 +29,9 @@ export default async function Administrate() {
 
   const cards: { kicker: string; title: string; blurb: string; href?: string }[] = [
     { kicker: "Finance · CFO", title: "The numbers, explained", blurb: "Revenue, covers, avg spend — in plain language.", href: "/administrate/finance" },
-    { kicker: "Decisions", title: (events.count ?? 0) + " events in pipeline", blurb: "Surfaced decisions and the events pipeline." },
+    { kicker: "Events", title: (events.count ?? 0) + " events", blurb: "Catering & private events pipeline.", href: "/administrate/events" },
+    { kicker: "Suppliers", title: (providersCount.count ?? 0) + " suppliers", blurb: "Providers, products & ordering.", href: "/administrate/suppliers" },
+    { kicker: "Decisions", title: "Surfaced decisions", blurb: "What needs a call — with stakeholder voting." },
     { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place." },
   ];
 
