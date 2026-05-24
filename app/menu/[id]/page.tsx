@@ -49,9 +49,9 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
 
       {recipe ? (
-        <div className="mt-6 rounded-xl bg-ember px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7]">
-          Cook mode — coming next
-        </div>
+        <Link href={`/recipes/${item.recipe_id}`} className="mt-6 block rounded-xl bg-ember px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">
+          Open the recipe
+        </Link>
       ) : (
         <div className="mt-6 rounded-xl border border-dashed border-black/20 px-5 py-4 font-sans text-[13px] text-clay">No recipe linked to this dish yet.</div>
       )}
