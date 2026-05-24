@@ -28,6 +28,12 @@ export default async function Trial() {
         <p className="mt-1 font-sans text-[13px] text-ink-soft">What the count says is missing versus what sales used. Tap to see by ingredient.</p>
       </Link>
 
+      <Link href="/develop/menu-engineering" className="mt-4 block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-tomato/40">
+        <p className="font-sans text-xs font-medium text-tomato">Menu engineering</p>
+        <h2 className="mt-1 font-serif text-2xl text-ink">Stars, plowhorses, puzzles, dogs</h2>
+        <p className="mt-1 font-sans text-[13px] text-ink-soft">Every dish by margin × popularity.</p>
+      </Link>
+
       <p className="mt-8 font-mono text-[11px] uppercase tracking-wide text-clay">Menu · live food cost</p>
       <ul className="mt-2 divide-y divide-black/10 border-t border-black/10">
         {dishes.map((d: any) => {

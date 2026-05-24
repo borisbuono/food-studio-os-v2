@@ -11,6 +11,7 @@ export default async function Develop() {
     { href: "/recipes", kicker: "Recipes", title: (recipes.count ?? 0) + " recipes", blurb: "The library — method, cost, story behind each dish." },
     { href: "/develop/lexicon", kicker: "Lexicon", title: "The story layer", blurb: "Dishes, ingredients, products & culture — the knowledge behind the craft." },
     { href: "/develop/repricing", kicker: "Repricing", title: "Price vs margin", blurb: "Every dish against its target margin." },
+    { href: "/develop/menu-engineering", kicker: "Menu engineering", title: "Stars & dogs", blurb: "Every dish by margin × popularity." },
   ];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
