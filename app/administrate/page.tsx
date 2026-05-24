@@ -26,8 +26,8 @@ export default async function Administrate() {
     return { ...v, menu, inv, zones, cleaning, flag };
   });
 
-  const cards = [
-    { kicker: "Finance · CFO", title: "The numbers, explained", blurb: "Bank, invoices, food cost — in plain language, when you need it." },
+  const cards: { kicker: string; title: string; blurb: string; href?: string }[] = [
+    { kicker: "Finance · CFO", title: "The numbers, explained", blurb: "Revenue, covers, avg spend — in plain language.", href: "/administrate/finance" },
     { kicker: "Decisions", title: (events.count ?? 0) + " events in pipeline", blurb: "Surfaced decisions and the events pipeline." },
     { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place." },
   ];
@@ -64,7 +64,13 @@ export default async function Administrate() {
       </div>
 
       <div className="mt-8 space-y-4">
-        {cards.map((c, n) => (
+        {cards.map((c, n) => c.href ? (
+          <Link key={n} href={c.href} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
+            <p className="font-sans text-xs font-medium text-ember">{c.kicker}</p>
+            <h2 className="mt-1 font-serif text-2xl text-ink">{c.title}</h2>
+            <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">{c.blurb}</p>
+          </Link>
+        ) : (
           <div key={n} className="rounded-2xl border border-black/10 bg-card p-6">
             <div className="flex items-center justify-between">
               <p className="font-sans text-xs font-medium text-ember">{c.kicker}</p>
