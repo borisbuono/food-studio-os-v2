@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
+import EightySixToggle from "@/components/EightySixToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,8 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       ) : (
         <div className="mt-6 rounded-xl border border-dashed border-black/20 px-5 py-4 font-sans text-[13px] text-clay">No recipe linked to this dish yet.</div>
       )}
+
+      <EightySixToggle id={item.id} initial={!!item.is_eighty_six} />
 
       <Row k="Margin" v={mg !== null ? mg + "% · " + mgRead : mgRead} accent={mgColor} />
       {cost !== null ? <Row k="Cost / portion" v={"€" + Number(cost).toFixed(2)} /> : null}
