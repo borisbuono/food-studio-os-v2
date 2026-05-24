@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
+import ClockIn from "@/components/ClockIn";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export default async function Today() {
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ember">Today · {venue?.name}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{dateLabel}</h1>
+
+      <div className="mt-6"><ClockIn /></div>
 
       <div className="mt-8 rounded-2xl border border-black/10 bg-card p-6">
         <p className="font-sans text-xs font-medium text-ember">Covers today</p>

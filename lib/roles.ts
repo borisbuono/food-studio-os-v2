@@ -28,7 +28,7 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
       { href: "/menu", label: "Menu", blurb: "Sell and present every dish." },
       { href: "/administrate/events", label: "Events", blurb: "Private events and catering." },
       { href: "/execute/cleaning", label: "Cleaning", blurb: "Front-of-house close-down." },
-      { href: "/administrate/team", label: "Schedule", blurb: "Who's on, when." },
+      { href: "/schedule", label: "Schedule", blurb: "Who's on, when." },
     ],
   },
 };

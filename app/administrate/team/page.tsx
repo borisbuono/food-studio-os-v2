@@ -22,9 +22,11 @@ export default async function Team() {
       <p className="mt-6 font-sans text-xs font-medium text-ember">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
 
-      <div className="mt-6 rounded-2xl border border-dashed border-black/20 p-5">
-        <p className="font-sans text-[14px] text-ink-soft">{(shifts.count ?? 0) === 0 ? "No shifts scheduled yet — the weekly rota (FOH / BOH, by zone) appears here." : (shifts.count + " shifts scheduled.")}</p>
-      </div>
+      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+        <p className="font-sans text-xs font-medium text-ember">Schedule</p>
+        <h2 className="mt-1 font-serif text-xl text-ink">Weekly rota</h2>
+        <p className="mt-1 font-sans text-[13px] text-ink-soft">{(shifts.count ?? 0) === 0 ? "Browse by week — FOH / BOH, by zone." : (shifts.count + " shifts scheduled.")}</p>
+      </Link>
 
       <div className="mt-6 divide-y divide-black/10">
         {people.map((p: any, i: number) => (
