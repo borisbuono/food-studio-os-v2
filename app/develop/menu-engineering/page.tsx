@@ -35,7 +35,7 @@ export default async function MenuEngineering() {
       <Link href="/trial" className="font-sans text-sm text-ink-soft">← Restaurant Utopia</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Menu engineering</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What earns its place</h1>
-      <p class‌Name="" className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Every dish placed by margin against popularity. Stars carry the menu; plowhorses sell but barely pay; puzzles are worth promoting; dogs are candidates to rework or cut.</p>
+      <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Every dish placed by margin against popularity. Stars carry the menu; plowhorses sell but barely pay; puzzles are worth promoting; dogs are candidates to rework or cut.</p>
 
       <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Total contribution · period</p>
