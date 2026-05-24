@@ -43,6 +43,20 @@ export default async function MenuEngineering() {
         <p className="mt-2 font-sans text-[13px] text-ink-soft">Avg margin {eur(avgMargin)} · avg {Math.round(avgUnits)} sold. Top earner: {ranked[0] ? noEmoji(ranked[0].name) : "—"}.</p>
       </div>
 
+      <div className="mt-4 rounded-2xl border border-tomato/30 bg-card p-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-tomato">Where the money actually is</p>
+        <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Margin % isn't the whole story — a pricier dish at a lower % can earn more in absolute euros. Biggest earners this period:</p>
+        <ul className="mt-2">
+          {ranked.slice(0, 3).map((r, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-4 py-1 font-mono text-[12.5px]">
+              <span className="text-ink">{i + 1}. {noEmoji(r.name)}</span>
+              <span className="text-ink-soft">{eur(r.contribution)} · {r.marginPct}%</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 font-sans text-[12px] text-clay">Worth protecting and pushing even when the margin % isn't the highest — sometimes you bite the margin for the bigger euro.</p>
+      </div>
+
       <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
         {ranked.map((r) => (
           <li key={r.id} className="py-3">
