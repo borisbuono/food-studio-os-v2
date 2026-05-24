@@ -23,3 +23,5 @@ export async function POST(req: Request) {
     return Response.json({ configured: true, reply: "Assistant error: " + (e?.message || "unknown") });
   }
 }
+
+// redeploy: pick up ANTHROPIC_API_KEY (production)
