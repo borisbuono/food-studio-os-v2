@@ -17,6 +17,10 @@ export default async function Finance() {
       <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ember">Finance · the numbers, explained</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">How the house is doing</h1>
+      <div className="mt-4 flex gap-4 font-sans text-sm text-ember">
+        <Link href="/administrate/cashflow">Cash flow →</Link>
+        <Link href="/administrate/invoices">Missing invoices →</Link>
+      </div>
 
       {byVenue.map((v: any) => {
         const latest = v.rs[0], prev = v.rs[1];

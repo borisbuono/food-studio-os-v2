@@ -35,6 +35,7 @@ export default async function Administrate() {
     { kicker: "Decisions · inbox", title: (inbox.count ?? 0) + " in inbox", blurb: "What needs a call — with stakeholder voting.", href: "/administrate/decisions" },
     { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place.", href: "/administrate/team" },
     { kicker: "Settings", title: "Connections & skills", blurb: "Integrations and the AI skills (admin).", href: "/administrate/settings" },
+    { kicker: "Command center", title: "The control room", blurb: "Flags, entities, accounts, skills, activity.", href: "/command" },
   ];
 
   return (
