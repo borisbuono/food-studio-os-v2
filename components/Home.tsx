@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_LABEL, ENTITY_H1 } from "@/lib/entities";
+import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import BrandMark from "@/components/BrandMark";
 
 export type EntityStats = {
@@ -90,31 +90,32 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
     const e = localStorage.getItem("fs_entity") as EntityKey | null;
     if (e && statsByEntity[e]) setEntity(e);
   }, [statsByEntity]);
+  useEffect(() => { if (typeof document !== "undefined") document.documentElement.style.setProperty("--accent", ENTITY_ACCENT[entity]); }, [entity]);
   const chooseRole = (r: RoleKey) => { setRole(r); localStorage.setItem("fs_role", r); };
   const chooseEntity = (e: EntityKey) => { setEntity(e); localStorage.setItem("fs_entity", e); };
   const s = statsByEntity[entity];
   const cfg = ROLES[role];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
-      <p className="font-sans text-xs font-medium text-ember">Home</p>
+    <main className="mx-auto max-w-xl px-6 py-12" style={{ ["--accent" as any]: ENTITY_ACCENT[entity] }}>
+      <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Home</p>
       <div className="mt-2"><BrandMark entity={entity} variant="full" tone="light" /></div>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {ENTITY_ORDER.map((k) => (
-          <button key={k} onClick={() => chooseEntity(k)} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === entity ? "bg-ink text-paper" : "border border-black/15 text-ink-soft hover:border-ink/40")}>{ENTITY_SHORT[k]}</button>
+          <button key={k} onClick={() => chooseEntity(k)} style={k === entity ? { background: ENTITY_ACCENT[k] } : undefined} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === entity ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft hover:border-ink/40")}>{ENTITY_SHORT[k]}</button>
         ))}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {(Object.keys(ROLES) as RoleKey[]).map((k) => (
-          <button key={k} onClick={() => chooseRole(k)} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === role ? "bg-ember text-[#FCEFE7]" : "border border-black/15 text-ink-soft hover:border-ember/40")}>{ROLES[k].label}</button>
+          <button key={k} onClick={() => chooseRole(k)} style={k === role ? { background: "var(--accent)" } : undefined} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === role ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft")}>{ROLES[k].label}</button>
         ))}
       </div>
 
       <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
-        <p className="font-sans text-xs font-medium text-ember">Your dashboard · {ENTITY_LABEL[entity]}</p>
+        <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Your dashboard · {ENTITY_LABEL[entity]}</p>
         <Dashboard role={role} s={s} />
       </div>
 

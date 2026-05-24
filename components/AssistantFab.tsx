@@ -47,7 +47,8 @@ export default function AssistantFab() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Assistant"
-        className="fixed bottom-5 right-5 z-50 h-14 w-14 rounded-full bg-ember font-sans text-[13px] font-medium text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95"
+        style={{ background: "var(--accent)" }}
+        className="fixed bottom-5 right-5 z-50 h-14 w-14 rounded-full font-sans text-[13px] font-medium text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95"
       >
         {open ? "Close" : "Ask"}
       </button>
@@ -82,13 +83,14 @@ export default function AssistantFab() {
                 <button
                   onClick={startStop}
                   disabled={!supported}
-                  className={"h-12 w-12 rounded-full font-mono text-[10px] uppercase tracking-wide transition " + (listening ? "animate-pulse bg-ember text-[#FCEFE7]" : "border border-black/20 text-ink-soft hover:border-ember disabled:opacity-50")}
+                  style={listening ? { background: "var(--accent)" } : undefined}
+                  className={"h-12 w-12 rounded-full font-mono text-[10px] uppercase tracking-wide transition " + (listening ? "animate-pulse text-[#FCEFE7]" : "border border-black/20 text-ink-soft disabled:opacity-50")}
                 >
                   {supported ? (listening ? "stop" : "mic") : "—"}
                 </button>
               </div>
             )}
-            {text ? <button onClick={send} className="mt-2 w-full rounded-full bg-ember px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]">Send</button> : null}
+            {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="mt-2 w-full rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]">Send</button> : null}
             {mode === "talk" && !supported ? <p className="mt-2 font-mono text-[10px] text-clay">Voice needs Chrome or Safari.</p> : null}
           </div>
         </div>

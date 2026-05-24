@@ -40,7 +40,11 @@ export default function CookMode({ name, panels, backHref }: { name: string; pan
       <button aria-label="previous" onClick={() => go(-1)} className="absolute left-0 top-28 bottom-28 z-10 w-1/3" />
       <button aria-label="next" onClick={() => go(1)} className="absolute right-0 top-28 bottom-28 z-10 w-1/3" />
 
-      <div className="relative z-20 pb-8 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-night-ink/40">‹ swipe › to move</div>
+      <div className="relative z-20 flex gap-3 px-7 pb-6">
+        <button onClick={() => go(-1)} disabled={i === 0} className="flex-1 rounded-full border border-night-ink/25 py-3 font-serif text-[16px] text-night-ink/80 transition hover:border-night-ink/50 disabled:opacity-25">Back</button>
+        <button onClick={() => go(1)} disabled={i === n - 1} className="flex-1 rounded-full bg-amber py-3 font-serif text-[16px] text-night transition hover:opacity-90 disabled:opacity-25">Next</button>
+      </div>
+      <div className="relative z-20 pb-7 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-night-ink/40">tap Back / Next · or swipe on mobile</div>
     </div>
   );
 }

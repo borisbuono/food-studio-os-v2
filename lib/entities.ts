@@ -18,3 +18,11 @@ export const ENTITY_H1: Record<EntityKey, string> = {
   taller: "font-sans text-3xl font-bold uppercase tracking-[0.05em] text-ink",
   utopia: "font-serif italic text-3xl text-ochre",
 };
+
+// per-profile signature colour (the single --accent knob)
+export const ENTITY_ACCENT: Record<EntityKey, string> = {
+  holdings: "#B5701C",      // ochre — the operator
+  bistro_mondo: "#9A3122",  // tomato — folk warmth
+  taller: "#2B3A45",        // slate — modernist
+  utopia: "#0E7C86",        // teal-blue — the most-seen demo profile (starting option)
+};
