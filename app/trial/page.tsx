@@ -7,20 +7,20 @@ const UT = "a0000000-0000-4000-8000-000000000001";
 const eur = (n: number) => "€" + n.toFixed(2);
 
 export default async function Trial() {
-  const dishes = (await supabase.from("menu_items").select("id,name,price,cost,course").eq("restaurant_id", UT).order("price", { ascending: false })).data || [];
-  const items = (await supabase.from("inventory_items").select("id,unit_cost,quantity_on_hand").eq("restaurant_id", UT)).data || [];
-  const ids = items.map((i: any) => i.id);
-  const moves = ids.length ? (await supabase.from("inventory_movements").select("inventory_item_id,quantity").in("inventory_item_id", ids)).data || [] : [];
-  const theoBy: Record<string, number> = {};
-  moves.forEach((m: any) => { theoBy[m.inventory_item_id] = (theoBy[m.inventory_item_id] || 0) + Number(m.quantity || 0); });
-  const loss = items.reduce((a: number, i: any) => { const v = ((theoBy[i.id] || 0) - Number(i.quantity_on_hand || 0)) * Number(i.unit_cost || 0); return a + (v > 0 ? v : 0); }, 0);
+  const dishes = (await supabase.from("menu_items").select("id,name,price,cost").eq("restaurant_id", UT).order("price", { ascending: false })).data || [];
+  const items = (await supabase.from("inventory_items").select("unit_cost,quantity_on_hand,counted_qty").eq("restaurant_id", UT)).data || [];
+  const loss = items.reduce((a: number, i: any) => {
+    if (i.counted_qty == null) return a;
+    const v = (Number(i.quantity_on_hand || 0) - Number(i.counted_qty || 0)) * Number(i.unit_cost || 0);
+    return a + (v > 0 ? v : 0);
+  }, 0);
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ochre">Trial · the engine</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Restaurant Utopia</h1>
-      <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">A sandbox venue with a fully costed menu, so the closed-loop engine — live food costing and theoretical-vs-actual variance — can run end to end. None of this touches Bistro Mondo or Taller.</p>
+      <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">A sandbox venue with a fully costed menu, so the closed-loop engine — live food costing and theoretical-vs-actual variance — runs end to end. None of this touches Bistro Mondo or Taller.</p>
 
       <Link href="/administrate/finance/variance" className="mt-6 block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
         <p className="font-sans text-xs font-medium text-ochre">Variance · theoretical vs actual</p>
