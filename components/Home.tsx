@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_LABEL, ENTITY_H1 } from "@/lib/entities";
+import BrandMark from "@/components/BrandMark";
 
 export type EntityStats = {
   label: string;
@@ -80,7 +81,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <p className="font-sans text-xs font-medium text-ember">Home</p>
-      <h1 className={"mt-1 " + ENTITY_H1[entity]}>{ENTITY_LABEL[entity]}</h1>
+      <div className="mt-2"><BrandMark entity={entity} variant="full" tone="light" /></div>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">

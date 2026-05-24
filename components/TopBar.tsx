@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AuthStatus from "@/components/AuthStatus";
 import CommandK from "@/components/CommandK";
-import { ENTITY_LABEL, ENTITY_WORDMARK, EntityKey } from "@/lib/entities";
+import { EntityKey } from "@/lib/entities";
+import BrandMark from "@/components/BrandMark";
 
 export default function TopBar() {
   const [entity, setEntity] = useState<EntityKey>("holdings");
@@ -17,7 +18,7 @@ export default function TopBar() {
   return (
     <header className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur">
       <div className="mx-auto flex max-w-xl items-center justify-between px-6 py-3">
-        <Link href="/" className={ENTITY_WORDMARK[entity]}>{ENTITY_LABEL[entity]}</Link>
+        <Link href="/" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
         <div className="flex items-center gap-3">
           <CommandK />
           <AuthStatus />
