@@ -38,6 +38,16 @@ export default async function Execute() {
           <h2 className="mt-1 font-serif text-2xl text-ink">Before service</h2>
           <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">The morning division of work — who's doing what.</p>
         </Link>
+        <Link href="/execute/inventory" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
+          <p className="font-sans text-xs font-medium text-ember">Inventory</p>
+          <h2 className="mt-1 font-serif text-2xl text-ink">Stock & reorder</h2>
+          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">What's on hand, what's below reorder.</p>
+        </Link>
+        <Link href="/execute/receiving" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
+          <p className="font-sans text-xs font-medium text-ember">Receiving</p>
+          <h2 className="mt-1 font-serif text-2xl text-ink">Stock movements</h2>
+          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Recent deliveries and usage.</p>
+        </Link>
       </div>
     </main>
   );
