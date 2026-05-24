@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function Recipes() {
           return (
             <li key={r.id}>
               <a href={"/recipes/" + r.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
-                <span className="font-serif text-lg text-ink">{r.name}</span>
+                <span className="font-serif text-lg text-ink">{noEmoji(r.name)}</span>
                 <span className="shrink-0 font-mono text-[13px] text-ink-soft">{r.cost_per_portion ? "€" + Number(r.cost_per_portion).toFixed(2) : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>
               </a>
             </li>

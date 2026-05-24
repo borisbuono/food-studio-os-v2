@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { noEmoji } from "@/lib/text";
 import type { MenuItem } from "@/types/db";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ function Item({ it }: { it: MenuItem }) {
     <li>
       <Link href={"/menu/" + it.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
         <span className="font-serif text-lg text-ink">
-          {it.name}
+          {noEmoji(it.name)}
           {it.course ? <span className="ml-2 font-sans text-[11px] uppercase tracking-wide text-clay">{COURSE_LABEL[it.course] || it.course}</span> : null}
         </span>
         <span className="shrink-0 font-mono text-sm text-ink-soft">{it.price ? "€" + it.price : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>

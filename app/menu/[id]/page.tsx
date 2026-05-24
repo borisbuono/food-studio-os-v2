@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ember">{sec || "Dish"}</p>
-      <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{item.name}</h1>
+      <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(item.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
 
       {recipe ? (
@@ -79,7 +80,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
           <ul className="mt-2 divide-y divide-black/10">
             {ings.map((i: any, n: number) => (
               <li key={n} className="flex items-baseline justify-between gap-4 py-2">
-                <span className="font-sans text-[15px] text-ink">{i.name}</span>
+                <span className="font-sans text-[15px] text-ink">{noEmoji(i.name)}</span>
                 <span className="font-mono text-[13px] text-ink-soft">{i.quantity ?? ""} {i.unit ?? ""}</span>
               </li>
             ))}
