@@ -12,6 +12,7 @@ export type EntityStats = {
   revDelta: number | null; avgDelta: number | null;
   inbox: number; events: number; prep: number; cleaningDue: number;
   venues?: { name: string; rev: number; cov: number }[];
+  trial?: boolean; dishCount?: number; contribution?: number; varianceLoss?: number;
 };
 
 
@@ -19,6 +20,15 @@ const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const deltaWord = (d: number | null) => d === null ? "" : d >= 0 ? `up ${d}%` : `down ${Math.abs(d)}%`;
 
 function Dashboard({ role, s }: { role: RoleKey; s: EntityStats }) {
+  if (s.trial) {
+    return (
+      <>
+        <p className="mt-2 font-serif text-4xl text-ink">{s.dishCount} <span className="font-sans text-base text-ink-soft">dishes costed</span></p>
+        <p className="mt-1 font-sans text-[14px] text-ink-soft">€{(s.contribution || 0).toLocaleString("en-GB")} contribution · €{(s.varianceLoss || 0).toFixed(2)} variance to chase</p>
+        <p className="mt-3 font-mono text-[12px] text-clay">Sandbox venue · the engine runs end to end here</p>
+      </>
+    );
+  }
   const good = (s.revDelta ?? 0) >= 0 && (s.avgDelta ?? 0) >= 0;
   const verdict = s.revDelta === null ? "" : good ? "you're doing a hell of a job" : "worth a look this week";
   let body;
@@ -64,6 +74,13 @@ function Dashboard({ role, s }: { role: RoleKey; s: EntityStats }) {
   );
 }
 
+const UTOPIA_POINTS = [
+  { href: "/trial", label: "The engine", blurb: "Costing, variance and menu engineering, end to end." },
+  { href: "/develop/menu-engineering", label: "Menu engineering", blurb: "Stars, plowhorses, puzzles, dogs." },
+  { href: "/administrate/finance/variance", label: "Variance", blurb: "Where the stock went, in euros." },
+  { href: "/recipes", label: "Recipes", blurb: "The library, with Cook Mode." },
+];
+
 export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKey, EntityStats> }) {
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>("holdings");
@@ -102,7 +119,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
       </div>
 
       <div className="mt-6 space-y-3">
-        {cfg.points.map((p) => (
+        {(entity === "utopia" ? UTOPIA_POINTS : cfg.points).map((p) => (
           <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
             <h2 className="font-serif text-xl text-ink">{p.label}</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>

@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 const BM = "fb4d008f-2d2a-4e0d-a525-6e0e36af0259";
 const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
+const UT = "a0000000-0000-4000-8000-000000000001";
 
 export default async function Page() {
   const restaurants = (await supabase.from("restaurants").select("id,name")).data || [];
@@ -57,5 +58,16 @@ export default async function Page() {
     venues: [{ name: bm.label, rev: bm.rev, cov: bm.cov }, { name: taller.label, rev: taller.rev, cov: taller.cov }],
   };
 
-  return <Home statsByEntity={{ holdings, bistro_mondo: bm, taller }} />;
+  const utMenu = (await supabase.from("menu_items").select("price,cost,units_sold").eq("restaurant_id", UT)).data || [];
+  const utInv = (await supabase.from("inventory_items").select("unit_cost,quantity_on_hand,counted_qty").eq("restaurant_id", UT)).data || [];
+  const utContribution = utMenu.reduce((a: number, m: any) => a + (Number(m.price || 0) - Number(m.cost || 0)) * Number(m.units_sold || 0), 0);
+  const utLoss = utInv.reduce((a: number, i: any) => { if (i.counted_qty == null) return a; const v = (Number(i.quantity_on_hand || 0) - Number(i.counted_qty || 0)) * Number(i.unit_cost || 0); return a + (v > 0 ? v : 0); }, 0);
+  const utopia: EntityStats = {
+    label: "Restaurant Utopia", reportPeriod: null,
+    rev: 0, cov: 0, avg: 0, revDelta: null, avgDelta: null,
+    inbox: 0, events: 0, prep: 0, cleaningDue: 0,
+    trial: true, dishCount: utMenu.length, contribution: Math.round(utContribution), varianceLoss: Math.round(utLoss * 100) / 100,
+  };
+
+  return <Home statsByEntity={{ holdings, bistro_mondo: bm, taller, utopia }} />;
 }
