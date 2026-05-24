@@ -30,21 +30,30 @@ export default async function RecipePage({ params }: { params: { id: string } })
 
   return (
     <main className="bg-paper">
-      <section className="relative flex min-h-[78vh] flex-col justify-between overflow-hidden px-7 pb-14 pt-14" style={{ background: "radial-gradient(140% 100% at 30% 0%, #2a1d16 0%, #1c130e 46%, #120c08 100%)" }}>
-        <div className="flex items-center justify-between">
-          <Link href="/recipes" className="font-serif text-[16px] text-[#F2ECDE]/70">‹</Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2ECDE]/50">{r.restaurant || "Food Studios"}</span>
-        </div>
-        <div>
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.32em] text-amber">{kicker}</p>
-          <h1 className="font-serif text-[68px] font-light leading-[0.88] tracking-tight text-[#F2ECDE]">{noEmoji(r.name)}</h1>
-          {dek ? <p className="mt-5 max-w-[300px] font-serif text-[19px] font-light italic leading-snug text-[#F2ECDE]/80">{dek}</p> : null}
-          <div className="mt-7 flex items-center justify-between">
-            <Link href={`/recipes/${r.id}/cook`} className="rounded-full border border-amber/40 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-amber transition hover:bg-amber/10">Begin cook mode ›</Link>
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#F2ECDE]/40">scroll ↓</span>
+      {r.hero_image_url ? (
+        <section className="relative flex min-h-[64vh] flex-col justify-between overflow-hidden px-7 pb-12 pt-14" style={{ backgroundImage: `linear-gradient(to top, rgba(16,15,12,.82), rgba(16,15,12,.25)), url(${r.hero_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}>
+          <div className="flex items-center justify-between">
+            <Link href="/recipes" className="font-serif text-[16px] text-[#F2ECDE]/80">‹</Link>
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F2ECDE]/70">{r.restaurant || "Food Studios"}</span>
           </div>
-        </div>
-      </section>
+          <div>
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.32em] text-amber">{kicker}</p>
+            <h1 className="font-serif text-[60px] font-light leading-[0.9] tracking-tight text-[#F2ECDE]">{noEmoji(r.name)}</h1>
+            {dek ? <p className="mt-4 max-w-[320px] font-serif text-[19px] font-light italic leading-snug text-[#F2ECDE]/85">{dek}</p> : null}
+          </div>
+        </section>
+      ) : (
+        <section className="border-b border-line px-7 pb-10 pt-12">
+          <div className="flex items-center justify-between">
+            <Link href="/recipes" className="font-serif text-[16px] text-ink-soft">‹</Link>
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-clay">{r.restaurant || "Food Studios"}</span>
+          </div>
+          <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.32em] text-tomato">{kicker}</p>
+          <h1 className="mt-2 font-serif text-[clamp(40px,9vw,60px)] font-light leading-[0.92] tracking-tight text-ink">{noEmoji(r.name)}</h1>
+          {dek ? <p className="mt-4 max-w-[340px] font-serif text-[19px] font-light italic leading-snug text-ink-soft">{dek}</p> : null}
+          <Link href={`/recipes/${r.id}/cook`} className="mt-6 inline-block rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-medium text-paper transition hover:opacity-90">Begin cook mode</Link>
+        </section>
+      )}
 
       <div className="mx-auto max-w-xl px-7">
         {story ? (
