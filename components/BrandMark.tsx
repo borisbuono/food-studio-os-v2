@@ -10,6 +10,9 @@ export default function BrandMark({ entity, variant = "full", tone = "light" }: 
   if (entity === "taller") {
     return <img src={`/brand/taller-${color}.png`} alt="Taller Sa Penya" className={variant === "mark" ? "h-5 w-auto" : "h-11 w-auto"} />;
   }
-  // Bistro Mondo — no asset in the brand folder yet: styled text fallback
-  return <span className={"font-serif italic " + (tone === "dark" ? "text-[#F2ECDE]" : "text-tomato") + (variant === "mark" ? " text-[17px]" : " text-4xl")}>Bistro Mondo</span>;
+  if (entity === "bistro_mondo") {
+    const src = variant === "mark" ? `/brand/bm-mark-${color}.png` : `/brand/bm-full-${color}.png`;
+    return <img src={src} alt="Bistro Mondo" className={variant === "mark" ? "h-8 w-auto" : "h-14 w-auto"} />;
+  }
+  return null;
 }
