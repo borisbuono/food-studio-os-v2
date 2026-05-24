@@ -12,14 +12,11 @@ export default async function Execute() {
       <p className="mt-6 font-sans text-xs font-medium text-ember">Execute · service</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The daily loop</h1>
       <div className="mt-8 space-y-4">
-        <div className="rounded-2xl border border-black/10 bg-card p-6">
-          <div className="flex items-center justify-between">
-            <p className="font-sans text-xs font-medium text-ember">Today</p>
-            <span className="font-mono text-[10px] uppercase tracking-wide text-clay">building next</span>
-          </div>
+        <Link href="/execute/today" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
+          <p className="font-sans text-xs font-medium text-ember">Today</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Today’s priorities</h2>
-          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Clock in, your 4–5 priority preps, covers & special diets.</p>
-        </div>
+          <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Your 4–5 priority preps, covers & cleaning due today.</p>
+        </Link>
         <Link href="/execute/prep" className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ember/40">
           <p className="font-sans text-xs font-medium text-ember">Prep · MEP</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">{mep.count ?? 0} prep dishes</h2>
