@@ -13,6 +13,7 @@ export default async function Administrate() {
   const taskRows = (await supabase.from("tasks").select("zone_id").eq("is_active", true).eq("task_type", "cleaning")).data || [];
   const events = await supabase.from("sales_events").select("*", { count: "exact", head: true });
   const providersCount = await supabase.from("providers").select("*", { count: "exact", head: true });
+  const inbox = await supabase.from("inbox_items").select("*", { count: "exact", head: true });
 
   const zoneToVenue = new Map<string, string>();
   zoneRows.forEach((z: any) => zoneToVenue.set(z.id, z.restaurant_id));
@@ -31,8 +32,9 @@ export default async function Administrate() {
     { kicker: "Finance · CFO", title: "The numbers, explained", blurb: "Revenue, covers, avg spend — in plain language.", href: "/administrate/finance" },
     { kicker: "Events", title: (events.count ?? 0) + " events", blurb: "Catering & private events pipeline.", href: "/administrate/events" },
     { kicker: "Suppliers", title: (providersCount.count ?? 0) + " suppliers", blurb: "Providers, products & ordering.", href: "/administrate/suppliers" },
-    { kicker: "Decisions", title: "Surfaced decisions", blurb: "What needs a call — with stakeholder voting." },
-    { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place." },
+    { kicker: "Decisions · inbox", title: (inbox.count ?? 0) + " in inbox", blurb: "What needs a call — with stakeholder voting.", href: "/administrate/decisions" },
+    { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place.", href: "/administrate/team" },
+    { kicker: "Settings", title: "Connections & skills", blurb: "Integrations and the AI skills (admin).", href: "/administrate/settings" },
   ];
 
   return (
@@ -65,6 +67,7 @@ export default async function Administrate() {
           </div>
         ))}
       </div>
+      <Link href="/administrate/holdings" className="mt-3 inline-block font-sans text-sm text-ember">Entity map →</Link>
 
       <div className="mt-8 space-y-4">
         {cards.map((c, n) => c.href ? (
