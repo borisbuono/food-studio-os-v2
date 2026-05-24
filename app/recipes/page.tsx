@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Recipes() {
   const { data } = await supabase.from("recipes").select("id,name,section,cost_per_portion,menu_price,is_active").order("name");
-  const recipes: any[] = data || [];
+  const recipes: any[] = (data || []).filter((r: any) => r.is_active !== false);
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
