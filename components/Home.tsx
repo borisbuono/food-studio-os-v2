@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
+import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_LABEL, ENTITY_H1 } from "@/lib/entities";
 
 export type EntityStats = {
   label: string;
@@ -12,9 +13,6 @@ export type EntityStats = {
   venues?: { name: string; rev: number; cov: number }[];
 };
 
-type EntityKey = "holdings" | "bistro_mondo" | "taller";
-const ENTITY_ORDER: EntityKey[] = ["holdings", "bistro_mondo", "taller"];
-const ENTITY_LABEL: Record<EntityKey, string> = { holdings: "Holdings", bistro_mondo: "Bistro Mondo", taller: "Taller" };
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const deltaWord = (d: number | null) => d === null ? "" : d >= 0 ? `up ${d}%` : `down ${Math.abs(d)}%`;
@@ -82,12 +80,12 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <p className="font-sans text-xs font-medium text-ember">Home</p>
-      <h1 className="mt-1 font-serif text-3xl text-ink">{ENTITY_LABEL[entity]}</h1>
+      <h1 className={"mt-1 " + ENTITY_H1[entity]}>{ENTITY_LABEL[entity]}</h1>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {ENTITY_ORDER.map((k) => (
-          <button key={k} onClick={() => chooseEntity(k)} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === entity ? "bg-ink text-paper" : "border border-black/15 text-ink-soft hover:border-ink/40")}>{ENTITY_LABEL[k]}</button>
+          <button key={k} onClick={() => chooseEntity(k)} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === entity ? "bg-ink text-paper" : "border border-black/15 text-ink-soft hover:border-ink/40")}>{ENTITY_SHORT[k]}</button>
         ))}
       </div>
 
