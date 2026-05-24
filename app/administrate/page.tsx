@@ -36,6 +36,7 @@ export default async function Administrate() {
     { kicker: "Team & schedule", title: "Who’s on, when", blurb: "HR, weekly rota, shift zones — one place.", href: "/administrate/team" },
     { kicker: "Settings", title: "Connections & skills", blurb: "Integrations and the AI skills (admin).", href: "/administrate/settings" },
     { kicker: "Command center", title: "The control room", blurb: "Flags, entities, accounts, skills, activity.", href: "/command" },
+    { kicker: "Trial · the engine", title: "Restaurant Utopia", blurb: "Live food costing + theoretical-vs-actual variance on sandbox data.", href: "/trial" },
   ];
 
   return (

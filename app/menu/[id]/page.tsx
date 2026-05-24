@@ -29,7 +29,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   let lex: any = null;
   if (item.recipe_id) {
     recipe = (await supabase.from("recipes").select("*").eq("id", item.recipe_id).maybeSingle()).data;
-    ings = (await supabase.from("recipe_ingredients").select("name,quantity,unit,sort_order").eq("recipe_id", item.recipe_id).order("sort_order")).data || [];
+    ings = (await supabase.from("recipe_ingredients").select("name,quantity,unit,sort_order,line_cost").eq("recipe_id", item.recipe_id).order("sort_order")).data || [];
     lex = (await supabase.from("lexicon_dishes").select("*").eq("recipe_id", item.recipe_id).maybeSingle()).data;
   }
   const price = item.price ?? recipe?.menu_price ?? null;
@@ -59,8 +59,36 @@ export default async function DishHub({ params }: { params: { id: string } }) {
 
       <EightySixToggle id={item.id} initial={!!item.is_eighty_six} />
 
-      <Row k="Margin" v={mg !== null ? mg + "% · " + mgRead : mgRead} accent={mgColor} />
-      {cost !== null ? <Row k="Cost / portion" v={"€" + Number(cost).toFixed(2)} /> : null}
+      {(() => {
+        const plate = ings.reduce((a: number, i: any) => a + Number(i.line_cost || 0), 0);
+        if (!plate) {
+          return (<>
+            <Row k="Margin" v={mg !== null ? mg + "% · " + mgRead : mgRead} accent={mgColor} />
+            {cost !== null ? <Row k="Cost / portion" v={"€" + Number(cost).toFixed(2)} /> : null}
+          </>);
+        }
+        const fp = price ? Math.round((plate / Number(price)) * 1000) / 10 : null;
+        const marg = price != null ? Number(price) - plate : null;
+        return (
+          <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
+            <p className="font-sans text-xs font-medium text-ochre">Calculation · per portion</p>
+            <ul className="mt-3 divide-y divide-black/10">
+              {ings.filter((i: any) => Number(i.line_cost) > 0).map((i: any, n: number) => (
+                <li key={n} className="flex items-baseline justify-between gap-4 py-1.5 font-mono text-[12.5px]">
+                  <span className="text-ink-soft">{noEmoji(i.name)} · {i.quantity}{i.unit}</span>
+                  <span className="text-ink">€{Number(i.line_cost).toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 flex items-baseline justify-between border-t border-black/20 pt-3 font-serif text-[16px] text-ink"><span>Food cost</span><span>€{plate.toFixed(2)}</span></div>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div><p className="font-serif text-xl text-ink">{price != null ? "€" + Number(price).toFixed(2) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Price</p></div>
+              <div><p className={"font-serif text-xl " + (fp != null && fp <= 32 ? "text-olive" : "text-ember")}>{fp != null ? fp + "%" : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Food cost</p></div>
+              <div><p className="font-serif text-xl text-ink">{marg != null ? "€" + marg.toFixed(2) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Margin</p></div>
+            </div>
+          </div>
+        );
+      })()}
       {allergens.length ? <Row k="Allergens" v={allergens.join(" · ")} /> : null}
 
       {pitch ? (
