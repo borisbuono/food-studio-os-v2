@@ -16,6 +16,10 @@ export default async function Develop() {
       { href: "/develop/menu-engineering", label: "Menu engineering", blurb: "Stars, plowhorses, puzzles, dogs." },
       { href: "/develop/repricing", label: "Repricing", blurb: "Every dish against its target margin." },
     ]},
+    { title: "Cellar & bar", items: [
+      { href: "/develop/wine", label: "Wine", blurb: "The cellar — by style, by glass & bottle, with the pitch." },
+      { href: "/develop/bar", label: "Bar", blurb: "Cocktails, builds and specs." },
+    ]},
   ];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
