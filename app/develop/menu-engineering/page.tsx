@@ -57,6 +57,11 @@ export default async function MenuEngineering() {
         <p className="mt-2 font-sans text-[12px] text-clay">Worth protecting and pushing even when the margin % isn't the highest — sometimes you bite the margin for the bigger euro.</p>
       </div>
 
+      <div className="mt-4 rounded-2xl border border-dashed border-black/20 p-5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-tomato">Academy · the play</p>
+        <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Turn Plowhorses into Stars by trimming cost or gently lifting price. Push Puzzles harder — better menu placement, a line on the specials board, staff recommending them. Rework or retire Dogs. A rough target is 28–32% food cost, but follow total contribution, not just the percentage — a €12 dish at 35% can beat a €5 one at 80%.</p>
+      </div>
+
       <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
         {ranked.map((r) => (
           <li key={r.id} className="py-3">

@@ -33,6 +33,11 @@ export default async function Variance() {
         <p className="mt-2 font-sans text-[13px] text-ink-soft">Across {rows.length} tracked ingredients. Biggest leak: {rows[0] ? noEmoji(rows[0].name) : "—"}.</p>
       </div>
 
+      <div className="mt-4 rounded-2xl border border-dashed border-black/20 p-5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ochre">Academy · what to aim for</p>
+        <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">A healthy kitchen runs variance near zero. A point or two is normal shrink — but a steady gap on one pricey line (here, the iberico) is usually over-portioning, waste, or stock walking out the door. Chase the biggest euro first, fix the cause, recount next week, and watch it close. That habit is worth more than any single report.</p>
+      </div>
+
       <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
         {rows.map((r, i) => (
           <li key={i} className="flex items-baseline justify-between gap-4 py-3">
