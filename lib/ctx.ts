@@ -1,0 +1,13 @@
+"use client";
+// Small same-tab sync for the entity/role context that the home, top bar and
+// downstream pages all read from localStorage. localStorage's native "storage"
+// event only fires cross-tab, so we add a custom event for same-tab updates.
+export function setEntity(entity: string) { localStorage.setItem("fs_entity", entity); ping(); }
+export function setRole(role: string) { localStorage.setItem("fs_role", role); ping(); }
+function ping() { window.dispatchEvent(new Event("fs:ctx")); }
+export function onCtx(fn: () => void) {
+  window.addEventListener("fs:ctx", fn);
+  window.addEventListener("storage", fn);
+  window.addEventListener("focus", fn);
+  return () => { window.removeEventListener("fs:ctx", fn); window.removeEventListener("storage", fn); window.removeEventListener("focus", fn); };
+}

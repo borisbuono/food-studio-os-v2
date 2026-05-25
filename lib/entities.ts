@@ -26,3 +26,15 @@ export const ENTITY_ACCENT: Record<EntityKey, string> = {
   taller: "#2B3A45",        // slate — modernist
   utopia: "#0E7C86",        // teal-blue — the most-seen demo profile (starting option)
 };
+
+// Restaurant UUID ↔ entity key. Utopia is the launch venue.
+export const RESTAURANT_TO_ENTITY: Record<string, EntityKey> = {
+  "a0000000-0000-4000-8000-000000000001": "utopia",
+  "fb4d008f-2d2a-4e0d-a525-6e0e36af0259": "bistro_mondo",
+  "ca83e06f-a24d-43d7-bce4-57ac341d190f": "taller",
+};
+export const ENTITY_TO_RESTAURANT: Partial<Record<EntityKey, string>> = {
+  utopia: "a0000000-0000-4000-8000-000000000001",
+  bistro_mondo: "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
+  taller: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
+};

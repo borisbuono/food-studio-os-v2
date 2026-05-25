@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import TopBar from "@/components/TopBar";
 import AssistantFab from "@/components/AssistantFab";
+import RouteGuard from "@/components/RouteGuard";
 
 export const metadata: Metadata = {
   title: "Food Studios",
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <TopBar />
-        {children}
+        <RouteGuard>{children}</RouteGuard>
         <AssistantFab />
       </body>
     </html>

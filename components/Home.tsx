@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROLES, RoleKey } from "@/lib/roles";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
+import { EntityKey, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import BrandMark from "@/components/BrandMark";
+import { getMyProfile, MyProfile } from "@/lib/profile";
+import { onCtx } from "@/lib/ctx";
 
 export type EntityStats = {
   label: string;
@@ -13,13 +15,18 @@ export type EntityStats = {
   inbox: number; events: number; prep: number; cleaningDue: number;
   venues?: { name: string; rev: number; cov: number }[];
   trial?: boolean; dishCount?: number; contribution?: number; varianceLoss?: number;
+  // brief signals
+  specials?: string[]; eightySix?: string[];
+  deliveriesDue?: number; deliveriesNext?: string | null;
+  eventsToday?: { title: string; guests: number }[];
+  messages?: number;
 };
-
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const deltaWord = (d: number | null) => d === null ? "" : d >= 0 ? `up ${d}%` : `down ${Math.abs(d)}%`;
 
-function Dashboard({ role, s }: { role: RoleKey; s: EntityStats }) {
+// The Office (admin) numbers view — revenue/covers/avg + venue roll-up.
+function OfficeDashboard({ s }: { s: EntityStats }) {
   if (s.trial) {
     return (
       <>
@@ -31,35 +38,11 @@ function Dashboard({ role, s }: { role: RoleKey; s: EntityStats }) {
   }
   const good = (s.revDelta ?? 0) >= 0 && (s.avgDelta ?? 0) >= 0;
   const verdict = s.revDelta === null ? "" : good ? "you're doing a hell of a job" : "worth a look this week";
-  let body;
-  if (role === "office") {
-    body = (
-      <>
-        <p className="mt-2 font-serif text-4xl text-ink">{eur(s.rev)}</p>
-        <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
-        <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
-      </>
-    );
-  } else if (role === "foh") {
-    body = (
-      <>
-        <p className="mt-2 font-serif text-4xl text-ink">{s.cov.toLocaleString("en-GB")} <span className="font-sans text-base text-ink-soft">covers</span></p>
-        <p className="mt-1 font-sans text-[14px] text-ink-soft">{eur(s.avg)} average spend{s.avgDelta !== null ? " · " + deltaWord(s.avgDelta) : ""}{verdict ? " · " + verdict : ""}</p>
-        <p className="mt-3 font-mono text-[12px] text-clay">{s.cleaningDue} cleaning due today · {s.events} events on</p>
-      </>
-    );
-  } else {
-    body = (
-      <>
-        <p className="mt-2 font-serif text-4xl text-ink">{eur(s.avg)} <span className="font-sans text-base text-ink-soft">avg spend</span></p>
-        <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.avgDelta !== null ? deltaWord(s.avgDelta) + " vs prior period" : "no prior period"}{verdict ? " · " + verdict : ""}</p>
-        <p className="mt-3 font-mono text-[12px] text-clay">{s.prep} preps · {s.cleaningDue} cleaning due today</p>
-      </>
-    );
-  }
   return (
     <>
-      {body}
+      <p className="mt-2 font-serif text-4xl text-ink">{eur(s.rev)}</p>
+      <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
+      <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
       {s.venues ? (
         <ul className="mt-4 divide-y divide-black/10 border-t border-black/10">
           {s.venues.map((v, i) => (
@@ -74,7 +57,38 @@ function Dashboard({ role, s }: { role: RoleKey; s: EntityStats }) {
   );
 }
 
-const UTOPIA_POINTS = [
+// The real brief — what a FOH/BOH person needs the moment they open the app.
+function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
+  const Row = ({ label, value, soft }: { label: string; value: string; soft?: boolean }) => (
+    <div className="flex items-baseline justify-between gap-4 py-2.5">
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-clay">{label}</span>
+      <span className={"text-right font-sans text-[14px] " + (soft ? "text-clay" : "text-ink")}>{value}</span>
+    </div>
+  );
+  const tonight = s.eventsToday && s.eventsToday.length
+    ? s.eventsToday.map((e) => `${e.title}${e.guests ? ` · ${e.guests} guests` : ""}`).join("  ·  ")
+    : null;
+  const specials = s.specials && s.specials.length ? s.specials.join(", ") : null;
+  const sixed = s.eightySix && s.eightySix.length ? s.eightySix.join(", ") : null;
+  const deliveries = s.deliveriesDue
+    ? `${s.deliveriesDue} due${s.deliveriesNext ? ` · next ${s.deliveriesNext}` : ""}`
+    : null;
+  const msgs = s.messages ? `${s.messages} need a look` : null;
+
+  return (
+    <div className="divide-y divide-black/10">
+      <Row label="Tonight" value={tonight || "Nothing booked yet — covers connect when a booking system is linked"} soft={!tonight} />
+      {role === "boh" ? <Row label="Prep" value={s.prep ? `${s.prep} on your station list` : "Nothing queued"} soft={!s.prep} /> : null}
+      <Row label="Specials" value={specials || "None flagged today"} soft={!specials} />
+      <Row label="86 tonight" value={sixed || "Nothing 86’d"} soft={!sixed} />
+      <Row label="Deliveries" value={deliveries || "None due"} soft={!deliveries} />
+      <Row label="Cleaning" value={s.cleaningDue ? `${s.cleaningDue} due today` : "All clear"} soft={!s.cleaningDue} />
+      <Row label="Messages" value={msgs || "Inbox clear"} soft={!msgs} />
+    </div>
+  );
+}
+
+const UTOPIA_ENGINE = [
   { href: "/trial", label: "The engine", blurb: "Costing, variance and menu engineering, end to end." },
   { href: "/develop/menu-engineering", label: "Menu engineering", blurb: "Stars, plowhorses, puzzles, dogs." },
   { href: "/administrate/finance/variance", label: "Variance", blurb: "Where the stock went, in euros." },
@@ -82,47 +96,74 @@ const UTOPIA_POINTS = [
 ];
 
 export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKey, EntityStats> }) {
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>("holdings");
   const [userAccent, setUserAccent] = useState<string | null>(null);
+
   useEffect(() => {
-    const r = localStorage.getItem("fs_role") as RoleKey | null;
-    if (r && ROLES[r]) setRole(r);
-    const e = localStorage.getItem("fs_entity") as EntityKey | null;
-    if (e && statsByEntity[e]) setEntity(e);
-    setUserAccent(localStorage.getItem("fs_user_accent"));
+    getMyProfile().then((p) => {
+      setProfile(p); setLoaded(true);
+      if (p && !p.isAdmin) {
+        if (p.entity && statsByEntity[p.entity]) { setEntity(p.entity); localStorage.setItem("fs_entity", p.entity); }
+        setRole(p.world); localStorage.setItem("fs_role", p.world);
+        if (p.color) { setUserAccent(p.color); localStorage.setItem("fs_user_accent", p.color); }
+      } else {
+        const r = localStorage.getItem("fs_role") as RoleKey | null; if (r && ROLES[r]) setRole(r);
+        const e = localStorage.getItem("fs_entity") as EntityKey | null; if (e && statsByEntity[e]) setEntity(e);
+        const ua = localStorage.getItem("fs_user_accent"); setUserAccent(ua);
+        if (p && p.color && !ua) setUserAccent(p.color);
+      }
+    });
   }, [statsByEntity]);
-  useEffect(() => { if (typeof document !== "undefined") { const ua = localStorage.getItem("fs_user_accent"); document.documentElement.style.setProperty("--accent", ua || ENTITY_ACCENT[entity]); } }, [entity]);
-  const chooseRole = (r: RoleKey) => { setRole(r); localStorage.setItem("fs_role", r); };
-  const chooseEntity = (e: EntityKey) => { setEntity(e); localStorage.setItem("fs_entity", e); };
+
+  // follow context changes coming from the TopBar switcher (admins / preview)
+  useEffect(() => onCtx(() => {
+    const e = localStorage.getItem("fs_entity") as EntityKey | null; if (e && statsByEntity[e]) setEntity(e);
+    const r = localStorage.getItem("fs_role") as RoleKey | null; if (r && ROLES[r]) setRole(r);
+    setUserAccent(localStorage.getItem("fs_user_accent"));
+  }), [statsByEntity]);
+
+  useEffect(() => { if (typeof document !== "undefined") document.documentElement.style.setProperty("--accent", userAccent || ENTITY_ACCENT[entity]); }, [entity, userAccent]);
+
+  const scopedNoVenue = loaded && profile && !profile.isAdmin && !profile.entity;
   const s = statsByEntity[entity];
-  const cfg = ROLES[role];
+  const isOffice = role === "office";
+  const showEngine = entity === "utopia" && isOffice;     // engine tiles are an Office/owner tool
+  const isAdmin = !!profile?.isAdmin;
+  const greeting = profile?.name ? profile.name.split(" ")[0] : null;
+
+  if (scopedNoVenue) {
+    return (
+      <main className="mx-auto max-w-xl px-6 py-12">
+        <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Welcome{greeting ? `, ${greeting}` : ""}</p>
+        <h1 className="mt-2 font-serif text-3xl text-ink">You’re signed in</h1>
+        <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">No venue is assigned to you yet. Ask your manager to add you to a venue, then reload — your home will fill with tonight’s brief.</p>
+        <Link href="/account" className="mt-6 inline-block font-sans text-sm text-ember">Your profile →</Link>
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12" style={{ ["--accent" as any]: userAccent || ENTITY_ACCENT[entity] }}>
-      <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Home</p>
+    <main className="mx-auto max-w-xl px-6 py-10" style={{ ["--accent" as any]: userAccent || ENTITY_ACCENT[entity] }}>
+      <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{greeting ? `Hello, ${greeting}` : "Home"}</p>
       <div className="mt-2"><BrandMark entity={entity} variant="full" tone="light" /></div>
-      <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{s.reportPeriod ? "last report " + s.reportPeriod : entity === "holdings" ? "latest per venue" : ""}</p>
+      <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">
+        {ROLES[role].label}{s.reportPeriod && isOffice ? " · last report " + s.reportPeriod : ""}
+      </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {ENTITY_ORDER.map((k) => (
-          <button key={k} onClick={() => chooseEntity(k)} style={k === entity ? { background: ENTITY_ACCENT[k] } : undefined} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === entity ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft hover:border-ink/40")}>{ENTITY_SHORT[k]}</button>
-        ))}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {(Object.keys(ROLES) as RoleKey[]).map((k) => (
-          <button key={k} onClick={() => chooseRole(k)} style={k === role ? { background: "var(--accent)" } : undefined} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (k === role ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft")}>{ROLES[k].label}</button>
-        ))}
-      </div>
-
+      {/* PRIME REAL ESTATE — the brief (FOH/BOH) or the numbers (Office) */}
       <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
-        <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Your dashboard · {ENTITY_LABEL[entity]}</p>
-        <Dashboard role={role} s={s} />
+        <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>
+          {isOffice ? `Your dashboard · ${ENTITY_LABEL[entity]}` : `Your brief · ${ENTITY_LABEL[entity]}`}
+        </p>
+        {isOffice ? <OfficeDashboard s={s} /> : <Brief role={role} s={s} />}
       </div>
 
+      {/* Role actions — the few things this person reaches for */}
       <div className="mt-6 space-y-3">
-        {(entity === "utopia" ? UTOPIA_POINTS : cfg.points).map((p) => (
+        {ROLES[role].points.map((p) => (
           <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
             <h2 className="font-serif text-xl text-ink">{p.label}</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>
@@ -130,16 +171,36 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         ))}
       </div>
 
-      <div className="mt-8">
-        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">All areas</p>
-        <div className="mt-2 flex gap-5 font-sans text-sm text-ember">
-          <Link href="/develop">Develop</Link>
-          <Link href="/execute">Execute</Link>
-          <Link href="/administrate">Administrate</Link>
+      {/* Engine tiles — Office/owner only, on the trial profile */}
+      {showEngine ? (
+        <div className="mt-8">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The engine</p>
+          <div className="mt-2 space-y-3">
+            {UTOPIA_ENGINE.map((p) => (
+              <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+                <h2 className="font-serif text-xl text-ink">{p.label}</h2>
+                <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Entity & role are a preview — sign-in will make this per-person</p>
+      {/* Areas — admins only; workers stay in their world + use Ask for the rest */}
+      {isAdmin ? (
+        <div className="mt-8">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">All areas</p>
+          <div className="mt-2 flex gap-5 font-sans text-sm text-ember">
+            <Link href="/develop">Develop</Link>
+            <Link href="/execute">Execute</Link>
+            <Link href="/administrate">Administrate</Link>
+          </div>
+        </div>
+      ) : null}
+
+      {!profile ? (
+        <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Previewing — sign in to bind this to you</p>
+      ) : null}
     </main>
   );
 }

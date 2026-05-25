@@ -1,5 +1,6 @@
 import Home, { EntityStats } from "@/components/Home";
 import { supabase } from "@/lib/supabase";
+import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +9,21 @@ const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
 const UT = "a0000000-0000-4000-8000-000000000001";
 
 export default async function Page() {
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+
   const restaurants = (await supabase.from("restaurants").select("id,name")).data || [];
   const rname = new Map(restaurants.map((r: any) => [r.id, r.name]));
   const eod = (await supabase.from("eod_reports").select("restaurant_id,report_date,revenue,actual_covers").order("report_date", { ascending: false })).data || [];
   const zones = (await supabase.from("zones").select("id,restaurant_id")).data || [];
   const mep = (await supabase.from("mep_dishes").select("zone_id").eq("is_active", true)).data || [];
   const tasks = (await supabase.from("tasks").select("zone_id,frequency_rule").eq("is_active", true).eq("task_type", "cleaning")).data || [];
-  const inbox = (await supabase.from("inbox_items").select("restaurant_id")).data || [];
-  const events = (await supabase.from("sales_events").select("restaurant_id")).data || [];
+  const inbox = (await supabase.from("inbox_items").select("restaurant_id,status")).data || [];
+  const events = (await supabase.from("sales_events").select("restaurant_id,event_date,title,guests_count")).data || [];
+  const menuAll = (await supabase.from("menu_items").select("restaurant_id,name,is_special,is_eighty_six,is_active,price,cost,units_sold")).data || [];
+  const orders = (await supabase.from("orders").select("restaurant_id,delivery_date,status,provider_id")).data || [];
+  const providers = (await supabase.from("providers").select("id,name")).data || [];
+  const pname = new Map(providers.map((p: any) => [p.id, p.name]));
 
   const weekday = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
@@ -31,6 +39,11 @@ export default async function Page() {
     const zoneIds = zones.filter((z: any) => z.restaurant_id === vid).map((z: any) => z.id);
     const prep = mep.filter((m: any) => zoneIds.includes(m.zone_id)).length;
     const cleaningDue = tasks.filter((t: any) => zoneIds.includes(t.zone_id) && ((t.frequency_rule || "").startsWith("daily_") || t.frequency_rule === "weekly_" + weekday)).length;
+    const specials = menuAll.filter((m: any) => m.restaurant_id === vid && m.is_special && m.is_active !== false).map((m: any) => noEmoji(m.name)).slice(0, 4);
+    const eightySix = menuAll.filter((m: any) => m.restaurant_id === vid && m.is_eighty_six).map((m: any) => noEmoji(m.name)).slice(0, 4);
+    const dueOrders = orders.filter((o: any) => o.restaurant_id === vid && (o.delivery_date === today || o.delivery_date === tomorrow) && !["delivered", "cancelled"].includes(o.status || ""));
+    const eventsToday = events.filter((e: any) => e.restaurant_id === vid && e.event_date === today).map((e: any) => ({ title: noEmoji(e.title || "Event"), guests: Number(e.guests_count || 0) }));
+    const messages = inbox.filter((i: any) => i.restaurant_id === vid && (i.status === "open" || i.status === "new" || i.status == null)).length;
     return {
       label: rname.get(vid) || "Venue",
       reportPeriod: L?.report_date ?? null,
@@ -40,6 +53,10 @@ export default async function Page() {
       inbox: inbox.filter((i: any) => i.restaurant_id === vid).length,
       events: events.filter((e: any) => e.restaurant_id === vid).length,
       prep, cleaningDue,
+      specials, eightySix,
+      deliveriesDue: dueOrders.length,
+      deliveriesNext: dueOrders.length ? (pname.get(dueOrders[0].provider_id) ? noEmoji(pname.get(dueOrders[0].provider_id)) : null) : null,
+      eventsToday, messages,
     };
   };
 
@@ -56,16 +73,23 @@ export default async function Page() {
     prep: bm.prep + taller.prep,
     cleaningDue: bm.cleaningDue + taller.cleaningDue,
     venues: [{ name: bm.label, rev: bm.rev, cov: bm.cov }, { name: taller.label, rev: taller.rev, cov: taller.cov }],
+    specials: [...(bm.specials || []), ...(taller.specials || [])].slice(0, 4),
+    eightySix: [...(bm.eightySix || []), ...(taller.eightySix || [])].slice(0, 4),
+    deliveriesDue: (bm.deliveriesDue || 0) + (taller.deliveriesDue || 0),
+    deliveriesNext: bm.deliveriesNext || taller.deliveriesNext || null,
+    eventsToday: [...(bm.eventsToday || []), ...(taller.eventsToday || [])],
+    messages: (bm.messages || 0) + (taller.messages || 0),
   };
 
-  const utMenu = (await supabase.from("menu_items").select("price,cost,units_sold").eq("restaurant_id", UT)).data || [];
+  const utMenu = menuAll.filter((m: any) => m.restaurant_id === UT);
   const utInv = (await supabase.from("inventory_items").select("unit_cost,quantity_on_hand,counted_qty").eq("restaurant_id", UT)).data || [];
   const utContribution = utMenu.reduce((a: number, m: any) => a + (Number(m.price || 0) - Number(m.cost || 0)) * Number(m.units_sold || 0), 0);
   const utLoss = utInv.reduce((a: number, i: any) => { if (i.counted_qty == null) return a; const v = (Number(i.quantity_on_hand || 0) - Number(i.counted_qty || 0)) * Number(i.unit_cost || 0); return a + (v > 0 ? v : 0); }, 0);
+  const utBase = venueStats(UT);
   const utopia: EntityStats = {
+    ...utBase,
     label: "Restaurant Utopia", reportPeriod: null,
     rev: 0, cov: 0, avg: 0, revDelta: null, avgDelta: null,
-    inbox: 0, events: 0, prep: 0, cleaningDue: 0,
     trial: true, dishCount: utMenu.length, contribution: Math.round(utContribution), varianceLoss: Math.round(utLoss * 100) / 100,
   };
 
