@@ -40,7 +40,7 @@ export default async function WineHub({ params }: { params: { id: string } }) {
 
       <div className="mt-8 rounded-2xl border border-dashed border-black/20 p-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-tomato">Coming to the wine module</p>
-        <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Vintage-change prompts (re-cost + re-note when the year turns over), open-bottle / Coravin freshness tracking, and a sommelier-training mode for the team.</p>
+        <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Scan the label on receiving (Vivino-style) to auto-fill producer, region, vintage and tasting notes — and flag a vintage change so it gets re-costed and re-noted, never sold as the old year. Plus open-bottle / Coravin freshness and a sommelier-training mode.</p>
       </div>
     </main>
   );

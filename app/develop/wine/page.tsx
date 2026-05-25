@@ -35,7 +35,7 @@ export default async function Wine() {
           </ul>
         </section>
       ))}
-      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">By-the-glass / Coravin tracking + vintage-change prompts arrive next</p>
+      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Coming: scan the bottle label on receiving (Vivino-style) → auto-fill producer / region / vintage / tasting + catch vintage changes · by-the-glass & Coravin freshness · sommelier training</p>
     </main>
   );
 }
