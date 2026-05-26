@@ -17,6 +17,7 @@ export default async function Execute() {
       { href: "/execute/prep", label: "Prep · " + (mep.count ?? 0) + " dishes", blurb: "Mise en place by station, with components." },
       { href: "/execute/cleaning", label: "Cleaning · " + (tasks.count ?? 0), blurb: "Daily & weekly schedule, by station." },
       { href: "/execute/sops", label: "Libro Azul · " + (sops.count ?? 0) + " SOPs", blurb: "HACCP plans that ground the tasks." },
+      { href: "/execute/temp", label: "Temperatures", blurb: "Log a fridge / hot-hold temp by voice — HACCP." },
     ]},
     { title: "Stock", items: [
       { href: "/execute/inventory", label: "Inventory", blurb: "What's on hand, what's below reorder." },

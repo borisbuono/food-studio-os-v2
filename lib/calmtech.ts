@@ -106,3 +106,25 @@ export function useVoiceCommands(commands: CommandMap, enabled: boolean) {
 
   return { listening, supported };
 }
+
+// --- One-shot dictation: capture a single spoken phrase, resolve the transcript. ---
+export function speechSupported(): boolean {
+  return typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+}
+export function dictateOnce(lang: string = "en-US"): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!speechSupported()) { reject(new Error("speech-unsupported")); return; }
+    const w: any = window;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = lang;
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    let done = false;
+    rec.onresult = (e: any) => { done = true; resolve(String(e.results[0][0].transcript || "").trim()); };
+    rec.onerror = (e: any) => { if (!done) reject(new Error(e?.error || "speech-error")); };
+    rec.onend = () => { if (!done) reject(new Error("no-speech")); };
+    try { rec.start(); } catch (err) { reject(err as Error); }
+  });
+}
