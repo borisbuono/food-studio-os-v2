@@ -76,14 +76,19 @@ export default function AssistantFab() {
     try {
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: t, route: pathname || "" }) });
       const d = await r.json();
-      let reply = d.reply || "…";
-      // feedback intent → log to the board (client has the session)
-      if (d.feedback && d.feedback.body && profile) {
-        const ent = (!profile.isAdmin ? profile.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-        const rid = profile.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
-        try { await supabaseBrowser.from("feedback").insert({ restaurant_id: rid, route: pathname || "", author_id: profile.id, author_name: profile.name, author_role: profile.dbRole, kind: d.feedback.kind || "idea", body: d.feedback.body }); reply += "  ✓ on the feedback board"; } catch {}
-      }
+      const reply = d.reply || "…";
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply }; return n; });
+      // feedback intent → log to the board (client has the session), with a VISIBLE result
+      if (d.feedback && d.feedback.body) {
+        if (!profile) {
+          setLog((l) => [...l, { role: "sys", text: "⚠ Sign in to save this to the feedback board." }]);
+        } else {
+          const ent = (!profile.isAdmin ? profile.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+          const rid = profile.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+          const { error } = await supabaseBrowser.from("feedback").insert({ restaurant_id: rid, route: pathname || "", author_id: profile.id, author_name: profile.name, author_role: profile.dbRole, kind: d.feedback.kind || "idea", body: d.feedback.body });
+          setLog((l) => [...l, { role: "sys", text: error ? ("⚠ Couldn’t save to the board: " + error.message) : "✓ Saved to the feedback board" }]);
+        }
+      }
       if (Array.isArray(d.order) && d.order.length) setOrderDraft(d.order);
     } catch { setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: "Couldn’t reach Chef — try again." }; return n; }); }
   };
@@ -106,7 +111,7 @@ export default function AssistantFab() {
             {log.length === 0 && !text ? (
               <p className="font-serif text-[16px] leading-relaxed text-clay">Talk to Chef. “Chef, give me a recipe for romesco.” · “Order 5 kilos of carrots for tomorrow.” · “This screen is confusing because…”</p>
             ) : null}
-            {log.map((m, i) => <p key={i} className={"mb-3 whitespace-pre-line font-serif text-[17px] leading-relaxed " + (m.role === "you" ? "text-ink" : "text-ink-soft")}>{m.text}</p>)}
+            {log.map((m, i) => m.role === "sys" ? <p key={i} className="mb-3 font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>{m.text}</p> : <p key={i} className={"mb-3 whitespace-pre-line font-serif text-[17px] leading-relaxed " + (m.role === "you" ? "text-ink" : "text-ink-soft")}>{m.text}</p>)}
             {text ? <p className="font-serif text-[17px] leading-relaxed text-ink">{text}</p> : null}
           </div>
 
