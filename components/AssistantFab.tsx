@@ -85,12 +85,16 @@ export default function AssistantFab() {
   return (
     <>
       <button onClick={() => (open ? closeFab() : openFab())} aria-label="Chef" style={{ background: "var(--accent)" }}
-        className="fixed bottom-5 right-5 z-50 h-16 w-16 rounded-full font-serif text-[15px] text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95">
-        {open ? "Close" : "Chef"}
+        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 rounded-full font-serif text-[15px] text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (open ? "ring-2 ring-white/70" : "")}>
+        Chef
       </button>
 
       {open ? (
-        <div className="fixed bottom-24 right-5 z-50 flex h-[64vh] max-h-[560px] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-card shadow-2xl shadow-black/25">
+        <div className="fixed bottom-24 right-5 z-50 flex max-h-[min(64vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl rounded-br-md border border-black/10 bg-card shadow-2xl shadow-black/25">
+          <div className="flex items-center justify-between border-b border-black/10 px-4 py-2">
+            <span className="font-serif text-[15px] text-ink">Chef</span>
+            <button onClick={closeFab} aria-label="close" className="font-mono text-[12px] text-clay hover:text-ink">close ×</button>
+          </div>
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5">
             {log.length === 0 && !text ? (
               <p className="font-serif text-[16px] leading-relaxed text-clay">Talk to Chef. “Chef, give me a recipe for romesco.” · “Order 5 kilos of carrots for tomorrow.” · “This screen is confusing because…”</p>
