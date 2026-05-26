@@ -17,6 +17,10 @@ export default async function Wine() {
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · the wine list</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{wines.length} wines</h1>
+      <div className="mt-3 flex gap-4 font-mono text-[11px] uppercase tracking-wide text-tomato">
+        <Link href="/develop/wine/scan">+ Scan a label</Link>
+        <Link href="/develop/wine/train">Train the list</Link>
+      </div>
 
       {ORDER.filter((s) => styled(s).length).map((s) => (
         <section key={s} className="mt-8">

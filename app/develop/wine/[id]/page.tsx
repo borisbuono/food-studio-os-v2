@@ -11,7 +11,7 @@ export default async function WineHub({ params }: { params: { id: string } }) {
   const producer = w.producer || lex?.producer;
   const region = w.region || lex?.region;
   const vintage = w.vintage || lex?.vintage;
-  const story = lex?.story || lex?.why_chosen || "";
+  const story = lex?.story || lex?.why_chosen || w.description || "";
 
   return (
     <main className="mx-auto max-w-xl px-7 py-12">
