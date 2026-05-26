@@ -2,14 +2,14 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
 import ClockIn from "@/components/ClockIn";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
-const BISTRO_MONDO = "fb4d008f-2d2a-4e0d-a525-6e0e36af0259";
-
 export default async function Today() {
-  const venue = (await supabase.from("restaurants").select("id,name").eq("id", BISTRO_MONDO).maybeSingle()).data;
-  const zones = (await supabase.from("zones").select("id").eq("restaurant_id", BISTRO_MONDO)).data || [];
+  const RID = serverRestaurantId();
+  const venue = (await supabase.from("restaurants").select("id,name").eq("id", RID).maybeSingle()).data;
+  const zones = (await supabase.from("zones").select("id").eq("restaurant_id", RID)).data || [];
   const zoneIds = zones.map((z: any) => z.id);
 
   const preps = zoneIds.length

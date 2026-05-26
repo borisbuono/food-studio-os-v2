@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 function clip(s: string, n = 200) { s = (s || "").trim(); return s.length > n ? s.slice(0, n).trim() + "…" : s; }
 
 export default async function Decisions() {
-  const items = (await supabase.from("inbox_items").select("source,category,sender_name,subject,body,received_at,status,priority").order("received_at", { ascending: false })).data || [];
+  const items = (await supabase.from("inbox_items").select("source,category,sender_name,subject,body,received_at,status,priority").eq("restaurant_id", serverRestaurantId()).order("received_at", { ascending: false })).data || [];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>

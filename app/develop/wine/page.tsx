@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +8,7 @@ const ORDER = ["sparkling", "petnat", "white", "orange", "amber", "rose", "red",
 const LABEL: Record<string, string> = { sparkling: "Sparkling", petnat: "Pét-Nat", white: "White", orange: "Orange", amber: "Amber", rose: "Rosé", red: "Red", to_classify: "To classify" };
 
 export default async function Wine() {
-  const wines = (await supabase.from("menu_items").select("id,name,price,glass_price,bottle_price,wine_style,producer,region,vintage,is_eighty_six").eq("is_active", true).eq("category", "drink").eq("section", "wine")).data || [];
+  const wines = (await supabase.from("menu_items").select("id,name,price,glass_price,bottle_price,wine_style,producer,region,vintage,is_eighty_six").eq("is_active", true).eq("category", "drink").eq("section", "wine").eq("restaurant_id", serverRestaurantId())).data || [];
   const styled = (s: string) => wines.filter((w: any) => (w.wine_style || "to_classify") === s);
   const priced = (w: any) => [w.glass_price ? "€" + w.glass_price + " glass" : null, (w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) + " bottle" : null].filter(Boolean).join(" · ");
 

@@ -5,7 +5,7 @@ import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { onCtx } from "@/lib/ctx";
+import { onCtx, writeCookie } from "@/lib/ctx";
 
 export type EntityStats = {
   label: string;
@@ -106,7 +106,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
     getMyProfile().then((p) => {
       setProfile(p); setLoaded(true);
       if (p && !p.isAdmin) {
-        if (p.entity && statsByEntity[p.entity]) { setEntity(p.entity); localStorage.setItem("fs_entity", p.entity); }
+        if (p.entity && statsByEntity[p.entity]) { setEntity(p.entity); localStorage.setItem("fs_entity", p.entity); writeCookie(p.entity); }
         setRole(p.world); localStorage.setItem("fs_role", p.world);
         if (p.color) { setUserAccent(p.color); localStorage.setItem("fs_user_accent", p.color); }
       } else {

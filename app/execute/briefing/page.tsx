@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
 export default async function Briefing() {
   const today = new Date().toISOString().slice(0, 10);
-  const briefs = (await supabase.from("briefings").select("briefing_type,content,service_date,created_at,structured_content").order("service_date", { ascending: false }).limit(20)).data || [];
+  const briefs = (await supabase.from("briefings").select("briefing_type,content,service_date,created_at,structured_content").eq("restaurant_id", serverRestaurantId()).order("service_date", { ascending: false }).limit(20)).data || [];
   const handover = briefs.find((b: any) => b.briefing_type === "handover" && (b.service_date === today || !b.service_date));
   const rest = briefs.filter((b: any) => b !== handover);
 

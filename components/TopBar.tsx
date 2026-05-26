@@ -7,7 +7,7 @@ import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/enti
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx } from "@/lib/ctx";
+import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie } from "@/lib/ctx";
 
 export default function TopBar() {
   const [entity, setEntity] = useState<EntityKey>("holdings");
@@ -24,7 +24,7 @@ export default function TopBar() {
     const read = () => {
       const e = (localStorage.getItem("fs_entity") as EntityKey | null) || "holdings";
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
-      setEntity(e); setRole(r);
+      setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
       document.documentElement.style.setProperty("--accent", ua || ENTITY_ACCENT[e] || "#B8552E");
     };

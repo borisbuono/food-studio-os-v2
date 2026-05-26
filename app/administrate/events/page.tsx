@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ const ORDER = ["enquiry", "proposal", "confirmed", "completed", "cancelled"];
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 export default async function Events() {
-  const evs = (await supabase.from("sales_events").select("title,event_type,status,client_name,event_date,guests_count,estimated_revenue,estimated_gp_pct,theme").order("event_date", { ascending: true })).data || [];
+  const evs = (await supabase.from("sales_events").select("title,event_type,status,client_name,event_date,guests_count,estimated_revenue,estimated_gp_pct,theme").eq("restaurant_id", serverRestaurantId()).order("event_date", { ascending: true })).data || [];
   const groups: Record<string, any[]> = {};
   evs.forEach((e: any) => { const k = (e.status || "other").toLowerCase(); (groups[k] ||= []).push(e); });
   const keys = Object.keys(groups).sort((a, b) => { const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });

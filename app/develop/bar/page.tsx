@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Bar() {
-  const cocktails = (await supabase.from("menu_items").select("id,name,price,build").eq("is_active", true).eq("category", "drink").eq("section", "cocktail").order("name")).data || [];
+  const cocktails = (await supabase.from("menu_items").select("id,name,price,build").eq("is_active", true).eq("category", "drink").eq("section", "cocktail").eq("restaurant_id", serverRestaurantId()).order("name")).data || [];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
