@@ -11,7 +11,7 @@ export default async function Execute() {
     { title: "Service", items: [
       { href: "/execute/today", label: "Today", blurb: "Clock-in, priority preps, covers, cleaning due." },
       { href: "/execute/briefing", label: "Briefing", blurb: "Who's doing what before service." },
-      { href: "/execute/handover", label: "Handover", blurb: "Pass-down for the next shift." },
+      { href: "/execute/handover", label: "The Pass", blurb: "Close-down: mark off, set tomorrow, hand over." },
     ]},
     { title: "Kitchen", items: [
       { href: "/execute/prep", label: "Prep · " + (mep.count ?? 0) + " dishes", blurb: "Mise en place by station, with components." },
