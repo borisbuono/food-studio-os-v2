@@ -96,9 +96,9 @@ export default function AssistantFab() {
 
   return (
     <>
-      <button onClick={() => (open ? closeFab() : openFab())} aria-label="Chef" style={{ background: "var(--accent)" }}
-        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 rounded-full font-serif text-[15px] text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (open ? "ring-2 ring-white/70" : "")}>
-        Chef
+      <button onClick={() => { if (!open) openFab(); else (listening ? stop() : listen()); }} aria-label="Chef" style={{ background: "var(--accent)" }}
+        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 rounded-full font-serif text-[15px] text-[#FCEFE7] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (listening ? "animate-pulse ring-4 ring-white/70" : open ? "ring-2 ring-white/70" : "")}>
+        {listening ? "●" : "Chef"}
       </button>
 
       {open ? (
@@ -121,15 +121,10 @@ export default function AssistantFab() {
 
           {/* tap big mic to talk again; type field always there as fallback — no modes */}
           <div className="flex items-center gap-3 border-t border-black/10 p-3">
-            <button onClick={() => (listening ? stop() : listen())} disabled={!supported} aria-label="talk"
-              style={listening ? { background: "var(--accent)" } : undefined}
-              className={"h-12 w-12 shrink-0 rounded-full font-mono text-[11px] uppercase tracking-wide transition " + (listening ? "scale-110 animate-pulse text-[#FCEFE7]" : "border border-black/20 text-ink-soft disabled:opacity-50")}>
-              {supported ? (listening ? "●" : "talk") : "—"}
-            </button>
             <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ember" />
             {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]">Send</button> : null}
           </div>
-          {status ? <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status}</p> : null}
+          <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? "Tap the Chef button to talk · or type above" : "Type to Chef above")}</p>
         </div>
       ) : null}
     </>
