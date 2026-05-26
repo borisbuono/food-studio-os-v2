@@ -57,7 +57,14 @@ export default function AssistantFab() {
   const listen = () => { const r = recRef.current; if (!r || listening) return; setText(""); textRef.current = ""; autoRef.current = true; try { r.start(); } catch {} };
   const stop = () => { const r = recRef.current; if (!r) return; autoRef.current = false; try { r.stop(); } catch {} setListening(false); };
 
-  const openFab = () => { setOpen(true); if (supported) setTimeout(listen, 250); };  // Siri: open and listen
+  const openFab = () => {
+    setOpen(true);
+    // Only auto-listen when mic permission is already granted (desktop). On iOS/Safari
+    // permission query is unsupported → we DON'T auto-prompt; the user taps TALK instead.
+    if (supported && (navigator as any).permissions?.query) {
+      (navigator as any).permissions.query({ name: "microphone" as any }).then((p: any) => { if (p.state === "granted") setTimeout(listen, 200); }).catch(() => {});
+    }
+  };
   const closeFab = () => { stop(); setOpen(false); };
 
   const send = async () => {

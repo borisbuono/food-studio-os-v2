@@ -203,7 +203,7 @@ export default function ThePass() {
       {forecast != null ? (
         <div className="mt-5 rounded-xl border border-black/10 bg-card p-4">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Tomorrow’s forecast</p>
-          <p className="mt-1 font-serif text-2xl text-ink">≈ {forecast} covers</p>
+          <p className="mt-1 font-serif text-5xl font-medium text-ink">≈ {forecast} <span className="text-2xl font-normal text-ink-soft">covers</span></p>
           <p className="font-sans text-[13px] text-ink-soft">{busierWord}{fcSource ? ` · from ${fcSource}` : ""}. Prep quantities below scale to this.</p>
         </div>
       ) : (
