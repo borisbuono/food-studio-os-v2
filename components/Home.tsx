@@ -171,6 +171,16 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         ))}
       </div>
 
+      {/* Academy — your skill ladder, for any signed-in person */}
+      {profile ? (
+        <div className="mt-6">
+          <Link href="/academy" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+            <h2 className="font-serif text-xl text-ink">Your academy</h2>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">What you’ve learned, what you can do, what you can manage.</p>
+          </Link>
+        </div>
+      ) : null}
+
       {/* Engine tiles — Office/owner only, on the trial profile */}
       {showEngine ? (
         <div className="mt-8">

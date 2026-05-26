@@ -52,6 +52,10 @@ export default function Account() {
         <div className="flex items-baseline justify-between py-3"><span className="font-sans text-[14px] text-ink-soft">Sign-in</span><span className="font-mono text-[12px] text-ink">{ready ? (profile ? "signed in" : "signed out") : "…"}</span></div>
       </div>
 
+      <div className="mt-6">
+        <Link href="/academy" className="font-sans text-sm text-ember">Your academy →</Link>
+      </div>
+
       <p className="mt-8 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Your colour</p>
       <p className="mt-1 font-sans text-[13px] leading-relaxed text-ink-soft">Make it yours — this sets your accent across the whole app{profile ? " and is saved to your profile" : ""}. (Background, brand and Instagram feed personalisation coming next.)</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
