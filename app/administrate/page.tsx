@@ -45,6 +45,7 @@ export default async function Administrate() {
       { href: "/administrate/holdings", label: "Holdings · entity map", blurb: "The structure, venue by venue." },
       { href: "/command", label: "Command centre", blurb: "Flags, accounts, skills, activity." },
       { href: "/administrate/decisions", label: "Decisions · " + (inbox.count ?? 0) + " in inbox", blurb: "What needs a call." },
+      { href: "/administrate/feedback", label: "Feedback board", blurb: "What the team is flagging, by screen." },
       { href: "/administrate/settings", label: "Settings", blurb: "Connections and AI skills." },
     ]},
   ];
