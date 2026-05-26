@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
 export default async function Receiving() {
-  const moves = (await supabase.from("inventory_movements").select("inventory_item_id,quantity,unit,reason,movement_at").order("movement_at", { ascending: false }).limit(50)).data || [];
-  const ids = Array.from(new Set(moves.map((m: any) => m.inventory_item_id).filter(Boolean)));
-  const items = ids.length ? (await supabase.from("inventory_items").select("id,name").in("id", ids)).data || [] : [];
+  const RID = serverRestaurantId();
+  const venueItems = (await supabase.from("inventory_items").select("id,name").eq("restaurant_id", RID)).data || [];
+  const venueItemIds = venueItems.map((i: any) => i.id);
+  const moves = venueItemIds.length
+    ? (await supabase.from("inventory_movements").select("inventory_item_id,quantity,unit,reason,movement_at").in("inventory_item_id", venueItemIds).order("movement_at", { ascending: false }).limit(50)).data || []
+    : [];
+  const items = venueItems;
   const name = new Map(items.map((i: any) => [i.id, i.name]));
 
   return (

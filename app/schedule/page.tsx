@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getMyProfile } from "@/lib/profile";
+import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 
 function startOfWeek(d: Date) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; }
 function dayLabel(d: Date) { return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }); }
@@ -22,13 +24,17 @@ export default function Schedule() {
     (async () => {
       setLoading(true);
       const from = iso(days[0]), to = iso(days[6]);
+      const prof = await getMyProfile();
+      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "utopia";
+      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
       const [s, p, z] = await Promise.all([
         supabase.from("shifts").select("id,profile_id,zone_id,shift_date,start_time,end_time").gte("shift_date", from).lte("shift_date", to),
         supabase.from("profiles").select("id,name,role"),
-        supabase.from("zones").select("id,name,area"),
+        supabase.from("zones").select("id,name,area").eq("restaurant_id", rid),
       ]);
       if (!active) return;
-      setShifts(s.data || []);
+      const venueZoneIds = new Set((z.data || []).map((r: any) => r.id));
+      setShifts((s.data || []).filter((sh: any) => venueZoneIds.has(sh.zone_id)));
       setProfiles(Object.fromEntries((p.data || []).map((r: any) => [r.id, r])));
       setZones(Object.fromEntries((z.data || []).map((r: any) => [r.id, r])));
       setLoading(false);

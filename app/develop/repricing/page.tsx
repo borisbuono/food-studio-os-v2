@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + n.toFixed(2);
 
 export default async function Repricing() {
-  const items = (await supabase.from("menu_items").select("name,price,cost,target_margin_pct,computed_price,category").eq("is_active", true).eq("category", "food")).data || [];
+  const items = (await supabase.from("menu_items").select("name,price,cost,target_margin_pct,computed_price,category").eq("is_active", true).eq("category", "food").eq("restaurant_id", serverRestaurantId())).data || [];
   const rows = items.map((i: any) => {
     const price = Number(i.price || 0);
     const cost = Number(i.cost || 0);

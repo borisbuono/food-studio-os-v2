@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
 export default async function Invoices() {
-  const orders = (await supabase.from("orders").select("id,provider_id,order_date,total,invoice_ref,delivered_at").order("order_date", { ascending: false }).limit(50)).data || [];
+  const orders = (await supabase.from("orders").select("id,provider_id,order_date,total,invoice_ref,delivered_at").eq("restaurant_id", serverRestaurantId()).order("order_date", { ascending: false }).limit(50)).data || [];
   const missing = orders.filter((o: any) => o.delivered_at && !o.invoice_ref);
 
   return (
