@@ -88,12 +88,6 @@ function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
   );
 }
 
-const UTOPIA_ENGINE = [
-  { href: "/trial", label: "The engine", blurb: "Costing, variance and menu engineering, end to end." },
-  { href: "/develop/menu-engineering", label: "Menu engineering", blurb: "Stars, plowhorses, puzzles, dogs." },
-  { href: "/administrate/finance/variance", label: "Variance", blurb: "Where the stock went, in euros." },
-  { href: "/recipes", label: "Recipes", blurb: "The library, with Cook Mode." },
-];
 
 export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKey, EntityStats> }) {
   const [profile, setProfile] = useState<MyProfile | null>(null);
@@ -130,7 +124,6 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
   const scopedNoVenue = loaded && profile && !profile.isAdmin && !profile.entity;
   const s = statsByEntity[entity];
   const isOffice = role === "office";
-  const showEngine = entity === "utopia" && isOffice;     // engine tiles are an Office/owner tool
   const isAdmin = !!profile?.isAdmin;
   const greeting = profile?.name ? profile.name.split(" ")[0] : null;
 
@@ -182,33 +175,6 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
             <h2 className="font-serif text-xl text-ink">Messages</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">The team — channels and direct messages, in the OS.</p>
           </Link>
-        </div>
-      ) : null}
-
-      {/* Engine tiles — Office/owner only, on the trial profile */}
-      {showEngine ? (
-        <div className="mt-8">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The engine</p>
-          <div className="mt-2 space-y-3">
-            {UTOPIA_ENGINE.map((p) => (
-              <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
-                <h2 className="font-serif text-xl text-ink">{p.label}</h2>
-                <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Areas — admins only; workers stay in their world + use Ask for the rest */}
-      {isAdmin ? (
-        <div className="mt-8">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">All areas</p>
-          <div className="mt-2 flex gap-5 font-sans text-sm text-ember">
-            <Link href="/develop">Develop</Link>
-            <Link href="/execute">Execute</Link>
-            <Link href="/administrate">Administrate</Link>
-          </div>
         </div>
       ) : null}
 

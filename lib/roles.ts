@@ -4,11 +4,11 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   office: {
     label: "Office",
     points: [
-      { href: "/administrate/finance", label: "Finance", blurb: "Revenue, covers — the numbers explained." },
-      { href: "/administrate/decisions", label: "Decisions", blurb: "What needs a call." },
-      { href: "/administrate/team", label: "Team", blurb: "HR, the roster, the schedule." },
-      { href: "/administrate/holdings", label: "Holdings", blurb: "The group, venue by venue." },
-      { href: "/administrate/settings", label: "Settings", blurb: "Connections and skills." },
+      { href: "/administrate/decisions", label: "Inbox", blurb: "Emails, requests, reviews — what needs a reply or a call." },
+      { href: "/messages", label: "Team", blurb: "Channels and direct messages." },
+      { href: "/administrate/finance", label: "The numbers", blurb: "What's moving — revenue, covers, costs to react to." },
+      { href: "/administrate/team", label: "People", blurb: "Roster, roles, schedule." },
+      { href: "/administrate/suppliers", label: "Suppliers", blurb: "Orders, prices, deliveries." },
     ],
   },
   boh: {
