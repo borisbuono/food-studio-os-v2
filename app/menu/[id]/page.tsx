@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
 import EightySixToggle from "@/components/EightySixToggle";
+import SoftRecipeCost from "@/components/SoftRecipeCost";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,9 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       {(() => {
         const plate = ings.reduce((a: number, i: any) => a + Number(i.line_cost || 0), 0);
         if (!plate) {
+          if (!item.recipe_id) {
+            return <SoftRecipeCost id={item.id} initialCost={item.cost ?? null} initialBasis={item.cost_basis ?? null} price={price != null ? Number(price) : null} />;
+          }
           return (<>
             <Row k="Margin" v={mg !== null ? mg + "% · " + mgRead : mgRead} accent={mgColor} />
             {cost !== null ? <Row k="Cost / portion" v={"€" + Number(cost).toFixed(2)} /> : null}
