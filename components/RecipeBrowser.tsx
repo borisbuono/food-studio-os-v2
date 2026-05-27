@@ -5,6 +5,18 @@ import { noEmoji } from "@/lib/text";
 type R = { id: string; name: string; section: string | null; cost_per_portion: number | null; menu_price: number | null; hero_image_url: string | null };
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
+// Auto editorial cover: deterministic colour per section/name (no external photo needed).
+const PALETTE = [
+  { bg: "#B8552E", fg: "#F7F1E6" }, { bg: "#9A3122", fg: "#F7F1E6" }, { bg: "#3E5A37", fg: "#F7F1E6" },
+  { bg: "#B5701C", fg: "#F7F1E6" }, { bg: "#5A6B3B", fg: "#F7F1E6" }, { bg: "#7A6A57", fg: "#F7F1E6" },
+  { bg: "#2B3A45", fg: "#F7F1E6" }, { bg: "#E4A94B", fg: "#3A352D" },
+];
+function cover(key: string) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
 export default function RecipeBrowser({ recipes }: { recipes: R[] }) {
   const [q, setQ] = useState("");
   const [section, setSection] = useState<string>("All");
@@ -34,12 +46,13 @@ export default function RecipeBrowser({ recipes }: { recipes: R[] }) {
   const renderRow = (r: R) => {
     const mg = r.menu_price && r.cost_per_portion ? Math.round((1 - r.cost_per_portion / r.menu_price) * 100) : null;
     const name = noEmoji(r.name);
+    const c = cover((r.section || "").trim() || name);
     return (
       <a key={r.id} href={"/recipes/" + r.id} className="flex items-center gap-3 py-2.5 transition hover:opacity-70">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-paper-deep">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: r.hero_image_url ? undefined : c.bg }}>
           {r.hero_image_url
             ? <img src={r.hero_image_url} alt="" className="h-full w-full object-cover" />
-            : <span className="font-serif text-[18px] text-clay">{(name[0] || "·").toUpperCase()}</span>}
+            : <span className="font-serif text-[19px] leading-none" style={{ color: c.fg }}>{(name[0] || "·").toUpperCase()}</span>}
         </span>
         <span className="min-w-0 flex-1 font-serif text-[18px] leading-tight text-ink">{name}</span>
         <span className="shrink-0 font-mono text-[12.5px] text-ink-soft">
