@@ -2,6 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { getMyProfile } from "@/lib/profile";
+import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Prov = { id: string; name: string; category: string | null; whatsapp: string | null; email: string | null; cutoff_time: string | null; delivery_schedule: string | null };
@@ -14,7 +17,8 @@ export default function Order() {
   const [products, setProducts] = useState<Prod[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [stage, setStage] = useState<"build" | "review" | "sent">("build");
+  const [stage, setStage] = useState<"build" | "review" | "send" | "sent">("build");
+  const [sentVia, setSentVia] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<any[] | null>(null);
 
@@ -37,15 +41,52 @@ export default function Order() {
   const lines = Object.entries(cart).map(([id, q]) => { const pr = products.find((p) => p.id === id); return { id, name: pr?.name || "", unit: pr?.unit, price: pr?.price ?? 0, qty: q, total: (pr?.price ?? 0) * q }; });
   const total = lines.reduce((a, l) => a + l.total, 0);
 
+  const orderMessage = () => {
+    const head = `Hola${provider?.name ? " " + provider.name : ""} — pedido / order:`;
+    const body = lines.map((l) => `• ${l.qty} × ${noEmoji(l.name)}${l.unit ? " (" + l.unit + ")" : ""}`).join("\n");
+    const tail = [provider?.delivery_schedule ? "Entrega/Delivery: " + provider.delivery_schedule : "", "Gracias!"].filter(Boolean).join("\n");
+    return [head, "", body, "", tail].join("\n");
+  };
+  const logOrder = async (channel: string) => {
+    try {
+      const p = await getMyProfile();
+      const ent = (p && !p.isAdmin ? p.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "utopia";
+      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      await supabaseBrowser.from("orders").insert({ restaurant_id: rid, provider_id: provider?.id || null, created_by: p?.id || null, status: "sent", channel, sent_at: new Date().toISOString(), order_date: new Date().toISOString().slice(0, 10), subtotal: total, total, notes: orderMessage() });
+    } catch {}
+  };
+  const sendVia = async (channel: "whatsapp" | "email", url: string) => { await logOrder(channel); setSentVia(channel); window.open(url, "_blank"); setStage("sent"); };
+
   if (loading) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading suppliers…</p></main>;
+
+  if (stage === "send") {
+    const message = orderMessage();
+    const wa = provider?.whatsapp ? "https://wa.me/" + provider.whatsapp.replace(/[^0-9]/g, "") + "?text=" + encodeURIComponent(message) : null;
+    const mail = provider?.email ? "mailto:" + provider.email + "?subject=" + encodeURIComponent("Order — Food Studios") + "&body=" + encodeURIComponent(message) : null;
+    return (
+      <main className="mx-auto max-w-xl px-6 py-12">
+        <button onClick={() => setStage("review")} className="font-sans text-sm text-ink-soft">← back</button>
+        <p className="mt-6 font-sans text-xs font-medium text-ochre">Send · {noEmoji(provider?.name || "")}</p>
+        <h1 className="mt-2 font-serif text-3xl text-ink">Send the order</h1>
+        <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">This opens your own WhatsApp or email with the order written out — you tap send. We log it as sent here so it shows in Receiving.</p>
+        <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-black/10 bg-card p-4 font-sans text-[14px] leading-relaxed text-ink">{message}</pre>
+        <div className="mt-4 flex flex-col gap-3">
+          {wa ? <button onClick={() => sendVia("whatsapp", wa)} className="w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">Send on WhatsApp</button> : null}
+          {mail ? <button onClick={() => sendVia("email", mail)} className="w-full rounded-xl border border-black/20 px-6 py-4 font-sans text-[15px] text-ink">Send by email</button> : null}
+          {!wa && !mail ? <p className="font-sans text-[14px] text-clay">No WhatsApp or email on file for this supplier — add one on the supplier card.</p> : null}
+          <button onClick={() => { navigator.clipboard?.writeText(message); }} className="w-full rounded-xl border border-black/15 px-6 py-3 font-mono text-[11px] uppercase tracking-wide text-ink-soft">Copy the message</button>
+        </div>
+      </main>
+    );
+  }
 
   if (stage === "sent") {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
         <p className="font-sans text-xs font-medium text-ochre">Order</p>
-        <h1 className="mt-2 font-serif text-3xl text-ink">Draft ready for {noEmoji(provider?.name || "")}</h1>
-        <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">{lines.length} lines · {eur(total)}. Sending to suppliers (via {provider?.whatsapp ? "WhatsApp" : provider?.email ? "email" : "their channel"}) connects with your confirm step — nothing has actually been sent.</p>
-        <button onClick={() => { setCart({}); setSel(null); setStage("build"); }} className="mt-6 rounded-xl bg-ochre px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Start another order</button>
+        <h1 className="mt-2 font-serif text-3xl text-ink">Order sent to {noEmoji(provider?.name || "")}</h1>
+        <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">{lines.length} lines · {eur(total)} · opened in {sentVia === "email" ? "your email" : "WhatsApp"} for you to hit send. Logged here as sent — it’ll appear in Receiving and Invoices.</p>
+        <button onClick={() => { setCart({}); setSel(null); setSentVia(null); setStage("build"); }} className="mt-6 rounded-xl bg-ochre px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Start another order</button>
       </main>
     );
   }
@@ -65,7 +106,7 @@ export default function Order() {
           ))}
         </ul>
         <p className="mt-3 font-mono text-[11px] text-clay">{[provider?.delivery_schedule, provider?.cutoff_time ? "cutoff " + provider.cutoff_time : ""].filter(Boolean).join(" · ")}</p>
-        <button onClick={() => setStage("sent")} className="mt-6 w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">Prepare to send</button>
+        <button onClick={() => setStage("send")} className="mt-6 w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]">Send order →</button>
       </main>
     );
   }
