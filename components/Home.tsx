@@ -178,6 +178,10 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
             <h2 className="font-serif text-xl text-ink">Your academy</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">What you’ve learned, what you can do, what you can manage.</p>
           </Link>
+          <Link href="/messages" className="mt-3 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+            <h2 className="font-serif text-xl text-ink">Messages</h2>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">The team — channels and direct messages, in the OS.</p>
+          </Link>
         </div>
       ) : null}
 
