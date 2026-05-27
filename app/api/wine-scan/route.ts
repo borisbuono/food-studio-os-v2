@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SYSTEM = `You are a sommelier reading a wine label from a photo. From the image, extract what you can and return ONLY a JSON object (no prose, no code fences) with these keys:
-{"name": "...", "producer": "...", "region": "...", "grape": "...", "vintage": "...", "wine_style": "sparkling|white|orange|rose|red|sweet|fortified", "tasting_notes": "one short line", "pitch": "one warm line a waiter can say to sell it", "description": "2-3 sentences covering grape, area and producer"}.
+{"name": "...", "producer": "...", "region": "...", "grape": "...", "vintage": "...", "cuvee": "specific cuvée / bottling name if any", "classification": "quality tier exactly as printed — e.g. Grand Cru, Premier Cru, Gran Reserva, Reserva, single-vineyard name, or \"\"", "wine_style": "sparkling|white|orange|rose|red|sweet|fortified", "tasting_notes": "one short line", "pitch": "one warm line a waiter can say to sell it", "description": "2-3 sentences covering grape, area and producer"}.\nBE PRECISE about cuvee and classification: in wine a one-word tier difference (Grand Cru vs Premier Cru, Reserva vs Gran Reserva, a single-vineyard name) is a completely different, often far pricier wine — capture exactly what the label says, never round up or guess a tier.
 Use the label's language for names; write tasting_notes, pitch and description in English. If a field isn't legible, infer conservatively from what is visible or leave it "". vintage is the year only.`;
 
 export async function POST(req: Request) {
