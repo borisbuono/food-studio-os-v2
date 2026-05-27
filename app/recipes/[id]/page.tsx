@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
+import MiseScaler from "@/components/MiseScaler";
 
 export const dynamic = "force-dynamic";
 const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"];
@@ -63,19 +64,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
           </section>
         ) : null}
 
-        {ings.length ? (
-          <section className="pt-14">
-            <p className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">Mise{r.portions ? " — for " + r.portions : ""}</p>
-            <div>
-              {ings.map((i: any, n: number) => (
-                <div key={n} className="flex items-baseline gap-4 border-b border-line py-4 first:border-t">
-                  <span className="flex-1 font-serif text-[20px] text-ink">{noEmoji(i.name)}</span>
-                  <span className="font-sans text-[12.5px] tracking-wide text-clay">{i.quantity ?? ""} {i.unit ?? ""}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <MiseScaler ings={ings as any} portions={(r.portions as number) ?? null} recipeId={r.id} />
 
         {steps.length ? (
           <section className="pt-14">
@@ -95,6 +84,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
 
         <div className="flex items-stretch gap-3 pb-16">
           <Link href={`/recipes/${r.id}/cook`} className="flex-1 rounded-sm border border-ink py-4 text-center font-serif text-[18px] font-light italic text-ink transition hover:bg-ink hover:text-paper">Begin Cook Mode</Link>
+          <Link href={`/recipes/${r.id}/edit`} className="flex items-center rounded-sm border border-ink/30 px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft transition hover:border-ink/60">Edit</Link>
           {dish ? <Link href={`/menu/${dish.id}`} className="flex items-center rounded-sm bg-ink px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-paper">Calculation</Link> : null}
         </div>
       </div>
