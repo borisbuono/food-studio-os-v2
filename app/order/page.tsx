@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseBrowser as supabase } from "@/lib/supabaseBrowser";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
