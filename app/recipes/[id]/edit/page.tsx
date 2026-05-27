@@ -5,6 +5,8 @@ import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 type Ing = { id?: string; name: string; quantity: string; unit: string };
+type Comp = { id?: string; recipeId: string; name: string; portions: number };
+type RecOpt = { id: string; name: string; cost: number };
 
 export default function EditRecipe({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -21,6 +23,9 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const [allergens, setAllergens] = useState("");
   const [hero, setHero] = useState("");
   const [ings, setIngs] = useState<Ing[]>([]);
+  const [comps, setComps] = useState<Comp[]>([]);
+  const [recOpts, setRecOpts] = useState<RecOpt[]>([]);
+  const [pick, setPick] = useState("");
   const originalIds = useRef<string[]>([]);
 
   useEffect(() => {
@@ -34,10 +39,13 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
         setAllergens(Array.isArray(r.allergens) ? r.allergens.join(", ") : (r.allergens || ""));
         setHero(r.hero_image_url || "");
       }
-      const { data: ig } = await supabaseBrowser.from("recipe_ingredients").select("id,name,quantity,unit,sort_order").eq("recipe_id", params.id).order("sort_order");
-      const rows = (ig || []).map((i: any) => ({ id: i.id, name: i.name || "", quantity: i.quantity != null ? String(i.quantity) : "", unit: i.unit || "" }));
-      originalIds.current = rows.map((x: any) => x.id);
-      setIngs(rows);
+      const { data: ig } = await supabaseBrowser.from("recipe_ingredients").select("id,name,quantity,unit,sort_order,sub_recipe_id").eq("recipe_id", params.id).order("sort_order");
+      const all = ig || [];
+      originalIds.current = all.map((x: any) => x.id);
+      setIngs(all.filter((i: any) => !i.sub_recipe_id).map((i: any) => ({ id: i.id, name: i.name || "", quantity: i.quantity != null ? String(i.quantity) : "", unit: i.unit || "" })));
+      setComps(all.filter((i: any) => i.sub_recipe_id).map((i: any) => ({ id: i.id, recipeId: i.sub_recipe_id, name: i.name || "", portions: Number(i.quantity) || 1 })));
+      const { data: opts } = await supabaseBrowser.from("recipes").select("id,name,cost_per_portion").neq("id", params.id).order("name");
+      setRecOpts((opts || []).map((o: any) => ({ id: o.id, name: o.name, cost: Number(o.cost_per_portion) || 0 })));
       setLoading(false);
     })();
   }, [params.id]);
@@ -45,6 +53,17 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const setIng = (k: number, f: keyof Ing, v: string) => setIngs((a) => a.map((x, i) => (i === k ? { ...x, [f]: v } : x)));
   const addIng = () => setIngs((a) => [...a, { name: "", quantity: "", unit: "" }]);
   const rmIng = (k: number) => setIngs((a) => a.filter((_, i) => i !== k));
+  const setComp = (k: number, p: number) => setComps((a) => a.map((x, i) => (i === k ? { ...x, portions: p } : x)));
+  const rmComp = (k: number) => setComps((a) => a.filter((_, i) => i !== k));
+  const addComp = () => {
+    const t = pick.trim().toLowerCase();
+    const m = recOpts.find((o) => o.name.toLowerCase() === t);
+    if (!m) { setErr("Pick a recipe from the list to add as a component."); return; }
+    if (comps.some((c) => c.recipeId === m.id)) { setPick(""); return; }
+    setComps((a) => [...a, { recipeId: m.id, name: m.name, portions: 1 }]);
+    setPick(""); setErr(null);
+  };
+  const costOf = (id: string) => recOpts.find((o) => o.id === id)?.cost || 0;
 
   const save = async () => {
     if (!authed) { setErr("Sign in to save changes."); return; }
@@ -52,27 +71,32 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     setSaving(true); setErr(null);
     const allergensArr = allergens.split(",").map((s) => s.trim()).filter(Boolean);
     const { error: e1 } = await supabaseBrowser.from("recipes").update({
-      name: name.trim(),
-      section: section.trim() || null,
+      name: name.trim(), section: section.trim() || null,
       portions: portions.trim() && !isNaN(Number(portions)) ? Number(portions) : null,
-      voice_statement: pitch.trim() || null,
-      description: method.trim() || null,
-      allergens: allergensArr.length ? allergensArr : null,
-      hero_image_url: hero.trim() || null,
+      voice_statement: pitch.trim() || null, description: method.trim() || null,
+      allergens: allergensArr.length ? allergensArr : null, hero_image_url: hero.trim() || null,
     }).eq("id", params.id);
     if (e1) { setErr("Couldn't save recipe — " + e1.message); setSaving(false); return; }
 
-    // Ingredients: update existing in place (preserves cost links), insert new, delete removed.
-    const cur = ings.filter((i) => i.name.trim());
     const ops: Promise<any>[] = [];
-    cur.forEach((i, idx) => {
-      if (i.id) ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").update({ name: i.name.trim(), quantity: i.quantity.trim() || null, unit: i.unit.trim() || null, sort_order: idx }).eq("id", i.id)));
+    const keptIds = new Set<string>();
+    // raw ingredient lines (preserve cost links by updating in place)
+    const rawCur = ings.filter((i) => i.name.trim());
+    rawCur.forEach((i, idx) => {
+      if (i.id) { keptIds.add(i.id); ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").update({ name: i.name.trim(), quantity: i.quantity.trim() || null, unit: i.unit.trim() || null, sort_order: idx }).eq("id", i.id))); }
     });
-    const inserts = cur.map((i, idx) => ({ i, idx })).filter((x) => !x.i.id).map((x) => ({ recipe_id: params.id, name: x.i.name.trim(), quantity: x.i.quantity.trim() || null, unit: x.i.unit.trim() || null, sort_order: x.idx, yield_factor: 1 }));
-    if (inserts.length) ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").insert(inserts)));
-    const curIds = new Set(cur.filter((i) => i.id).map((i) => i.id));
-    const removed = originalIds.current.filter((id) => !curIds.has(id));
+    const rawIns = rawCur.map((i, idx) => ({ i, idx })).filter((x) => !x.i.id).map((x) => ({ recipe_id: params.id, name: x.i.name.trim(), quantity: x.i.quantity.trim() || null, unit: x.i.unit.trim() || null, sort_order: x.idx, yield_factor: 1 }));
+    if (rawIns.length) ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").insert(rawIns)));
+    // component (sub-recipe) lines — cost rolls up via line_cost
+    comps.forEach((c, idx) => {
+      const lc = Math.round(costOf(c.recipeId) * c.portions * 100) / 100;
+      const row = { name: c.name, quantity: String(c.portions), unit: "portion", sub_recipe_id: c.recipeId, line_cost: lc, sort_order: 100 + idx };
+      if (c.id) { keptIds.add(c.id); ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").update(row).eq("id", c.id))); }
+      else ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").insert({ recipe_id: params.id, yield_factor: 1, ...row })));
+    });
+    const removed = originalIds.current.filter((id) => !keptIds.has(id));
     if (removed.length) ops.push(Promise.resolve(supabaseBrowser.from("recipe_ingredients").delete().in("id", removed)));
+
     const results = await Promise.all(ops);
     const bad: any = results.find((r: any) => r && r.error);
     if (bad) { setErr("Recipe saved; ingredients hit an error — " + bad.error.message); setSaving(false); return; }
@@ -116,6 +140,24 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
         ))}
       </div>
       <button onClick={addIng} className="mt-2 rounded-full border border-black/15 px-4 h-9 font-sans text-[13px] text-ink-soft">+ add ingredient</button>
+
+      <p className={label}>Components — sub-recipes that make up this dish</p>
+      <div className="space-y-2">
+        {comps.map((c, k) => (
+          <div key={k} className="flex items-center gap-2">
+            <span className="flex-1 truncate font-serif text-[17px] text-ink">{c.name}</span>
+            <input className={mini} value={String(c.portions)} onChange={(e) => setComp(k, Number(e.target.value) || 0)} inputMode="decimal" />
+            <span className="font-mono text-[10px] uppercase tracking-wide text-clay">portion</span>
+            <button aria-label="remove component" onClick={() => rmComp(k)} className="h-9 w-9 shrink-0 rounded-full border border-black/15 font-serif text-[16px] text-ink-soft">×</button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input list="reclist" className={field + " flex-1"} value={pick} onChange={(e) => setPick(e.target.value)} placeholder="Add a component recipe (type to search)" />
+        <datalist id="reclist">{recOpts.map((o) => <option key={o.id} value={o.name} />)}</datalist>
+        <button onClick={addComp} className="shrink-0 rounded-full border border-black/15 px-4 h-11 font-sans text-[13px] text-ink-soft">+ add</button>
+      </div>
+      <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">Component cost rolls into this dish's Calculation</p>
 
       <p className={label}>Allergens (comma-separated)</p>
       <input className={field} value={allergens} onChange={(e) => setAllergens(e.target.value)} placeholder="gluten, dairy, egg" />

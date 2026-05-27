@@ -16,7 +16,9 @@ export default async function RecipePage({ params }: { params: { id: string } })
       </main>
     );
   }
-  const ings: any[] = (await supabase.from("recipe_ingredients").select("name,quantity,unit,sort_order").eq("recipe_id", r.id).order("sort_order")).data || [];
+  const allLines: any[] = (await supabase.from("recipe_ingredients").select("name,quantity,unit,sort_order,sub_recipe_id,line_cost").eq("recipe_id", r.id).order("sort_order")).data || [];
+  const ings = allLines.filter((i: any) => !i.sub_recipe_id);
+  const comps = allLines.filter((i: any) => i.sub_recipe_id);
   const lex: any = (await supabase.from("lexicon_dishes").select("*").eq("recipe_id", r.id).maybeSingle()).data;
   const dish: any = (await supabase.from("menu_items").select("id").eq("recipe_id", r.id).maybeSingle()).data;
 
@@ -61,6 +63,20 @@ export default async function RecipePage({ params }: { params: { id: string } })
           <section className="pt-16">
             <p className="mb-5 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">The story</p>
             <p className="font-serif text-[21px] font-light leading-relaxed text-ink-soft">{story}</p>
+          </section>
+        ) : null}
+
+        {comps.length ? (
+          <section className="pt-14">
+            <p className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">Built from</p>
+            <div>
+              {comps.map((c: any, n: number) => (
+                <a key={n} href={`/recipes/${c.sub_recipe_id}`} className="flex items-baseline justify-between gap-4 border-b border-line py-4 first:border-t transition hover:opacity-70">
+                  <span className="flex-1 font-serif text-[20px] text-ink">{noEmoji(c.name)}</span>
+                  <span className="font-sans text-[12.5px] tracking-wide text-clay">{c.quantity} {String(c.quantity) === "1" ? "portion" : "portions"} ›</span>
+                </a>
+              ))}
+            </div>
           </section>
         ) : null}
 
