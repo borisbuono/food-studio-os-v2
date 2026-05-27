@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function EightySixToggle({ id, initial }: { id: string; initial: boolean }) {
   const [on, setOn] = useState(!!initial);
@@ -10,7 +10,7 @@ export default function EightySixToggle({ id, initial }: { id: string; initial: 
   const toggle = async () => {
     const next = !on;
     setOn(next); setSaving(true); setErr(false);
-    const { error } = await supabase.from("menu_items").update({ is_eighty_six: next }).eq("id", id);
+    const { error } = await supabaseBrowser.from("menu_items").update({ is_eighty_six: next }).eq("id", id);
     if (error) { setOn(!next); setErr(true); }
     setSaving(false);
   };
