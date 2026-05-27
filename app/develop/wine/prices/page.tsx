@@ -31,6 +31,7 @@ export default function WinePrices() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState<string[] | null>(null);
+  const [rid, setRid] = useState("");
 
   const onPick = async (file?: File | null) => {
     if (!file) return;
@@ -39,6 +40,7 @@ export default function WinePrices() {
       const p = await getMyProfile();
       const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
       const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      setRid(rid);
       const { data: ws } = await supabaseBrowser.from("menu_items").select("id,name,producer,cost,bottle_price").eq("restaurant_id", rid).eq("section", "wine").eq("is_active", true);
       const wl = (ws || []) as Wine[]; setWines(wl);
       const { data, media_type } = await downscale(file);
@@ -60,6 +62,7 @@ export default function WinePrices() {
       const old = wine.cost; const next = Number(row.unit_price);
       const { error } = await supabaseBrowser.from("menu_items").update({ cost: next }).eq("id", wine.id);
       if (error) { msgs.push("⚠ " + wine.name + ": " + error.message); continue; }
+      try { await supabaseBrowser.from("price_history").insert({ restaurant_id: rid, item_kind: "wine", item_id: wine.id, name: wine.name, unit: "bottle", unit_price: next, supplier: supplier || null, source: "invoice" }); } catch {}
       const margin = wine.bottle_price != null ? Number(wine.bottle_price) - next : null;
       const move = old != null && old !== next ? ` (was ${eur(old)}${old ? `, ${next > old ? "+" : ""}${Math.round((next / old - 1) * 100)}%` : ""})` : "";
       msgs.push(`✓ ${noEmoji(wine.name)} cost → ${eur(next)}${move}${margin != null ? ` · bottle margin ${eur(margin)}` : ""}`);

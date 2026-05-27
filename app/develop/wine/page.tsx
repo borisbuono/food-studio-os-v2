@@ -21,6 +21,7 @@ export default async function Wine() {
         <Link href="/develop/wine/scan">+ Scan a label</Link>
         <Link href="/develop/wine/train">Train the list</Link>
         <Link href="/develop/wine/prices">Update prices</Link>
+        <Link href="/administrate/finance/costs">Cost trends</Link>
       </div>
 
       {ORDER.filter((s) => styled(s).length).map((s) => (

@@ -23,6 +23,7 @@ export default async function Finance() {
         <Link href="/administrate/finance/eod">EOD reports →</Link>
         <Link href="/administrate/finance/variance">Variance →</Link>
         <Link href="/administrate/finance/forecast">Forecast →</Link>
+        <Link href="/administrate/finance/costs">Cost trends →</Link>
       </div>
 
       {byVenue.map((v: any) => {
