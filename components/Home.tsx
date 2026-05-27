@@ -163,7 +163,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
 
       {/* Role actions — the few things this person reaches for */}
       <div className="mt-6 space-y-3">
-        {ROLES[role].points.map((p) => (
+        {ROLES[role].points.filter((p) => p.href !== "/administrate/holdings" || entity === "holdings").map((p) => (
           <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
             <h2 className="font-serif text-xl text-ink">{p.label}</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>

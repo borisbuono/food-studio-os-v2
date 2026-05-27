@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 type Venue = { id: string; name: string };
 
 export default async function Administrate() {
+  const ent = serverEntity();
+  const isHoldings = ent === "holdings";
+  const rid = serverRestaurantId();
   const venues: Venue[] = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
   const invCounts: Record<string, number> = {};
   for (const v of venues) { invCounts[v.id] = (await supabase.from("inventory_items").select("*", { count: "exact", head: true }).eq("restaurant_id", v.id)).count ?? 0; }
@@ -41,14 +45,18 @@ export default async function Administrate() {
       { href: "/administrate/team", label: "Team", blurb: "HR roster and roles." },
       { href: "/schedule", label: "Schedule", blurb: "Weekly rota, FOH / BOH." },
     ]},
-    { title: "The group", items: [
-      { href: "/administrate/holdings", label: "Holdings · entity map", blurb: "The structure, venue by venue." },
-      { href: "/command", label: "Command centre", blurb: "Flags, accounts, skills, activity." },
+    { title: isHoldings ? "The group" : "The house", items: [
+      ...(isHoldings ? [
+        { href: "/administrate/holdings", label: "Holdings · entity map", blurb: "The structure, venue by venue." },
+        { href: "/command", label: "Command centre", blurb: "Flags, accounts, skills, activity." },
+      ] : []),
       { href: "/administrate/decisions", label: "Decisions · " + (inbox.count ?? 0) + " in inbox", blurb: "What needs a call." },
       { href: "/administrate/feedback", label: "Feedback board", blurb: "What the team is flagging, by screen." },
       { href: "/administrate/settings", label: "Settings", blurb: "Connections and AI skills." },
     ]},
   ];
+  // on a single venue, only that venue's temperature card; the all-venues roll-up is Holdings-only
+  const shownStats = isHoldings ? venueStats : venueStats.filter((v) => v.id === rid);
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
@@ -56,9 +64,9 @@ export default async function Administrate() {
       <p className="mt-6 font-sans text-xs font-medium text-ochre">Administrate · the house</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Run the business</h1>
 
-      <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.18em] text-ochre">Holdings · temperature check</p>
+      <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.18em] text-ochre">{isHoldings ? "Holdings · temperature check" : "Temperature check"}</p>
       <div className="mt-2 space-y-3">
-        {venueStats.map((v) => (
+        {shownStats.map((v) => (
           <div key={v.id} className="rounded-2xl border border-black/10 bg-card p-5">
             <div className="flex items-baseline justify-between">
               <h2 className="font-serif text-xl text-ink">{v.name}</h2>
