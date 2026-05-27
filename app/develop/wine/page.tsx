@@ -20,6 +20,7 @@ export default async function Wine() {
       <div className="mt-3 flex gap-4 font-mono text-[11px] uppercase tracking-wide text-tomato">
         <Link href="/develop/wine/scan">+ Scan a label</Link>
         <Link href="/develop/wine/train">Train the list</Link>
+        <Link href="/develop/wine/prices">Update prices</Link>
       </div>
 
       {ORDER.filter((s) => styled(s).length).map((s) => (
