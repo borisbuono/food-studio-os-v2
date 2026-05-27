@@ -33,6 +33,23 @@ export default async function DishHub({ params }: { params: { id: string } }) {
     ings = (await supabase.from("recipe_ingredients").select("name,quantity,unit,sort_order,line_cost").eq("recipe_id", item.recipe_id).order("sort_order")).data || [];
     lex = (await supabase.from("lexicon_dishes").select("*").eq("recipe_id", item.recipe_id).maybeSingle()).data;
   }
+  // menu-engineering position, folded onto the dish itself (no separate engineering screen)
+  let mePos: { label: string; nudge: string; color: string } | null = null;
+  if (item.category === "food") {
+    const sibs = (await supabase.from("menu_items").select("units_sold").eq("restaurant_id", item.restaurant_id).eq("category", "food").eq("is_active", true)).data || [];
+    const sold = sibs.map((x: any) => Number(x.units_sold || 0)).sort((a: number, b: number) => a - b);
+    const med = sold.length ? sold[Math.floor(sold.length / 2)] : 0;
+    const popular = Number(item.units_sold || 0) >= med && med > 0;
+    const _p = item.price ?? recipe?.menu_price ?? null;
+    const _c = recipe?.cost_per_portion ?? item.cost ?? null;
+    const goodMargin = _p && _c ? (1 - _c / _p) >= 0.55 : null;
+    if (goodMargin !== null && med > 0) {
+      if (popular && goodMargin) mePos = { label: "Star", nudge: "Protect it — keep it visible and consistent.", color: "#5A6B3B" };
+      else if (popular && !goodMargin) mePos = { label: "Plowhorse", nudge: "Sells well, thin margin — nudge the price or trim the cost.", color: "#B5701C" };
+      else if (!popular && goodMargin) mePos = { label: "Puzzle", nudge: "Great margin, slow seller — reposition or push it.", color: "#B5701C" };
+      else mePos = { label: "Dog", nudge: "Low on both — rework or retire it.", color: "#B8552E" };
+    }
+  }
   const price = item.price ?? recipe?.menu_price ?? null;
   const cost = recipe?.cost_per_portion ?? item.cost ?? null;
   const mg = price && cost ? Math.round((1 - cost / price) * 100) : null;
@@ -49,6 +66,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       <p className="mt-6 font-sans text-xs font-medium text-tomato">{sec || "Dish"}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(item.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
+      {mePos ? <div className="mt-3 rounded-xl border border-black/10 bg-card px-4 py-2.5"><span className="font-mono text-[11px] uppercase tracking-wide" style={{ color: mePos.color }}>{mePos.label}</span><span className="ml-2 font-sans text-[13px] text-ink-soft">{mePos.nudge}</span></div> : null}
 
       {recipe ? (
         <Link href={`/recipes/${item.recipe_id}`} className="mt-6 block rounded-xl bg-tomato px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">
