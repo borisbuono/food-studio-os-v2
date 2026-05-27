@@ -20,6 +20,7 @@ export default function Messages() {
   const [active, setActive] = useState<Channel | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
+  const [sendErr, setSendErr] = useState("");
   const [ready, setReady] = useState(false);
   const [newCh, setNewCh] = useState(false);
   const [newChName, setNewChName] = useState("");
@@ -59,11 +60,12 @@ export default function Messages() {
   };
   const send = async () => {
     const b = text.trim(); if (!b || !active || !profile) return;
-    setText("");
+    setText(""); setSendErr("");
     const optimistic = { id: "tmp" + Date.now(), author_id: profile.id, author_name: profile.name, body: b, created_at: new Date().toISOString() };
     setMsgs((m) => [...m, optimistic]);
     setTimeout(() => endRef.current?.scrollIntoView(), 40);
-    await supabaseBrowser.from("messages").insert({ channel_id: active.id, author_id: profile.id, author_name: profile.name, body: b });
+    const { error } = await supabaseBrowser.from("messages").insert({ channel_id: active.id, author_id: profile.id, author_name: profile.name, body: b });
+    if (error) { setSendErr("Couldn’t send — sign in to post to the team."); setMsgs((m) => m.filter((x) => x.id !== optimistic.id)); setText(b); return; }
     const { data } = await supabaseBrowser.from("messages").select("id,author_id,author_name,body,created_at").eq("channel_id", active.id).order("created_at");
     setMsgs((data || []) as Msg[]);
   };
@@ -127,6 +129,7 @@ export default function Messages() {
           {!msgs.length ? <p className="font-sans text-[14px] text-clay">No messages yet — say something.</p> : null}
           <div ref={endRef} />
         </div>
+        {sendErr ? <p className="pb-2 text-center font-mono text-[10px] uppercase tracking-wide text-ember">{sendErr}</p> : null}
         <div className="flex items-center gap-2 border-t border-black/10 pt-3">
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Message…" className="flex-1 rounded-full border border-black/15 bg-paper px-4 py-2.5 font-sans text-[15px] text-ink outline-none focus:border-ember" />
           <button onClick={send} className="rounded-full px-5 py-2.5 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Send</button>
