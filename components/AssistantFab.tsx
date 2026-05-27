@@ -21,6 +21,7 @@ export default function AssistantFab() {
   const [log, setLog] = useState<Msg[]>([]);
   const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
   const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [lastYou, setLastYou] = useState("");
   const recRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textRef = useRef("");
@@ -84,6 +85,7 @@ export default function AssistantFab() {
     const t = (textRef.current.trim() || text.trim()); if (!t) return;
     keepRef.current = false; if (listening) { try { recRef.current?.stop(); } catch {} setListening(false); }
     setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
+    setLastYou(t);
     setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "…" }]);
     try {
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: t, route: pathname || "" }) });
@@ -101,6 +103,15 @@ export default function AssistantFab() {
       }
       if (Array.isArray(d.order) && d.order.length) setOrderDraft(d.order);
     } catch { setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: "Couldn’t reach Chef — try again." }; return n; }); }
+  };
+  const fileLast = async () => {
+    if (!lastYou) return;
+    if (!profile) { setLog((l) => [...l, { role: "sys", text: "⚠ Sign in to save to the board." }]); return; }
+    const ent = (!profile.isAdmin ? profile.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+    const rid = profile.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+    const { error } = await supabaseBrowser.from("feedback").insert({ restaurant_id: rid, route: pathname || "", author_id: profile.id, author_name: profile.name, author_role: profile.dbRole, kind: "idea", body: lastYou });
+    setLog((l) => [...l, { role: "sys", text: error ? ("⚠ Couldn\u2019t save: " + error.message) : "\u2713 Saved to the feedback board" }]);
+    setLastYou("");
   };
   useEffect(() => { sendRef.current = send; });
 
@@ -132,6 +143,7 @@ export default function AssistantFab() {
             <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/order"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#FCEFE7]">Draft this order in Ordering →</button>
           ) : null}
 
+          {lastYou ? <button onClick={fileLast} className="mx-3 mb-1 rounded-lg border border-black/15 px-3 py-1.5 text-left font-mono text-[10px] uppercase tracking-wide text-ink-soft transition hover:border-ink/40">↪ Save that to the feedback board</button> : null}
           <div className="flex items-center gap-3 border-t border-black/10 p-3">
             <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ember" />
             {text && !listening ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]">Send</button> : null}
