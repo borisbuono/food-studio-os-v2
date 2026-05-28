@@ -5,9 +5,8 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
     label: "Office",
     points: [
       { href: "/administrate/decisions", label: "Inbox", blurb: "Emails, requests, reviews — what needs a reply or a call." },
-      { href: "/messages", label: "Team", blurb: "Channels and direct messages." },
+      { href: "/messages", label: "Team", blurb: "Everyone the team, in one place: channels, roster, message anyone." },
       { href: "/administrate/finance", label: "The numbers", blurb: "What's moving — revenue, covers, costs to react to." },
-      { href: "/administrate/team", label: "People", blurb: "Roster, roles, schedule." },
       { href: "/administrate/suppliers", label: "Suppliers", blurb: "Orders, prices, deliveries." },
     ],
   },

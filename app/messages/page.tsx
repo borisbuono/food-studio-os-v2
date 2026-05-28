@@ -173,6 +173,16 @@ export default function Messages() {
           </ul>
         </>
       ) : null}
+      <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.18em] text-clay">People</p>
+      <ul className="mt-2 divide-y divide-black/10 border-t border-black/10">
+        {people.length ? people.map((pp) => (
+          <li key={pp.id} className="flex items-center justify-between gap-3 py-3">
+            <span><span className="font-serif text-[16px] text-ink">{noEmoji(pp.name)}</span>{pp.role ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wide text-clay">{pp.role}</span> : null}</span>
+            <button onClick={() => startDm(pp)} className="rounded-full border border-black/15 px-3 py-1 font-sans text-[12px] text-ink-soft transition hover:border-ink/40">Message</button>
+          </li>
+        )) : <li className="py-3 font-sans text-[14px] text-clay">No teammates signed up yet — they appear here once onboarded.</li>}
+      </ul>
+
     </main>
   );
 }
