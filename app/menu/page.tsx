@@ -34,14 +34,18 @@ export default async function MenuPage() {
     .select("id,restaurant_id,recipe_id,name,section,price,cost,description,is_active,is_eighty_six,is_special,beverage_type,category,course,wine_style")
     .eq("is_active", true).neq("restaurant_id", "a0000000-0000-4000-8000-000000000001");
   const items = (data ?? []) as MenuItem[];
+  // Library: recipes with no linked menu item (sub-recipes, prep)
+  const linkedRecipeIds = new Set(items.map((i) => i.recipe_id).filter(Boolean));
+  const recRes = await supabase.from("recipes").select("id,name,section").order("name");
+  const library = ((recRes.data || []) as any[]).filter((r) => !linkedRecipeIds.has(r.id));
   const food = items.filter((i) => i.category === "food");
   const drink = items.filter((i) => i.category === "drink");
   const inSection = (arr: MenuItem[], s: string) => arr.filter((i) => (i.section || "") === s);
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-tomato">Menu · live from database</p>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">Dishes · the menu and the library</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length} items</h1>
       <a href="/m" className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide text-tomato">Guest menu →</a>
 
@@ -76,6 +80,23 @@ export default async function MenuPage() {
           </section>
         );
       })}
+
+      {library.length > 0 ? (
+        <section className="mt-14">
+          <h2 className="font-serif text-2xl text-ink">Library</h2>
+          <p className="mt-1 font-sans text-[13px] text-ink-soft">Sub-recipes and prep that aren't on the menu yet. {library.length} in total.</p>
+          <ul className="mt-3 divide-y divide-black/10">
+            {library.map((r: any) => (
+              <li key={r.id}>
+                <Link href={"/recipes/" + r.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
+                  <span className="font-serif text-lg text-ink">{r.name}</span>
+                  {r.section ? <span className="font-mono text-[11px] uppercase tracking-wide text-clay">{r.section}</span> : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </main>
   );
 }
