@@ -24,14 +24,14 @@ export default async function Suppliers() {
 
       <div className="mt-6 space-y-4">
         {providers.map((p: any) => (
-          <div key={p.id} className="rounded-2xl border border-black/10 bg-card p-6">
+          <Link key={p.id} href={"/administrate/suppliers/" + p.id} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ochre/40">
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-serif text-2xl text-ink">{noEmoji(p.name)}</h2>
               <span className="font-mono text-[11px] text-clay">{prodCount[p.id] || 0} products</span>
             </div>
             <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{[p.category, p.delivery_schedule, p.cutoff_time ? "cutoff " + p.cutoff_time : ""].filter(Boolean).join(" · ")}</p>
             {p.current_offer ? <p className="mt-3 font-sans text-[14px] leading-relaxed text-ink-soft">{p.current_offer}</p> : null}
-          </div>
+          </Link>
         ))}
         {!providers.length ? <p className="font-sans text-[14px] text-clay">No suppliers yet.</p> : null}
       </div>
