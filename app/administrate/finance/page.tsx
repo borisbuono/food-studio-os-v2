@@ -1,31 +1,73 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 export default async function Finance() {
+  const rid = serverRestaurantId();
   const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
   const reports = (await supabase.from("eod_reports").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar").order("report_date", { ascending: false })).data || [];
-  const coa = (await supabase.from("chart_of_accounts").select("code,label_en,label_es,direction,is_active").eq("is_active", true).order("code")).data || [];
-
   const byVenue = venues.map((v: any) => ({ ...v, rs: reports.filter((r: any) => r.restaurant_id === v.id) })).filter((x: any) => x.rs.length);
+
+  // Engine-as-signal: biggest recent cost moves on this venue's purchases
+  const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString();
+  const prices = (await supabase.from("price_history")
+    .select("item_id,name,unit,unit_price,supplier,captured_at,item_kind")
+    .gte("captured_at", since)
+    .order("captured_at", { ascending: false })
+    .limit(500)).data || [];
+  const byItem: Record<string, any[]> = {};
+  prices.forEach((r: any) => {
+    const key = r.item_id || r.name;
+    if (!byItem[key]) byItem[key] = [];
+    byItem[key].push(r);
+  });
+  const moves = Object.values(byItem).map((rows) => {
+    const sorted = rows.sort((a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime());
+    const latest = sorted[0], prior = sorted[sorted.length - 1];
+    if (!prior || Number(prior.unit_price) === 0) return null;
+    const pct = ((Number(latest.unit_price) - Number(prior.unit_price)) / Number(prior.unit_price)) * 100;
+    return { name: latest.name, supplier: latest.supplier, kind: latest.item_kind, latest: Number(latest.unit_price), prior: Number(prior.unit_price), unit: latest.unit, pct };
+  }).filter((m): m is NonNullable<typeof m> => m !== null && Math.abs(m.pct) >= 5)
+    .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
+    .slice(0, 5);
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Finance · the numbers, explained</p>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">The numbers · what to react to</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">How the house is doing</h1>
-      <div className="mt-4 flex gap-4 font-sans text-sm text-ochre">
-        <Link href="/administrate/cashflow">Cash flow →</Link>
-        <Link href="/administrate/invoices">Missing invoices →</Link>
-        <Link href="/administrate/finance/eod">EOD reports →</Link>
-        <Link href="/administrate/finance/variance">Variance →</Link>
-        <Link href="/administrate/finance/forecast">Forecast →</Link>
-        <Link href="/administrate/finance/costs">Cost trends →</Link>
-      </div>
+      <p className="mt-2 font-sans text-[14px] text-ink-soft">The engine runs out of sight. Below are only the signals that actually want a call.</p>
 
+      {/* Signals — react-to */}
+      {moves.length > 0 ? (
+        <section className="mt-7">
+          <p className="font-sans text-xs font-medium text-clay">Costs that moved</p>
+          <p className="mt-1 font-sans text-[12px] text-ink-soft">From your invoices, last 30 days. ≥5% move surfaces here.</p>
+          <ul className="mt-3 space-y-2">
+            {moves.map((m, i) => {
+              const up = m.pct > 0;
+              return (
+                <li key={i} className="rounded-xl border border-black/10 bg-card px-4 py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-sans text-[14px] text-ink">{m.name}</span>
+                    <span className={"font-mono text-[12px] " + (up ? "text-rose-700" : "text-emerald-700")}>{up ? "▲" : "▼"} {Math.abs(m.pct).toFixed(1)}%</span>
+                  </div>
+                  <p className="mt-0.5 font-sans text-[11px] leading-snug text-ink-soft">€{m.prior.toFixed(2)} → €{m.latest.toFixed(2)} per {m.unit} · {m.supplier || ""} · {up && Math.abs(m.pct) >= 10 ? "Worth a call or a switch." : "Within normal."}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <Link href="/administrate/finance/costs" className="mt-3 inline-block font-sans text-sm text-ochre">All cost trends →</Link>
+        </section>
+      ) : (
+        <p className="mt-7 font-sans text-[13px] text-clay">No notable cost moves in the last 30 days.</p>
+      )}
+
+      {/* The EOD topline per venue */}
       {byVenue.map((v: any) => {
         const latest = v.rs[0], prev = v.rs[1];
         const rev = Number(latest.revenue || 0);
@@ -64,19 +106,17 @@ export default async function Finance() {
       })}
       {!byVenue.length ? <p className="mt-8 font-sans text-[14px] text-clay">No end-of-day reports yet.</p> : null}
 
-      <section className="mt-10">
-        <p className="font-sans text-xs font-medium text-clay">Chart of accounts · {coa.length}</p>
-        <ul className="mt-2 divide-y divide-black/10">
-          {coa.map((a: any, i: number) => (
-            <li key={i} className="flex items-baseline justify-between gap-4 py-2">
-              <span className="font-sans text-[14px] text-ink">{a.label_en || a.label_es}</span>
-              <span className="font-mono text-[11px] text-clay">{a.code}{a.direction ? " · " + a.direction : ""}</span>
-            </li>
-          ))}
-        </ul>
+      {/* Deeper engine — links recede, available if needed */}
+      <section className="mt-10 border-t border-black/10 pt-6">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">If you need to look deeper</p>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 font-sans text-[13px] text-ochre">
+          <Link href="/administrate/finance/costs">All cost trends</Link>
+          <Link href="/administrate/finance/eod">EOD reports</Link>
+          <Link href="/administrate/finance/variance">Variance</Link>
+          <Link href="/administrate/finance/forecast">Forecast</Link>
+          <Link href="/administrate/invoices">Missing invoices</Link>
+        </div>
       </section>
-
-      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Holded sync + missing-invoice tracking arrive next</p>
     </main>
   );
 }
