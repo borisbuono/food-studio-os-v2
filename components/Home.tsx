@@ -59,10 +59,13 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
 
 // The real brief — what a FOH/BOH person needs the moment they open the app.
 function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
-  const Row = ({ label, value, soft }: { label: string; value: string; soft?: boolean }) => (
-    <div className="flex items-baseline justify-between gap-4 py-2.5">
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-clay">{label}</span>
-      <span className={"text-right font-sans text-[14px] " + (soft ? "text-clay" : "text-ink")}>{value}</span>
+  const Row = ({ label, value, why, soft }: { label: string; value: string; why?: string; soft?: boolean }) => (
+    <div className="flex flex-col gap-0.5 py-2.5">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-clay">{label}</span>
+        <span className={"text-right font-sans text-[14px] " + (soft ? "text-clay" : "text-ink")}>{value}</span>
+      </div>
+      {why && !soft ? <p className="text-right font-sans text-[11px] leading-snug text-ink-soft">{why}</p> : null}
     </div>
   );
   const tonight = s.eventsToday && s.eventsToday.length
