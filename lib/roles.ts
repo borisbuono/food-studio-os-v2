@@ -23,11 +23,10 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   foh: {
     label: "Front of House",
     points: [
-      { href: "/execute/today", label: "Today", blurb: "Covers and what's on." },
+      { href: "/execute/handover", label: "The Pass", blurb: "Tonight: covers, specials, 86s, close-down." },
       { href: "/menu", label: "Menu", blurb: "Sell and present every dish." },
       { href: "/administrate/events", label: "Events", blurb: "Private events and catering." },
-      { href: "/execute/cleaning", label: "Cleaning", blurb: "Front-of-house close-down." },
-      { href: "/schedule", label: "Schedule", blurb: "Who's on, when." },
+      { href: "/schedule", label: "Schedule", blurb: "Who is on, when." },
     ],
   },
 };
