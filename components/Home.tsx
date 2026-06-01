@@ -77,13 +77,13 @@ function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
 
   return (
     <div className="divide-y divide-black/10">
-      <Row label="Tonight" value={tonight || "Nothing booked yet — covers connect when a booking system is linked"} soft={!tonight} />
-      {role === "boh" ? <Row label="Prep" value={s.prep ? `${s.prep} on your station list` : "Nothing queued"} soft={!s.prep} /> : null}
-      <Row label="Specials" value={specials || "None flagged today"} soft={!specials} />
-      <Row label="86 tonight" value={sixed || "Nothing 86’d"} soft={!sixed} />
-      <Row label="Deliveries" value={deliveries || "None due"} soft={!deliveries} />
-      <Row label="Cleaning" value={s.cleaningDue ? `${s.cleaningDue} due today` : "All clear"} soft={!s.cleaningDue} />
-      <Row label="Messages" value={msgs || "Inbox clear"} soft={!msgs} />
+      <Row label="Tonight" value={tonight || "Nothing booked yet — covers connect when a booking system is linked"} why="Who's coming. Sets the pace for the night." soft={!tonight} />
+      {role === "boh" ? <Row label="Prep" value={s.prep ? `${s.prep} on your station list` : "Nothing queued"} why="Scaled to tomorrow's covers — opens the recipe + SOP." soft={!s.prep} /> : null}
+      <Row label="Specials" value={specials || "None flagged today"} why="What the floor pushes tonight. Tap to read the pitch." soft={!specials} />
+      <Row label="86 tonight" value={sixed || "Nothing 86’d"} why="Tell the floor before they tell a guest." soft={!sixed} />
+      <Row label="Deliveries" value={deliveries || "None due"} why="Photograph the note on arrival — costs update everywhere." soft={!deliveries} />
+      <Row label="Cleaning" value={s.cleaningDue ? `${s.cleaningDue} due today` : "All clear"} why="HACCP sign-off — auditable, station-by-station." soft={!s.cleaningDue} />
+      <Row label="Messages" value={msgs || "Inbox clear"} why="The team, in the OS. Not WhatsApp." soft={!msgs} />
     </div>
   );
 }

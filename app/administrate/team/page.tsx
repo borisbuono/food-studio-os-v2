@@ -8,12 +8,12 @@ export default async function Team() {
   const venues = (await supabase.from("restaurants").select("id,name")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
   const members = (await supabase.from("team_members").select("name,email,default_role,default_restaurant_id,status").order("name")).data || [];
-  const profiles = (await supabase.from("profiles").select("name,role,restaurant_id").order("name")).data || [];
+  const profiles = (await supabase.from("profiles").select("id,name,role,restaurant_id,color").order("name")).data || [];
   const shifts = await supabase.from("shifts").select("*", { count: "exact", head: true });
 
   const people = [
     ...members.map((m: any) => ({ name: m.name, role: m.default_role, venue: vname.get(m.default_restaurant_id), status: m.status })),
-    ...profiles.map((p: any) => ({ name: p.name, role: p.role, venue: vname.get(p.restaurant_id), status: "profile" })),
+    ...profiles.map((p: any) => ({ id: p.id, name: p.name, role: p.role, venue: vname.get(p.restaurant_id), status: "profile" })),
   ].filter((p) => p.name);
 
   return (
@@ -29,15 +29,22 @@ export default async function Team() {
       </Link>
 
       <div className="mt-6 divide-y divide-black/10">
-        {people.map((p: any, i: number) => (
-          <div key={i} className="flex items-baseline justify-between gap-4 py-3">
-            <div>
-              <p className="font-serif text-[19px] text-ink">{noEmoji(p.name)}</p>
-              <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{[p.role, p.venue].filter(Boolean).join(" · ")}</p>
-            </div>
-            <span className="font-mono text-[11px] text-clay">{p.status || ""}</span>
-          </div>
-        ))}
+        {people.map((p: any, i: number) => {
+          const inner = (
+            <>
+              <div>
+                <p className="font-serif text-[19px] text-ink">{noEmoji(p.name)}</p>
+                <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{[p.role, p.venue].filter(Boolean).join(" · ")}</p>
+              </div>
+              <span className="font-mono text-[11px] text-clay">{p.status || ""}</span>
+            </>
+          );
+          return p.id ? (
+            <Link key={i} href={"/administrate/team/" + p.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:text-ember">{inner}</Link>
+          ) : (
+            <div key={i} className="flex items-baseline justify-between gap-4 py-3">{inner}</div>
+          );
+        })}
         {!people.length ? <p className="py-3 font-sans text-[14px] text-clay">No team members yet — invite the team to populate this.</p> : null}
       </div>
     </main>
