@@ -97,7 +97,10 @@ export default async function SupplierHub({ params }: { params: { id: string } }
 
       {/* products this supplier carries */}
       <section className="mt-10">
-        <h2 className="font-serif text-xl text-ink">{products.length} products</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-serif text-xl text-ink">{products.length} products</h2>
+          <Link href={"/administrate/suppliers/" + params.id + "/add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ochre">+ add</Link>
+        </div>
         {!products.length ? <p className="mt-2 font-sans text-[14px] text-clay">No catalog yet. Build it from your last invoice.</p> : (
           <ul className="mt-3 divide-y divide-black/5 rounded-2xl border border-black/10 bg-card">
             {products.slice(0, 30).map((pr: any) => (

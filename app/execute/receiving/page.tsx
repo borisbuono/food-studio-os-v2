@@ -98,7 +98,7 @@ export default function Receiving() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Receiving · delivery in</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Log a delivery</h1>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Photograph the delivery note. Chef reads the lines, matches them to your stock and wines — you confirm, and it updates costs, logs the price to the trend, and books the stock in.</p>

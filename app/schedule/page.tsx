@@ -13,6 +13,8 @@ const hhmm = (t: string | null) => (t || "").slice(0, 5);
 export default function Schedule() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState<any[]>([]);
+  const [clocks, setClocks] = useState<Record<string, "in" | "out">>({});
+  const [today, setToday] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [zones, setZones] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -27,16 +29,25 @@ export default function Schedule() {
       const prof = await getMyProfile();
       const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "utopia";
       const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
-      const [s, p, z] = await Promise.all([
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const dayStart = new Date(todayIso + "T00:00:00").toISOString();
+      const [s, p, z, ce] = await Promise.all([
         supabase.from("shifts").select("id,profile_id,zone_id,shift_date,start_time,end_time").gte("shift_date", from).lte("shift_date", to),
         supabase.from("profiles").select("id,name,role"),
         supabase.from("zones").select("id,name,area").eq("restaurant_id", rid),
+        supabase.from("clock_events").select("profile_id,event_type,event_at").gte("event_at", dayStart).order("event_at"),
       ]);
       if (!active) return;
       const venueZoneIds = new Set((z.data || []).map((r: any) => r.id));
       setShifts((s.data || []).filter((sh: any) => venueZoneIds.has(sh.zone_id)));
       setProfiles(Object.fromEntries((p.data || []).map((r: any) => [r.id, r])));
       setZones(Object.fromEntries((z.data || []).map((r: any) => [r.id, r])));
+      // latest clock_event per profile = current in/out status
+      const cmap: Record<string, "in" | "out"> = {};
+      (ce.data || []).forEach((row: any) => { cmap[row.profile_id] = row.event_type; });
+      setClocks(cmap);
+      const todayList = (s.data || []).filter((sh: any) => sh.shift_date === todayIso && venueZoneIds.has(sh.zone_id));
+      setToday(todayList);
       setLoading(false);
     })();
     return () => { active = false; };
@@ -47,8 +58,38 @@ export default function Schedule() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">← team</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ochre">Schedule · weekly rota</p>
+      {/* Today's roster — who's in, who's late */}
+      {today.length ? (
+        <section className="mt-4 rounded-2xl border border-black/10 bg-card p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">On today</p>
+          <ul className="mt-2 divide-y divide-black/10">
+            {today.map((sh: any) => {
+              const prof = profiles[sh.profile_id];
+              const status = clocks[sh.profile_id];
+              const start = (sh.start_time || "").slice(0, 5);
+              const lateBy = (() => {
+                if (status === "in") return null;
+                const [hh, mm] = start.split(":").map(Number);
+                const startMin = (hh * 60) + (mm || 0);
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                const diff = nowMin - startMin;
+                return diff > 0 ? diff : null;
+              })();
+              return (
+                <li key={sh.id} className="flex items-baseline justify-between gap-4 py-2">
+                  <span className="font-serif text-[15px] text-ink">{prof?.name || "Unassigned"}</span>
+                  <span className="font-mono text-[11px]" style={{ color: status === "in" ? "#5A6B3B" : lateBy ? "#B8552E" : "#9C8B7A" }}>
+                    {status === "in" ? "Clocked in" : lateBy ? "Late " + lateBy + "m" : "Due " + start}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on, when</h1>
 
       <div className="mt-6 flex items-center justify-between">

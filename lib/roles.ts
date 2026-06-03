@@ -13,11 +13,8 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   boh: {
     label: "Back of House",
     points: [
-      { href: "/execute/today", label: "Today", blurb: "Your priority prep and cleaning." },
-      { href: "/menu", label: "Menu", blurb: "Every dish, its recipe and story." },
-      { href: "/recipes", label: "Recipes", blurb: "The library, with cook mode." },
-      { href: "/execute/prep", label: "Prep", blurb: "Mise en place by station." },
-      { href: "/execute/cleaning", label: "Cleaning", blurb: "Daily and weekly, by station." },
+      { href: "/execute/handover", label: "The Pass", blurb: "Tonight's prep + cleaning + close-down, scaled to tomorrow's covers." },
+      { href: "/menu", label: "Menu", blurb: "Every dish — recipe, Calculation, story, allergens, Cook Mode." },
     ],
   },
   foh: {

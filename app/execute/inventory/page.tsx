@@ -13,7 +13,7 @@ export default async function Inventory() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Inventory</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length.toLocaleString("en-GB")} items on file</h1>
 

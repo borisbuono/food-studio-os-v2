@@ -7,7 +7,7 @@ export default async function Bookings() {
   const covers = (await supabase.from("covers").select("*").limit(50)).data || [];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute/today" className="font-sans text-sm text-ink-soft">← today</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Bookings · the book</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Reservations</h1>
       {covers.length ? (

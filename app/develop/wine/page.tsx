@@ -14,7 +14,7 @@ export default async function Wine() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · the wine list</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{wines.length} wines</h1>
       <div className="mt-3 flex gap-4 font-mono text-[11px] uppercase tracking-wide text-tomato">

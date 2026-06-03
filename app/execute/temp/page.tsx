@@ -156,7 +156,7 @@ export default function TempLog() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← the daily loop</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Execute · Kitchen</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Temperatures</h1>
       <p className="mt-1 font-sans text-[14px] text-ink-soft">Say it, glance, confirm. Hands can stay where they are.</p>

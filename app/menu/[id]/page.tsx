@@ -69,9 +69,14 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       {mePos ? <div className="mt-3 rounded-xl border border-black/10 bg-card px-4 py-2.5"><span className="font-mono text-[11px] uppercase tracking-wide" style={{ color: mePos.color }}>{mePos.label}</span><span className="ml-2 font-sans text-[13px] text-ink-soft">{mePos.nudge}</span></div> : null}
 
       {recipe ? (
-        <Link href={`/recipes/${item.recipe_id}`} className="mt-6 block rounded-xl bg-tomato px-6 py-4 text-center font-sans text-[15px] font-medium text-[#FCEFE7] transition hover:opacity-90">
-          Open the recipe
-        </Link>
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <Link href={`/recipes/${item.recipe_id}`} className="rounded-xl bg-tomato px-4 py-4 text-center font-sans text-[14px] font-medium text-[#FCEFE7] transition hover:opacity-90">
+            Open the recipe
+          </Link>
+          <Link href={`/recipes/${item.recipe_id}/cook`} className="rounded-xl border border-black/15 bg-card px-4 py-4 text-center font-sans text-[14px] text-ink transition hover:border-ochre/40">
+            Cook Mode
+          </Link>
+        </div>
       ) : (
         <div className="mt-6 rounded-xl border border-dashed border-black/20 px-5 py-4 font-sans text-[13px] text-clay">No recipe linked to this dish yet.</div>
       )}

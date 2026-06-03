@@ -54,6 +54,7 @@ export default function ThePass() {
   const [passed, setPassed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [forecast, setForecast] = useState<number | null>(null);
+  const [clockIn, setClockIn] = useState<{ inCount: number; lateCount: number; total: number; latest: string }>({ inCount: 0, lateCount: 0, total: 0, latest: "" });
   const [typical, setTypical] = useState<number | null>(null);
   const [fcSource, setFcSource] = useState("");
 
@@ -72,6 +73,25 @@ export default function ThePass() {
       const { data: zs } = await supabaseBrowser.from("zones").select("id,name,area").eq("restaurant_id", restaurant);
       const rname = (await supabaseBrowser.from("restaurants").select("name").eq("id", restaurant).maybeSingle()).data?.name;
       setVenueName(rname || "Your venue");
+      // who's clocked in right now
+      const dayStart = new Date(todayStr + "T00:00:00").toISOString();
+      const { data: ce } = await supabaseBrowser.from("clock_events").select("profile_id,event_type,event_at").gte("event_at", dayStart).order("event_at");
+      const cmap: Record<string, "in" | "out"> = {};
+      (ce || []).forEach((row: any) => { cmap[row.profile_id] = row.event_type; });
+      const { data: todaysShifts } = await supabaseBrowser.from("shifts").select("profile_id,start_time,zone_id").eq("shift_date", todayStr);
+      const venueShiftSet = (todaysShifts || []).filter((sh: any) => zoneIds.includes(sh.zone_id));
+      const total = venueShiftSet.length;
+      let inCount = 0, lateCount = 0;
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      for (const sh of venueShiftSet) {
+        if (cmap[sh.profile_id] === "in") inCount++;
+        else {
+          const [hh, mm] = (sh.start_time || "00:00").split(":").map(Number);
+          if ((hh * 60 + (mm || 0)) < nowMin - 5) lateCount++;
+        }
+      }
+      setClockIn({ inCount, lateCount, total, latest: "" });
       const zoneIds = (zs || []).map((z: any) => z.id);
       const zmap = new Map((zs || []).map((z: any) => [z.id, z.name]));
 
@@ -161,7 +181,7 @@ export default function ThePass() {
   if (!ready) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening the pass…</p></main>;
   if (!profile) return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">The Pass</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to run the close-down — the pass records who closed and lands on tomorrow’s open.</p>
       <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Sign in</Link>
@@ -169,7 +189,7 @@ export default function ThePass() {
   );
   if (!items.length) return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">The Pass</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">No prep or cleaning is set up for {venueName} yet.</p>
     </main>
@@ -180,7 +200,7 @@ export default function ThePass() {
       <h1 className="mt-2 font-serif text-3xl text-ink">The pass is signed</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">{venueName} · closed by {profile.name}. {forecast ? `≈${forecast} covers forecast · ` : ""}{toDo.length} prep jobs and {shopping.length} shopping lines land on tomorrow’s open.</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/execute/briefing" className="rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>See tomorrow’s briefing</Link>
+        <Link href="/" className="rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Back to home</Link>
         {shopping.length ? <button onClick={sendShoppingToOrdering} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft">Send shopping to Ordering</button> : null}
       </div>
     </main>
@@ -191,7 +211,7 @@ export default function ThePass() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-10">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-5 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>The Pass · close-down · {venueName}</p>
       <div className="mt-2 flex items-baseline justify-between">
         <h1 className="font-serif text-3xl text-ink">{Steps[step]}</h1>
@@ -211,6 +231,17 @@ export default function ThePass() {
           <p className="font-sans text-[13px] text-ink-soft">No trading history yet — connect your POS and the forecast will set tomorrow’s quantities for you.</p>
         </div>
       )}
+
+      {/* Clock-in pulse — who's in, who's late */}
+      {clockIn.total > 0 ? (
+        <div className="mt-3 flex items-baseline justify-between rounded-xl border border-black/10 bg-card p-4">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">On shift today</p>
+          <p className="font-sans text-[13px]">
+            <span className="text-ink">{clockIn.inCount}/{clockIn.total} in</span>
+            {clockIn.lateCount > 0 ? <span className="ml-2 text-tomato">· {clockIn.lateCount} late</span> : null}
+          </p>
+        </div>
+      ) : null}
 
       {step === 0 ? (
         <div className="mt-6">

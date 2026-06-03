@@ -13,7 +13,7 @@ export default async function Suppliers() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ochre">Suppliers · ordering</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{providers.length} suppliers</h1>
       <Link href="/order" className="mt-4 inline-block rounded-xl bg-ochre px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Place an order</Link>

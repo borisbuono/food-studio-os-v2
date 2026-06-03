@@ -16,9 +16,10 @@ export default async function Events() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/administrate" className="font-sans text-sm text-ink-soft">← administrate</Link>
+      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ochre">Events · the pipeline</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Catering & private events</h1>
+      <Link href="/administrate/events/new" className="mt-4 inline-block rounded-xl bg-ochre px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">+ New event</Link>
 
       {keys.map((k) => (
         <section key={k} className="mt-8">
