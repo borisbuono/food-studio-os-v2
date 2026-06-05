@@ -7,6 +7,9 @@ import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { onCtx, writeCookie } from "@/lib/ctx";
 
+export type PeriodAgg = { rev: number; cov: number; avg: number; n: number };
+export type PeriodKey = "week" | "lastWeek" | "month" | "ytd";
+
 export type EntityStats = {
   label: string;
   reportPeriod: string | null;
@@ -15,6 +18,7 @@ export type EntityStats = {
   inbox: number; events: number; prep: number; cleaningDue: number;
   venues?: { name: string; rev: number; cov: number }[];
   trial?: boolean; dishCount?: number; contribution?: number; varianceLoss?: number;
+  periods?: { week: PeriodAgg; lastWeek: PeriodAgg; month: PeriodAgg; ytd: PeriodAgg };
   // brief signals
   specials?: string[]; eightySix?: string[];
   deliveriesDue?: number; deliveriesNext?: string | null;
@@ -25,8 +29,16 @@ export type EntityStats = {
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const deltaWord = (d: number | null) => d === null ? "" : d >= 0 ? `up ${d}%` : `down ${Math.abs(d)}%`;
 
-// The Office (admin) numbers view — revenue/covers/avg + venue roll-up.
+// The Office (admin) numbers view — period shuffler (week / last week / month / YTD) over EOD reports.
+const PERIOD_TABS: { key: PeriodKey; label: string }[] = [
+  { key: "week", label: "This week" },
+  { key: "lastWeek", label: "Last week" },
+  { key: "month", label: "Month" },
+  { key: "ytd", label: "YTD" },
+];
+
 function OfficeDashboard({ s }: { s: EntityStats }) {
+  const [pk, setPk] = useState<PeriodKey>("week");
   if (s.trial) {
     return (
       <>
@@ -36,13 +48,43 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
       </>
     );
   }
-  const good = (s.revDelta ?? 0) >= 0 && (s.avgDelta ?? 0) >= 0;
-  const verdict = s.revDelta === null ? "" : good ? "you're doing a hell of a job" : "worth a look this week";
+  const P = s.periods;
+  if (!P) {
+    // fallback to the legacy single-report headline if periods weren't computed
+    const good = (s.revDelta ?? 0) >= 0 && (s.avgDelta ?? 0) >= 0;
+    const verdict = s.revDelta === null ? "" : good ? "you're doing a hell of a job" : "worth a look this week";
+    return (
+      <>
+        <p className="mt-2 font-serif text-4xl text-ink">{eur(s.rev)}</p>
+        <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
+        <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
+      </>
+    );
+  }
+  const cur = P[pk];
+  const wow = pk === "week" && P.lastWeek.rev ? Math.round((P.week.rev / P.lastWeek.rev - 1) * 100) : null;
   return (
     <>
-      <p className="mt-2 font-serif text-4xl text-ink">{eur(s.rev)}</p>
-      <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
-      <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {PERIOD_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setPk(t.key)}
+            className={"rounded-full px-3 py-1 font-sans text-[12px] transition " + (pk === t.key ? "text-white" : "border border-black/10 text-ink-soft hover:border-ember/40")}
+            style={pk === t.key ? { backgroundColor: "var(--accent)" } : undefined}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 font-serif text-4xl text-ink">{eur(cur.rev)}</p>
+      <p className="mt-1 font-sans text-[14px] text-ink-soft">
+        {cur.cov.toLocaleString("en-GB")} covers · avg {eur(cur.avg)}
+        {wow !== null ? " · " + deltaWord(wow) + " vs last week" : ""}
+      </p>
+      <p className="mt-3 font-mono text-[12px] text-clay">
+        {cur.n} service{cur.n === 1 ? "" : "s"} · {s.inbox} in inbox · {s.events} events in pipeline
+      </p>
       {s.venues ? (
         <ul className="mt-4 divide-y divide-black/10 border-t border-black/10">
           {s.venues.map((v, i) => (

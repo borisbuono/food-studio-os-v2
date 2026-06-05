@@ -12,6 +12,21 @@ export default async function Page() {
   const today = new Date().toISOString().slice(0, 10);
   const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
 
+  // --- period boundaries for the Office dashboard shuffler (week / last week / month / YTD) ---
+  const _now = new Date();
+  const _mon = new Date(Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth(), _now.getUTCDate()));
+  _mon.setUTCDate(_mon.getUTCDate() - ((_now.getUTCDay() + 6) % 7));
+  const monStr = _mon.toISOString().slice(0, 10);
+  const _lastMon = new Date(_mon); _lastMon.setUTCDate(_lastMon.getUTCDate() - 7);
+  const lastMonStr = _lastMon.toISOString().slice(0, 10);
+  const monthStr = today.slice(0, 8) + "01";
+  const ytdStr = today.slice(0, 4) + "-01-01";
+  const aggPeriod = (rows: any[]) => {
+    const rev = rows.reduce((a: number, r: any) => a + Number(r.revenue || 0), 0);
+    const cov = rows.reduce((a: number, r: any) => a + Number(r.actual_covers || 0), 0);
+    return { rev, cov, avg: cov ? Math.round(rev / cov) : 0, n: rows.length };
+  };
+
   const restaurants = (await supabase.from("restaurants").select("id,name")).data || [];
   const rname = new Map(restaurants.map((r: any) => [r.id, r.name]));
   const eod = (await supabase.from("eod_reports").select("restaurant_id,report_date,revenue,actual_covers").order("report_date", { ascending: false })).data || [];
@@ -44,7 +59,14 @@ export default async function Page() {
     const dueOrders = orders.filter((o: any) => o.restaurant_id === vid && (o.delivery_date === today || o.delivery_date === tomorrow) && !["delivered", "cancelled"].includes(o.status || ""));
     const eventsToday = events.filter((e: any) => e.restaurant_id === vid && e.event_date === today).map((e: any) => ({ title: noEmoji(e.title || "Event"), guests: Number(e.guests_count || 0) }));
     const messages = inbox.filter((i: any) => i.restaurant_id === vid && (i.status === "open" || i.status === "new" || i.status == null)).length;
+    const periods = {
+      week: aggPeriod(rs.filter((e: any) => e.report_date >= monStr)),
+      lastWeek: aggPeriod(rs.filter((e: any) => e.report_date >= lastMonStr && e.report_date < monStr)),
+      month: aggPeriod(rs.filter((e: any) => e.report_date >= monthStr)),
+      ytd: aggPeriod(rs.filter((e: any) => e.report_date >= ytdStr)),
+    };
     return {
+      periods,
       label: rname.get(vid) || "Venue",
       reportPeriod: L?.report_date ?? null,
       rev, cov, avg: Math.round(avg),
@@ -63,9 +85,16 @@ export default async function Page() {
   const bm = venueStats(BM);
   const taller = venueStats(TALLER);
   const hRev = bm.rev + taller.rev, hCov = bm.cov + taller.cov;
+  const addP = (a: any, b: any) => { const rev = a.rev + b.rev, cov = a.cov + b.cov; return { rev, cov, avg: cov ? Math.round(rev / cov) : 0, n: a.n + b.n }; };
   const holdings: EntityStats = {
     label: "Holdings",
     reportPeriod: null,
+    periods: bm.periods && taller.periods ? {
+      week: addP(bm.periods.week, taller.periods.week),
+      lastWeek: addP(bm.periods.lastWeek, taller.periods.lastWeek),
+      month: addP(bm.periods.month, taller.periods.month),
+      ytd: addP(bm.periods.ytd, taller.periods.ytd),
+    } : undefined,
     rev: hRev, cov: hCov, avg: hCov ? Math.round(hRev / hCov) : 0,
     revDelta: null, avgDelta: null,
     inbox: bm.inbox + taller.inbox,
