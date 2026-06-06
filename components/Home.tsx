@@ -5,7 +5,7 @@ import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { onCtx, writeCookie } from "@/lib/ctx";
+import { onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 
 export type PeriodAgg = { rev: number; cov: number; avg: number; n: number };
 export type PeriodKey = "week" | "lastWeek" | "month" | "ytd";
@@ -138,7 +138,13 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [role, setRole] = useState<RoleKey>("office");
-  const [entity, setEntity] = useState<EntityKey>("holdings");
+  // Boot from the fs_entity cookie (the same source the server layout reads),
+  // so the first client render matches the server HTML and the home does not
+  // flash the holdings/Food-Studios profile before settling on the real venue.
+  const [entity, setEntity] = useState<EntityKey>(() => {
+    const c = readEntityCookie() as EntityKey | null;
+    return c && (["holdings","bistro_mondo","taller","utopia"] as string[]).includes(c) ? c : "utopia";
+  });
   const [userAccent, setUserAccent] = useState<string | null>(null);
 
   useEffect(() => {

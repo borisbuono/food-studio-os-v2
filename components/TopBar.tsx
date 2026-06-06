@@ -7,10 +7,13 @@ import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/enti
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie } from "@/lib/ctx";
+import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 
 export default function TopBar() {
-  const [entity, setEntity] = useState<EntityKey>("holdings");
+  const [entity, setEntity] = useState<EntityKey>(() => {
+    const c = readEntityCookie() as EntityKey | null;
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "utopia";
+  });
   const [role, setRole] = useState<RoleKey>("office");
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -22,7 +25,7 @@ export default function TopBar() {
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || "holdings";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "utopia";
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
       setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
