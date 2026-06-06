@@ -7,7 +7,8 @@ import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Stage = "manage" | "maintain" | "learn";
-type Skill = { key: string; name: string; how: string | null; area: string; count: number; days: number; spanDays: number; signed: boolean; stage: Stage };
+type Category = "food" | "wine" | "drinks" | "cleaning" | "office";
+type Skill = { key: string; name: string; how: string | null; area: string; category: Category; count: number; days: number; spanDays: number; signed: boolean; stage: Stage };
 
 const STAGE_TITLE: Record<Stage, string> = { manage: "Can manage", maintain: "Can do", learn: "Learning" };
 const STAGE_BLURB: Record<Stage, string> = {
@@ -16,6 +17,24 @@ const STAGE_BLURB: Record<Stage, string> = {
   learn: "Knows the method — needs reps to own it.",
 };
 
+const CATEGORY_TITLE: Record<Category, string> = { food: "Food", wine: "Wine", drinks: "Drinks & Bar", cleaning: "Cleaning & HACCP", office: "Service & Office" };
+const CATEGORY_BLURB: Record<Category, string> = {
+  food: "Mise en place, recipes, technique. The body of the craft.",
+  wine: "The list — producers, regions, vintages, the pitch in one minute.",
+  drinks: "Coffee, cocktails, beer, soft. Everything across the bar.",
+  cleaning: "Daily, weekly, deep. HACCP sign-off lives here too.",
+  office: "Service flow, guest moments, the ops behind the smile.",
+};
+function classify(taskType: string | null, areaLower: string, isMep: boolean): Category {
+  if (taskType === "haccp_check") return "cleaning";
+  if (taskType === "cleaning") return "cleaning";
+  if (areaLower.includes("bar")) return "drinks";
+  if (areaLower.includes("foh") || areaLower.includes("floor") || areaLower.includes("service") || areaLower.includes("host")) return "office";
+  if (areaLower.includes("somm") || areaLower.includes("wine") || areaLower.includes("cellar")) return "wine";
+  if (isMep) return "food";
+  if (areaLower.includes("kitchen") || areaLower.includes("pastry") || areaLower.includes("prep") || areaLower.includes("pass") || areaLower.includes("cold") || areaLower.includes("hot")) return "food";
+  return "office";
+}
 function stageOf(count: number, days: number, spanDays: number, signed: boolean): Stage {
   if (days >= 8 && spanDays >= 21) return "manage";
   if (count >= 3 || signed) return "maintain";
@@ -33,6 +52,7 @@ export default function Academy() {
   const [venueName, setVenueName] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<"area" | "stage">("area");
 
   useEffect(() => {
     (async () => {
@@ -60,8 +80,8 @@ export default function Academy() {
       (mc || []).forEach((r: any) => { const e = mcByComp.get(r.component_id) || new Set(); e.add(r.service_date); mcByComp.set(r.component_id, e); });
       const span = (dates: Set<string>) => { if (dates.size < 2) return 0; const ds = Array.from(dates).map((d) => new Date(d + "T00:00").getTime()); return Math.round((Math.max(...ds) - Math.min(...ds)) / 864e5); };
       const out: Skill[] = [];
-      (tasks || []).forEach((t: any) => { const e = tcByTask.get(t.id) || { dates: new Set<string>(), signed: false }; const days = e.dates.size; const sp = span(e.dates); const stage = stageOf(days, days, sp, e.signed); out.push({ key: "task:" + t.id, name: noEmoji(t.name), how: t.sub_text || null, area: zmap.get(t.zone_id) || (t.task_type === "haccp_check" ? "HACCP" : ""), count: days, days, spanDays: sp, signed: e.signed, stage }); });
-      (comps || []).forEach((c: any) => { const dates = mcByComp.get(c.id) || new Set<string>(); const days = dates.size; const sp = span(dates); const d = dmap.get(c.mep_dish_id); const stage = stageOf(days, days, sp, false); out.push({ key: "mep:" + c.id, name: noEmoji(c.name) + (d ? ` · ${d.name.split(" — ")[0]}` : ""), how: c.method || null, area: d?.zone || "Prep", count: days, days, spanDays: sp, signed: false, stage }); });
+      (tasks || []).forEach((t: any) => { const e = tcByTask.get(t.id) || { dates: new Set<string>(), signed: false }; const days = e.dates.size; const sp = span(e.dates); const stage = stageOf(days, days, sp, e.signed); const zArea = (zs || []).find((z: any) => z.id === t.zone_id)?.area || ""; const category = classify(t.task_type, String(zArea).toLowerCase(), false); out.push({ key: "task:" + t.id, name: noEmoji(t.name), how: t.sub_text || null, area: zmap.get(t.zone_id) || (t.task_type === "haccp_check" ? "HACCP" : ""), category, count: days, days, spanDays: sp, signed: e.signed, stage }); });
+      (comps || []).forEach((c: any) => { const dates = mcByComp.get(c.id) || new Set<string>(); const days = dates.size; const sp = span(dates); const d = dmap.get(c.mep_dish_id); const stage = stageOf(days, days, sp, false); const zArea = ((zs || []).find((z: any) => z.id === (dishes || []).find((dd: any) => dd.id === c.mep_dish_id)?.zone_id)?.area || "kitchen"); const category = classify(null, String(zArea).toLowerCase(), true); out.push({ key: "mep:" + c.id, name: noEmoji(c.name) + (d ? ` · ${d.name.split(" — ")[0]}` : ""), how: c.method || null, area: d?.zone || "Prep", category, count: days, days, spanDays: sp, signed: false, stage }); });
       setSkills(out); setReady(true);
     })();
   }, []);
@@ -77,7 +97,9 @@ export default function Academy() {
   );
 
   const counts = { manage: skills.filter((s) => s.stage === "manage").length, maintain: skills.filter((s) => s.stage === "maintain").length, learn: skills.filter((s) => s.stage === "learn").length };
-  const order: Stage[] = ["manage", "maintain", "learn"];
+  const stageOrder: Stage[] = ["manage", "maintain", "learn"];
+  const categoryOrder: Category[] = ["food", "wine", "drinks", "cleaning", "office"];
+  const groupBy = view;
 
   return (
     <main className="mx-auto max-w-xl px-6 py-10">
@@ -86,21 +108,47 @@ export default function Academy() {
       <h1 className="mt-2 font-serif text-3xl text-ink">Your skills</h1>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Every job has an SOP behind it. Learn it, do it, then — after a real run of doing it — manage it. {counts.manage} managing · {counts.maintain} you can do · {counts.learn} learning.</p>
 
-      {order.map((st) => {
+      <div className="mt-5 inline-flex gap-4 border-b border-line">
+        <button onClick={() => setView("area")} className={"pb-2 font-mono text-[11px] uppercase tracking-wide " + (groupBy === "area" ? "text-ink border-b-2" : "text-clay")} style={groupBy === "area" ? { borderColor: "var(--accent)" } : undefined}>By area</button>
+        <button onClick={() => setView("stage")} className={"pb-2 font-mono text-[11px] uppercase tracking-wide " + (groupBy === "stage" ? "text-ink border-b-2" : "text-clay")} style={groupBy === "stage" ? { borderColor: "var(--accent)" } : undefined}>By stage</button>
+      </div>
+
+      {groupBy === "area" ? categoryOrder.map((cat) => {
+        const list = skills.filter((s) => s.category === cat).sort((a, b) => { const r = stageRank(b.stage) - stageRank(a.stage); return r !== 0 ? r : b.days - a.days; });
+        if (!list.length) return null;
+        return (
+          <div key={cat} className="mt-8">
+            <p className="font-serif text-2xl text-ink">{CATEGORY_TITLE[cat]}</p>
+            <p className="font-serif italic text-[13px] text-ink-soft">{CATEGORY_BLURB[cat]}</p>
+            <ul className="mt-3 divide-y divide-line border-t border-line">
+              {list.map((s) => (
+                <li key={s.key} className="py-3">
+                  <button onClick={() => setOpen(open === s.key ? null : s.key)} className="flex w-full items-baseline justify-between gap-3 text-left">
+                    <span className="font-serif text-[16px] text-ink">{s.name}</span>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide" style={{ color: s.stage === "learn" ? "#7A7A75" : "var(--accent)" }}>{STAGE_TITLE[s.stage]}</span>
+                  </button>
+                  <p className="font-mono text-[10px] text-clay">{s.area}{s.signed ? " · signed off" : ""} · {nextHint(s)}</p>
+                  {open === s.key && s.how ? <p className="mt-2 whitespace-pre-line font-serif text-[14px] leading-relaxed text-ink-soft">{s.how}</p> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }) : stageOrder.map((st) => {
         const list = skills.filter((s) => s.stage === st).sort((a, b) => b.days - a.days);
         if (!list.length) return null;
         return (
           <div key={st} className="mt-8">
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{STAGE_TITLE[st]} · {list.length}</p>
             <p className="font-sans text-[12px] text-clay">{STAGE_BLURB[st]}</p>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 divide-y divide-line border-t border-line">
               {list.map((s) => (
-                <li key={s.key} className="rounded-xl border border-black/10 bg-card p-4">
+                <li key={s.key} className="py-3">
                   <button onClick={() => setOpen(open === s.key ? null : s.key)} className="flex w-full items-baseline justify-between gap-3 text-left">
-                    <span className="font-sans text-[15px] text-ink">{s.name}</span>
-                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide" style={{ color: st === "learn" ? undefined : "var(--accent)" }}>{nextHint(s)}</span>
+                    <span className="font-serif text-[16px] text-ink">{s.name}</span>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide" style={{ color: st === "learn" ? "#7A7A75" : "var(--accent)" }}>{nextHint(s)}</span>
                   </button>
-                  <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{s.area}{s.signed ? " · signed off" : ""}</p>
+                  <p className="font-mono text-[10px] text-clay">{CATEGORY_TITLE[s.category]} · {s.area}{s.signed ? " · signed off" : ""}</p>
                   {open === s.key && s.how ? <p className="mt-2 whitespace-pre-line font-serif text-[14px] leading-relaxed text-ink-soft">{s.how}</p> : null}
                 </li>
               ))}
@@ -112,3 +160,5 @@ export default function Academy() {
     </main>
   );
 }
+function stageRank(s: Stage) { return s === "manage" ? 2 : s === "maintain" ? 1 : 0; }
+
