@@ -10,6 +10,7 @@ export default async function Bookings() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Bookings · the book</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Reservations</h1>
+      <Link href="/execute/floor" className="mt-3 inline-block font-sans text-sm" style={{ color: "var(--accent)" }}>Open the floor plan →</Link>
       {covers.length ? (
         <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
           {covers.map((c: any, i: number) => (
