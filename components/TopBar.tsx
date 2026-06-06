@@ -66,7 +66,7 @@ export default function TopBar() {
             </div>
           ) : null}
           {loaded && scoped ? (
-            <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-[12px] text-[#FBF8F2]" style={{ background: ENTITY_ACCENT[entity] }}>
+            <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-[12px] text-[#EFEEEB]" style={{ background: ENTITY_ACCENT[entity] }}>
               <span className="h-2 w-2 rounded-full bg-white/70" />
               {ENTITY_SHORT[entity]}
             </span>
@@ -81,7 +81,7 @@ export default function TopBar() {
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-6 pb-2">
           <span className="font-mono text-[10px] uppercase tracking-wide text-clay">View as</span>
           {(Object.keys(ROLES) as RoleKey[]).map((k) => (
-            <button key={k} onClick={() => { setRoleCtx(k); setRole(k); }} className={"rounded-full px-2.5 py-0.5 font-sans text-[11px] transition " + (k === role ? "text-[#FBF8F2]" : "text-ink-soft hover:text-ink")} style={k === role ? { background: "var(--accent)" } : undefined}>{ROLES[k].label}</button>
+            <button key={k} onClick={() => { setRoleCtx(k); setRole(k); }} className={"rounded-full px-2.5 py-0.5 font-sans text-[11px] transition " + (k === role ? "text-[#EFEEEB]" : "text-ink-soft hover:text-ink")} style={k === role ? { background: "var(--accent)" } : undefined}>{ROLES[k].label}</button>
           ))}
         </div>
       ) : null}

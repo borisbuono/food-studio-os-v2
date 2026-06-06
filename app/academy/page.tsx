@@ -72,7 +72,7 @@ export default function Academy() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">Academy</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to see your skills grow — every job you do is logged against its SOP and builds your ladder.</p>
-      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Sign in</Link>
+      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Sign in</Link>
     </main>
   );
 

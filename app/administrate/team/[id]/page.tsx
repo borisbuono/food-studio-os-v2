@@ -73,7 +73,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
 
       {/* Person atom action set */}
       <div className="mt-8 grid grid-cols-2 gap-3">
-        <Link href={"/messages?to=" + p.id} className="rounded-xl bg-ochre px-4 py-3 text-center font-sans text-[14px] font-medium text-[#FCEFE7]">Message</Link>
+        <Link href={"/messages?to=" + p.id} className="rounded-xl bg-ochre px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
         <Link href="/schedule" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Schedule</Link>
         <Link href="/academy" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Skill ladder</Link>
         <Link href="/clock" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Clock</Link>

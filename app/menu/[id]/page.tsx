@@ -70,7 +70,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
 
       {recipe ? (
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <Link href={`/recipes/${item.recipe_id}`} className="rounded-xl bg-tomato px-4 py-4 text-center font-sans text-[14px] font-medium text-[#FCEFE7] transition hover:opacity-90">
+          <Link href={`/recipes/${item.recipe_id}`} className="rounded-xl bg-tomato px-4 py-4 text-center font-sans text-[14px] font-medium text-[#F7F7F4] transition hover:opacity-90">
             Open the recipe
           </Link>
           <Link href={`/recipes/${item.recipe_id}/cook`} className="rounded-xl border border-black/15 bg-card px-4 py-4 text-center font-sans text-[14px] text-ink transition hover:border-ochre/40">

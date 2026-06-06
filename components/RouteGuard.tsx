@@ -32,7 +32,7 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
         <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Not in your area</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">That’s an Office screen</h1>
         <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Your role doesn’t include the back-office. Everything you need is on your home and in Ask.</p>
-        <button onClick={() => router.replace("/")} className="mt-6 rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Back to home</button>
+        <button onClick={() => router.replace("/")} className="mt-6 rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Back to home</button>
       </main>
     );
   }

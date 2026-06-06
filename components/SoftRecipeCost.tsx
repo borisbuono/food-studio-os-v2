@@ -42,7 +42,7 @@ export default function SoftRecipeCost({ id, initialCost, initialBasis, price }:
             <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Basis</span>
             <select value={basis} onChange={(e) => setBasis(e.target.value)} className="mt-1 rounded-lg border border-black/15 bg-paper px-2 py-2 font-sans text-[14px] text-ink">{BASES.map((b) => <option key={b.k} value={b.k}>{b.label}</option>)}</select>
           </label>
-          <button onClick={save} disabled={saving} className="rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7] disabled:opacity-60" style={{ background: "var(--accent)" }}>{saving ? "Saving…" : "Save cost"}</button>
+          <button onClick={save} disabled={saving} className="rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{saving ? "Saving…" : "Save cost"}</button>
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-3 gap-3">

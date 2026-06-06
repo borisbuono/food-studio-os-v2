@@ -3,5 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; --accent: #B8552E; }
-body { background: #FBF8F2; color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 300; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+:root { color-scheme: light; --accent: #0E7C86; }
+html, body { background: #EFEEEB; }
+body { color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 300; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }

@@ -78,7 +78,7 @@ export default function NewEvent() {
         <div><p className={lbl}>Theme / notes</p><textarea value={f.theme} onChange={(e) => setF({ ...f, theme: e.target.value })} rows={3} className={inp} /></div>
 
         {err ? <p className="font-sans text-[13px] text-tomato">{err}</p> : null}
-        <button disabled={busy} className="w-full rounded-xl px-5 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>
+        <button disabled={busy} className="w-full rounded-xl px-5 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>
           {busy ? "Saving…" : "Save event"}
         </button>
       </form>

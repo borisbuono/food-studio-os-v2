@@ -165,7 +165,7 @@ export default function TempLog() {
       <div className="mt-7 rounded-2xl border border-black/10 bg-card p-6">
         {speechSupported() ? (
           <button onClick={listen} disabled={listening}
-            className="w-full rounded-2xl bg-ember py-5 font-serif text-[20px] text-[#FCEFE7] transition active:scale-[0.99] disabled:opacity-60">
+            className="w-full rounded-2xl bg-ember py-5 font-serif text-[20px] text-[#F7F7F4] transition active:scale-[0.99] disabled:opacity-60">
             {listening ? "Listening…" : "Speak the temperature"}
           </button>
         ) : (

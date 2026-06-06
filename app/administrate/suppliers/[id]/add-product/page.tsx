@@ -39,7 +39,7 @@ export default function AddProduct() {
         </div>
         <div><p className={lbl}>Pack size (free text)</p><input value={f.pack_size} onChange={(e) => setF({ ...f, pack_size: e.target.value })} placeholder="5 kg box, 12 × 250 g, etc." className={inp} /></div>
         {err ? <p className="font-sans text-[13px] text-tomato">{err}</p> : null}
-        <button disabled={busy} className="w-full rounded-xl px-5 py-4 font-sans text-[15px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>{busy ? "Saving…" : "Add to this supplier"}</button>
+        <button disabled={busy} className="w-full rounded-xl px-5 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>{busy ? "Saving…" : "Add to this supplier"}</button>
       </form>
     </main>
   );

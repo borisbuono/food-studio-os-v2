@@ -70,7 +70,7 @@ export default function Account() {
         {profile ? (
           <button onClick={() => supabaseBrowser.auth.signOut().then(() => setProfile(null))} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft transition hover:border-ember/40">Sign out</button>
         ) : (
-          <Link href="/login" className="inline-block rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Sign in</Link>
+          <Link href="/login" className="inline-block rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Sign in</Link>
         )}
       </div>
     </main>

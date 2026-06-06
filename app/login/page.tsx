@@ -38,7 +38,7 @@ export default function Login() {
           <form onSubmit={submit}>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@restaurant.com"
               className="w-full rounded-xl border border-black/15 bg-card px-4 py-3 font-sans text-[15px] text-ink outline-none focus:border-ember" />
-            <button disabled={busy} className="mt-3 w-full rounded-xl bg-ember px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7] disabled:opacity-60">{busy ? "Sending…" : "Email me a sign-in link"}</button>
+            <button disabled={busy} className="mt-3 w-full rounded-xl bg-ember px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60">{busy ? "Sending…" : "Email me a sign-in link"}</button>
           </form>
         </>
       )}

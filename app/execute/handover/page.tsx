@@ -184,7 +184,7 @@ export default function ThePass() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">The Pass</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to run the close-down — the pass records who closed and lands on tomorrow’s open.</p>
-      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Sign in</Link>
+      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Sign in</Link>
     </main>
   );
   if (!items.length) return (
@@ -200,7 +200,7 @@ export default function ThePass() {
       <h1 className="mt-2 font-serif text-3xl text-ink">The pass is signed</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">{venueName} · closed by {profile.name}. {forecast ? `≈${forecast} covers forecast · ` : ""}{toDo.length} prep jobs and {shopping.length} shopping lines land on tomorrow’s open.</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/" className="rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Back to home</Link>
+        <Link href="/" className="rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Back to home</Link>
         {shopping.length ? <button onClick={sendShoppingToOrdering} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft">Send shopping to Ordering</button> : null}
       </div>
     </main>
@@ -285,8 +285,8 @@ export default function ThePass() {
                     <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{i.zone}{i.kind === "prep" ? " · prep" : " · clean"}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button onClick={() => setPlan((p) => ({ ...p, [i.key]: "ahead" }))} className={"rounded-full px-3 py-1 font-sans text-[12px] " + (st === "ahead" ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft")} style={st === "ahead" ? { background: "var(--accent)" } : undefined}>done ahead</button>
-                    <button onClick={() => setPlan((p) => ({ ...p, [i.key]: "todo" }))} className={"rounded-full px-3 py-1 font-sans text-[12px] " + (st === "todo" ? "text-[#FBF8F2]" : "border border-black/15 text-ink-soft")} style={st === "todo" ? { background: "var(--accent)" } : undefined}>to-do</button>
+                    <button onClick={() => setPlan((p) => ({ ...p, [i.key]: "ahead" }))} className={"rounded-full px-3 py-1 font-sans text-[12px] " + (st === "ahead" ? "text-[#EFEEEB]" : "border border-black/15 text-ink-soft")} style={st === "ahead" ? { background: "var(--accent)" } : undefined}>done ahead</button>
+                    <button onClick={() => setPlan((p) => ({ ...p, [i.key]: "todo" }))} className={"rounded-full px-3 py-1 font-sans text-[12px] " + (st === "todo" ? "text-[#EFEEEB]" : "border border-black/15 text-ink-soft")} style={st === "todo" ? { background: "var(--accent)" } : undefined}>to-do</button>
                   </div>
                 </li>
               );
@@ -320,13 +320,13 @@ export default function ThePass() {
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The pass</p>
             <p className="mt-1 font-sans text-[14px] text-ink-soft">{forecast ? `≈${forecast} covers · ` : ""}{items.filter((i) => !doneToday[i.key]).length} carried over · {toDo.length} prep for tomorrow · {shopping.length} to buy · closed by {profile.name}</p>
           </div>
-          <button onClick={sign} disabled={busy} className="mt-4 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy ? "Signing…" : "Sign & pass to tomorrow"}</button>
+          <button onClick={sign} disabled={busy} className="mt-4 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy ? "Signing…" : "Sign & pass to tomorrow"}</button>
         </div>
       ) : null}
 
       <div className="mt-8 flex items-center justify-between">
         <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className="font-sans text-[14px] text-ink-soft disabled:opacity-30">← back</button>
-        {step < 3 ? <button onClick={() => setStep((s) => s + 1)} className="rounded-xl px-5 py-2.5 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Next →</button> : <span />}
+        {step < 3 ? <button onClick={() => setStep((s) => s + 1)} className="rounded-xl px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Next →</button> : <span />}
       </div>
     </main>
   );

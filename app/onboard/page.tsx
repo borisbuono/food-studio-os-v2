@@ -28,9 +28,9 @@ export default function Onboard() {
       <div className="mt-8 flex gap-3">
         {i > 0 ? <button onClick={() => setI(i - 1)} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft">Back</button> : null}
         {!last ? (
-          <button onClick={() => setI(i + 1)} className="rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Next</button>
+          <button onClick={() => setI(i + 1)} className="rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">Next</button>
         ) : (
-          <Link href="/" className="rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Finish</Link>
+          <Link href="/" className="rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">Finish</Link>
         )}
       </div>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Wizard scaffold · each step wires to real setup as venues are onboarded</p>

@@ -55,7 +55,7 @@ export default function TrainWine() {
       <div className="mt-6 flex items-center justify-between">
         <button onClick={prev} className="font-sans text-[14px] text-ink-soft">← back</button>
         <Link href={"/develop/wine/" + w.id} className="font-mono text-[11px] uppercase tracking-wide text-tomato">full card →</Link>
-        <button onClick={next} className="rounded-xl px-5 py-2.5 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Next →</button>
+        <button onClick={next} className="rounded-xl px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Next →</button>
       </div>
     </main>
   );

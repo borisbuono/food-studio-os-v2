@@ -101,7 +101,7 @@ export default function Messages() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">Messages</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to talk with the team — channels and direct messages, all in the OS.</p>
-      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Sign in</Link>
+      <Link href="/login" className="mt-6 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Sign in</Link>
     </main>
   );
 
@@ -118,7 +118,7 @@ export default function Messages() {
             const mine = m.author_id === profile.id;
             return (
               <div key={m.id} className={"flex " + (mine ? "justify-end" : "justify-start")}>
-                <div className={"max-w-[80%] rounded-2xl px-4 py-2 " + (mine ? "text-[#FCEFE7]" : "border border-black/10 bg-card text-ink")} style={mine ? { background: "var(--accent)" } : undefined}>
+                <div className={"max-w-[80%] rounded-2xl px-4 py-2 " + (mine ? "text-[#F7F7F4]" : "border border-black/10 bg-card text-ink")} style={mine ? { background: "var(--accent)" } : undefined}>
                   {!mine ? <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{m.author_name || "someone"}</p> : null}
                   <p className="font-serif text-[16px] leading-relaxed">{m.body}</p>
                   <p className={"mt-0.5 font-mono text-[9px] " + (mine ? "text-white/70" : "text-clay")}>{when(m.created_at)}</p>
@@ -132,7 +132,7 @@ export default function Messages() {
         {sendErr ? <p className="pb-2 text-center font-mono text-[10px] uppercase tracking-wide text-ember">{sendErr}</p> : null}
         <div className="flex items-center gap-2 border-t border-black/10 pt-3">
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Message…" className="flex-1 rounded-full border border-black/15 bg-paper px-4 py-2.5 font-sans text-[15px] text-ink outline-none focus:border-ember" />
-          <button onClick={send} className="rounded-full px-5 py-2.5 font-sans text-[14px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Send</button>
+          <button onClick={send} className="rounded-full px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Send</button>
         </div>
       </main>
     );
@@ -151,7 +151,7 @@ export default function Messages() {
       {newCh ? (
         <div className="mt-3 flex gap-2">
           <input value={newChName} onChange={(e) => setNewChName(e.target.value)} placeholder="Channel name (e.g. Events, Pastry)" className="flex-1 rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[14px] text-ink outline-none focus:border-ember" />
-          <button onClick={createChannel} className="rounded-lg px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Create</button>
+          <button onClick={createChannel} className="rounded-lg px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Create</button>
         </div>
       ) : null}
       {dmPick ? (

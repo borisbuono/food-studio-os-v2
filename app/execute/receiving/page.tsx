@@ -104,7 +104,7 @@ export default function Receiving() {
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Photograph the delivery note. Chef reads the lines, matches them to your stock and wines — you confirm, and it updates costs, logs the price to the trend, and books the stock in.</p>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />
-      <button onClick={() => fileRef.current?.click()} disabled={busy} className="mt-6 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#FCEFE7] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy && !rows.length ? "Reading the delivery note…" : "Photograph a delivery note"}</button>
+      <button onClick={() => fileRef.current?.click()} disabled={busy} className="mt-6 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy && !rows.length ? "Reading the delivery note…" : "Photograph a delivery note"}</button>
       {err ? <p className="mt-3 font-mono text-[11px] text-ember">{err}</p> : null}
       {supplier ? <p className="mt-3 font-mono text-[11px] uppercase tracking-wide text-clay">From {supplier}</p> : null}
 
@@ -127,7 +127,7 @@ export default function Receiving() {
               </div>
             );
           })}
-          <button onClick={apply} disabled={busy || !applicable} className="mt-3 w-full rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7] disabled:opacity-50" style={{ background: "var(--accent)" }}>{busy ? "Booking in…" : `Receive ${applicable} line${applicable === 1 ? "" : "s"}`}</button>
+          <button onClick={apply} disabled={busy || !applicable} className="mt-3 w-full rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4] disabled:opacity-50" style={{ background: "var(--accent)" }}>{busy ? "Booking in…" : `Receive ${applicable} line${applicable === 1 ? "" : "s"}`}</button>
         </div>
       ) : null}
 
@@ -135,7 +135,7 @@ export default function Receiving() {
         <div className="mt-5 rounded-2xl border border-black/10 bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Received</p>
           <ul className="mt-2 space-y-1">{done.length ? done.map((m, i) => <li key={i} className="font-sans text-[14px] text-ink-soft">{m}</li>) : <li className="font-sans text-[14px] text-clay">Nothing matched — pick targets and try again.</li>}</ul>
-          <button onClick={() => { setRows([]); setDone(null); setSupplier(""); }} className="mt-4 rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#FCEFE7]" style={{ background: "var(--accent)" }}>Log another</button>
+          <button onClick={() => { setRows([]); setDone(null); setSupplier(""); }} className="mt-4 rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Log another</button>
         </div>
       ) : null}
 

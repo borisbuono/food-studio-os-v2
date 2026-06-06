@@ -19,7 +19,7 @@ export default function ClockIn() {
       ) : (
         <>
           <p className="mt-2 font-serif text-2xl text-ink">You’re not clocked in</p>
-          <button onClick={clockIn} className="mt-3 rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#FCEFE7]">Clock in</button>
+          <button onClick={clockIn} className="mt-3 rounded-xl bg-ember px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">Clock in</button>
         </>
       )}
       <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">Preview · GPS-fenced clock-in records to your profile with sign-in</p>
