@@ -209,7 +209,18 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         ))}
       </div>
 
-      {/* Academy — your skill ladder, for any signed-in person */}
+      {/* Receive-from-home photo entry — Boris 2026-06-01 walkthrough ask: NOT inside a supplier */}
+      {profile ? (
+        <Link href="/execute/receiving" className="mt-3 flex items-baseline justify-between gap-4 border-t border-line py-4 transition hover:opacity-70">
+          <div>
+            <h2 className="font-serif text-xl text-ink">Receive a delivery</h2>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">Photograph the delivery note — costs, stock and the supplier all update automatically.</p>
+          </div>
+          <span className="font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>camera ›</span>
+        </Link>
+      ) : null}
+
+            {/* Academy — your skill ladder, for any signed-in person */}
       {profile ? (
         <div className="mt-6">
           <Link href="/academy" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">

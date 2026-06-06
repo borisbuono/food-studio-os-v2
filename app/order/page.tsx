@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabaseBrowser as supabase } from "@/lib/supabaseBrowser";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
@@ -13,9 +14,11 @@ type Prod = { id: string; provider_id: string; name: string; price: number | nul
 const eur = (n: number) => "€" + n.toFixed(2);
 
 export default function Order() {
+  const params = useSearchParams();
+  const lockedSupplier = params.get("supplier");
   const [providers, setProviders] = useState<Prov[]>([]);
   const [products, setProducts] = useState<Prod[]>([]);
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(lockedSupplier);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [stage, setStage] = useState<"build" | "review" | "send" | "sent">("build");
   const [sentVia, setSentVia] = useState<string | null>(null);
@@ -129,7 +132,7 @@ export default function Order() {
         </div>
       ) : null}
 
-      {!provider ? (
+      {!provider && !lockedSupplier ? (
         <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
           {providers.map((p) => (
             <li key={p.id}>
@@ -143,7 +146,7 @@ export default function Order() {
         </ul>
       ) : (
         <>
-          <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ochre">change supplier</button>
+          {!lockedSupplier ? <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ochre">change supplier</button> : null}
           <ul className="mt-5 divide-y divide-black/10 border-t border-black/10">
             {provProducts.map((p) => {
               const q = cart[p.id] || 0;
