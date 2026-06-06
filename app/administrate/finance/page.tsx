@@ -106,15 +106,30 @@ export default async function Finance() {
       })}
       {!byVenue.length ? <p className="mt-8 font-sans text-[14px] text-clay">No end-of-day reports yet.</p> : null}
 
-      {/* Deeper engine — links recede, available if needed */}
-      <section className="mt-10 border-t border-black/10 pt-6">
-        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">If you need to look deeper</p>
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 font-sans text-[13px] text-ochre">
-          <Link href="/administrate/finance/costs">All cost trends</Link>
-          <Link href="/administrate/finance/eod">EOD reports</Link>
-          <Link href="/administrate/finance/variance">Variance</Link>
-          <Link href="/administrate/finance/forecast">Forecast</Link>
-          <Link href="/administrate/invoices">Missing invoices</Link>
+      {/* The Numbers tiles — promoted (Boris 2026-06-01) from a footer strip to proper tiles */}
+      <section className="mt-10">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Go deeper</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Link href="/administrate/finance/costs" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+            <h3 className="font-serif text-xl text-ink">Cost trends</h3>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">Every product you buy, charted from your invoices. ▲ dearer / ▼ cheaper.</p>
+          </Link>
+          <Link href="/administrate/finance/eod" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+            <h3 className="font-serif text-xl text-ink">EOD reports</h3>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">Each night's close — covers, revenue, food/wine/bar split. The trace of the house.</p>
+          </Link>
+          <Link href="/administrate/finance/variance" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+            <h3 className="font-serif text-xl text-ink">Variance</h3>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">What the recipes said you should use vs what stock actually moved — by recipe and by ingredient.</p>
+          </Link>
+          <Link href="/administrate/finance/forecast" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+            <h3 className="font-serif text-xl text-ink">Forecast</h3>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">Where the next month likely lands, fused with how the last month actually went.</p>
+          </Link>
+          <Link href="/administrate/invoices" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+            <h3 className="font-serif text-xl text-ink">Missing invoices &amp; notes</h3>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">What we delivered without paper — and what to chase, with status of the conversation.</p>
+          </Link>
         </div>
       </section>
     </main>

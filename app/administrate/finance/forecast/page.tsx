@@ -1,65 +1,140 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-export default async function Forecast() {
-  const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
-  const eod = (await supabase.from("eod_reports").select("restaurant_id,report_date,revenue,actual_covers,revenue_labour").order("report_date", { ascending: false })).data || [];
+type Point = { date: string; rev: number; kind: "actual" | "forecast" };
 
-  const byVenue = venues
-    .map((v: any) => ({ ...v, rs: eod.filter((e: any) => e.restaurant_id === v.id) }))
-    .filter((x: any) => x.rs.length >= 1);
+export default async function Forecast() {
+  const rid = serverRestaurantId();
+  const eod = (await supabase.from("eod_reports").select("report_date,revenue,actual_covers,revenue_labour").eq("restaurant_id", rid).order("report_date", { ascending: true })).data || [];
+
+  if (!eod.length) {
+    return (
+      <main className="mx-auto max-w-xl px-6 py-12">
+        <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
+        <h1 className="mt-6 font-serif text-3xl text-ink">Forecast</h1>
+        <p className="mt-3 font-sans text-[15px] text-clay">No end-of-day reports yet to forecast from.</p>
+      </main>
+    );
+  }
+
+  const venueName = (await supabase.from("restaurants").select("name").eq("id", rid).maybeSingle()).data?.name || "the venue";
+
+  // Past 28 days actuals
+  const days28 = 28;
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const cutoff = new Date(today); cutoff.setUTCDate(cutoff.getUTCDate() - days28);
+  const past = eod.filter((e: any) => new Date(e.report_date) >= cutoff).map((e: any) => ({ date: e.report_date, rev: Number(e.revenue || 0), kind: "actual" as const }));
+
+  // Day-of-week seasonality: average revenue per weekday across the available history
+  const dowAvg = new Map<number, { sum: number; n: number }>();
+  eod.forEach((e: any) => {
+    const dow = new Date(e.report_date).getUTCDay();
+    const cur = dowAvg.get(dow) || { sum: 0, n: 0 };
+    cur.sum += Number(e.revenue || 0); cur.n += 1;
+    dowAvg.set(dow, cur);
+  });
+  const baseByDow = (d: number) => { const v = dowAvg.get(d); return v && v.n ? v.sum / v.n : 0; };
+
+  // Recent trend: last 14d vs prior 14d
+  const last14 = eod.slice(-14).reduce((a, e: any) => a + Number(e.revenue || 0), 0);
+  const prior14 = eod.slice(-28, -14).reduce((a, e: any) => a + Number(e.revenue || 0), 0);
+  const trend = prior14 ? clamp((last14 / prior14 - 1), -0.2, 0.2) : 0;
+
+  // Forecast next 28 days
+  const forecast: Point[] = [];
+  for (let i = 1; i <= 28; i++) {
+    const d = new Date(today); d.setUTCDate(d.getUTCDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const base = baseByDow(d.getUTCDay());
+    forecast.push({ date: iso, rev: base * (1 + trend), kind: "forecast" });
+  }
+
+  const series: Point[] = [...past, ...forecast];
+  const maxRev = Math.max(...series.map((p) => p.rev), 1);
+  const w = 700, h = 200, padL = 36, padR = 12, padT = 16, padB = 26;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const xFor = (i: number) => padL + (i / (series.length - 1)) * innerW;
+  const yFor = (v: number) => padT + innerH - (v / maxRev) * innerH;
+
+  // Build paths for actual and forecast portions separately so we can render different strokes
+  const actuals = past.map((p, i) => ({ p, i }));
+  const fxStart = past.length; // index of first forecast point
+  const path = (pts: { p: Point; i: number }[]) => pts.length ? pts.map((x, k) => (k === 0 ? "M" : "L") + xFor(x.i).toFixed(1) + " " + yFor(x.p.rev).toFixed(1)).join(" ") : "";
+  const actualPath = path(actuals);
+  const forecastPath = path(forecast.map((p, k) => ({ p, i: fxStart + k })));
+
+  // Totals
+  const last28Actual = past.reduce((a, p) => a + p.rev, 0);
+  const next28Forecast = forecast.reduce((a, p) => a + p.rev, 0);
+  const change = last28Actual ? Math.round((next28Forecast / last28Actual - 1) * 100) : 0;
+  const labourBudget = next28Forecast * 0.30;
+
+  // y-axis tick marks (4 ticks)
+  const ticks = [0.25, 0.5, 0.75, 1].map((f) => maxRev * f);
+  // dim every Monday for visual rhythm
+  const mondayIdx: number[] = [];
+  series.forEach((p, i) => { if (new Date(p.date).getUTCDay() === 1) mondayIdx.push(i); });
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
-      <Link href="/administrate/finance" className="font-sans text-sm text-ochre">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Forecast · next period</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">Where the numbers point</h1>
-      <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">A read on the trend from your end-of-day reports, a simple projection for the next period, and a labour budget to hold margin. The CFO view explains the move, it doesn’t just show it.</p>
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
+      <p className="mt-6 font-sans text-xs font-medium text-ochre">Forecast · last 28d ↔ next 28d</p>
+      <h1 className="mt-2 font-serif text-3xl text-ink">{venueName}</h1>
 
-      {byVenue.map((v: any) => {
-        const L = v.rs[0], P = v.rs[1];
-        const rev = Number(L.revenue || 0), cov = Number(L.actual_covers || 0);
-        const avg = cov ? rev / cov : 0;
-        const pRev = P ? Number(P.revenue || 0) : 0, pCov = P ? Number(P.actual_covers || 0) : 0;
-        const pAvg = pCov ? pRev / pCov : 0;
-        const revTrend = pRev ? (rev / pRev - 1) : 0;
-        const covTrend = pCov ? (cov / pCov - 1) : 0;
-        const proj = rev * (1 + clamp(revTrend, -0.2, 0.2));
-        const labourActual = L.revenue_labour ? Number(L.revenue_labour) / rev : null;
-        const labourBudget = proj * 0.30;
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-black/10 bg-card p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Last 28 days · actual</p>
+          <p className="mt-1 font-serif text-3xl text-ink">{eur(last28Actual)}</p>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-card p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Next 28 days · projected</p>
+          <p className="mt-1 font-serif text-3xl text-ink">{eur(next28Forecast)}</p>
+          <p className="mt-1 font-mono text-[11px]" style={{ color: change >= 0 ? "#5A6B3B" : "#B8552E" }}>{change >= 0 ? "▲" : "▼"} {Math.abs(change)}% vs the 28 just past</p>
+        </div>
+      </div>
 
-        let read = "Not enough history yet to read a trend.";
-        if (P) {
-          const dirR = revTrend >= 0.02 ? "up" : revTrend <= -0.02 ? "down" : "flat";
-          const dirA = pAvg ? (avg / pAvg - 1) : 0;
-          if (dirR === "up" && covTrend > 0.02 && Math.abs(dirA) < 0.02) read = "Growth is coming from volume — more covers at a steady average spend. Protect the experience and watch labour scales with the room.";
-          else if (dirR === "up" && dirA > 0.02) read = "Revenue and average spend both up — you're selling more and selling better. The menu work is landing.";
-          else if (dirR === "down") read = "Revenue softened versus the prior period — check covers vs. average spend below to see whether it's footfall or basket size, and hold labour to budget.";
-          else read = "Broadly flat period over period — stable, but no momentum. A menu-engineering push on the puzzles could move it.";
-        }
+      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-4">
+        <svg viewBox={"0 0 " + w + " " + h} width="100%" height={h}>
+          {/* y grid */}
+          {ticks.map((tv, i) => (
+            <g key={i}>
+              <line x1={padL} x2={w - padR} y1={yFor(tv)} y2={yFor(tv)} stroke="rgba(0,0,0,0.06)" strokeWidth="1" />
+              <text x={padL - 6} y={yFor(tv) + 3} textAnchor="end" className="fill-clay" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "9px" }}>{"€" + Math.round(tv).toLocaleString("en-GB")}</text>
+            </g>
+          ))}
+          {/* monday markers */}
+          {mondayIdx.map((i, k) => (
+            <line key={"m" + k} x1={xFor(i)} x2={xFor(i)} y1={padT} y2={h - padB} stroke="rgba(0,0,0,0.04)" strokeDasharray="2 3" />
+          ))}
+          {/* today divider */}
+          <line x1={xFor(fxStart - 0.5)} x2={xFor(fxStart - 0.5)} y1={padT} y2={h - padB} stroke="var(--accent)" strokeOpacity="0.45" strokeDasharray="3 3" />
+          <text x={xFor(fxStart - 0.5)} y={padT - 4} textAnchor="middle" className="fill-clay" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "9px" }}>today</text>
+          {/* actual line */}
+          <path d={actualPath} stroke="var(--accent)" strokeWidth="1.8" fill="none" />
+          {/* forecast line */}
+          <path d={forecastPath} stroke="var(--accent)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" strokeOpacity="0.7" />
+          {/* day labels - sparse */}
+          {series.filter((_, i) => i % 7 === 0).map((p, k) => {
+            const i = k * 7;
+            const lbl = new Date(p.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+            return <text key={"x" + k} x={xFor(i)} y={h - 8} textAnchor="middle" className="fill-clay" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "9px" }}>{lbl}</text>;
+          })}
+        </svg>
+        <p className="mt-2 font-mono text-[10px] text-clay">solid = actual EOD revenue · dashed = projection from weekday seasonality × recent trend ({trend >= 0 ? "+" : ""}{Math.round(trend * 100)}%)</p>
+      </div>
 
-        return (
-          <section key={v.id} className="mt-8 rounded-2xl border border-black/10 bg-card p-6">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-serif text-2xl text-ink">{v.name}</h2>
-              <span className="font-mono text-[11px] text-clay">from {L.report_date}</span>
-            </div>
-            <p className="mt-3 font-serif text-3xl text-ink">{eur(proj)} <span className="font-sans text-[14px] text-ink-soft">projected</span></p>
-            <p className="mt-1 font-sans text-[13px] text-ink-soft">last {eur(rev)} · {cov.toLocaleString("en-GB")} covers · {eur(avg)} avg{P ? " · " + (revTrend >= 0 ? "up " : "down ") + Math.abs(Math.round(revTrend * 100)) + "% vs prior" : ""}</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div><p className="font-serif text-xl text-ink">{eur(labourBudget)}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Labour budget · 30%</p></div>
-              <div><p className={"font-serif text-xl " + (labourActual != null && labourActual <= 0.32 ? "text-olive" : "text-ember")}>{labourActual != null ? Math.round(labourActual * 100) + "%" : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Labour last period</p></div>
-            </div>
-            <p className="mt-4 font-serif text-[16px] leading-relaxed text-ink-soft">{read}</p>
-          </section>
-        );
-      })}
-      {!byVenue.length ? <p className="mt-8 font-sans text-[14px] text-clay">No end-of-day reports to forecast from yet.</p> : null}
-      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Simple trend projection · a demand model (weather, events, day-part) is the next step — partner-grade, not guesswork</p>
+      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-5">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Labour budget · next 28 days @ 30%</p>
+        <p className="mt-1 font-serif text-2xl text-ink">{eur(labourBudget)}</p>
+        <p className="mt-1 font-sans text-[13px] text-ink-soft">Hold the schedule to this and margin stays where it should.</p>
+      </div>
+
+      <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Trend = last 14d revenue vs prior 14d, clamped ±20% · seasonality = average revenue by weekday across all EOD on file</p>
     </main>
   );
 }
