@@ -21,6 +21,7 @@ export default function FloorPlan() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [frestoMode, setFrestoMode] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -41,9 +42,35 @@ export default function FloorPlan() {
       if (z.error) { setMissing(true); setLoading(false); return; }
       const t = await supabase.from("dining_tables").select("*").eq("restaurant_id", rid);
       const b = await supabase.from("bookings").select("*").eq("restaurant_id", rid).eq("service_date", todayISO());
+      const tbls = (t.data as Tbl[]) || [];
       setZones((z.data as Zone[]) || []);
-      setTables((t.data as Tbl[]) || []);
-      setBookings((b.data as Booking[]) || []);
+      setTables(tbls);
+      let rows = (b.data as Booking[]) || [];
+      let fMode: string | null = null;
+      // No bookings written to the DB yet → read tonight's book through the fresto adapter
+      // (mock until Lars's API lands). One seam: /api/fresto/sync. Read-only overlay.
+      if (rows.length === 0) {
+        try {
+          const res = await fetch(`/api/fresto/sync?date=${todayISO()}`, { cache: "no-store" });
+          const j = await res.json();
+          if (j?.ok && Array.isArray(j.bookings)) {
+            const byLabel = new Map(tbls.map((x) => [x.label, x.id]));
+            rows = j.bookings
+              .filter((x: any) => x.status !== "cancelled")
+              .map((x: any) => ({
+                id: x.id,
+                guest_name: x.guestName ?? null,
+                party_size: x.partySize ?? 0,
+                service_time: x.time ?? null,
+                table_id: x.tableLabel ? (byLabel.get(x.tableLabel) ?? null) : null,
+                status: x.status === "finished" ? "seated" : x.status,
+              })) as Booking[];
+            fMode = j.mode || "mock";
+          }
+        } catch { /* seam unreachable → leave the book empty, plan still renders */ }
+      }
+      setBookings(rows);
+      setFrestoMode(fMode);
       setLoading(false);
     })();
   }, [rid]);
@@ -120,7 +147,7 @@ export default function FloorPlan() {
               style={{ background: "var(--accent)" }}>
               {saving ? "Saving…" : dirtyCount ? `Save layout (${dirtyCount})` : "Saved"}
             </button>
-            <span className="font-mono text-xs text-clay">{tables.length} tables · {bookings.length} booked tonight</span>
+            <span className="font-mono text-xs text-clay">{tables.length} tables · {bookings.length} booked tonight{frestoMode ? ` · via fresto (${frestoMode})` : ""}</span>
           </div>
 
           <svg ref={svgRef} viewBox={`0 0 ${VB.w} ${VB.h}`} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}

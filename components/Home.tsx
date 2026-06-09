@@ -24,6 +24,8 @@ export type EntityStats = {
   deliveriesDue?: number; deliveriesNext?: string | null;
   eventsToday?: { title: string; guests: number }[];
   messages?: number;
+  // tonight's live pulse from the fresto adapter (mock until Lars's API lands)
+  pulse?: { mode: "live" | "mock"; bookedTonight: number; openTabs: number; liveGross: number; covers: number };
 };
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
@@ -37,6 +39,18 @@ const PERIOD_TABS: { key: PeriodKey; label: string }[] = [
   { key: "ytd", label: "YTD" },
 ];
 
+// Tonight's live service pulse — booked covers, money on the floor, open tabs — read
+// through the fresto adapter (mock data until the API is connected). One subtle mono line.
+function PulseLine({ p }: { p: NonNullable<EntityStats["pulse"]> }) {
+  return (
+    <p className="mt-2 font-mono text-[12px] text-basil">
+      Tonight · {p.bookedTonight} booked · {eur(p.liveGross)} on the floor
+      {p.openTabs > 0 ? ` · ${p.openTabs} open` : ""}
+      <span className="text-clay"> · fresto{p.mode === "mock" ? " (mock)" : ""}</span>
+    </p>
+  );
+}
+
 function OfficeDashboard({ s }: { s: EntityStats }) {
   const [pk, setPk] = useState<PeriodKey>("week");
   if (s.trial) {
@@ -45,6 +59,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
         <p className="mt-2 font-serif text-4xl text-ink">{s.dishCount} <span className="font-sans text-base text-ink-soft">dishes costed</span></p>
         <p className="mt-1 font-sans text-[14px] text-ink-soft">€{(s.contribution || 0).toLocaleString("en-GB")} contribution · €{(s.varianceLoss || 0).toFixed(2)} variance to chase</p>
         <p className="mt-3 font-mono text-[12px] text-clay">Sandbox venue · the engine runs end to end here</p>
+        {s.pulse ? <PulseLine p={s.pulse} /> : null}
       </>
     );
   }
@@ -58,6 +73,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
         <p className="mt-2 font-serif text-4xl text-ink">{eur(s.rev)}</p>
         <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
         <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
+        {s.pulse ? <PulseLine p={s.pulse} /> : null}
       </>
     );
   }
@@ -85,6 +101,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
       <p className="mt-3 font-mono text-[12px] text-clay">
         {cur.n} service{cur.n === 1 ? "" : "s"} · {s.inbox} in inbox · {s.events} events in pipeline
       </p>
+      {s.pulse ? <PulseLine p={s.pulse} /> : null}
       {s.venues ? (
         <ul className="mt-4 divide-y divide-black/10 border-t border-black/10">
           {s.venues.map((v, i) => (

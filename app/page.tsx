@@ -1,6 +1,7 @@
 import Home, { EntityStats } from "@/components/Home";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
+import { getFrestoAdapter } from "@/lib/integrations/fresto";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,26 @@ export default async function Page() {
 
   const bm = venueStats(BM);
   const taller = venueStats(TALLER);
+  // --- tonight's live service pulse via the fresto adapter (mock until connected) ---
+  const venuePulse = async (vid: string) => {
+    try {
+      const f = await getFrestoAdapter(vid);
+      const [sum, bk] = await Promise.all([f.getSalesSummary(today), f.getBookings(today)]);
+      const booked = bk.filter((b: any) => b.status !== "cancelled" && b.status !== "no_show").length;
+      return { mode: f.mode, bookedTonight: booked, openTabs: sum.openTabs, liveGross: Math.round(sum.grossSales), covers: sum.covers };
+    } catch { return undefined; }
+  };
+  const [bmPulse, tallerPulse, utPulse] = await Promise.all([venuePulse(BM), venuePulse(TALLER), venuePulse(UT)]);
+  (bm as any).pulse = bmPulse;
+  (taller as any).pulse = tallerPulse;
+  const rollPulse = (a: any, b: any) => (a || b) ? {
+    mode: ((a?.mode === "live" && b?.mode === "live") ? "live" : "mock") as "live" | "mock",
+    bookedTonight: (a?.bookedTonight || 0) + (b?.bookedTonight || 0),
+    openTabs: (a?.openTabs || 0) + (b?.openTabs || 0),
+    liveGross: (a?.liveGross || 0) + (b?.liveGross || 0),
+    covers: (a?.covers || 0) + (b?.covers || 0),
+  } : undefined;
+
   const hRev = bm.rev + taller.rev, hCov = bm.cov + taller.cov;
   const addP = (a: any, b: any) => { const rev = a.rev + b.rev, cov = a.cov + b.cov; return { rev, cov, avg: cov ? Math.round(rev / cov) : 0, n: a.n + b.n }; };
   const holdings: EntityStats = {
@@ -108,6 +129,7 @@ export default async function Page() {
     deliveriesNext: bm.deliveriesNext || taller.deliveriesNext || null,
     eventsToday: [...(bm.eventsToday || []), ...(taller.eventsToday || [])],
     messages: (bm.messages || 0) + (taller.messages || 0),
+    pulse: rollPulse(bmPulse, tallerPulse),
   };
 
   const utMenu = menuAll.filter((m: any) => m.restaurant_id === UT);
@@ -120,6 +142,7 @@ export default async function Page() {
     label: "Restaurant Utopia", reportPeriod: null,
     rev: 0, cov: 0, avg: 0, revDelta: null, avgDelta: null,
     trial: true, dishCount: utMenu.length, contribution: Math.round(utContribution), varianceLoss: Math.round(utLoss * 100) / 100,
+    pulse: utPulse,
   };
 
   return <Home statsByEntity={{ holdings, bistro_mondo: bm, taller, utopia }} />;
