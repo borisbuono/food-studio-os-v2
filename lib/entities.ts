@@ -9,19 +9,19 @@ export const ENTITY_WORDMARK: Record<EntityKey, string> = {
   holdings: "font-serif text-[17px] tracking-tight text-ink",
   bistro_mondo: "font-serif italic text-[18px] text-tomato",
   taller: "font-sans text-[13px] font-semibold uppercase tracking-[0.18em] text-ink",
-  utopia: "font-serif italic text-[17px] text-ochre",
+  utopia: "font-serif italic text-[17px]",
 };
 // per-venue voice — page title
 export const ENTITY_H1: Record<EntityKey, string> = {
   holdings: "font-serif text-3xl text-ink",
   bistro_mondo: "font-serif italic text-4xl text-tomato",
   taller: "font-sans text-3xl font-bold uppercase tracking-[0.05em] text-ink",
-  utopia: "font-serif italic text-3xl text-ochre",
+  utopia: "font-serif italic text-3xl",
 };
 
 // per-profile signature colour (the single --accent knob)
 export const ENTITY_ACCENT: Record<EntityKey, string> = {
-  holdings: "#B5701C",      // ochre — the operator
+  holdings: "#3F4C28",      // olive — operator (was ochre, Boris 2026-06-09 swap to kill Claude-orange feel)
   bistro_mondo: "#9A3122",  // tomato — folk warmth
   taller: "#2B3A45",        // slate — modernist
   utopia: "#0E7C86",        // teal-blue — the most-seen demo profile (starting option)

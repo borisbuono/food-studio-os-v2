@@ -5,6 +5,7 @@ import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
+import { t, getLang, Lang } from "@/lib/i18n";
 import { onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 
 export type PeriodAgg = { rev: number; cov: number; avg: number; n: number };
@@ -117,7 +118,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
 }
 
 // The real brief — what a FOH/BOH person needs the moment they open the app.
-function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
+function Brief({ role, s, lang }: { role: RoleKey; s: EntityStats; lang: Lang }) {
   const Row = ({ label, value, why, soft }: { label: string; value: string; why?: string; soft?: boolean }) => (
     <div className="flex flex-col gap-0.5 py-2.5">
       <div className="flex items-baseline justify-between gap-4">
@@ -139,13 +140,13 @@ function Brief({ role, s }: { role: RoleKey; s: EntityStats }) {
 
   return (
     <div className="divide-y divide-black/10">
-      <Row label="Tonight" value={tonight || "Nothing booked yet — covers connect when a booking system is linked"} why="Who's coming. Sets the pace for the night." soft={!tonight} />
-      {role === "boh" ? <Row label="Prep" value={s.prep ? `${s.prep} on your station list` : "Nothing queued"} why="Scaled to tomorrow's covers — opens the recipe + SOP." soft={!s.prep} /> : null}
-      <Row label="Specials" value={specials || "None flagged today"} why="What the floor pushes tonight. Tap to read the pitch." soft={!specials} />
-      <Row label="86 tonight" value={sixed || "Nothing 86’d"} why="Tell the floor before they tell a guest." soft={!sixed} />
-      <Row label="Deliveries" value={deliveries || "None due"} why="Photograph the note on arrival — costs update everywhere." soft={!deliveries} />
-      <Row label="Cleaning" value={s.cleaningDue ? `${s.cleaningDue} due today` : "All clear"} why="HACCP sign-off — auditable, station-by-station." soft={!s.cleaningDue} />
-      <Row label="Messages" value={msgs || "Inbox clear"} why="The team, in the OS. Not WhatsApp." soft={!msgs} />
+      <Row label={t("brief.tonight", lang)} value={tonight || t("brief.tonight.empty", lang)} why={t("brief.tonight.why", lang)} soft={!tonight} />
+      {role === "boh" ? <Row label={t("brief.prep", lang)} value={s.prep ? `${s.prep} on your station list` : t("brief.prep.empty", lang)} why={t("brief.prep.why", lang)} soft={!s.prep} /> : null}
+      <Row label={t("brief.specials", lang)} value={specials || t("brief.specials.empty", lang)} why={t("brief.specials.why", lang)} soft={!specials} />
+      <Row label={t("brief.86", lang)} value={sixed || t("brief.86.empty", lang)} why={t("brief.86.why", lang)} soft={!sixed} />
+      <Row label={t("brief.deliveries", lang)} value={deliveries || t("brief.deliveries.empty", lang)} why={t("brief.deliveries.why", lang)} soft={!deliveries} />
+      <Row label={t("brief.cleaning", lang)} value={s.cleaningDue ? `${s.cleaningDue} due today` : t("brief.cleaning.empty", lang)} why={t("brief.cleaning.why", lang)} soft={!s.cleaningDue} />
+      <Row label={t("brief.messages", lang)} value={msgs || t("brief.messages.empty", lang)} why={t("brief.messages.why", lang)} soft={!msgs} />
     </div>
   );
 }
@@ -163,7 +164,9 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
     return c && (["holdings","bistro_mondo","taller","utopia"] as string[]).includes(c) ? c : "utopia";
   });
   const [userAccent, setUserAccent] = useState<string | null>(null);
+  const [lang, setLang] = useState<Lang>("en");
 
+  useEffect(() => { setLang(getLang()); }, []);
   useEffect(() => {
     getMyProfile().then((p) => {
       setProfile(p); setLoaded(true);
@@ -219,7 +222,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>
           {isOffice ? `Your dashboard · ${ENTITY_LABEL[entity]}` : `Your brief · ${ENTITY_LABEL[entity]}`}
         </p>
-        {isOffice ? <OfficeDashboard s={s} /> : <Brief role={role} s={s} />}
+        {isOffice ? <OfficeDashboard s={s} /> : <Brief role={role} s={s} lang={lang} />}
       </div>
 
       {/* Role actions — the few things this person reaches for */}

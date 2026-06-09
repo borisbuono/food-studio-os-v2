@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AuthStatus from "@/components/AuthStatus";
+import LangChooser from "@/components/LangChooser";
 import CommandK from "@/components/CommandK";
 import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
 import { ROLES, RoleKey } from "@/lib/roles";
@@ -75,6 +76,7 @@ export default function TopBar() {
             </span>
           ) : null}
 
+          <LangChooser />
           <AuthStatus />
         </div>
       </div>
