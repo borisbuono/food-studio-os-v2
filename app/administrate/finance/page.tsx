@@ -38,8 +38,8 @@ export default async function Finance() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">The numbers · what to react to</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">How the house is doing</h1>
+      <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>The numbers · what to react to</p>
+      <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">How the house is doing</h1>
       <p className="mt-2 font-sans text-[14px] text-ink-soft">The engine runs out of sight. Below are only the signals that actually want a call.</p>
 
       {/* Signals — react-to */}
@@ -47,21 +47,21 @@ export default async function Finance() {
         <section className="mt-7">
           <p className="font-sans text-xs font-medium text-clay">Costs that moved</p>
           <p className="mt-1 font-sans text-[12px] text-ink-soft">From your invoices, last 30 days. ≥5% move surfaces here.</p>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 divide-y divide-line border-y border-line">
             {moves.map((m, i) => {
               const up = m.pct > 0;
               return (
-                <li key={i} className="rounded-xl border border-black/10 bg-card px-4 py-3">
+                <li key={i} className="py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="font-sans text-[14px] text-ink">{m.name}</span>
-                    <span className={"font-mono text-[12px] " + (up ? "text-rose-700" : "text-emerald-700")}>{up ? "▲" : "▼"} {Math.abs(m.pct).toFixed(1)}%</span>
+                    <span className={"font-mono text-[12px] " + (up ? "text-tomato" : "text-basil")}>{up ? "+" : "\u2212"}{Math.abs(m.pct).toFixed(1)}%</span>
                   </div>
                   <p className="mt-0.5 font-sans text-[11px] leading-snug text-ink-soft">€{m.prior.toFixed(2)} → €{m.latest.toFixed(2)} per {m.unit} · {m.supplier || ""} · {up && Math.abs(m.pct) >= 10 ? "Worth a call or a switch." : "Within normal."}</p>
                 </li>
               );
             })}
           </ul>
-          <Link href="/administrate/finance/costs" className="mt-3 inline-block font-sans text-sm text-ochre">All cost trends →</Link>
+          <Link href="/administrate/finance/costs" className="mt-3 inline-block font-sans text-sm" style={{ color: "var(--accent)" }}>All cost trends →</Link>
         </section>
       ) : (
         <p className="mt-7 font-sans text-[13px] text-clay">No notable cost moves in the last 30 days.</p>
@@ -78,7 +78,7 @@ export default async function Finance() {
         const deltaWord = delta === null ? "" : delta >= 0 ? `up ${delta}% vs prior period` : `down ${Math.abs(delta)}% vs prior period`;
         return (
           <section key={v.id} className="mt-8">
-            <div className="rounded-2xl border border-black/10 bg-card p-6">
+            <div className="border-y border-line py-6">
               <div className="flex items-baseline justify-between">
                 <h2 className="font-serif text-2xl text-ink">{v.name}</h2>
                 <span className="font-mono text-[11px] text-clay">{latest.report_date}</span>
@@ -92,7 +92,7 @@ export default async function Finance() {
               </div>
             </div>
             {v.rs.length > 1 ? (
-              <ul className="mt-3 divide-y divide-black/10">
+              <ul className="divide-y divide-line-soft">
                 {v.rs.slice(1, 6).map((r: any, i: number) => (
                   <li key={i} className="flex items-baseline justify-between py-2">
                     <span className="font-mono text-[12px] text-clay">{r.report_date}</span>
@@ -110,23 +110,23 @@ export default async function Finance() {
       <section className="mt-10">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Go deeper</p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Link href="/administrate/finance/costs" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+          <Link href="/administrate/finance/costs" className="block border-t border-line py-5 pr-4 transition hover:border-ink/40">
             <h3 className="font-serif text-xl text-ink">Cost trends</h3>
-            <p className="mt-1 font-sans text-[13px] text-ink-soft">Every product you buy, charted from your invoices. ▲ dearer / ▼ cheaper.</p>
+            <p className="mt-1 font-sans text-[13px] text-ink-soft">Every product you buy, charted from your invoices — dearer or cheaper, at a glance.</p>
           </Link>
-          <Link href="/administrate/finance/eod" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+          <Link href="/administrate/finance/eod" className="block border-t border-line py-5 pr-4 transition hover:border-ink/40">
             <h3 className="font-serif text-xl text-ink">EOD reports</h3>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">Each night's close — covers, revenue, food/wine/bar split. The trace of the house.</p>
           </Link>
-          <Link href="/administrate/finance/variance" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+          <Link href="/administrate/finance/variance" className="block border-t border-line py-5 pr-4 transition hover:border-ink/40">
             <h3 className="font-serif text-xl text-ink">Variance</h3>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">What the recipes said you should use vs what stock actually moved — by recipe and by ingredient.</p>
           </Link>
-          <Link href="/administrate/finance/forecast" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+          <Link href="/administrate/finance/forecast" className="block border-t border-line py-5 pr-4 transition hover:border-ink/40">
             <h3 className="font-serif text-xl text-ink">Forecast</h3>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">Where the next month likely lands, fused with how the last month actually went.</p>
           </Link>
-          <Link href="/administrate/invoices" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
+          <Link href="/administrate/invoices" className="block border-t border-line py-5 pr-4 transition hover:border-ink/40">
             <h3 className="font-serif text-xl text-ink">Missing invoices &amp; notes</h3>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">What we delivered without paper — and what to chase, with status of the conversation.</p>
           </Link>
