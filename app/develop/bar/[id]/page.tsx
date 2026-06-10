@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function CocktailHub({ params }: { params: { id: string } }) {
-  const c: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
+  
+  const supabase = supabaseServer();const c: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
   if (!c) return <main className="mx-auto max-w-xl px-6 py-12"><Link href="/develop/bar" className="font-sans text-sm text-ink-soft">← bar</Link><p className="mt-8 font-serif text-2xl text-ink">Cocktail not found.</p></main>;
   const build = (c.build || c.description || "").trim();
   return (

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function SupplierHub({ params }: { params: { id: string } }) {
-  const { data: p } = await supabase.from("providers").select("*").eq("id", params.id).maybeSingle();
+  
+  const supabase = supabaseServer();const { data: p } = await supabase.from("providers").select("*").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/suppliers");
 
   const products = (await supabase

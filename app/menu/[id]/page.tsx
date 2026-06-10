@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import EightySixToggle from "@/components/EightySixToggle";
 import SoftRecipeCost from "@/components/SoftRecipeCost";
@@ -16,7 +16,8 @@ function Row({ k, v, accent }: { k: string; v: string; accent?: string }) {
 }
 
 export default async function DishHub({ params }: { params: { id: string } }) {
-  const { data: item } = await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle();
+  
+  const supabase = supabaseServer();const { data: item } = await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle();
   if (!item) {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">

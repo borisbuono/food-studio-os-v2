@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Settings() {
-  const acct = await supabase.from("accounting_integrations").select("*", { count: "exact", head: true });
+  
+  const supabase = supabaseServer();const acct = await supabase.from("accounting_integrations").select("*", { count: "exact", head: true });
   const booking = await supabase.from("booking_integrations").select("*", { count: "exact", head: true });
   const entityInt = await supabase.from("entity_integrations").select("*", { count: "exact", head: true });
   const skills = (await supabase.from("agent_skills").select("display_name,skill_code,model,provider,human_review_required,is_active").eq("is_active", true).order("display_name")).data || [];

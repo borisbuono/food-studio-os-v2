@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,8 @@ const CLASS: Record<string, { label: string; note: string; color: string }> = {
 };
 
 export default async function MenuEngineering() {
-  const dishes = (await supabase.from("menu_items").select("id,name,price,cost,units_sold").eq("restaurant_id", UT).not("units_sold", "is", null)).data || [];
+  
+  const supabase = supabaseServer();const dishes = (await supabase.from("menu_items").select("id,name,price,cost,units_sold").eq("restaurant_id", UT).not("units_sold", "is", null)).data || [];
   const rows = dishes.map((d: any) => {
     const price = Number(d.price || 0), cost = Number(d.cost || 0), units = Number(d.units_sold || 0);
     const marginEur = price - cost;

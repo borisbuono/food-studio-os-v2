@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
 export default async function Bookings() {
-  const covers = (await supabase.from("covers").select("*").limit(50)).data || [];
+  
+  const supabase = supabaseServer();const covers = (await supabase.from("covers").select("*").limit(50)).data || [];
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>

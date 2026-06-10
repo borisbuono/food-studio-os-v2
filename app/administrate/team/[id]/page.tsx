@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,8 @@ function fmtDay(s: string) {
 }
 
 export default async function PersonHub({ params }: { params: { id: string } }) {
-  const { data: p } = await supabase.from("profiles").select("id,name,role,restaurant_id,email,color").eq("id", params.id).maybeSingle();
+  
+  const supabase = supabaseServer();const { data: p } = await supabase.from("profiles").select("id,name,role,restaurant_id,email,color").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/team");
 
   const { data: venue } = await supabase.from("restaurants").select("name").eq("id", p.restaurant_id).maybeSingle();

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 export default async function Finance() {
-  const rid = serverRestaurantId();
+  
+  const supabase = supabaseServer();const rid = serverRestaurantId();
   const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
   const reports = (await supabase.from("eod_reports").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar").order("report_date", { ascending: false })).data || [];
   const byVenue = venues.map((v: any) => ({ ...v, rs: reports.filter((r: any) => r.restaurant_id === v.id) })).filter((x: any) => x.rs.length);

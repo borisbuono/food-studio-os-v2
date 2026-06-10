@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function WineHub({ params }: { params: { id: string } }) {
-  const w: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
+  
+  const supabase = supabaseServer();const w: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
   if (!w) return <main className="mx-auto max-w-xl px-6 py-12"><Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link><p className="mt-8 font-serif text-2xl text-ink">Wine not found.</p></main>;
 
   const lex: any = (await supabase.from("lexicon_products").select("story,why_chosen,pairing_dishes,producer,region,vintage").ilike("name", w.name).maybeSingle()).data;

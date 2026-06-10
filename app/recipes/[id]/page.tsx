@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import MiseScaler from "@/components/MiseScaler";
 
@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"];
 
 export default async function RecipePage({ params }: { params: { id: string } }) {
-  const r: any = (await supabase.from("recipes").select("*").eq("id", params.id).maybeSingle()).data;
+  
+  const supabase = supabaseServer();const r: any = (await supabase.from("recipes").select("*").eq("id", params.id).maybeSingle()).data;
   if (!r) {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">

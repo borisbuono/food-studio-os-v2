@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function HoldingsMap() {
-  const entities = (await supabase.from("entities").select("id,name,entity_type,legal_form,city,country,parent_entity_id,is_active").order("name")).data || [];
+  
+  const supabase = supabaseServer();const entities = (await supabase.from("entities").select("id,name,entity_type,legal_form,city,country,parent_entity_id,is_active").order("name")).data || [];
   const rels = (await supabase.from("entity_relationships").select("source_entity_id,target_entity_id,relationship_type")).data || [];
   const ename = new Map(entities.map((e: any) => [e.id, e.name]));
   const roots = entities.filter((e: any) => !e.parent_entity_id);

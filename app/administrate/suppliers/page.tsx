@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Suppliers() {
-  const providers = (await supabase.from("providers").select("id,name,category,delivery_schedule,delivery_days,cutoff_time,current_offer,notes").order("name")).data || [];
+  
+  const supabase = supabaseServer();const providers = (await supabase.from("providers").select("id,name,category,delivery_schedule,delivery_days,cutoff_time,current_offer,notes").order("name")).data || [];
   const prods = (await supabase.from("provider_products").select("provider_id").eq("is_active", true)).data || [];
   const orders = await supabase.from("orders").select("*", { count: "exact", head: true });
   const prodCount: Record<string, number> = {};

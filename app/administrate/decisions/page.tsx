@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
@@ -43,7 +43,8 @@ const TABS: { key: string; label: string }[] = [
 ];
 
 export default async function Inbox({ searchParams }: { searchParams?: { src?: string } }) {
-  const rid = serverRestaurantId();
+  
+  const supabase = supabaseServer();const rid = serverRestaurantId();
   const active = (searchParams?.src && TABS.some((t) => t.key === searchParams.src)) ? searchParams!.src! : "all";
 
   const [{ data: ext }, { data: fb }] = await Promise.all([

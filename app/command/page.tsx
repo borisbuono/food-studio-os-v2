@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Command() {
-  const flags = (await supabase.from("review_flags").select("flag_type,description,skill_category,resolved,created_at").order("resolved").order("created_at", { ascending: false })).data || [];
+  
+  const supabase = supabaseServer();const flags = (await supabase.from("review_flags").select("flag_type,description,skill_category,resolved,created_at").order("resolved").order("created_at", { ascending: false })).data || [];
   const entities = await supabase.from("entities").select("*", { count: "exact", head: true });
   const coa = await supabase.from("chart_of_accounts").select("*", { count: "exact", head: true });
   const skills = await supabase.from("agent_skills").select("*", { count: "exact", head: true }).eq("is_active", true);

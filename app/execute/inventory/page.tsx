@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Inventory() {
-  const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
+  
+  const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name").order("name")).data || [];
   const perVenue = await Promise.all((venues as any[]).map((v: any) => supabase.from("inventory_items").select("restaurant_id,name,unit,quantity_on_hand,reorder_threshold").eq("restaurant_id", v.id).order("name")));
   const items = perVenue.flatMap((r: any) => r.data || []);
 

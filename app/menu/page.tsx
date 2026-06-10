@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import type { MenuItem } from "@/types/db";
 
@@ -29,7 +29,8 @@ function Item({ it }: { it: MenuItem }) {
 }
 
 export default async function MenuPage() {
-  const { data } = await supabase
+  
+  const supabase = supabaseServer();const { data } = await supabase
     .from("menu_items")
     .select("id,restaurant_id,recipe_id,name,section,price,cost,description,is_active,is_eighty_six,is_special,beverage_type,category,course,wine_style")
     .eq("is_active", true).neq("restaurant_id", "a0000000-0000-4000-8000-000000000001");

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 export default async function Team() {
-  const venues = (await supabase.from("restaurants").select("id,name")).data || [];
+  
+  const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
   const members = (await supabase.from("team_members").select("name,email,default_role,default_restaurant_id,status").order("name")).data || [];
   const profiles = (await supabase.from("profiles").select("id,name,role,restaurant_id,color").order("name")).data || [];

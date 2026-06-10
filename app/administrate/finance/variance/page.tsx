@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 const eur = (n: number) => (n < 0 ? "-€" : "€") + Math.abs(n).toFixed(2);
 
 export default async function Variance({ searchParams }: { searchParams: { by?: string } }) {
-  const by = (searchParams?.by === "recipe" ? "recipe" : "ingredient") as "recipe" | "ingredient";
+  
+  const supabase = supabaseServer();const by = (searchParams?.by === "recipe" ? "recipe" : "ingredient") as "recipe" | "ingredient";
   const rid = serverRestaurantId();
 
   // 1) raw ingredient variance from inventory book - count

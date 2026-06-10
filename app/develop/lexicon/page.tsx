@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ function Entry({ title, meta, body }: { title: string; meta?: string; body?: str
 }
 
 export default async function Lexicon() {
-  const dishes = (await supabase.from("lexicon_dishes").select("recipe_id,cultural_inspiration,history,technique_narrative,pairing_notes")).data || [];
+  
+  const supabase = supabaseServer();const dishes = (await supabase.from("lexicon_dishes").select("recipe_id,cultural_inspiration,history,technique_narrative,pairing_notes")).data || [];
   const recIds = dishes.map((d: any) => d.recipe_id).filter(Boolean);
   const recs = recIds.length ? (await supabase.from("recipes").select("id,name").in("id", recIds)).data || [] : [];
   const recName = new Map(recs.map((r: any) => [r.id, r.name]));

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 
@@ -13,7 +13,8 @@ function daysSince(iso: string | null) {
 }
 
 export default async function Invoices() {
-  const rid = serverRestaurantId();
+  
+  const supabase = supabaseServer();const rid = serverRestaurantId();
   const [orders, providers, movements, history] = await Promise.all([
     supabase.from("orders").select("id,provider_id,order_date,delivery_date,delivered_at,sent_at,total,invoice_ref,channel,notes,metadata,reconciled_at,variance_notes").eq("restaurant_id", rid).order("delivery_date", { ascending: false, nullsFirst: false }).limit(120),
     supabase.from("providers").select("id,name,email,whatsapp,category"),

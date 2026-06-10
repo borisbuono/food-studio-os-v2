@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,8 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 type Point = { date: string; rev: number; kind: "actual" | "forecast" };
 
 export default async function Forecast() {
-  const rid = serverRestaurantId();
+  
+  const supabase = supabaseServer();const rid = serverRestaurantId();
   const eod = (await supabase.from("eod_reports").select("report_date,revenue,actual_covers,revenue_labour").eq("restaurant_id", rid).order("report_date", { ascending: true })).data || [];
 
   if (!eod.length) {

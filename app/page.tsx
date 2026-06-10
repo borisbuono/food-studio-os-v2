@@ -1,5 +1,5 @@
 import Home, { EntityStats } from "@/components/Home";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import { getFrestoAdapter } from "@/lib/integrations/fresto";
 
@@ -10,7 +10,8 @@ const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
 const UT = "a0000000-0000-4000-8000-000000000001";
 
 export default async function Page() {
-  const today = new Date().toISOString().slice(0, 10);
+  
+  const supabase = supabaseServer();const today = new Date().toISOString().slice(0, 10);
   const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
 
   // --- period boundaries for the Office dashboard shuffler (week / last week / month / YTD) ---
