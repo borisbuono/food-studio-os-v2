@@ -14,7 +14,17 @@ export default function Callback() {
           await supabaseBrowser.auth.exchangeCodeForSession(window.location.href);
         }
         const { data } = await supabaseBrowser.auth.getSession();
-        if (data.session) router.replace("/");
+        if (data.session) {
+          // First sign-in → the 60-second first-run tour (column lands with the 20260611 migration)
+          let dest = "/";
+          try {
+            try { await supabaseBrowser.rpc("sync_my_profile_from_invite"); } catch {}
+            const { data: prof, error } = await supabaseBrowser
+              .from("profiles").select("first_run_done_at").eq("id", data.session.user.id).maybeSingle();
+            if (!error && prof && !prof.first_run_done_at) dest = "/welcome";
+          } catch {}
+          router.replace(dest);
+        }
         else setMsg("Couldn’t complete sign-in — the link may have expired. Try again from the sign-in page.");
       } catch (e: any) {
         setMsg("Sign-in error: " + (e?.message || "unknown"));

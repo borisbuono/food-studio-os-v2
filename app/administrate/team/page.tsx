@@ -23,6 +23,8 @@ export default async function Team() {
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
 
+      <Link href="/administrate/team/invite" className="mt-4 inline-block rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">+ Add to team</Link>
+
       <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
         <p className="font-sans text-xs font-medium text-ink-soft">Schedule</p>
         <h2 className="mt-1 font-serif text-xl text-ink">Weekly rota</h2>
