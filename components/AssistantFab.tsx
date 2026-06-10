@@ -28,6 +28,7 @@ export default function AssistantFab() {
   const finalRef = useRef("");      // transcript committed across auto-restarts
   const keepRef = useRef(false);    // user wants to keep listening until they tap to send
   const sendRef = useRef<() => void>(() => {});
+  const pressStart = useRef<number | null>(null);
 
   useEffect(() => { getMyProfile().then(setProfile); }, []);
 
@@ -36,7 +37,7 @@ export default function AssistantFab() {
     if (!SR) { setSupported(false); return; }
     const r = new SR();
     r.continuous = true; r.interimResults = true; r.lang = "en-GB";
-    r.onstart = () => { setListening(true); setStatus("Listening… tap Chef to send"); };
+    r.onstart = () => { setListening(true); setStatus("Listening… release to send"); };
     r.onresult = (e: any) => {
       let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
       const full = (finalRef.current + t).replace(/\s+/g, " ").trim();
@@ -68,7 +69,7 @@ export default function AssistantFab() {
   const listen = () => {
     const r = recRef.current; if (!r) return;
     finalRef.current = ""; textRef.current = ""; setText("");
-    keepRef.current = true; setStatus("Listening… tap Chef to send");
+    keepRef.current = true; setStatus("Listening… release to send");
     try { r.start(); setListening(true); } catch {}
   };
   const stopAndSend = () => { const r = recRef.current; if (!r) return; keepRef.current = false; try { r.stop(); } catch {} };
@@ -117,9 +118,28 @@ export default function AssistantFab() {
 
   return (
     <>
-      <button onClick={() => { if (!open) openFab(); else (listening ? stopAndSend() : listen()); }} aria-label="Chef" style={{ background: "var(--accent)" }}
-        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (listening ? "animate-pulse ring-4 ring-white/70" : open ? "ring-2 ring-white/70" : "")}>
-        {listening ? "Send" : "Chef"}
+      <button
+        aria-label="Chef — hold to speak"
+        style={{ background: "var(--accent)", touchAction: "manipulation" }}
+        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (listening ? "scale-110 ring-4 ring-white/70" : open ? "ring-2 ring-white/70" : "")}
+        onPointerDown={(e) => { e.preventDefault(); pressStart.current = Date.now(); if (!open) setOpen(true); listen(); }}
+        onPointerUp={(e) => {
+          e.preventDefault();
+          const held = Date.now() - (pressStart.current || 0);
+          pressStart.current = null;
+          if (held < 200) {
+            // treated as a tap — just open the panel; don't auto-send
+            keepRef.current = false; try { recRef.current?.stop(); } catch {} setListening(false); setStatus("Hold the button to talk · or type below"); setText(""); textRef.current = ""; finalRef.current = "";
+            return;
+          }
+          // press-and-hold released: stop + send if we have anything
+          stopAndSend();
+        }}
+        onPointerLeave={(e) => { if (pressStart.current) { pressStart.current = null; stopAndSend(); } }}
+        onPointerCancel={() => { if (pressStart.current) { pressStart.current = null; stopAndSend(); } }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {listening ? "···" : "Chef"}
       </button>
 
       {open ? (
@@ -131,7 +151,7 @@ export default function AssistantFab() {
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5">
             {log.length === 0 && !text ? (
-              <p className="font-serif text-[16px] leading-relaxed text-clay">Tap the Chef button and talk — take your time, it won’t cut you off; tap Chef again to send. “Chef, give me a recipe for romesco.” · “Order 5 kilos of carrots for tomorrow.” · “This screen is confusing because…”</p>
+              <p className="font-serif text-[16px] leading-relaxed text-clay">Hold the Chef button and talk. Release to send. Quick tap opens this panel so you can type. “Chef, give me a recipe for romesco.” · “Order 5 kilos of carrots for tomorrow.” · “This screen is confusing because…”</p>
             ) : null}
             {log.map((m, i) => m.role === "sys"
               ? <p key={i} className="mb-3 font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>{m.text}</p>
@@ -148,7 +168,7 @@ export default function AssistantFab() {
             <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
             {text && !listening ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">Send</button> : null}
           </div>
-          <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? "Tap Chef to talk · tap again to send" : "Type to Chef above")}</p>
+          <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? "Hold Chef to talk · release to send" : "Type to Chef above")}</p>
         </div>
       ) : null}
     </>
