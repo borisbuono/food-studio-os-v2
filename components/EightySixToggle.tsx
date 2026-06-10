@@ -21,11 +21,11 @@ export default function EightySixToggle({ id, initial }: { id: string; initial: 
         onClick={toggle}
         disabled={saving}
         className={"w-full rounded-xl px-6 py-4 text-center font-sans text-[15px] font-medium transition disabled:opacity-60 " +
-          (on ? "bg-ochre text-[#FBF1E2]" : "border border-black/15 text-ink-soft hover:border-ember/40")}
+          (on ? "bg-[color:var(--accent)] text-[#FBF1E2]" : "border border-black/15 text-ink-soft hover:border-line")}
       >
         {saving ? "Saving…" : on ? "86’d — tap to put back on the menu" : "Mark 86 — out of stock"}
       </button>
-      {err ? <p className="mt-2 font-mono text-[11px] text-ember">Saving needs sign-in — this is a preview of the action.</p> : null}
+      {err ? <p className="mt-2 font-mono text-[11px] text-ink-soft">Saving needs sign-in — this is a preview of the action.</p> : null}
     </div>
   );
 }

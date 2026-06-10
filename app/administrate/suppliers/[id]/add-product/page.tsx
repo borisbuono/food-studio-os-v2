@@ -28,7 +28,7 @@ export default function AddProduct() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href={"/administrate/suppliers/" + params.id} className="font-sans text-sm text-ink-soft">← supplier</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Add product</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Add product</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">A new line for this supplier</h1>
 
       <form onSubmit={save} className="mt-8 space-y-4">

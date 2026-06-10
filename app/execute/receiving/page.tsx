@@ -105,7 +105,7 @@ export default function Receiving() {
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />
       <button onClick={() => fileRef.current?.click()} disabled={busy} className="mt-6 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy && !rows.length ? "Reading the delivery note…" : "Photograph a delivery note"}</button>
-      {err ? <p className="mt-3 font-mono text-[11px] text-ember">{err}</p> : null}
+      {err ? <p className="mt-3 font-mono text-[11px] text-ink-soft">{err}</p> : null}
       {supplier ? <p className="mt-3 font-mono text-[11px] uppercase tracking-wide text-clay">From {supplier}</p> : null}
 
       {rows.length && !done ? (

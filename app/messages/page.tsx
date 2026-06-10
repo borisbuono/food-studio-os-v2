@@ -129,9 +129,9 @@ export default function Messages() {
           {!msgs.length ? <p className="font-sans text-[14px] text-clay">No messages yet — say something.</p> : null}
           <div ref={endRef} />
         </div>
-        {sendErr ? <p className="pb-2 text-center font-mono text-[10px] uppercase tracking-wide text-ember">{sendErr}</p> : null}
+        {sendErr ? <p className="pb-2 text-center font-mono text-[10px] uppercase tracking-wide text-ink-soft">{sendErr}</p> : null}
         <div className="flex items-center gap-2 border-t border-black/10 pt-3">
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Message…" className="flex-1 rounded-full border border-black/15 bg-paper px-4 py-2.5 font-sans text-[15px] text-ink outline-none focus:border-ember" />
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Message…" className="flex-1 rounded-full border border-black/15 bg-paper px-4 py-2.5 font-sans text-[15px] text-ink outline-none focus:border-ink" />
           <button onClick={send} className="rounded-full px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Send</button>
         </div>
       </main>
@@ -150,7 +150,7 @@ export default function Messages() {
       </div>
       {newCh ? (
         <div className="mt-3 flex gap-2">
-          <input value={newChName} onChange={(e) => setNewChName(e.target.value)} placeholder="Channel name (e.g. Events, Pastry)" className="flex-1 rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[14px] text-ink outline-none focus:border-ember" />
+          <input value={newChName} onChange={(e) => setNewChName(e.target.value)} placeholder="Channel name (e.g. Events, Pastry)" className="flex-1 rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
           <button onClick={createChannel} className="rounded-lg px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Create</button>
         </div>
       ) : null}

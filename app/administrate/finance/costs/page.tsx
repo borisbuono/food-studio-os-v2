@@ -54,7 +54,7 @@ export default function Costs() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Costs · price trends</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Costs · price trends</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What we pay, over time</h1>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Every cost logged from a delivery note lands here — wine, food, cleaning. ▲ means it’s getting dearer, ▼ cheaper. Tap a line to see the points.</p>
 
@@ -62,7 +62,7 @@ export default function Costs() {
 
       {KIND_ORDER.filter((k) => series.some((s) => s.kind === k)).map((k) => (
         <section key={k} className="mt-8">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ochre">{KIND_LABEL[k] || k}</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft">{KIND_LABEL[k] || k}</p>
           <ul className="mt-2 space-y-2">
             {series.filter((s) => s.kind === k).map((s) => {
               const up = s.chg >= 0;

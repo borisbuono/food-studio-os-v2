@@ -31,12 +31,12 @@ export default function SoftRecipeCost({ id, initialCost, initialBasis, price }:
 
   return (
     <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
-      <p className="font-sans text-xs font-medium text-ochre">Calculation · buy &amp; sell</p>
+      <p className="font-sans text-xs font-medium text-ink-soft">Calculation · buy &amp; sell</p>
       {edit ? (
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="flex flex-col">
             <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Cost €</span>
-            <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="2.50" className="mt-1 w-24 rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[15px] text-ink outline-none focus:border-ember" />
+            <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="2.50" className="mt-1 w-24 rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[15px] text-ink outline-none focus:border-ink" />
           </label>
           <label className="flex flex-col">
             <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Basis</span>
@@ -51,7 +51,7 @@ export default function SoftRecipeCost({ id, initialCost, initialBasis, price }:
           <div><p className="font-serif text-xl text-ink">{marg != null ? "€" + marg.toFixed(2) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Margin</p></div>
         </div>
       )}
-      {err ? <p className="mt-2 font-mono text-[11px] text-ember">{err}</p> : null}
+      {err ? <p className="mt-2 font-mono text-[11px] text-ink-soft">{err}</p> : null}
       {!edit ? <button onClick={() => setEdit(true)} className="mt-3 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>edit cost</button> : null}
       <p className="mt-3 font-sans text-[12px] leading-relaxed text-clay">A buy-and-sell dish — no full recipe, but still costed. Price comes from the menu; cost from the delivery note.</p>
     </div>

@@ -15,9 +15,9 @@ export default async function Suppliers() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Suppliers · ordering</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Suppliers · ordering</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{providers.length} suppliers</h1>
-      <Link href="/order/picker" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide text-ochre">Find a product across all suppliers →</Link>
+      <Link href="/order/picker" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide text-ink-soft">Find a product across all suppliers →</Link>
 
       <div className="mt-6 rounded-2xl border border-dashed border-black/20 p-5">
         <p className="font-sans text-[14px] text-ink-soft">{(orders.count ?? 0) === 0 ? "No orders placed through the OS yet — placing orders to suppliers arrives next." : (orders.count + " orders on record.")}</p>
@@ -25,7 +25,7 @@ export default async function Suppliers() {
 
       <div className="mt-6 space-y-4">
         {providers.map((p: any) => (
-          <Link key={p.id} href={"/administrate/suppliers/" + p.id} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-ochre/40">
+          <Link key={p.id} href={"/administrate/suppliers/" + p.id} className="block rounded-2xl border border-black/10 bg-card p-6 transition hover:border-line">
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-serif text-2xl text-ink">{noEmoji(p.name)}</h2>
               <span className="font-mono text-[11px] text-clay">{prodCount[p.id] || 0} products</span>

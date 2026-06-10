@@ -84,7 +84,7 @@ export default async function Forecast() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Forecast · last 28d ↔ next 28d</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Forecast · last 28d ↔ next 28d</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{venueName}</h1>
 
       <div className="mt-6 grid grid-cols-2 gap-3">

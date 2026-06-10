@@ -59,7 +59,7 @@ export default function Schedule() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Schedule · weekly rota</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Schedule · weekly rota</p>
       {/* Today's roster — who's in, who's late */}
       {today.length ? (
         <section className="mt-4 rounded-2xl border border-black/10 bg-card p-5">
@@ -93,9 +93,9 @@ export default function Schedule() {
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on, when</h1>
 
       <div className="mt-6 flex items-center justify-between">
-        <button onClick={() => move(-1)} className="font-mono text-[12px] uppercase tracking-wide text-clay hover:text-ochre">‹ prev</button>
+        <button onClick={() => move(-1)} className="font-mono text-[12px] uppercase tracking-wide text-clay hover:text-ink-soft">‹ prev</button>
         <span className="font-mono text-[12px] text-ink">{dayLabel(days[0])} – {dayLabel(days[6])}</span>
-        <button onClick={() => move(1)} className="font-mono text-[12px] uppercase tracking-wide text-clay hover:text-ochre">next ›</button>
+        <button onClick={() => move(1)} className="font-mono text-[12px] uppercase tracking-wide text-clay hover:text-ink-soft">next ›</button>
       </div>
 
       {shifts.length === 0 && !loading ? (

@@ -35,7 +35,7 @@ export default function CommandK() {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ember">search</button>
+      <button onClick={() => setOpen(true)} className="font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ink-soft">search</button>
       {open ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/20 px-6 pt-24" onClick={() => setOpen(false)}>
           <div className="w-full max-w-md overflow-hidden rounded-2xl border border-black/10 bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>

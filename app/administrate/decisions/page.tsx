@@ -103,7 +103,7 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Inbox · everything that wants you</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Inbox · everything that wants you</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What needs a call</h1>
       <p className="mt-2 font-sans text-[14px] text-ink-soft">{counts.all} open · {counts.external} from outside · {counts.feedback} from the team. One inbox — email, reviews, WhatsApp and the team's own notes. Outside channels are mirrored read-only.</p>
 

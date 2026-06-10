@@ -63,21 +63,21 @@ export default async function SupplierHub({ params }: { params: { id: string } }
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Supplier · {p.category || "supplier"}</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Supplier · {p.category || "supplier"}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name)}</h1>
       <p className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay">
         {[p.delivery_schedule, p.cutoff_time ? "cutoff " + p.cutoff_time : "", p.whatsapp ? "wa " + p.whatsapp : "", p.email ? p.email : ""].filter(Boolean).join(" · ")}
       </p>
 
       {p.current_offer ? (
-        <div className="mt-5 rounded-2xl border border-ochre/30 bg-ochre/5 p-5">
+        <div className="mt-5 rounded-2xl border border-ochre/30 bg-line p-5">
           <p className="font-sans text-[14px] leading-relaxed text-ink-soft">{p.current_offer}</p>
         </div>
       ) : null}
 
       {/* the three actions this surface absorbs */}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Link href={"/order?supplier=" + p.id} className="rounded-xl bg-ochre px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
+        <Link href={"/order?supplier=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
         <Link href="/execute/handover#receiving" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
         <Link href="/administrate/finance/costs" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
         {p.category === "wine" ? (
@@ -114,7 +114,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-serif text-xl text-ink">{products.length} products</h2>
-          <Link href={"/administrate/suppliers/" + params.id + "/add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ochre">+ add</Link>
+          <Link href={"/administrate/suppliers/" + params.id + "/add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">+ add</Link>
         </div>
         {!products.length ? <p className="mt-2 font-sans text-[14px] text-clay">No catalog yet. Build it from your last invoice.</p> : (
           <ul className="mt-3 divide-y divide-black/5 rounded-2xl border border-black/10 bg-card">

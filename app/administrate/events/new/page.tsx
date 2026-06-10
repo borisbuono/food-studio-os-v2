@@ -57,7 +57,7 @@ export default function NewEvent() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/events" className="font-sans text-sm text-ink-soft">← events</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">New event</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">New event</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Capture an enquiry</h1>
 
       <form onSubmit={save} className="mt-8 space-y-4">

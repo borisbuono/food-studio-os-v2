@@ -20,7 +20,7 @@ export default async function Settings() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Settings · connections & skills</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Settings · connections & skills</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The plumbing</h1>
 
       <section className="mt-8">
@@ -44,7 +44,7 @@ export default async function Settings() {
                 <p className="font-sans text-[15px] text-ink">{noEmoji(s.display_name || s.skill_code)}</p>
                 <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{[s.provider, s.model].filter(Boolean).join(" · ")}</p>
               </div>
-              {s.human_review_required ? <span className="font-mono text-[10px] uppercase tracking-wide text-ochre">human review</span> : null}
+              {s.human_review_required ? <span className="font-mono text-[10px] uppercase tracking-wide text-ink-soft">human review</span> : null}
             </li>
           ))}
           {!skills.length ? <p className="py-3 font-sans text-[14px] text-clay">No skills configured.</p> : null}

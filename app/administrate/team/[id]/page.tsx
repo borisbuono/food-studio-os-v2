@@ -53,7 +53,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
       <section className="mt-8">
         <h2 className="font-serif text-xl text-ink">Next shifts</h2>
         {!shifts.length ? (
-          <p className="mt-2 font-sans text-[14px] text-clay">Nothing scheduled. <Link href="/schedule" className="text-ember">Open the rota →</Link></p>
+          <p className="mt-2 font-sans text-[14px] text-clay">Nothing scheduled. <Link href="/schedule" className="text-ink-soft">Open the rota →</Link></p>
         ) : (
           <ul className="mt-3 space-y-2">
             {shifts.map((s: any, i: number) => {
@@ -74,7 +74,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
 
       {/* Person atom action set */}
       <div className="mt-8 grid grid-cols-2 gap-3">
-        <Link href={"/messages?to=" + p.id} className="rounded-xl bg-ochre px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
+        <Link href={"/messages?to=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
         <Link href="/schedule" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Schedule</Link>
         <Link href="/academy" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Skill ladder</Link>
         <Link href="/clock" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Clock</Link>

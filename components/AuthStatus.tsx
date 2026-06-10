@@ -11,7 +11,7 @@ export default function AuthStatus() {
     return () => sub.subscription.unsubscribe();
   }, []);
   if (email) {
-    return <Link href="/account" className="font-mono text-[11px] text-ember">{email.split("@")[0]}</Link>;
+    return <Link href="/account" className="font-mono text-[11px] text-ink-soft">{email.split("@")[0]}</Link>;
   }
-  return <Link href="/login" className="font-mono text-[11px] text-ember">Sign in</Link>;
+  return <Link href="/login" className="font-mono text-[11px] text-ink-soft">Sign in</Link>;
 }

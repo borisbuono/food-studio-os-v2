@@ -69,12 +69,12 @@ export default function Order() {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
         <button onClick={() => setStage("review")} className="font-sans text-sm text-ink-soft">← back</button>
-        <p className="mt-6 font-sans text-xs font-medium text-ochre">Send · {noEmoji(provider?.name || "")}</p>
+        <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Send · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Send the order</h1>
         <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">This opens your own WhatsApp or email with the order written out — you tap send. We log it as sent here so it shows in Receiving.</p>
         <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-black/10 bg-card p-4 font-sans text-[14px] leading-relaxed text-ink">{message}</pre>
         <div className="mt-4 flex flex-col gap-3">
-          {wa ? <button onClick={() => sendVia("whatsapp", wa)} className="w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">Send on WhatsApp</button> : null}
+          {wa ? <button onClick={() => sendVia("whatsapp", wa)} className="w-full rounded-xl bg-[color:var(--accent)] px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">Send on WhatsApp</button> : null}
           {mail ? <button onClick={() => sendVia("email", mail)} className="w-full rounded-xl border border-black/20 px-6 py-4 font-sans text-[15px] text-ink">Send by email</button> : null}
           {!wa && !mail ? <p className="font-sans text-[14px] text-clay">No WhatsApp or email on file for this supplier — add one on the supplier card.</p> : null}
           <button onClick={() => { navigator.clipboard?.writeText(message); }} className="w-full rounded-xl border border-black/15 px-6 py-3 font-mono text-[11px] uppercase tracking-wide text-ink-soft">Copy the message</button>
@@ -86,10 +86,10 @@ export default function Order() {
   if (stage === "sent") {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
-        <p className="font-sans text-xs font-medium text-ochre">Order</p>
+        <p className="font-sans text-xs font-medium text-ink-soft">Order</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Order sent to {noEmoji(provider?.name || "")}</h1>
         <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">{lines.length} lines · {eur(total)} · opened in {sentVia === "email" ? "your email" : "WhatsApp"} for you to hit send. Logged here as sent — it’ll appear in Receiving and Invoices.</p>
-        <button onClick={() => { setCart({}); setSel(null); setSentVia(null); setStage("build"); }} className="mt-6 rounded-xl bg-ochre px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">Start another order</button>
+        <button onClick={() => { setCart({}); setSel(null); setSentVia(null); setStage("build"); }} className="mt-6 rounded-xl bg-[color:var(--accent)] px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">Start another order</button>
       </main>
     );
   }
@@ -98,7 +98,7 @@ export default function Order() {
     return (
       <main className="mx-auto max-w-xl px-6 py-12">
         <button onClick={() => setStage("build")} className="font-sans text-sm text-ink-soft">← edit order</button>
-        <p className="mt-6 font-sans text-xs font-medium text-ochre">Review · {noEmoji(provider?.name || "")}</p>
+        <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Review · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{lines.length} lines · {eur(total)}</h1>
         <ul className="mt-6 divide-y divide-black/10 border-y border-black/10">
           {lines.map((l) => (
@@ -109,7 +109,7 @@ export default function Order() {
           ))}
         </ul>
         <p className="mt-3 font-mono text-[11px] text-clay">{[provider?.delivery_schedule, provider?.cutoff_time ? "cutoff " + provider.cutoff_time : ""].filter(Boolean).join(" · ")}</p>
-        <button onClick={() => setStage("send")} className="mt-6 w-full rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">Send order →</button>
+        <button onClick={() => setStage("send")} className="mt-6 w-full rounded-xl bg-[color:var(--accent)] px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">Send order →</button>
       </main>
     );
   }
@@ -118,7 +118,7 @@ export default function Order() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">New order</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">New order</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{provider ? noEmoji(provider.name) : "Choose a supplier"}</h1>
 
       {draft && draft.length ? (
@@ -146,7 +146,7 @@ export default function Order() {
         </ul>
       ) : (
         <>
-          {!lockedSupplier ? <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ochre">change supplier</button> : null}
+          {!lockedSupplier ? <button onClick={() => { setSel(null); setCart({}); }} className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ink-soft">change supplier</button> : null}
           <ul className="mt-5 divide-y divide-black/10 border-t border-black/10">
             {provProducts.map((p) => {
               const q = cart[p.id] || 0;
@@ -171,7 +171,7 @@ export default function Order() {
 
       {lines.length ? (
         <div className="sticky bottom-4 mt-6">
-          <button onClick={() => setStage("review")} className="flex w-full items-center justify-between rounded-xl bg-ochre px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">
+          <button onClick={() => setStage("review")} className="flex w-full items-center justify-between rounded-xl bg-[color:var(--accent)] px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">
             <span>Review order</span>
             <span className="font-mono text-[13px]">{lines.length} lines · {eur(total)}</span>
           </button>

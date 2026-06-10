@@ -165,7 +165,7 @@ export default function TempLog() {
       <div className="mt-7 rounded-2xl border border-black/10 bg-card p-6">
         {speechSupported() ? (
           <button onClick={listen} disabled={listening}
-            className="w-full rounded-2xl bg-ember py-5 font-serif text-[20px] text-[#F7F7F4] transition active:scale-[0.99] disabled:opacity-60">
+            className="w-full rounded-2xl bg-[color:var(--accent)] py-5 font-serif text-[20px] text-[#F7F7F4] transition active:scale-[0.99] disabled:opacity-60">
             {listening ? "Listening…" : "Speak the temperature"}
           </button>
         ) : (
@@ -178,7 +178,7 @@ export default function TempLog() {
         <div className="mt-2 flex flex-wrap gap-2">
           {EQUIP.map((e) => (
             <button key={e.key} onClick={() => { setEquipKey(e.key); haptic(HAPTIC.tap); }}
-              className={"rounded-full border px-4 h-11 font-sans text-[14px] transition " + (equipKey === e.key ? "border-ember bg-ember/10 text-ink" : "border-black/15 text-ink-soft")}>
+              className={"rounded-full border px-4 h-11 font-sans text-[14px] transition " + (equipKey === e.key ? "border-line bg-[color:var(--accent)]/10 text-ink" : "border-black/15 text-ink-soft")}>
               {e.name}
             </button>
           ))}
@@ -188,7 +188,7 @@ export default function TempLog() {
         <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-basil">Reading</p>
         <div className="mt-2 flex items-center gap-3">
           <input value={temp} onChange={(e) => setTemp(e.target.value)} inputMode="numeric" placeholder="—"
-            className="w-32 rounded-xl border border-black/15 bg-paper px-4 py-3 font-serif text-2xl text-ink outline-none focus:border-ember/50" />
+            className="w-32 rounded-xl border border-black/15 bg-paper px-4 py-3 font-serif text-2xl text-ink outline-none focus:border-ink/50" />
           <span className="font-serif text-2xl text-ink-soft">°C</span>
         </div>
 

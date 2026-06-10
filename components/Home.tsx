@@ -87,7 +87,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
           <button
             key={t.key}
             onClick={() => setPk(t.key)}
-            className={"rounded-full px-3 py-1 font-sans text-[12px] transition " + (pk === t.key ? "text-white" : "border border-black/10 text-ink-soft hover:border-ember/40")}
+            className={"rounded-full px-3 py-1 font-sans text-[12px] transition " + (pk === t.key ? "text-white" : "border border-black/10 text-ink-soft hover:border-line")}
             style={pk === t.key ? { backgroundColor: "var(--accent)" } : undefined}
           >
             {t.label}
@@ -204,7 +204,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Welcome{greeting ? `, ${greeting}` : ""}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">You’re signed in</h1>
         <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">No venue is assigned to you yet. Ask your manager to add you to a venue, then reload — your home will fill with tonight’s brief.</p>
-        <Link href="/account" className="mt-6 inline-block font-sans text-sm text-ember">Your profile →</Link>
+        <Link href="/account" className="mt-6 inline-block font-sans text-sm text-ink-soft">Your profile →</Link>
       </main>
     );
   }
@@ -228,7 +228,7 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
       {/* Role actions — the few things this person reaches for */}
       <div className="mt-6 space-y-3">
         {ROLES[role].points.filter((p) => p.href !== "/administrate/holdings" || entity === "holdings").map((p) => (
-          <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+          <Link key={p.href} href={p.href} className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
             <h2 className="font-serif text-xl text-ink">{p.label}</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">{p.blurb}</p>
           </Link>
@@ -249,11 +249,11 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
             {/* Academy — your skill ladder, for any signed-in person */}
       {profile ? (
         <div className="mt-6">
-          <Link href="/academy" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+          <Link href="/academy" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
             <h2 className="font-serif text-xl text-ink">Your academy</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">What you’ve learned, what you can do, what you can manage.</p>
           </Link>
-          <Link href="/messages" className="mt-3 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ember/40">
+          <Link href="/messages" className="mt-3 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
             <h2 className="font-serif text-xl text-ink">Messages</h2>
             <p className="mt-1 font-sans text-[13px] text-ink-soft">The team — channels and direct messages, in the OS.</p>
           </Link>

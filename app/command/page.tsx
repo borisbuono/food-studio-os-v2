@@ -21,12 +21,12 @@ export default async function Command() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Command center</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Command center</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The control room</h1>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
         {tiles.map((t) => (
-          <Link key={t.href} href={t.href} className="rounded-2xl border border-black/10 bg-card p-4 text-center transition hover:border-ochre/40">
+          <Link key={t.href} href={t.href} className="rounded-2xl border border-black/10 bg-card p-4 text-center transition hover:border-line">
             <p className="font-serif text-2xl text-ink">{t.n}</p>
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{t.label}</p>
           </Link>

@@ -197,7 +197,7 @@ export default function FloorPlan() {
             </ul>
           )}
           {unassigned.length > 0 && (
-            <p className="mt-3 font-sans text-xs text-ember">{unassigned.length} booking(s) not yet on a table.</p>
+            <p className="mt-3 font-sans text-xs text-ink-soft">{unassigned.length} booking(s) not yet on a table.</p>
           )}
         </>
       )}

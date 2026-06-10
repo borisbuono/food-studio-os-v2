@@ -306,7 +306,7 @@ export default function ThePass() {
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Shopping / order list · {shopping.length}</p>
             <ul className="mt-2 flex flex-wrap gap-2">{shopping.map((s) => <li key={s} className="rounded-full border border-black/15 px-3 py-1 font-sans text-[13px] text-ink-soft">{s}</li>)}</ul>
-            <textarea value={extraShop} onChange={(e) => setExtraShop(e.target.value)} placeholder="Add anything else to buy — gambas, eggs, lemons… (comma or new line)" className="mt-3 h-20 w-full rounded-xl border border-black/15 bg-card p-3 font-serif text-[15px] text-ink outline-none focus:border-ember" />
+            <textarea value={extraShop} onChange={(e) => setExtraShop(e.target.value)} placeholder="Add anything else to buy — gambas, eggs, lemons… (comma or new line)" className="mt-3 h-20 w-full rounded-xl border border-black/15 bg-card p-3 font-serif text-[15px] text-ink outline-none focus:border-ink" />
             {shopping.length ? <button onClick={sendShoppingToOrdering} className="mt-2 rounded-xl border border-black/15 px-4 py-2 font-sans text-[13px] text-ink-soft">Send shopping to Ordering →</button> : null}
           </div>
         </div>
@@ -315,7 +315,7 @@ export default function ThePass() {
       {step === 3 ? (
         <div className="mt-6">
           <p className="font-sans text-[14px] text-ink-soft">A word for whoever opens tomorrow — VIPs, 86s, equipment, anything to walk into knowing. It lands on their briefing.</p>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tomorrow ≈40 covers, table 6 is a birthday. Fryer’s due a filter. Low on gambas — on the order. Crema set overnight, ready." className="mt-3 h-40 w-full rounded-2xl border border-black/15 bg-card p-4 font-serif text-[16px] leading-relaxed text-ink outline-none focus:border-ember" />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tomorrow ≈40 covers, table 6 is a birthday. Fryer’s due a filter. Low on gambas — on the order. Crema set overnight, ready." className="mt-3 h-40 w-full rounded-2xl border border-black/15 bg-card p-4 font-serif text-[16px] leading-relaxed text-ink outline-none focus:border-ink" />
           <div className="mt-4 rounded-xl border border-black/10 bg-card p-4">
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The pass</p>
             <p className="mt-1 font-sans text-[14px] text-ink-soft">{forecast ? `≈${forecast} covers · ` : ""}{items.filter((i) => !doneToday[i.key]).length} carried over · {toDo.length} prep for tomorrow · {shopping.length} to buy · closed by {profile.name}</p>

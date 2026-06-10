@@ -74,7 +74,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
           <Link href={`/recipes/${item.recipe_id}`} className="rounded-xl bg-tomato px-4 py-4 text-center font-sans text-[14px] font-medium text-[#F7F7F4] transition hover:opacity-90">
             Open the recipe
           </Link>
-          <Link href={`/recipes/${item.recipe_id}/cook`} className="rounded-xl border border-black/15 bg-card px-4 py-4 text-center font-sans text-[14px] text-ink transition hover:border-ochre/40">
+          <Link href={`/recipes/${item.recipe_id}/cook`} className="rounded-xl border border-black/15 bg-card px-4 py-4 text-center font-sans text-[14px] text-ink transition hover:border-line">
             Cook Mode
           </Link>
         </div>
@@ -99,7 +99,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
         const marg = price != null ? Number(price) - plate : null;
         return (
           <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
-            <p className="font-sans text-xs font-medium text-ochre">Calculation · per portion</p>
+            <p className="font-sans text-xs font-medium text-ink-soft">Calculation · per portion</p>
             <ul className="mt-3 divide-y divide-black/10">
               {ings.filter((i: any) => Number(i.line_cost) > 0).map((i: any, n: number) => (
                 <li key={n} className="flex items-baseline justify-between gap-4 py-1.5 font-mono text-[12.5px]">
@@ -111,7 +111,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
             <div className="mt-2 flex items-baseline justify-between border-t border-black/20 pt-3 font-serif text-[16px] text-ink"><span>Food cost</span><span>€{plate.toFixed(2)}</span></div>
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div><p className="font-serif text-xl text-ink">{price != null ? "€" + Number(price).toFixed(2) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Price</p></div>
-              <div><p className={"font-serif text-xl " + (fp != null && fp <= 32 ? "text-olive" : "text-ember")}>{fp != null ? fp + "%" : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Food cost</p></div>
+              <div><p className={"font-serif text-xl " + (fp != null && fp <= 32 ? "text-olive" : "text-ink-soft")}>{fp != null ? fp + "%" : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Food cost</p></div>
               <div><p className="font-serif text-xl text-ink">{marg != null ? "€" + marg.toFixed(2) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">Margin</p></div>
             </div>
           </div>

@@ -145,7 +145,7 @@ export default function AssistantFab() {
 
           {lastYou ? <button onClick={fileLast} className="mx-3 mb-1 rounded-lg border border-black/15 px-3 py-1.5 text-left font-mono text-[10px] uppercase tracking-wide text-ink-soft transition hover:border-ink/40">↪ Save that to the feedback board</button> : null}
           <div className="flex items-center gap-3 border-t border-black/10 p-3">
-            <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ember" />
+            <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
             {text && !listening ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">Send</button> : null}
           </div>
           <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? "Tap Chef to talk · tap again to send" : "Type to Chef above")}</p>

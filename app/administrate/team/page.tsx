@@ -20,11 +20,11 @@ export default async function Team() {
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ochre">Team · HR & schedule</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
 
-      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-ochre/40">
-        <p className="font-sans text-xs font-medium text-ochre">Schedule</p>
+      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
+        <p className="font-sans text-xs font-medium text-ink-soft">Schedule</p>
         <h2 className="mt-1 font-serif text-xl text-ink">Weekly rota</h2>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">{(shifts.count ?? 0) === 0 ? "Browse by week — FOH / BOH, by zone." : (shifts.count + " shifts scheduled.")}</p>
       </Link>
@@ -41,7 +41,7 @@ export default async function Team() {
             </>
           );
           return p.id ? (
-            <Link key={i} href={"/administrate/team/" + p.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:text-ember">{inner}</Link>
+            <Link key={i} href={"/administrate/team/" + p.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:text-ink-soft">{inner}</Link>
           ) : (
             <div key={i} className="flex items-baseline justify-between gap-4 py-3">{inner}</div>
           );

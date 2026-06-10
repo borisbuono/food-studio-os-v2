@@ -19,7 +19,7 @@ function Item({ it }: { it: MenuItem }) {
       <Link href={"/menu/" + it.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
         <span className="font-serif text-lg text-ink">
           {noEmoji(it.name)}
-          {it.is_eighty_six ? <span className="ml-2 rounded bg-ochre/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ochre">86</span> : null}
+          {it.is_eighty_six ? <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-soft">86</span> : null}
           {it.course ? <span className="ml-2 font-sans text-[11px] uppercase tracking-wide text-clay">{COURSE_LABEL[it.course] || it.course}</span> : null}
         </span>
         <span className="shrink-0 font-mono text-sm text-ink-soft">{it.price ? "€" + it.price : "–"}{mg !== null ? <span className="ml-2 text-olive">{mg}%</span> : null}</span>

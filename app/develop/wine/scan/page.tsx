@@ -88,7 +88,7 @@ export default function ScanWine() {
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />
       <button onClick={() => fileRef.current?.click()} disabled={busy} className="mt-6 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy && !w ? "Reading the label…" : "Take / choose a photo"}</button>
       {preview ? <img src={preview} alt="label" className="mt-4 max-h-52 rounded-xl border border-black/10 object-contain" /> : null}
-      {err ? <p className="mt-3 font-mono text-[11px] text-ember">{err}</p> : null}
+      {err ? <p className="mt-3 font-mono text-[11px] text-ink-soft">{err}</p> : null}
 
       {w && !saved ? (
         <div className="mt-6 rounded-2xl border border-black/10 bg-card p-5">
@@ -96,7 +96,7 @@ export default function ScanWine() {
           {([["name", "Name"], ["producer", "Producer"], ["region", "Region / area"], ["grape", "Grape(s)"], ["cuvee", "Cuvée / bottling"], ["classification", "Cru / classification"], ["vintage", "Vintage"]] as const).map(([k, label]) => (
             <label key={k} className="mt-3 block">
               <span className="font-mono text-[10px] uppercase tracking-wide text-clay">{label}</span>
-              <input value={(w as any)[k]} onChange={(e) => setW({ ...w, [k]: e.target.value })} className="mt-1 w-full rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[15px] text-ink outline-none focus:border-ember" />
+              <input value={(w as any)[k]} onChange={(e) => setW({ ...w, [k]: e.target.value })} className="mt-1 w-full rounded-lg border border-black/15 bg-paper px-3 py-2 font-sans text-[15px] text-ink outline-none focus:border-ink" />
             </label>
           ))}
           <label className="mt-3 block"><span className="font-mono text-[10px] uppercase tracking-wide text-clay">Style</span>
@@ -104,7 +104,7 @@ export default function ScanWine() {
           </label>
           {(["tasting_notes", "pitch", "description"] as const).map((k) => (
             <label key={k} className="mt-3 block"><span className="font-mono text-[10px] uppercase tracking-wide text-clay">{k.replace("_", " ")}</span>
-              <textarea value={(w as any)[k]} onChange={(e) => setW({ ...w, [k]: e.target.value })} className="mt-1 h-20 w-full rounded-lg border border-black/15 bg-paper px-3 py-2 font-serif text-[15px] leading-relaxed text-ink outline-none focus:border-ember" /></label>
+              <textarea value={(w as any)[k]} onChange={(e) => setW({ ...w, [k]: e.target.value })} className="mt-1 h-20 w-full rounded-lg border border-black/15 bg-paper px-3 py-2 font-serif text-[15px] leading-relaxed text-ink outline-none focus:border-ink" /></label>
           ))}
           {!candidate ? <button onClick={attemptSave} disabled={busy || !w.name} className="mt-4 w-full rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>{busy ? "Checking the cellar…" : "Save to cellar"}</button> : null}
         </div>

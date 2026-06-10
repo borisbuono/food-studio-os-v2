@@ -8,7 +8,7 @@ const eur = (n: number) => "€" + n.toFixed(2);
 
 const CLASS: Record<string, { label: string; note: string; color: string }> = {
   star: { label: "Star", note: "Sells well and pays well — protect it, put it front and centre.", color: "text-olive" },
-  plow: { label: "Plowhorse", note: "A favourite, but the margin is thin — trim the cost or gently lift the price.", color: "text-ochre" },
+  plow: { label: "Plowhorse", note: "A favourite, but the margin is thin — trim the cost or gently lift the price.", color: "text-ink-soft" },
   puzzle: { label: "Puzzle", note: "Makes good money but few order it — promote it, move it up the menu, get staff selling it.", color: "text-tomato" },
   dog: { label: "Dog", note: "Low margin and slow — rework the dish, or retire it for something that earns.", color: "text-clay" },
 };

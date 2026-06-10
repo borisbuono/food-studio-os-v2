@@ -15,7 +15,9 @@ export default function BrandMark({ entity, variant = "full", tone = "light" }: 
     return <img src={src} alt="Bistro Mondo" className={variant === "mark" ? "h-8 w-auto" : "h-14 w-auto"} />;
   }
   if (entity === "utopia") {
-    return <span className={"font-serif italic " + (tone === "dark" ? "text-[#F2ECDE]" : "text-ochre") + (variant === "mark" ? " text-[16px]" : " text-3xl")}>Restaurant Utopia</span>;
+    const cls = "font-serif italic " + (tone === "dark" ? "text-[#F2ECDE]" : "") + (variant === "mark" ? " text-[16px]" : " text-3xl");
+    const style = tone === "dark" ? undefined : { color: "var(--accent)" };
+    return <span className={cls} style={style}>Restaurant Utopia</span>;
   }
   return null;
 }

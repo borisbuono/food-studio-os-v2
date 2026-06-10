@@ -53,7 +53,7 @@ export default function Account() {
       </div>
 
       <div className="mt-6">
-        <Link href="/academy" className="font-sans text-sm text-ember">Your academy →</Link>
+        <Link href="/academy" className="font-sans text-sm text-ink-soft">Your academy →</Link>
       </div>
 
       <p className="mt-8 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Your colour</p>
@@ -68,7 +68,7 @@ export default function Account() {
 
       <div className="mt-10">
         {profile ? (
-          <button onClick={() => supabaseBrowser.auth.signOut().then(() => setProfile(null))} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft transition hover:border-ember/40">Sign out</button>
+          <button onClick={() => supabaseBrowser.auth.signOut().then(() => setProfile(null))} className="rounded-xl border border-black/15 px-5 py-3 font-sans text-[14px] text-ink-soft transition hover:border-line">Sign out</button>
         ) : (
           <Link href="/login" className="inline-block rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Sign in</Link>
         )}
