@@ -31,7 +31,7 @@ values
    '{"rating":4,"reviewer_location":"Stockholm"}'::jsonb),
 
   -- ── Email (Gmail summaries) ────────────────────────────────────
-  ('a0000000-0000-4000-8000-000000000001','gmail','enquiry','Harmke de Bruine','harmke@parcom.nl',
+  ('a0000000-0000-4000-8000-000000000001','gmail','customer','Harmke de Bruine','harmke@parcom.nl',
    'Folklore BBQ — final headcount + ham cortador',
    'Hi Boris — confirming 20 guests for the 17 June villa BBQ. One question still open: are we able to get the Iberico ham cortador for the evening? Let me know cost and we''ll sign off.',
    now() - interval '7 hours','new','high','gmail_utopia_0608_01','https://mail.google.com/mail/u/0/#inbox/parcom-bbq',
@@ -56,13 +56,13 @@ values
    now() - interval '2 hours','new','high','wa_utopia_0608_01',null,
    '{"channel":"whatsapp_business","party_size":4}'::jsonb),
 
-  ('a0000000-0000-4000-8000-000000000001','whatsapp','allergy','+34 671 339 802','WhatsApp Business',
+  ('a0000000-0000-4000-8000-000000000001','whatsapp','booking','+34 671 339 802','WhatsApp Business',
    'Coeliac in our group on Saturday',
    'Booking under Nguyen, Saturday 20:30. One of us is strictly gluten-free — can the kitchen handle the tasting menu? Want to confirm before we come.',
    now() - interval '20 hours','new','high','wa_utopia_0608_02',null,
    '{"channel":"whatsapp_business","tag":"allergen"}'::jsonb),
 
-  ('a0000000-0000-4000-8000-000000000001','whatsapp','lost_property','+34 600 712 558','WhatsApp Business',
+  ('a0000000-0000-4000-8000-000000000001','whatsapp','customer','+34 600 712 558','WhatsApp Business',
    'Left a navy jacket last night',
    'Think I left a navy linen jacket on the back of a chair on the terrace last night. Any luck? Can collect tomorrow.',
    now() - interval '1 day 1 hour','new','normal','wa_utopia_0608_03',null,

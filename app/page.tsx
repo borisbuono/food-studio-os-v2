@@ -42,6 +42,17 @@ export default async function Page() {
   const providers = (await supabase.from("providers").select("id,name")).data || [];
   const pname = new Map(providers.map((p: any) => [p.id, p.name]));
 
+  // --- today's roster (shifts + clock state) mirrored onto the Office home (Day 7) ---
+  const shiftsToday = (await supabase.from("shifts").select("id,profile_id,zone_id,shift_date,start_time,end_time").eq("shift_date", today)).data || [];
+  const rosterProfiles = shiftsToday.length ? (await supabase.from("profiles").select("id,name")).data || [] : [];
+  const clockToday = shiftsToday.length ? (await supabase.from("clock_events").select("profile_id,event_type,event_at").gte("event_at", today + "T00:00:00Z").order("event_at")).data || [] : [];
+  const profName = new Map(rosterProfiles.map((p: any) => [p.id, p.name]));
+  const clockState = new Map<string, string>();
+  clockToday.forEach((e: any) => clockState.set(e.profile_id, e.event_type));
+  // Madrid wall-clock for the late calculation (the server runs UTC)
+  const _mad = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  const nowMin = Number(_mad.slice(0, 2)) * 60 + Number(_mad.slice(3, 5));
+
   const weekday = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
   const venueStats = (vid: string): EntityStats => {
@@ -61,6 +72,15 @@ export default async function Page() {
     const dueOrders = orders.filter((o: any) => o.restaurant_id === vid && (o.delivery_date === today || o.delivery_date === tomorrow) && !["delivered", "cancelled"].includes(o.status || ""));
     const eventsToday = events.filter((e: any) => e.restaurant_id === vid && e.event_date === today).map((e: any) => ({ title: noEmoji(e.title || "Event"), guests: Number(e.guests_count || 0) }));
     const messages = inbox.filter((i: any) => i.restaurant_id === vid && (i.status === "open" || i.status === "new" || i.status == null)).length;
+    const roster = shiftsToday
+      .filter((sh: any) => zoneIds.includes(sh.zone_id))
+      .sort((a: any, b: any) => (a.start_time || "").localeCompare(b.start_time || ""))
+      .map((sh: any) => {
+        const start = (sh.start_time || "").slice(0, 5);
+        const startMin = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5) || "0");
+        const status: "in" | "late" | "due" = clockState.get(sh.profile_id) === "in" ? "in" : nowMin > startMin ? "late" : "due";
+        return { name: (profName.get(sh.profile_id) as string) || "Unassigned", start, status, lateBy: status === "late" ? nowMin - startMin : undefined };
+      });
     const periods = {
       week: aggPeriod(rs.filter((e: any) => e.report_date >= monStr)),
       lastWeek: aggPeriod(rs.filter((e: any) => e.report_date >= lastMonStr && e.report_date < monStr)),
@@ -80,7 +100,7 @@ export default async function Page() {
       specials, eightySix,
       deliveriesDue: dueOrders.length,
       deliveriesNext: dueOrders.length ? (pname.get(dueOrders[0].provider_id) ? noEmoji(pname.get(dueOrders[0].provider_id)) : null) : null,
-      eventsToday, messages,
+      eventsToday, messages, roster,
     };
   };
 
@@ -130,6 +150,10 @@ export default async function Page() {
     deliveriesNext: bm.deliveriesNext || taller.deliveriesNext || null,
     eventsToday: [...(bm.eventsToday || []), ...(taller.eventsToday || [])],
     messages: (bm.messages || 0) + (taller.messages || 0),
+    roster: [
+      ...(bm.roster || []).map((r) => ({ ...r, venue: bm.label })),
+      ...(taller.roster || []).map((r) => ({ ...r, venue: taller.label })),
+    ],
     pulse: rollPulse(bmPulse, tallerPulse),
   };
 

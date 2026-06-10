@@ -27,6 +27,8 @@ export type EntityStats = {
   messages?: number;
   // tonight's live pulse from the fresto adapter (mock until Lars's API lands)
   pulse?: { mode: "live" | "mock"; bookedTonight: number; openTabs: number; liveGross: number; covers: number };
+  // today's roster mirrored from Schedule + the Pass (Day 7)
+  roster?: { name: string; start: string; status: "in" | "late" | "due"; lateBy?: number; venue?: string }[];
 };
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
@@ -52,6 +54,28 @@ function PulseLine({ p }: { p: NonNullable<EntityStats["pulse"]> }) {
   );
 }
 
+// Today's roster on the Office home — who's on, who's in, who's late.
+// Mirrors the Schedule "On today" card so the owner sees the floor without leaving home.
+const ROSTER_COLOR = { in: "#5A6B3B", late: "#B8552E", due: "#9C8B7A" } as const;
+function RosterToday({ roster }: { roster: NonNullable<EntityStats["roster"]> }) {
+  return (
+    <div className="mt-4 border-t border-black/10 pt-3">
+      <p className="font-mono text-[10px] uppercase tracking-wide text-clay">On today</p>
+      <ul className="mt-1 divide-y divide-black/5">
+        {roster.slice(0, 8).map((r, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-4 py-1.5">
+            <span className="font-sans text-[14px] text-ink">{r.name}{r.venue ? <span className="text-clay"> · {r.venue}</span> : null}</span>
+            <span className="font-mono text-[11px]" style={{ color: ROSTER_COLOR[r.status] }}>
+              {r.status === "in" ? "Clocked in" : r.status === "late" ? `Late ${r.lateBy}m` : `Due ${r.start}`}
+            </span>
+          </li>
+        ))}
+        {roster.length > 8 ? <li className="py-1.5 font-mono text-[11px] text-clay">+ {roster.length - 8} more</li> : null}
+      </ul>
+    </div>
+  );
+}
+
 function OfficeDashboard({ s }: { s: EntityStats }) {
   const [pk, setPk] = useState<PeriodKey>("week");
   if (s.trial) {
@@ -61,6 +85,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
         <p className="mt-1 font-sans text-[14px] text-ink-soft">€{(s.contribution || 0).toLocaleString("en-GB")} contribution · €{(s.varianceLoss || 0).toFixed(2)} variance to chase</p>
         <p className="mt-3 font-mono text-[12px] text-clay">Sandbox venue · the engine runs end to end here</p>
         {s.pulse ? <PulseLine p={s.pulse} /> : null}
+        {s.roster && s.roster.length ? <RosterToday roster={s.roster} /> : null}
       </>
     );
   }
@@ -75,6 +100,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
         <p className="mt-1 font-sans text-[14px] text-ink-soft">{s.cov.toLocaleString("en-GB")} covers{s.revDelta !== null ? " · " + deltaWord(s.revDelta) + " vs prior" : ""}{verdict ? " · " + verdict : ""}</p>
         <p className="mt-3 font-mono text-[12px] text-clay">{s.inbox} in inbox · {s.events} events in pipeline</p>
         {s.pulse ? <PulseLine p={s.pulse} /> : null}
+        {s.roster && s.roster.length ? <RosterToday roster={s.roster} /> : null}
       </>
     );
   }
@@ -113,6 +139,7 @@ function OfficeDashboard({ s }: { s: EntityStats }) {
           ))}
         </ul>
       ) : null}
+      {s.roster && s.roster.length ? <RosterToday roster={s.roster} /> : null}
     </>
   );
 }
