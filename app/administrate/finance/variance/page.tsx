@@ -71,41 +71,41 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Variance · theoretical vs. actual</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">Where the stock went</h1>
+      <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Variance · theoretical vs. actual</p>
+      <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">Where the stock went</h1>
       <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Book = opening stock minus what the recipes say the day's sales should have used. Counted = the physical stock-take. The gap is waste, over-portioning or shrinkage — priced out.</p>
 
-      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
+      <div className="mt-8 border-y border-line py-5">
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Unaccounted this period</p>
         <p className="mt-1 font-serif text-4xl text-ink-soft">{eur(totalLoss)}</p>
         <p className="mt-2 font-sans text-[13px] text-ink-soft">Across {ingRows.length} tracked ingredients. Biggest leak: {biggest ? noEmoji(biggest.name) : "—"}.</p>
       </div>
 
-      <div className="mt-5 inline-flex rounded-xl border border-black/10 bg-card p-1">
-        <Link href="/administrate/finance/variance?by=ingredient" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By ingredient</Link>
-        <Link href="/administrate/finance/variance?by=recipe" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By recipe</Link>
+      <div className="mt-6 flex gap-6 border-b border-line">
+        <Link href="/administrate/finance/variance?by=ingredient" className={"-mb-px pb-2 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "border-b text-ink" : "text-clay")} style={by === "ingredient" ? { borderColor: "var(--accent)" } : undefined}>By ingredient</Link>
+        <Link href="/administrate/finance/variance?by=recipe" className={"-mb-px pb-2 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "border-b text-ink" : "text-clay")} style={by === "recipe" ? { borderColor: "var(--accent)" } : undefined}>By recipe</Link>
       </div>
 
       {by === "ingredient" ? (
-        <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
+        <ul className="mt-6 divide-y divide-line border-t border-line">
           {ingRows.map((r, i) => (
             <li key={i} className="flex items-baseline justify-between gap-4 py-3">
               <div>
                 <p className="font-serif text-[17px] text-ink">{noEmoji(r.name)}</p>
                 <p className="font-mono text-[11px] text-clay">book {Math.round(r.book)} · counted {Math.round(r.counted)} {r.unit}</p>
               </div>
-              <span className={"font-mono text-[13px] " + (r.varEur > 0.5 ? "text-ink-soft" : r.varEur < -0.5 ? "text-olive" : "text-clay")}>{Math.abs(r.varEur) < 0.005 ? "ok" : eur(r.varEur)}</span>
+              <span className={"font-mono text-[13px] " + (r.varEur > 0.5 ? "text-tomato" : r.varEur < -0.5 ? "text-basil" : "text-clay")}>{Math.abs(r.varEur) < 0.005 ? "ok" : eur(r.varEur)}</span>
             </li>
           ))}
           {!ingRows.length ? <p className="py-3 font-sans text-[14px] text-clay">No counted stock yet.</p> : null}
         </ul>
       ) : (
-        <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
+        <ul className="mt-6 divide-y divide-line border-t border-line">
           {recipeRows.map((r, i) => (
             <li key={i} className="py-3">
               <div className="flex items-baseline justify-between gap-4">
                 <Link href={"/recipes/" + r.id} className="font-serif text-[17px] text-ink hover:text-ink-soft">{noEmoji(r.name)}</Link>
-                <span className={"font-mono text-[13px] " + (r.varEur > 0.5 ? "text-ink-soft" : r.varEur < -0.5 ? "text-olive" : "text-clay")}>{Math.abs(r.varEur) < 0.005 ? "ok" : eur(r.varEur)}</span>
+                <span className={"font-mono text-[13px] " + (r.varEur > 0.5 ? "text-tomato" : r.varEur < -0.5 ? "text-basil" : "text-clay")}>{Math.abs(r.varEur) < 0.005 ? "ok" : eur(r.varEur)}</span>
               </div>
               {r.topIng ? <p className="mt-0.5 font-mono text-[11px] text-clay">mostly: {r.topIng}</p> : null}
             </li>
@@ -114,7 +114,7 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
         </ul>
       )}
 
-      <div className="mt-8 rounded-2xl border border-dashed border-black/20 p-5">
+      <div className="mt-10 border-t border-line pt-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">Academy · what to aim for</p>
         <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">A healthy kitchen runs variance near zero. A point or two is normal shrink — but a steady gap on one pricey line is usually over-portioning, waste, or stock walking out the door. Chase the biggest euro first, fix the cause, recount next week, and watch it close.</p>
       </div>
