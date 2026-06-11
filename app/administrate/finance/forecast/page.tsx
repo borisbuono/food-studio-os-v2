@@ -84,22 +84,22 @@ export default async function Forecast() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Forecast · last 28d ↔ next 28d</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">{venueName}</h1>
+      <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Forecast · last 28d ↔ next 28d</p>
+      <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">{venueName}</h1>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-black/10 bg-card p-5">
+      <div className="mt-8 grid grid-cols-2 gap-6 border-y border-line py-5">
+        <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Last 28 days · actual</p>
           <p className="mt-1 font-serif text-3xl text-ink">{eur(last28Actual)}</p>
         </div>
-        <div className="rounded-2xl border border-black/10 bg-card p-5">
+        <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Next 28 days · projected</p>
           <p className="mt-1 font-serif text-3xl text-ink">{eur(next28Forecast)}</p>
-          <p className="mt-1 font-mono text-[11px]" style={{ color: change >= 0 ? "#5A6B3B" : "#B8552E" }}>{change >= 0 ? "▲" : "▼"} {Math.abs(change)}% vs the 28 just past</p>
+          <p className={"mt-1 font-mono text-[11px] " + (change >= 0 ? "text-basil" : "text-tomato")}>{change >= 0 ? "+" : "\u2212"}{Math.abs(change)}% vs the 28 just past</p>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-4">
+      <div className="mt-8 border-b border-line pb-4">
         <svg viewBox={"0 0 " + w + " " + h} width="100%" height={h}>
           {/* y grid */}
           {ticks.map((tv, i) => (
@@ -129,7 +129,7 @@ export default async function Forecast() {
         <p className="mt-2 font-mono text-[10px] text-clay">solid = actual EOD revenue · dashed = projection from weekday seasonality × recent trend ({trend >= 0 ? "+" : ""}{Math.round(trend * 100)}%)</p>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-5">
+      <div className="mt-8 border-t border-line pt-5">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Labour budget · next 28 days @ 30%</p>
         <p className="mt-1 font-serif text-2xl text-ink">{eur(labourBudget)}</p>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">Hold the schedule to this and margin stays where it should.</p>
