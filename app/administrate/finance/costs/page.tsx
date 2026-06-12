@@ -18,7 +18,7 @@ function Spark({ pts, w = 120, h = 34 }: { pts: number[]; w?: number; h?: number
   const step = w / (pts.length - 1);
   const d = pts.map((v, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(h - ((v - min) / span) * (h - 4) - 2).toFixed(1)}`).join(" ");
   const up = pts[pts.length - 1] >= pts[0];
-  return <svg width={w} height={h} className="overflow-visible"><path d={d} fill="none" stroke={up ? "#9A3122" : "#3E5A37"} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  return <svg width={w} height={h} className={`overflow-visible ${up ? "text-tomato" : "text-basil"}`}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 }
 
 export default function Costs() {
@@ -55,28 +55,28 @@ export default function Costs() {
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Costs · price trends</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">What we pay, over time</h1>
-      <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Every cost logged from a delivery note lands here — wine, food, cleaning. ▲ means it’s getting dearer, ▼ cheaper. Tap a line to see the points.</p>
+      <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">What we pay, over time</h1>
+      <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Every cost logged from a delivery note lands here — wine, food, cleaning. Red climbs, green eases. Tap a line to see the points.</p>
 
       {!series.length ? <p className="mt-8 font-sans text-[14px] text-clay">No price history yet — update costs from a delivery note and the trends build here.</p> : null}
 
       {KIND_ORDER.filter((k) => series.some((s) => s.kind === k)).map((k) => (
         <section key={k} className="mt-8">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft">{KIND_LABEL[k] || k}</p>
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-2 border-t border-line">
             {series.filter((s) => s.kind === k).map((s) => {
               const up = s.chg >= 0;
               return (
-                <li key={s.kind + s.name} className="rounded-xl border border-black/10 bg-card p-3">
+                <li key={s.kind + s.name} className="border-b border-line py-3">
                   <button onClick={() => setOpen(open === s.kind + s.name ? null : s.kind + s.name)} className="flex w-full items-center justify-between gap-3 text-left">
                     <span className="min-w-0"><span className="block truncate font-sans text-[15px] text-ink">{noEmoji(s.name)}</span><span className="font-mono text-[11px] text-clay">{eur(s.last)} · now</span></span>
                     <span className="flex items-center gap-3">
                       <Spark pts={s.pts.map((p) => p.v)} />
-                      <span className="w-14 shrink-0 text-right font-mono text-[12px]" style={{ color: up ? "#9A3122" : "#3E5A37" }}>{up ? "▲" : "▼"} {Math.abs(Math.round(s.chg * 100))}%</span>
+                      <span className={`w-14 shrink-0 text-right font-mono text-[12px] tabular-nums ${up ? "text-tomato" : "text-basil"}`}>{up ? "+" : "\u2212"}{Math.abs(Math.round(s.chg * 100))}%</span>
                     </span>
                   </button>
                   {open === s.kind + s.name ? (
-                    <div className="mt-3 border-t border-black/10 pt-3">
+                    <div className="mt-3 border-t border-line-soft pt-3">
                       <ul className="space-y-1">
                         {s.pts.slice().reverse().map((p, i) => (
                           <li key={i} className="flex items-baseline justify-between font-mono text-[11px] text-ink-soft"><span>{p.d}</span><span>{eur(p.v)}</span></li>
