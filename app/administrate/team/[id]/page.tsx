@@ -38,13 +38,13 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">← team</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: p.color || "var(--accent)" }}>Person · {p.role || "team"}</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name)}</h1>
+      <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{noEmoji(p.name)}</h1>
       <p className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay">{[venue?.name, p.email].filter(Boolean).join(" · ")}</p>
 
       {/* Status — react-to */}
-      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-5">
-        <p className="font-sans text-xs font-medium text-clay">Now</p>
-        <p className="mt-1 font-serif text-xl text-ink">
+      <div className="mt-8 border-t border-line pt-5">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Now</p>
+        <p className="mt-1 font-serif text-2xl text-ink">
           {lastClock ? `${lastClock.event_type === "in" ? "Clocked in" : "Off the clock"} · ${new Date(lastClock.event_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "No clock events yet"}
         </p>
       </div>
