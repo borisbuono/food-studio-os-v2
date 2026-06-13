@@ -50,17 +50,17 @@ export default async function WineHub({ params }: { params: { id: string } }) {
       <h1 className="mt-2 font-serif text-4xl font-light leading-tight text-ink">{noEmoji(w.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{[producer, region, vintage].filter(Boolean).join(" · ") || "details to add"}</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-black/10 bg-card p-5"><p className="font-serif text-2xl text-ink">{w.glass_price ? "€" + w.glass_price : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">By the glass</p></div>
-        <div className="rounded-2xl border border-black/10 bg-card p-5"><p className="font-serif text-2xl text-ink">{(w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) : "—"}</p><p className="font-mono text-[10px] uppercase tracking-wide text-clay">By the bottle</p></div>
+      <div className="mt-6 grid grid-cols-2 gap-6 border-y border-line py-5">
+        <div><p className="font-serif text-3xl text-ink">{w.glass_price ? "€" + w.glass_price : "—"}</p><p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-clay">By the glass</p></div>
+        <div><p className="font-serif text-3xl text-ink">{(w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) : "—"}</p><p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-clay">By the bottle</p></div>
       </div>
 
       {/* Cost trend — react-to signal, lives where you are */}
       {points.length >= 2 ? (
-        <div className="mt-7 rounded-2xl border border-black/10 bg-card p-5">
+        <div className="mt-7 border-y border-line py-5">
           <div className="flex items-baseline justify-between gap-4">
             <p className="font-sans text-xs font-medium text-clay">Cost trend</p>
-            {move ? <span className={"font-mono text-[12px] " + (move.up ? "text-rose-700" : "text-emerald-700")}>{move.up ? "▲" : "▼"} {Math.abs(move.pct).toFixed(1)}%</span> : null}
+            {move ? <span className={"font-mono text-[12px] " + (move.up ? "text-tomato" : "text-basil")}>{move.up ? "+" : "−"}{Math.abs(move.pct).toFixed(1)}%</span> : null}
           </div>
           <svg viewBox="0 0 200 40" className="mt-2 w-full"><path d={path} stroke="currentColor" strokeWidth="1.5" fill="none" className="text-tomato" /></svg>
           {move ? <p className="mt-1 font-sans text-[11px] leading-snug text-ink-soft">€{move.from.toFixed(2)} → €{move.to.toFixed(2)} ({move.supplier}). {Math.abs(move.pct) >= 8 ? "Big move — re-price the glass or call the supplier." : "Within normal."}</p> : null}
@@ -81,9 +81,9 @@ export default async function WineHub({ params }: { params: { id: string } }) {
       ) : null}
 
       <div className="mt-8 grid grid-cols-3 gap-2">
-        <Link href="/develop/wine/scan" className="rounded-xl border border-black/10 bg-card px-3 py-3 text-center font-sans text-[12px] text-ink">Scan label</Link>
-        <Link href="/develop/wine/train" className="rounded-xl border border-black/10 bg-card px-3 py-3 text-center font-sans text-[12px] text-ink">Train list</Link>
-        <Link href="/develop/wine/prices" className="rounded-xl border border-black/10 bg-card px-3 py-3 text-center font-sans text-[12px] text-ink">From invoice</Link>
+        <Link href="/develop/wine/scan" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">Scan label</Link>
+        <Link href="/develop/wine/train" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">Train list</Link>
+        <Link href="/develop/wine/prices" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">From invoice</Link>
       </div>
     </main>
   );
