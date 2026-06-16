@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
+import InviteTeammate from "@/components/InviteTeammate";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,16 @@ export default async function Team() {
   
   const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
-  const members = (await supabase.from("team_members").select("name,email,default_role,default_restaurant_id,status").order("name")).data || [];
+  const members = (await supabase.from("team_members").select("name,email,default_role,default_restaurant_id,status,first_login_at,invited_at").order("name")).data || [];
   const profiles = (await supabase.from("profiles").select("id,name,role,restaurant_id,color").order("name")).data || [];
   const shifts = await supabase.from("shifts").select("*", { count: "exact", head: true });
+
+  // Onboarding circle (RELEASE_PLAN): keep the funnel visible.
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // 0 = Monday
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - day); weekStart.setHours(0, 0, 0, 0);
+  const pending = members.filter((m: any) => (m.status || "invited") === "invited").length;
+  const joinedThisWeek = members.filter((m: any) => m.first_login_at && new Date(m.first_login_at) >= weekStart).length;
 
   const people = [
     ...members.map((m: any) => ({ name: m.name, role: m.default_role, venue: vname.get(m.default_restaurant_id), status: m.status })),
@@ -22,6 +30,15 @@ export default async function Team() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
+      {(pending || joinedThisWeek) ? (
+        <p className="mt-3 font-sans text-[13px] text-ink-soft">
+          {joinedThisWeek ? <span>{joinedThisWeek} {joinedThisWeek === 1 ? "person" : "people"} joined this week</span> : null}
+          {joinedThisWeek && pending ? <span className="text-clay"> · </span> : null}
+          {pending ? <span>{pending} {pending === 1 ? "invite" : "invites"} still pending</span> : null}
+        </p>
+      ) : null}
+
+      <InviteTeammate venues={venues} />
 
       <Link href="/administrate/team/invite" className="mt-4 inline-block rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">+ Add to team</Link>
 

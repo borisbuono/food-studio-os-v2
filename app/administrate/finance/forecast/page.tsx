@@ -84,6 +84,7 @@ export default async function Forecast() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
+<<<<<<< ours
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Forecast · last 28d ↔ next 28d</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">{venueName}</h1>
 
@@ -93,13 +94,28 @@ export default async function Forecast() {
           <p className="mt-1 font-serif text-3xl text-ink">{eur(last28Actual)}</p>
         </div>
         <div>
+=======
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Forecast · last 28d ↔ next 28d</p>
+      <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{venueName}</h1>
+
+      <div className="mt-8 grid grid-cols-2 gap-8">
+        <div className="border-t border-line pt-5">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Last 28 days · actual</p>
+          <p className="mt-1 font-serif text-3xl text-ink">{eur(last28Actual)}</p>
+        </div>
+        <div className="border-t border-line pt-5">
+>>>>>>> theirs
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Next 28 days · projected</p>
           <p className="mt-1 font-serif text-3xl text-ink">{eur(next28Forecast)}</p>
           <p className={"mt-1 font-mono text-[11px] " + (change >= 0 ? "text-basil" : "text-tomato")}>{change >= 0 ? "+" : "\u2212"}{Math.abs(change)}% vs the 28 just past</p>
         </div>
       </div>
 
+<<<<<<< ours
       <div className="mt-8 border-b border-line pb-4">
+=======
+      <div className="mt-8 border-t border-line pt-5">
+>>>>>>> theirs
         <svg viewBox={"0 0 " + w + " " + h} width="100%" height={h}>
           {/* y grid */}
           {ticks.map((tv, i) => (
