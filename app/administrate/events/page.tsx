@@ -25,9 +25,9 @@ export default async function Events() {
       {keys.map((k) => (
         <section key={k} className="mt-8">
           <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{k} · {groups[k].length}</p>
-          <div className="mt-3 space-y-4">
+          <div className="mt-3 divide-y divide-line border-y border-line">
             {groups[k].map((e: any, i: number) => (
-              <div key={i} className="rounded-2xl border border-black/10 bg-card p-6">
+              <div key={i} className="py-5">
                 <div className="flex items-baseline justify-between gap-4">
                   <h2 className="font-serif text-2xl text-ink">{noEmoji(e.title || e.event_type || "Event")}</h2>
                   <span className="font-mono text-[11px] text-clay">{e.event_date || ""}</span>
