@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { ROLES } from "@/lib/roles";
@@ -36,6 +35,13 @@ export default function Welcome() {
     getMyProfile().then(async (prof) => {
       if (!prof) { router.replace("/login"); return; }
       setP(prof); setName(prof.name || "");
+      // Idempotent: anyone who already finished the first run should not be made
+      // to repeat the tour (stale /welcome link, manual nav, re-login). Send them
+      // straight to their first task instead. (auth/callback only guards new users.)
+      try {
+        const { data: fr } = await supabaseBrowser.from("profiles").select("first_run_done_at").eq("id", prof.id).maybeSingle();
+        if (fr?.first_run_done_at) { router.replace(prof.world === "office" ? "/" : "/execute/handover"); return; }
+      } catch {}
       // language: cookie wins; otherwise inherit the invite's language
       const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
       if (m) setLangState(m[1] as Lang);
@@ -131,7 +137,7 @@ export default function Welcome() {
             className="mt-8 rounded-xl px-6 py-3 font-sans text-[14px] font-medium text-[#F7F7F4] disabled:opacity-50" style={{ background: "var(--accent)" }}>
             {busy ? "…" : tr("welcome.finish", { task: firstTask.label })}
           </button>
-          <p className="mt-4"><Link href="/" className="font-sans text-[13px] text-ink-soft">{tr("welcome.skip")}</Link></p>
+          <p className="mt-4"><button onClick={async () => { setBusy(true); await patchProfile({ first_run_done_at: new Date().toISOString() }); router.replace("/"); }} disabled={busy} className="font-sans text-[13px] text-ink-soft underline-offset-2 hover:underline disabled:opacity-50">{tr("welcome.skip")}</button></p>
         </>
       ) : null}
     </main>
