@@ -75,25 +75,15 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">Where the stock went</h1>
       <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Book = opening stock minus what the recipes say the day's sales should have used. Counted = the physical stock-take. The gap is waste, over-portioning or shrinkage — priced out.</p>
 
-<<<<<<< ours
-      <div className="mt-8 border-y border-line py-5">
-=======
       <div className="mt-6 border-y border-line py-6">
->>>>>>> theirs
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Unaccounted this period</p>
         <p className="mt-1 font-serif text-4xl text-ink">{eur(totalLoss)}</p>
         <p className="mt-2 font-sans text-[13px] text-ink-soft">Across {ingRows.length} tracked ingredients. Biggest leak: {biggest ? noEmoji(biggest.name) : "—"}.</p>
       </div>
 
-<<<<<<< ours
-      <div className="mt-6 flex gap-6 border-b border-line">
-        <Link href="/administrate/finance/variance?by=ingredient" className={"-mb-px pb-2 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "border-b text-ink" : "text-clay")} style={by === "ingredient" ? { borderColor: "var(--accent)" } : undefined}>By ingredient</Link>
-        <Link href="/administrate/finance/variance?by=recipe" className={"-mb-px pb-2 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "border-b text-ink" : "text-clay")} style={by === "recipe" ? { borderColor: "var(--accent)" } : undefined}>By recipe</Link>
-=======
       <div className="mt-5 inline-flex rounded-xl border border-line p-1">
         <Link href="/administrate/finance/variance?by=ingredient" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By ingredient</Link>
         <Link href="/administrate/finance/variance?by=recipe" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By recipe</Link>
->>>>>>> theirs
       </div>
 
       {by === "ingredient" ? (
@@ -124,11 +114,7 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
         </ul>
       )}
 
-<<<<<<< ours
-      <div className="mt-10 border-t border-line pt-5">
-=======
       <div className="mt-8 border-y border-dashed border-line py-5">
->>>>>>> theirs
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">Academy · what to aim for</p>
         <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">A healthy kitchen runs variance near zero. A point or two is normal shrink — but a steady gap on one pricey line is usually over-portioning, waste, or stock walking out the door. Chase the biggest euro first, fix the cause, recount next week, and watch it close.</p>
       </div>
