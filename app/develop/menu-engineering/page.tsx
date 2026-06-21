@@ -35,16 +35,16 @@ export default async function MenuEngineering() {
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/trial" className="font-sans text-sm text-ink-soft">← Restaurant Utopia</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Menu engineering</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">What earns its place</h1>
+      <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">What earns its place</h1>
       <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Every dish placed by margin against popularity. Stars carry the menu; plowhorses sell but barely pay; puzzles are worth promoting; dogs are candidates to rework or cut.</p>
 
-      <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
+      <div className="mt-6 border-y border-line py-6">
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Total contribution · period</p>
         <p className="mt-1 font-serif text-4xl text-ink">{eur(totalContribution)}</p>
         <p className="mt-2 font-sans text-[13px] text-ink-soft">Avg margin {eur(avgMargin)} · avg {Math.round(avgUnits)} sold. Top earner: {ranked[0] ? noEmoji(ranked[0].name) : "—"}.</p>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-tomato/30 bg-card p-6">
+      <div className="mt-4 border-y border-line py-6">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-tomato">Where the money actually is</p>
         <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Margin % isn't the whole story — a pricier dish at a lower % can earn more in absolute euros. Biggest earners this period:</p>
         <ul className="mt-2">
@@ -58,12 +58,12 @@ export default async function MenuEngineering() {
         <p className="mt-2 font-sans text-[12px] text-clay">Worth protecting and pushing even when the margin % isn't the highest — sometimes you bite the margin for the bigger euro.</p>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-dashed border-black/20 p-5">
+      <div className="mt-4 border-y border-dashed border-line py-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-tomato">Academy · the play</p>
         <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">Turn Plowhorses into Stars by trimming cost or gently lifting price. Push Puzzles harder — better menu placement, a line on the specials board, staff recommending them. Rework or retire Dogs. A rough target is 28–32% food cost, but follow total contribution, not just the percentage — a €12 dish at 35% can beat a €5 one at 80%.</p>
       </div>
 
-      <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
+      <ul className="mt-6 divide-y divide-line border-t border-line">
         {ranked.map((r) => (
           <li key={r.id} className="py-3">
             <Link href={"/menu/" + r.id} className="block transition hover:opacity-70">
