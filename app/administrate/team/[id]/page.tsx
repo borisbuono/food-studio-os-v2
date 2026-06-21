@@ -55,11 +55,11 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
         {!shifts.length ? (
           <p className="mt-2 font-sans text-[14px] text-clay">Nothing scheduled. <Link href="/schedule" className="text-ink-soft">Open the rota →</Link></p>
         ) : (
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 divide-y divide-line border-y border-line">
             {shifts.map((s: any, i: number) => {
               const z = zname.get(s.zone_id);
               return (
-                <li key={i} className="flex items-baseline justify-between gap-4 rounded-xl border border-black/10 bg-card px-4 py-3">
+                <li key={i} className="flex items-baseline justify-between gap-4 py-3">
                   <div>
                     <p className="font-sans text-[14px] text-ink">{fmtDay(s.shift_date)}</p>
                     <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{[z?.area, z?.name].filter(Boolean).join(" · ") || "—"}</p>
