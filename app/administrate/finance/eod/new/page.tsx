@@ -17,6 +17,27 @@ export default function NewEod() {
   const [softdrinks, setSoft] = useState("");
   const [tips, setTips] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+
+  const onPickFresto = async (file?: File | null) => {
+    if (!file) return; setUploadErr(""); setBusy(true);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const r = await fetch("/api/pos/import", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!d.ok) { setUploadErr(d.error || "Upload failed"); setBusy(false); return; }
+      const row = (d.rows as any[]).find((x) => x.date === date) || (d.rows as any[])[d.rows.length - 1];
+      if (!row) { setUploadErr("No row for " + date); setBusy(false); return; }
+      if (row.date) setDate(row.date);
+      if (row.covers) setCovers(String(row.covers));
+      if (row.food) setFood(String(row.food));
+      if (row.wine) setWine(String(row.wine));
+      if (row.bar) setBar(String(row.bar));
+      if (row.softdrinks) setSoft(String(row.softdrinks));
+      if (row.tips) setTips(String(row.tips));
+    } catch (e: any) { setUploadErr(e?.message || "Upload failed"); }
+    setBusy(false);
+  };
   const [result, setResult] = useState<any>(null);
   const [err, setErr] = useState("");
 
@@ -83,6 +104,13 @@ export default function NewEod() {
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">End of day · post to Holded</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">Close the day.</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Enter the night's totals from Fresto. The OS renders the 4-line VAT split and you tap to post the sales receipt into Holded.</p>
+
+      <div className="mt-5 border-t border-line pt-4">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Quick fill</p>
+        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" id="fresto-xlsx" onChange={(e) => onPickFresto(e.target.files?.[0])} />
+        <label htmlFor="fresto-xlsx" className="mt-2 inline-block cursor-pointer rounded-xl border border-line bg-paper px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink hover:border-ink-soft">Pull from Fresto export →</label>
+        {uploadErr ? <p className="mt-2 font-mono text-[11px] text-tomato">⚠ {uploadErr}</p> : null}
+      </div>
 
       <div className="mt-8 border-t border-line pt-4">
         <div className="flex items-baseline gap-3">
