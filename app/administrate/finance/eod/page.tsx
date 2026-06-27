@@ -15,6 +15,7 @@ export default async function EodList() {
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">End-of-day reports</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{eod.length} reports</h1>
+      <Link href="/administrate/finance/eod/new" className="mt-4 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>+ Close today's service</Link>
 
       <div className="mt-6 space-y-4">
         {eod.map((r: any, i: number) => (
