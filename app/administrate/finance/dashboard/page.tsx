@@ -109,6 +109,10 @@ export default async function FinanceDashboard() {
 
       <p className="mt-12 font-mono text-[10px] uppercase tracking-wide text-clay">Foundation surface. POS/Holded/bank integrations layer on next.</p>
           <p className="mt-10 font-mono text-[10px] uppercase tracking-wide text-clay"><a href="/administrate/finance/integrations">substrate &middot; integrations →</a></p>
+          <div className="mt-10 grid grid-cols-2 gap-3">
+        <a href="/capture" className="rounded-xl border border-ink bg-ink px-4 py-3 text-center font-mono text-[11px] uppercase tracking-wide text-paper">📷 Capture</a>
+        <a href="/administrate/finance/setup" className="rounded-xl border border-line bg-paper px-4 py-3 text-center font-mono text-[11px] uppercase tracking-wide text-ink">⚙ Onboard entities</a>
+      </div>
     </main>
   );
 }

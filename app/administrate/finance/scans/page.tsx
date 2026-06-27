@@ -48,6 +48,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
+      <a href="/capture" className="ml-3 inline-block font-mono text-sm text-tomato">+ 📷 capture</a>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Scans · {ec} · invoice triage</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">What needs a call.</h1>
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">Every factura that landed today. Duplicates, EU-VAT, intercompany — pre-flagged. Safe-to-approve sit at the top so you can tap through fast.</p>
