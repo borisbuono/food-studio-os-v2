@@ -25,7 +25,8 @@ const ACCOUNT: Record<EntityCode, Partial<Record<Group, string>>> = {
 const DRY_RUN = process.env.FS_HOLDED_DRY_RUN !== "false"; // default ON
 
 export const holdedAdapter: AccountingAdapter = {
-  name: "holded",
+  name: "Holded",
+  vendor: "holded",
 
   async postSalesReceipt(input: AccountingSalesReceipt) {
     const key = ENTITY_KEY[input.entity];
@@ -47,7 +48,7 @@ export const holdedAdapter: AccountingAdapter = {
     if (DRY_RUN) {
       // eslint-disable-next-line no-console
       console.log("[holded:dry-run] would POST salesreceipt", JSON.stringify({ entity: input.entity, payload }, null, 2));
-      return { external_id: "dry-run-" + Date.now() };
+      return { external_id: "dry-run-" + Date.now(), dryRun: true };
     }
 
     const r = await fetch(`${BASE}/documents/salesreceipt`, {
@@ -57,7 +58,7 @@ export const holdedAdapter: AccountingAdapter = {
     });
     if (!r.ok) throw new Error(`Holded POST salesreceipt ${r.status}: ${await r.text()}`);
     const d = await r.json();
-    return { external_id: d.id || d.invoiceNum || "" };
+    return { external_id: d.id || d.invoiceNum || "", dryRun: false };
   },
 
   async listUnapprovedPurchases(entity: EntityCode): Promise<AccountingPurchase[]> {
@@ -69,29 +70,27 @@ export const holdedAdapter: AccountingAdapter = {
     return (docs || [])
       .filter((d: any) => d.status !== 3 && !d.approvedAt) // status=3 = CANCELLED per [[holded_data_model]]
       .map((d: any) => ({
-        entity,
+        external_id: String(d.id || d.invoiceNum || ""),
         date: new Date((d.date || 0) * 1000).toISOString().slice(0, 10),
-        supplier_id_external: d.contact || "",
-        doc_ref: d.docNumber || d.id,
-        total_eur: Number(d.total || 0),
-        approved: !!d.approvedAt,
+        supplier_name: d.contactName || null,
+        amount_eur: Number(d.total || 0),
+        vat_eur: Number(d.totalTax || 0),
+        status: "unapproved" as const,
       }));
   },
 
-  async listMovementsSince(entity: EntityCode, since: string): Promise<AccountingMovement[]> {
+  async listMovementsSince(entity: EntityCode, sinceUnixSec: number): Promise<AccountingMovement[]> {
     const key = ENTITY_KEY[entity];
     if (!key) return [];
-    const sinceUnix = Math.floor(new Date(since).getTime() / 1000);
-    const r = await fetch(`${BASE}/treasury/movements?starttmp=${sinceUnix}`, { headers: { key } });
+    const r = await fetch(`${BASE}/treasury/movements?starttmp=${sinceUnixSec}`, { headers: { key } });
     if (!r.ok) return [];
     const movs = await r.json();
     return (movs || []).map((m: any) => ({
-      entity,
+      external_id: String(m.id || ""),
       date: new Date((m.date || 0) * 1000).toISOString().slice(0, 10),
-      account: m.account || "",
+      bank_account: String(m.account || ""),
       amount_eur: Number(m.amount || 0),
       description: m.desc || "",
-      external_id: m.id,
     }));
   },
 };

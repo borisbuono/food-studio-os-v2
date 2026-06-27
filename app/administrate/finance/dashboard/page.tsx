@@ -108,6 +108,7 @@ export default async function FinanceDashboard() {
       </section>
 
       <p className="mt-12 font-mono text-[10px] uppercase tracking-wide text-clay">Foundation surface. POS/Holded/bank integrations layer on next.</p>
+          <p className="mt-10 font-mono text-[10px] uppercase tracking-wide text-clay"><a href="/administrate/finance/integrations">substrate &middot; integrations →</a></p>
     </main>
   );
 }

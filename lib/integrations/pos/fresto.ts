@@ -60,7 +60,25 @@ export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: numbe
 // Once Lars's API lands, pullDay calls the live endpoint instead.
 
 export const frestoAdapter: PosAdapter = {
-  name: "fresto",
+  name: "Fresto",
+  vendor: "fresto",
+  async parseUpload(buf: ArrayBuffer): Promise<PosDailySale[]> {
+    const rows = parseFrestoXlsx(buf);
+    return rows.map((r) => ({
+      date: r.date,
+      restaurant_id: "",
+      covers: r.covers,
+      lines: [
+        { group: "food", net_eur: r.food, vat_rate: 10, vat_eur: r.food * 0.10 },
+        { group: "wine", net_eur: r.wine, vat_rate: 10, vat_eur: r.wine * 0.10 },
+        { group: "bar",  net_eur: r.bar,  vat_rate: 10, vat_eur: r.bar  * 0.10 },
+        { group: "softdrinks", net_eur: r.softdrinks, vat_rate: 10, vat_eur: r.softdrinks * 0.10 },
+        { group: "tips", net_eur: r.tips, vat_rate: 0, vat_eur: 0 },
+      ],
+      total_eur: r.total,
+      source: { adapter: "fresto" },
+    }));
+  },
   async pullDay(restaurant_id: string, date: string): Promise<PosDailySale | null> {
     // v1: data comes via upload, parsed and persisted by /api/pos/import into eod_reports.
     // pullDay just reads back the eod_reports row.

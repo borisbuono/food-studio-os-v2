@@ -22,8 +22,8 @@ export default function NewEod() {
   const onPickFresto = async (file?: File | null) => {
     if (!file) return; setUploadErr(""); setBusy(true);
     try {
-      const fd = new FormData(); fd.append("file", file);
-      const r = await fetch("/api/pos/import", { method: "POST", body: fd });
+      const fd = new FormData(); fd.append("file", file); fd.append("entity", "IFL");
+      const r = await fetch("/api/finance/import-pos", { method: "POST", body: fd });
       const d = await r.json();
       if (!d.ok) { setUploadErr(d.error || "Upload failed"); setBusy(false); return; }
       const row = (d.rows as any[]).find((x) => x.date === date) || (d.rows as any[])[d.rows.length - 1];
@@ -78,7 +78,7 @@ export default function NewEod() {
     setBusy(true); setErr(""); setResult(null);
     try {
       const rid = ENTITY_TO_RESTAURANT[entity] || ENTITY_TO_RESTAURANT.utopia!;
-      const r = await fetch("/api/holded/post-eod", {
+      const r = await fetch("/api/finance/post-eod", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ entity: ec, date, restaurant_id: rid, covers: t(covers), description: `EOD ${date}`, ...totals }),
@@ -108,7 +108,7 @@ export default function NewEod() {
       <div className="mt-5 border-t border-line pt-4">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Quick fill</p>
         <input type="file" accept=".xlsx,.xls,.csv" className="hidden" id="fresto-xlsx" onChange={(e) => onPickFresto(e.target.files?.[0])} />
-        <label htmlFor="fresto-xlsx" className="mt-2 inline-block cursor-pointer rounded-xl border border-line bg-paper px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink hover:border-ink-soft">Pull from Fresto export →</label>
+        <label htmlFor="fresto-xlsx" className="mt-2 inline-block cursor-pointer rounded-xl border border-line bg-paper px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink hover:border-ink-soft">Pull from POS export →</label>
         {uploadErr ? <p className="mt-2 font-mono text-[11px] text-tomato">⚠ {uploadErr}</p> : null}
       </div>
 
@@ -153,7 +153,7 @@ export default function NewEod() {
           </div>
 
           <button onClick={submit} disabled={busy} className="mt-6 w-full rounded-xl px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4] disabled:opacity-60" style={{ background: "var(--accent)" }}>
-            {busy ? "Posting…" : `Post to Holded — ${ec}`}
+            {busy ? "Posting…" : `Post to accounting — ${ec}`}
           </button>
           <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-clay">
             Dry-run mode is on by default. Real POST requires FS_HOLDED_DRY_RUN=false on the server.

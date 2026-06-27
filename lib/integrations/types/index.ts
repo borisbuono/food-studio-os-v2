@@ -1,19 +1,19 @@
-// Vendor-agnostic adapter contracts. Nothing in app/ imports a vendor SDK directly —
-// everything goes through these interfaces so we can swap fresto→square or
-// holded→quickbooks by changing a row in `integrations` (or per-venue config).
+// Substrate-agnostic adapter contracts. Vendor swaps (Fresto → Square, Holded → QuickBooks,
+// CoverManager → OpenTable, etc.) are config not rewrite. Every adapter exposes `name` so the
+// UI never hardcodes a vendor — labels come from the active adapter.
 
 export type EntityCode = "IFL" | "BM" | "BBH";
 
-// ---------- POS adapter (Fresto today, Square / Lightspeed / Micros later) ----------
+// ---------- POS ----------
 export interface PosSaleLine {
-  group: "food" | "wine" | "bar" | "softdrinks" | "tips" | "other";
+  group: "food" | "wine" | "bar" | "softdrinks" | "tips" | "service" | "other";
   description?: string;
   net_eur: number;
-  vat_rate: 0 | 10 | 21; // Spain rates
+  vat_rate: 0 | 4 | 10 | 21;
   vat_eur: number;
 }
 export interface PosDailySale {
-  date: string;          // YYYY-MM-DD
+  date: string;             // YYYY-MM-DD
   restaurant_id: string;
   covers: number;
   lines: PosSaleLine[];
@@ -22,64 +22,95 @@ export interface PosDailySale {
 }
 export interface PosAdapter {
   name: string;
+  vendor: "fresto" | "square" | "micros" | "toast" | "lightspeed" | "csv" | string;
+  // Pull a day's sales — live API if connected, cache fallback otherwise
   pullDay(restaurant_id: string, date: string): Promise<PosDailySale | null>;
+  // Optional XLSX/CSV parse path (used when the API isn't live yet)
+  parseUpload?(buf: ArrayBuffer): Promise<PosDailySale[]>;
 }
 
-// ---------- Accounting adapter (Holded today, QuickBooks / Sage later) ----------
+// ---------- Accounting ----------
 export interface AccountingSalesReceipt {
   entity: EntityCode;
-  date: string;          // YYYY-MM-DD
+  date: string;
   description: string;
-  lines: { account_code: string; description: string; net_eur: number; vat_rate: 0 | 10 | 21 }[];
+  lines: { account_code: string; description: string; net_eur: number; vat_rate: number }[];
 }
 export interface AccountingPurchase {
-  entity: EntityCode;
+  external_id: string;
   date: string;
-  supplier_id_external: string;
-  doc_ref: string;
-  total_eur: number;
-  approved: boolean;
+  supplier_name: string | null;
+  amount_eur: number;
+  vat_eur: number;
+  status: "unapproved" | "approved" | "cancelled" | string;
+  url?: string;
 }
 export interface AccountingMovement {
-  entity: EntityCode;
-  date: string;
-  account: string;
-  amount_eur: number;     // signed: + credit, - debit
-  description: string;
   external_id: string;
+  date: string;
+  description: string;
+  amount_eur: number;
+  bank_account: string;
 }
 export interface AccountingAdapter {
   name: string;
-  postSalesReceipt(input: AccountingSalesReceipt): Promise<{ external_id: string }>;
+  vendor: "holded" | "quickbooks" | "xero" | "sage" | string;
+  postSalesReceipt(input: AccountingSalesReceipt): Promise<{ external_id: string; dryRun: boolean }>;
   listUnapprovedPurchases(entity: EntityCode): Promise<AccountingPurchase[]>;
-  listMovementsSince(entity: EntityCode, since: string): Promise<AccountingMovement[]>;
+  listMovementsSince(entity: EntityCode, sinceUnixSec: number): Promise<AccountingMovement[]>;
 }
 
-// ---------- Booking adapter (Fresto / CoverManager / OpenTable) ----------
+// ---------- Booking ----------
 export interface BookingRecord {
   external_id: string;
-  service_date: string;
-  service_time?: string;
-  guest_name: string;
+  date: string;
+  time: string;
   party_size: number;
-  table_ref?: string;
-  notes?: string;
-  deposit_eur?: number;
+  guest_name: string;
+  status: "confirmed" | "cancelled" | "no_show" | "seated" | string;
 }
 export interface BookingAdapter {
   name: string;
-  listBookingsForDay(restaurant_id: string, date: string): Promise<BookingRecord[]>;
+  vendor: "covermanager" | "opentable" | "sevenrooms" | "thefork" | "resy" | string;
+  pullDay(restaurant_id: string, date: string): Promise<BookingRecord[]>;
 }
 
-// ---------- Payment adapter (Viva Wallet / Square / MIX) ----------
+// ---------- Payment / acquirer ----------
 export interface PaymentRecord {
   external_id: string;
   date: string;
   amount_eur: number;
-  payment_type: "booking_deposit" | "tip" | "card_present" | "online";
-  ref?: string;          // booking id / table / customer ref
+  fee_eur?: number;
+  brand?: string;
+  last4?: string;
 }
 export interface PaymentAdapter {
   name: string;
-  listPaymentsSince(restaurant_id: string, since: string): Promise<PaymentRecord[]>;
+  vendor: "stripe" | "adyen" | "redsys" | "caixabank" | "square_payments" | string;
+  pullSettlementsSince(entity: EntityCode, sinceUnixSec: number): Promise<PaymentRecord[]>;
+}
+
+// ---------- Banking ----------
+export interface BankMovement {
+  external_id: string;
+  date: string;
+  description: string;
+  amount_eur: number;
+  balance_eur?: number;
+  bank_account: string;
+}
+export interface BankingAdapter {
+  name: string;
+  vendor: "caixabank" | "bbva" | "santander" | "plaid" | "tink" | "gocardless" | string;
+  listMovementsSince(entity: EntityCode, sinceUnixSec: number): Promise<BankMovement[]>;
+}
+
+// ---------- Registry binding ----------
+export interface IntegrationBinding {
+  entity: EntityCode;
+  pos?: { vendor: string; status: "connected" | "stub" | "off" };
+  accounting?: { vendor: string; status: "connected" | "stub" | "off" };
+  booking?: { vendor: string; status: "connected" | "stub" | "off" };
+  payment?: { vendor: string; status: "connected" | "stub" | "off" };
+  banking?: { vendor: string; status: "connected" | "stub" | "off" };
 }
