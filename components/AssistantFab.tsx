@@ -21,6 +21,8 @@ export default function AssistantFab() {
   const [log, setLog] = useState<Msg[]>([]);
   const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
   const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [capBusy, setCapBusy] = useState(false);
+  const [capMsg, setCapMsg] = useState<string>("");
   const [lastYou, setLastYou] = useState("");
   const recRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -79,6 +81,20 @@ export default function AssistantFab() {
     if (supported && (navigator as any).permissions?.query) {
       (navigator as any).permissions.query({ name: "microphone" as any }).then((p: any) => { if (p.state === "granted") setTimeout(listen, 200); }).catch(() => {});
     }
+  };
+  const onCapture = async (file?: File | null) => {
+    if (!file) return; setCapBusy(true); setCapMsg("");
+    try {
+      const fd = new FormData(); fd.append("file", file); fd.append("type", "auto");
+      const r = await fetch("/api/capture", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!d.ok) { setCapMsg("⚠ " + (d.error || "upload failed")); setCapBusy(false); return; }
+      const det = d.detected;
+      const summary = det ? `${d.type}${det.supplier_name ? " · " + det.supplier_name : ""}${det.total_eur != null ? " · €" + Number(det.total_eur).toFixed(2) : ""}` : d.type;
+      setCapMsg(`✓ Filed: ${summary}`);
+      setLog((l) => [...l, { role: "sys", text: `📷 Captured: ${summary} → ${d.where}` }]);
+    } catch (e: any) { setCapMsg("⚠ " + (e?.message || "upload failed")); }
+    setCapBusy(false);
   };
   const closeFab = () => { keepRef.current = false; try { recRef.current?.stop(); } catch {} setListening(false); setOpen(false); };
 
@@ -164,6 +180,12 @@ export default function AssistantFab() {
           ) : null}
 
           {lastYou ? <button onClick={fileLast} className="mx-3 mb-1 rounded-lg border border-black/15 px-3 py-1.5 text-left font-mono text-[10px] uppercase tracking-wide text-ink-soft transition hover:border-ink/40">↪ Save that to the feedback board</button> : null}
+          <div className="flex items-center gap-2 border-t border-black/10 px-3 pt-2">
+            <input id="chef-fab-cap" type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
+            <label htmlFor="chef-fab-cap" className={"flex-1 cursor-pointer rounded-lg border border-black/15 px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-wide " + (capBusy ? "bg-paper-deep text-muted" : "bg-paper text-ink hover:border-ink/40")}>{capBusy ? "📷 classifying…" : "📷 capture (auto-file)"}</label>
+            <a href="/capture" className="rounded-lg border border-black/15 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay hover:border-ink/40">full</a>
+          </div>
+          {capMsg ? <p className="px-4 pt-1 font-mono text-[10px] text-clay">{capMsg}</p> : null}
           <div className="flex items-center gap-3 border-t border-black/10 p-3">
             <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
             {text && !listening ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">Send</button> : null}
