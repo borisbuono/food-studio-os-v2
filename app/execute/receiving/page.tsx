@@ -31,6 +31,8 @@ export default function Receiving() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState<string[] | null>(null);
+  const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
+  const [albaranNote, setAlbaranNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadMoves = async (rId: string, ts: Target[]) => {
@@ -47,10 +49,12 @@ export default function Receiving() {
       const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
       const r = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
       setRid(r);
-      const [{ data: inv }, { data: wines }] = await Promise.all([
+      const [{ data: inv }, { data: wines }, { data: provs }] = await Promise.all([
         supabaseBrowser.from("inventory_items").select("id,name,unit,unit_cost").eq("restaurant_id", r),
         supabaseBrowser.from("menu_items").select("id,name,cost").eq("restaurant_id", r).eq("section", "wine").eq("is_active", true),
+        supabaseBrowser.from("providers").select("id,name").order("name"),
       ]);
+      setProviders((provs || []) as { id: string; name: string }[]);
       const ts: Target[] = [
         ...(inv || []).map((i: any) => ({ id: i.id, kind: "inventory" as const, name: i.name, unit: i.unit, cost: i.unit_cost })),
         ...(wines || []).map((w: any) => ({ id: w.id, kind: "wine" as const, name: w.name, unit: "bottle", cost: w.cost })),
@@ -92,6 +96,45 @@ export default function Receiving() {
         msgs.push(`✓ ${noEmoji(t.name)}${price != null ? ` · cost ${eur(price)}${old != null && old !== price ? ` (was ${eur(old)})` : ""}` : ""}${t.kind === "inventory" && row.qty ? ` · +${row.qty} ${row.unit || t.unit || ""} in` : ""}`);
       } catch (e: any) { msgs.push("⚠ " + noEmoji(t.name) + ": " + (e?.message || "")); }
     }
+    // financial workflow — write an albarans row + try to link to an open order
+    try {
+      const matchedProvider = providers.find((p) => p.name.toLowerCase().includes((supplier || "").toLowerCase().split(" ")[0] || "__nope__"));
+      let linkedOrderId: string | null = null;
+      let linkedOrderNote = "";
+      if (matchedProvider) {
+        const { data: openOrders } = await supabaseBrowser
+          .from("orders")
+          .select("id,delivery_date,status,total")
+          .eq("restaurant_id", rid)
+          .eq("provider_id", matchedProvider.id)
+          .in("status", ["sent","received","draft"])
+          .order("delivery_date", { ascending: false })
+          .limit(1);
+        const open = (openOrders || [])[0];
+        if (open) {
+          linkedOrderId = open.id;
+          linkedOrderNote = "linked to order " + new Date(open.delivery_date || new Date()).toLocaleDateString("en-GB");
+          await supabaseBrowser.from("orders").update({ delivered_at: new Date().toISOString(), status: "received" }).eq("id", open.id);
+        }
+      }
+      const ocrPayload = { supplier, lines: rows.map((r) => ({ name: r.name, qty: r.qty, unit: r.unit, unit_price: r.unit_price, target_id: r.targetId })) };
+      const { data: ab, error: aberr } = await supabaseBrowser.from("albarans").insert({
+        restaurant_id: rid,
+        order_id: linkedOrderId,
+        provider_id: matchedProvider?.id || null,
+        received_at: new Date().toISOString(),
+        ocr_extracted: ocrPayload,
+        match_status: linkedOrderId ? "matched" : "unmatched",
+      }).select("id").maybeSingle();
+      if (aberr) {
+        msgs.push("⚠ couldn't write delivery note: " + aberr.message);
+      } else if (ab) {
+        setAlbaranNote("Delivery note logged" + (linkedOrderNote ? " · " + linkedOrderNote : " · no open order matched — drop-in"));
+      }
+    } catch (e: any) {
+      msgs.push("⚠ delivery-note write failed: " + (e?.message || ""));
+    }
+
     await loadMoves(rid, targets);
     setDone(msgs); setBusy(false);
   };
@@ -135,7 +178,8 @@ export default function Receiving() {
         <div className="mt-5 rounded-2xl border border-black/10 bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Received</p>
           <ul className="mt-2 space-y-1">{done.length ? done.map((m, i) => <li key={i} className="font-sans text-[14px] text-ink-soft">{m}</li>) : <li className="font-sans text-[14px] text-clay">Nothing matched — pick targets and try again.</li>}</ul>
-          <button onClick={() => { setRows([]); setDone(null); setSupplier(""); }} className="mt-4 rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Log another</button>
+          {albaranNote ? <p className="mt-3 font-serif italic text-[13px] text-ink-soft">{albaranNote}</p> : null}
+          <button onClick={() => { setRows([]); setDone(null); setSupplier(""); setAlbaranNote(null); }} className="mt-4 rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Log another</button>
         </div>
       ) : null}
 

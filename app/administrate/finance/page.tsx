@@ -42,6 +42,7 @@ export default async function Finance() {
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>The numbers · what to react to</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">How the house is doing</h1>
       <p className="mt-2 font-sans text-[14px] text-ink-soft">The engine runs out of sight. Below are only the signals that actually want a call.</p>
+      <Link href="/administrate/finance/dashboard" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Operational dashboard →</Link>
 
       {/* Signals — react-to */}
       {moves.length > 0 ? (
