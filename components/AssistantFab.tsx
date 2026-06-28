@@ -1,197 +1,308 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 
-type Msg = { role: "you" | "chef" | "sys"; text: string };
+// Chef FAB v2 — Siri-style tap-to-start, bottom-sheet drawer, long-press = camera,
+// confidence-gated intent chips with autolearning, language follows the OS i18n
+// setting (fs_lang cookie), hides on pages that set data-fab="hidden" on <body>.
+// Foundation contract: /api/ask returns { reply, intent, confidence, order,
+// feedback, memory, user_turn_id }. /api/chef/{confirm-intent,save-memory,log-action}
+// for the loop tails.
 
-// One button, like Siri — but it's Chef. Tap to talk; it keeps listening (auto-restarts
-// under the hood so the browser/iOS can't cut you off mid-sentence) until you tap Chef
-// again to send. Then it works out whether you're asking, want a recipe, drafting an
-// order, or leaving feedback — and routes it.
+type Msg = { role: "you" | "chef" | "sys"; text: string; intent?: string | null; confidence?: number | null; userText?: string; turnId?: string; needsConfirm?: boolean; memoryProposal?: any; orderDraft?: any; feedback?: any };
+const CONFIDENCE_THRESHOLD = 0.75;
+const SNAP_POINTS = [0.4, 0.7, 0.95]; // viewport fractions
+
+function readLang(): "en" | "es" {
+  if (typeof document === "undefined") return "en";
+  const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
+  return (m?.[1] as any) || "en";
+}
+function newSessionId() { return (typeof crypto !== "undefined" && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : String(Date.now()) + "-" + Math.random().toString(36).slice(2); }
+
 export default function AssistantFab() {
   const pathname = usePathname();
+  const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);
+  const [snap, setSnap] = useState(0); // index into SNAP_POINTS
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const [errorPulse, setErrorPulse] = useState(false);
   const [supported, setSupported] = useState(true);
   const [status, setStatus] = useState("");
   const [log, setLog] = useState<Msg[]>([]);
-  const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
   const [profile, setProfile] = useState<MyProfile | null>(null);
-  const [capBusy, setCapBusy] = useState(false);
-  const [capMsg, setCapMsg] = useState<string>("");
-  const [lastYou, setLastYou] = useState("");
+  const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
+  const [lang, setLang] = useState<"en" | "es">("en");
+  const sessionRef = useRef<string>(newSessionId());
   const recRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef<{ y: number; height: number } | null>(null);
   const textRef = useRef("");
-  const finalRef = useRef("");      // transcript committed across auto-restarts
-  const keepRef = useRef(false);    // user wants to keep listening until they tap to send
-  const sendRef = useRef<() => void>(() => {});
-  const pressStart = useRef<number | null>(null);
+  const finalRef = useRef("");
+  const silenceTimer = useRef<any>(null);
+  const pressTimer = useRef<any>(null);
+  const longPressFired = useRef(false);
+  const captureInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { getMyProfile().then(setProfile); }, []);
+  useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); }, []);
 
+  // Hide-on-route via body[data-fab="hidden"] (read on path change)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const check = () => setHidden(document.body.getAttribute("data-fab") === "hidden");
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { attributes: true, attributeFilter: ["data-fab"] });
+    return () => mo.disconnect();
+  }, [pathname]);
+
+  // Speech recognition — language from i18n
   useEffect(() => {
     const SR = (typeof window !== "undefined") && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition);
     if (!SR) { setSupported(false); return; }
     const r = new SR();
-    r.continuous = true; r.interimResults = true; r.lang = "en-GB";
-    r.onstart = () => { setListening(true); setStatus("Listening… release to send"); };
+    r.continuous = true; r.interimResults = true; r.lang = lang === "es" ? "es-ES" : "en-GB";
+    r.onstart = () => { setListening(true); setStatus(lang === "es" ? "Escuchando" : "Listening"); };
     r.onresult = (e: any) => {
       let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
       const full = (finalRef.current + t).replace(/\s+/g, " ").trim();
       setText(full); textRef.current = full;
+      // Auto-send-on-pause: reset 1.5s silence timer on every new chunk
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      if (full) silenceTimer.current = setTimeout(() => stopAndSend(), 1500);
     };
     r.onerror = (e: any) => {
       const code = e?.error || "";
       if (code === "not-allowed" || code === "service-not-allowed" || code === "audio-capture") {
-        keepRef.current = false; setListening(false);
-        setStatus(code === "audio-capture" ? "No microphone found — type below." : "Mic is blocked — allow it for this site, or type below.");
+        setListening(false);
+        setStatus(code === "audio-capture" ? (lang === "es" ? "Sin micrófono — escribe abajo." : "No microphone — type below.") : (lang === "es" ? "Permiso del micro bloqueado — tócalo para permitir." : "Mic blocked — tap to allow."));
+        setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
       }
-      // "no-speech" / "aborted": let onend decide (it will restart while keepRef is true)
     };
     r.onend = () => {
-      if (keepRef.current) {
-        // commit what we have and keep going — defeats iOS/Safari's early auto-stop
+      // Auto-restart only if we still want to listen (defeats iOS Safari early stop)
+      if (listening && !silenceTimer.current) {
         finalRef.current = textRef.current ? textRef.current + " " : finalRef.current;
         try { r.start(); } catch { setTimeout(() => { try { r.start(); } catch {} }, 300); }
         return;
       }
       setListening(false);
-      if (textRef.current.trim()) sendRef.current();
     };
     recRef.current = r;
-  }, []);
+    return () => { try { r.stop(); } catch {} };
+  }, [lang, listening]);
 
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [log, text]);
 
-  const listen = () => {
+  const startListen = useCallback(() => {
     const r = recRef.current; if (!r) return;
     finalRef.current = ""; textRef.current = ""; setText("");
-    keepRef.current = true; setStatus("Listening… release to send");
+    setStatus(lang === "es" ? "Escuchando" : "Listening");
     try { r.start(); setListening(true); } catch {}
-  };
-  const stopAndSend = () => { const r = recRef.current; if (!r) return; keepRef.current = false; try { r.stop(); } catch {} };
+  }, [lang]);
 
-  const openFab = () => {
-    setOpen(true);
-    if (supported && (navigator as any).permissions?.query) {
-      (navigator as any).permissions.query({ name: "microphone" as any }).then((p: any) => { if (p.state === "granted") setTimeout(listen, 200); }).catch(() => {});
-    }
+  const stopAndSend = useCallback(() => {
+    if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
+    const r = recRef.current; if (r) { try { r.stop(); } catch {} }
+    setListening(false);
+    if (textRef.current.trim()) send();
+  }, []);
+
+  const fabTap = () => {
+    if (!open) setOpen(true);
+    if (listening) { stopAndSend(); return; }
+    if (supported) startListen();
   };
+
+  // Long-press → camera
+  const fabPressDown = () => {
+    longPressFired.current = false;
+    pressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      // Haptic
+      if (navigator.vibrate) navigator.vibrate(15);
+      captureInputRef.current?.click();
+    }, 500);
+  };
+  const fabPressUp = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+    if (!longPressFired.current) fabTap();
+  };
+  const fabPressCancel = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } };
+
+  const send = async () => {
+    const t = (textRef.current.trim() || text.trim()); if (!t) return;
+    setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
+    setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "···", userText: t }]);
+    setThinking(true);
+    try {
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+      const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        message: t, route: pathname || "", session_id: sessionRef.current, entity_id: ent, language: lang,
+        page_context: (typeof window !== "undefined" ? (window as any).__fsChefContext : null),
+      })});
+      const d = await r.json();
+      const reply = d.reply || "…";
+      const needsConfirm = d.intent && typeof d.confidence === "number" && d.confidence < CONFIDENCE_THRESHOLD;
+      setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: d.intent, confidence: d.confidence, userText: t, turnId: d.user_turn_id, needsConfirm, memoryProposal: d.memory, orderDraft: d.order, feedback: d.feedback }; return n; });
+      if (d.order) setOrderDraft(d.order);
+    } catch (e: any) {
+      setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "sys", text: "⚠ " + (e?.message || "Chef offline") }; return n; });
+      setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+    }
+    setThinking(false);
+  };
+
+  const confirmIntent = async (msgIdx: number, confirmedIntent: string) => {
+    const m = log[msgIdx]; if (!m?.userText) return;
+    setLog((l) => l.map((x, i) => i === msgIdx ? { ...x, needsConfirm: false } : x));
+    fetch("/api/chef/confirm-intent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: m.userText, classified_intent: m.intent, confirmed_intent: confirmedIntent, classifier_confidence: m.confidence, language: lang }) });
+  };
+
+  const saveMemory = async (msgIdx: number) => {
+    const m = log[msgIdx]; if (!m?.memoryProposal?.fact) return;
+    setLog((l) => l.map((x, i) => i === msgIdx ? { ...x, memoryProposal: null } : x));
+    const r = await fetch("/api/chef/save-memory", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fact: m.memoryProposal.fact, scope: m.memoryProposal.scope || "global", source_conversation_id: m.turnId || null, confidence: m.confidence || null })});
+    const d = await r.json();
+    setLog((l) => [...l, { role: "sys", text: d.ok ? (lang === "es" ? "✓ Recordado" : "✓ Saved to memory") : ("⚠ " + (d.error || "save failed")) }]);
+  };
+
+  // Photo capture from long-press
   const onCapture = async (file?: File | null) => {
-    if (!file) return; setCapBusy(true); setCapMsg("");
+    if (!file) return;
+    setLog((l) => [...l, { role: "sys", text: lang === "es" ? "📷 Subiendo…" : "📷 Uploading…" }]);
     try {
       const fd = new FormData(); fd.append("file", file); fd.append("type", "auto");
       const r = await fetch("/api/capture", { method: "POST", body: fd });
       const d = await r.json();
-      if (!d.ok) { setCapMsg("⚠ " + (d.error || "upload failed")); setCapBusy(false); return; }
+      if (!d.ok) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (d.error || "upload failed") }]); return; }
       const det = d.detected;
       const summary = det ? `${d.type}${det.supplier_name ? " · " + det.supplier_name : ""}${det.total_eur != null ? " · €" + Number(det.total_eur).toFixed(2) : ""}` : d.type;
-      setCapMsg(`✓ Filed: ${summary}`);
-      setLog((l) => [...l, { role: "sys", text: `📷 Captured: ${summary} → ${d.where}` }]);
-    } catch (e: any) { setCapMsg("⚠ " + (e?.message || "upload failed")); }
-    setCapBusy(false);
+      setLog((l) => [...l, { role: "sys", text: `📷 ${lang === "es" ? "Archivado" : "Filed"}: ${summary} → ${d.where}` }]);
+    } catch (e: any) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "upload failed") }]); }
   };
-  const closeFab = () => { keepRef.current = false; try { recRef.current?.stop(); } catch {} setListening(false); setOpen(false); };
 
-  const send = async () => {
-    const t = (textRef.current.trim() || text.trim()); if (!t) return;
-    keepRef.current = false; if (listening) { try { recRef.current?.stop(); } catch {} setListening(false); }
-    setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
-    setLastYou(t);
-    setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "…" }]);
-    try {
-      const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: t, route: pathname || "" }) });
-      const d = await r.json();
-      const reply = d.reply || "…";
-      setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply }; return n; });
-      if (d.feedback && d.feedback.body) {
-        if (!profile) { setLog((l) => [...l, { role: "sys", text: "⚠ Sign in to save this to the feedback board." }]); }
-        else {
-          const ent = (!profile.isAdmin ? profile.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-          const rid = profile.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
-          const { error } = await supabaseBrowser.from("feedback").insert({ restaurant_id: rid, route: pathname || "", author_id: profile.id, author_name: profile.name, author_role: profile.dbRole, kind: d.feedback.kind || "idea", body: d.feedback.body });
-          setLog((l) => [...l, { role: "sys", text: error ? ("⚠ Couldn’t save: " + error.message) : "✓ Saved to the feedback board" }]);
-        }
-      }
-      if (Array.isArray(d.order) && d.order.length) setOrderDraft(d.order);
-    } catch { setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: "Couldn’t reach Chef — try again." }; return n; }); }
+  // Bottom-sheet drag
+  const onHandleDown = (e: React.PointerEvent) => {
+    if (!sheetRef.current) return;
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    dragStart.current = { y: e.clientY, height: sheetRef.current.clientHeight };
   };
-  const fileLast = async () => {
-    if (!lastYou) return;
-    if (!profile) { setLog((l) => [...l, { role: "sys", text: "⚠ Sign in to save to the board." }]); return; }
-    const ent = (!profile.isAdmin ? profile.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-    const rid = profile.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
-    const { error } = await supabaseBrowser.from("feedback").insert({ restaurant_id: rid, route: pathname || "", author_id: profile.id, author_name: profile.name, author_role: profile.dbRole, kind: "idea", body: lastYou });
-    setLog((l) => [...l, { role: "sys", text: error ? ("⚠ Couldn\u2019t save: " + error.message) : "\u2713 Saved to the feedback board" }]);
-    setLastYou("");
+  const onHandleMove = (e: React.PointerEvent) => {
+    if (!dragStart.current || !sheetRef.current) return;
+    const dy = e.clientY - dragStart.current.y;
+    const h = Math.max(80, dragStart.current.height - dy);
+    sheetRef.current.style.height = h + "px";
   };
-  useEffect(() => { sendRef.current = send; });
+  const onHandleUp = () => {
+    if (!dragStart.current || !sheetRef.current) return;
+    const vh = window.innerHeight;
+    const ratio = sheetRef.current.clientHeight / vh;
+    if (ratio < 0.25) { setOpen(false); sheetRef.current.style.height = ""; dragStart.current = null; return; }
+    // Snap to nearest
+    let best = 0, bestDelta = Infinity;
+    SNAP_POINTS.forEach((p, i) => { const d = Math.abs(ratio - p); if (d < bestDelta) { bestDelta = d; best = i; } });
+    setSnap(best);
+    sheetRef.current.style.height = (SNAP_POINTS[best] * vh) + "px";
+    dragStart.current = null;
+  };
+
+  // Hardware/browser back closes
+  useEffect(() => {
+    if (!open) return;
+    const onPop = () => setOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open]);
+
+  if (hidden) return null;
+
+  const ringClass = errorPulse ? "ring-4 ring-tomato animate-pulse" : listening ? "ring-4 ring-white/70 animate-pulse" : thinking ? "ring-4 ring-white/40" : open ? "ring-2 ring-white/70" : "";
+  const label = errorPulse ? "!" : listening ? "···" : thinking ? "···" : "Chef";
 
   return (
     <>
+      <input ref={captureInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
+
       <button
-        aria-label="Chef — hold to speak"
-        style={{ background: "var(--accent)", touchAction: "manipulation" }}
-        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition hover:scale-105 active:scale-95 " + (listening ? "scale-110 ring-4 ring-white/70" : open ? "ring-2 ring-white/70" : "")}
-        onPointerDown={(e) => { e.preventDefault(); pressStart.current = Date.now(); if (!open) setOpen(true); listen(); }}
-        onPointerUp={(e) => {
-          e.preventDefault();
-          const held = Date.now() - (pressStart.current || 0);
-          pressStart.current = null;
-          if (held < 200) {
-            // treated as a tap — just open the panel; don't auto-send
-            keepRef.current = false; try { recRef.current?.stop(); } catch {} setListening(false); setStatus("Hold the button to talk · or type below"); setText(""); textRef.current = ""; finalRef.current = "";
-            return;
-          }
-          // press-and-hold released: stop + send if we have anything
-          stopAndSend();
-        }}
-        onPointerLeave={(e) => { if (pressStart.current) { pressStart.current = null; stopAndSend(); } }}
-        onPointerCancel={() => { if (pressStart.current) { pressStart.current = null; stopAndSend(); } }}
+        aria-label="Chef — tap to talk · hold for camera"
+        style={{ background: errorPulse ? "#9A3122" : "var(--accent)", touchAction: "manipulation" }}
+        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95 " + ringClass}
+        onPointerDown={fabPressDown}
+        onPointerUp={fabPressUp}
+        onPointerCancel={fabPressCancel}
+        onPointerLeave={fabPressCancel}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {listening ? "···" : "Chef"}
+        {label}
       </button>
 
       {open ? (
-        <div className="fixed bottom-24 right-5 z-50 flex max-h-[min(64vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl rounded-br-md border border-black/10 bg-card shadow-2xl shadow-black/25">
-          <div className="flex items-center justify-between border-b border-black/10 px-4 py-2">
-            <span className="font-serif text-[15px] text-ink">Chef</span>
-            <button onClick={closeFab} aria-label="close" className="font-mono text-[12px] text-clay hover:text-ink">close ×</button>
-          </div>
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
+          <div ref={sheetRef} className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-2xl border-t border-black/10 bg-card shadow-2xl shadow-black/25" style={{ height: (SNAP_POINTS[snap] * 100) + "vh" }}>
+            <div className="flex items-center justify-between px-4 pt-2 pb-1" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp}>
+              <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Chef</span>
+              <div className="mx-auto h-1 w-9 rounded-full bg-black/15" />
+              <button onClick={() => setOpen(false)} aria-label="close" className="font-mono text-[11px] text-clay hover:text-ink">×</button>
+            </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5">
-            {log.length === 0 && !text ? (
-              <p className="font-serif text-[16px] leading-relaxed text-clay">Hold the Chef button and talk. Release to send. Quick tap opens this panel so you can type. “Chef, give me a recipe for romesco.” · “Order 5 kilos of carrots for tomorrow.” · “This screen is confusing because…”</p>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5">
+              {log.length === 0 && !text ? (
+                <div>
+                  <p className="font-serif text-[16px] leading-relaxed text-clay">
+                    {lang === "es" ? "Toca Chef y habla. Pausa para enviar." : "Tap Chef and talk. Pause to send."} {" "}
+                    <span className="text-muted">{lang === "es" ? "Mantén pulsado = cámara." : "Hold the button = camera."}</span>
+                  </p>
+                </div>
+              ) : null}
+              {log.map((m, i) => m.role === "sys"
+                ? <p key={i} className="mb-3 font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>{m.text}</p>
+                : (
+                  <div key={i} className="mb-3">
+                    <p className={"whitespace-pre-line font-serif text-[17px] leading-relaxed " + (m.role === "you" ? "text-ink" : "text-ink-soft")}>{m.text}</p>
+                    {m.needsConfirm ? (
+                      <div className="mt-2 rounded-xl border border-line bg-paper p-2">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "¿Qué pediste? Toca para confirmar — me ayuda a aprender." : "What did you mean? Tap to confirm — helps me learn."}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {["ask","order","feedback","memory","capture"].map((opt) => (
+                            <button key={opt} onClick={() => confirmIntent(i, opt)} className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide ${m.intent === opt ? "border-ink bg-paper-deep" : "border-line bg-paper hover:border-ink-soft"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {m.memoryProposal?.fact ? (
+                      <div className="mt-2 rounded-xl border border-line bg-paper-deep/40 p-3">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "¿Recordar?" : "Remember?"}</p>
+                        <p className="mt-1 font-serif italic text-[14px] text-ink">{m.memoryProposal.fact}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button onClick={() => saveMemory(i)} className="rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper">{lang === "es" ? "✓ guardar" : "✓ save"}</button>
+                          <button onClick={() => setLog((l) => l.map((x, j) => j === i ? { ...x, memoryProposal: null } : x))} className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink">{lang === "es" ? "× descartar" : "× dismiss"}</button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              {text ? <p className="font-serif text-[17px] leading-relaxed text-ink">{text}</p> : null}
+            </div>
+
+            {orderDraft ? (
+              <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/order"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Borrador en Pedidos →" : "Draft this order in Ordering →"}</button>
             ) : null}
-            {log.map((m, i) => m.role === "sys"
-              ? <p key={i} className="mb-3 font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>{m.text}</p>
-              : <p key={i} className={"mb-3 whitespace-pre-line font-serif text-[17px] leading-relaxed " + (m.role === "you" ? "text-ink" : "text-ink-soft")}>{m.text}</p>)}
-            {text ? <p className="font-serif text-[17px] leading-relaxed text-ink">{text}</p> : null}
-          </div>
 
-          {orderDraft ? (
-            <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/order"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#F7F7F4]">Draft this order in Ordering →</button>
-          ) : null}
-
-          {lastYou ? <button onClick={fileLast} className="mx-3 mb-1 rounded-lg border border-black/15 px-3 py-1.5 text-left font-mono text-[10px] uppercase tracking-wide text-ink-soft transition hover:border-ink/40">↪ Save that to the feedback board</button> : null}
-          <div className="flex items-center gap-2 border-t border-black/10 px-3 pt-2">
-            <input id="chef-fab-cap" type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
-            <label htmlFor="chef-fab-cap" className={"flex-1 cursor-pointer rounded-lg border border-black/15 px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-wide " + (capBusy ? "bg-paper-deep text-muted" : "bg-paper text-ink hover:border-ink/40")}>{capBusy ? "📷 classifying…" : "📷 capture (auto-file)"}</label>
-            <a href="/capture" className="rounded-lg border border-black/15 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay hover:border-ink/40">full</a>
+            <div className="flex items-center gap-3 border-t border-black/10 p-3">
+              <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={lang === "es" ? "…o escribe a Chef" : "…or type to Chef"} className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
+              {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Enviar" : "Send"}</button> : null}
+            </div>
+            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold = camera") : (lang === "es" ? "Escribe arriba" : "Type above"))}</p>
           </div>
-          {capMsg ? <p className="px-4 pt-1 font-mono text-[10px] text-clay">{capMsg}</p> : null}
-          <div className="flex items-center gap-3 border-t border-black/10 p-3">
-            <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="…or type to Chef" className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
-            {text && !listening ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">Send</button> : null}
-          </div>
-          <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? "Hold Chef to talk · release to send" : "Type to Chef above")}</p>
-        </div>
+        </>
       ) : null}
     </>
   );

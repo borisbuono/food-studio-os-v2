@@ -1,4 +1,5 @@
 "use client";
+import FabHidden from "@/components/FabHidden";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -28,7 +29,7 @@ export default function Capture() {
   };
 
   return (
-    <main className="mx-auto max-w-md px-6 py-10">
+    <main className="mx-auto max-w-md px-6 py-10"><FabHidden />
       <Link href="/administrate/finance/dashboard" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
       <h1 className="mt-3 font-serif text-[34px] leading-[1.05] text-ink">Capture</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Snap a paper invoice, delivery note, or EOD slip. Default is auto-detect — the OS reads the photo and files it.</p>

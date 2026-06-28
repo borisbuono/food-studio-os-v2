@@ -1,3 +1,4 @@
+import FabHidden from "@/components/FabHidden";
 import { supabase } from "@/lib/supabase";
 import { noEmoji } from "@/lib/text";
 
@@ -11,7 +12,7 @@ export default async function PublicMenu() {
   const drink = items.filter((i: any) => i.category === "drink" && !i.is_eighty_six);
 
   return (
-    <main className="mx-auto max-w-lg px-8 py-16">
+    <main className="mx-auto max-w-lg px-8 py-16"><FabHidden />
       <h1 className="text-center font-serif text-4xl text-ink">Bistro Mondo</h1>
       <p className="mt-2 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-clay">Menu</p>
 

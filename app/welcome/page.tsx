@@ -1,4 +1,5 @@
 "use client";
+import FabHidden from "@/components/FabHidden";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
@@ -63,7 +64,7 @@ export default function Welcome() {
   }
 
   if (loading || !p)
-    return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">{t("welcome.loading", lang)}</p></main>;
+    return <main className="mx-auto max-w-xl px-6 py-12"><FabHidden /><p className="font-serif text-2xl text-ink">{t("welcome.loading", lang)}</p></main>;
 
   const world = ROLES[p.world];
   const firstTask = p.world === "office"
