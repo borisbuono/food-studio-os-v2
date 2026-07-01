@@ -1,4 +1,5 @@
 import type { AccountingAdapter, AccountingSalesReceipt, AccountingPurchase, AccountingMovement, EntityCode } from "@/lib/integrations/types";
+import { getEntityCredential } from "@/lib/integrations/credentials";
 
 // Per-entity Holded API key + chart-of-accounts mapping.
 // Server-only — never imported from client components.
@@ -29,7 +30,7 @@ export const holdedAdapter: AccountingAdapter = {
   vendor: "holded",
 
   async postSalesReceipt(input: AccountingSalesReceipt) {
-    const key = ENTITY_KEY[input.entity];
+    const key = await getEntityCredential(input.entity, "holded");
     if (!key) throw new Error(`No Holded API key configured for entity ${input.entity}`);
 
     const payload = {
@@ -62,7 +63,7 @@ export const holdedAdapter: AccountingAdapter = {
   },
 
   async listUnapprovedPurchases(entity: EntityCode): Promise<AccountingPurchase[]> {
-    const key = ENTITY_KEY[entity];
+    const key = await getEntityCredential(entity, "holded");
     if (!key) return [];
     const r = await fetch(`${BASE}/documents/purchase?type=purchase`, { headers: { key } });
     if (!r.ok) return [];
@@ -80,7 +81,7 @@ export const holdedAdapter: AccountingAdapter = {
   },
 
   async listMovementsSince(entity: EntityCode, sinceUnixSec: number): Promise<AccountingMovement[]> {
-    const key = ENTITY_KEY[entity];
+    const key = await getEntityCredential(entity, "holded");
     if (!key) return [];
     const r = await fetch(`${BASE}/treasury/movements?starttmp=${sinceUnixSec}`, { headers: { key } });
     if (!r.ok) return [];

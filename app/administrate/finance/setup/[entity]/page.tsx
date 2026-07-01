@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { getBindings } from "@/lib/integrations/registry";
 import SyncCardClient from "./SyncCardClient";
 import BankImportClient from "./BankImportClient";
+import ConnectIntegration from "./ConnectIntegration";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,15 @@ export default async function SetupEntity({ params }: { params: { entity: string
           <li><span className="text-muted">Banking</span> · {b?.banking?.vendor} <Pill s={b?.banking?.status} /></li>
         </ul>
         <p className="mt-3 font-mono text-[10px] text-muted">Flip any via env: <code>FS_POS_{code}=square</code>, <code>FS_ACCOUNTING_{code}=quickbooks</code>, etc.</p>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-line p-5">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Integrations · connect</p>
+        <p className="mt-2 font-serif italic text-[13px] text-muted">Paste the API key from the vendor. The OS tests it against the vendor, encrypts it, and stores it. Keys never leave the server. Audit trail in <a className="underline" href="/administrate/chef-log">chef-log</a>.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <ConnectIntegration entity={code} vendor="holded" kind="accounting" label="Holded" howto="From holded.com → Settings → Developers → API keys → Create. Copy the key that belongs to THIS entity's Holded account only." />
+        </div>
+        <p className="mt-3 font-mono text-[10px] text-muted">Chift becomes the primary abstraction in Phase 2 of the finance backbone spec — this Holded connect is the tactical bridge until then.</p>
       </section>
 
       <section className="mt-6 rounded-2xl border border-line p-5">
