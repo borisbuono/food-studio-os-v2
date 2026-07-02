@@ -1,46 +1,40 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Refreshes the auth session on every request so JWT expiry doesn't silently
-// log the user out mid-session. @supabase/ssr required — without this, the
-// server-side session goes stale while the browser still holds the old cookies
-// and every navigation looks like "signed in / signed out flicker."
-//
-// Per the Supabase docs (https://supabase.com/docs/guides/auth/server-side/nextjs):
-// You MUST call supabase.auth.getUser() here to refresh; do not attempt to modify
-// the response cookies before this middleware runs.
+// Refreshes the Supabase auth session on every request so JWT expiry doesn't
+// silently log the user out. Uses the getAll/setAll pattern per Supabase's
+// official docs (https://supabase.com/docs/guides/auth/server-side/nextjs) —
+// preserves ALL auth cookies (including split token cookies over 4KB) in one
+// atomic response update.
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return request.cookies.get(name)?.value; },
-        set(name: string, value: string, options: any) {
-          request.cookies.set({ name, value, ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: any) {
-          request.cookies.set({ name, value: "", ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value: "", ...options });
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
         },
       },
       cookieOptions: { name: "sb-fs-auth" },
     }
   );
 
-  // Refresh the session — writes new tokens to cookies via the callbacks above
+  // Refreshes the session. Do NOT put any code between createServerClient and this call.
   await supabase.auth.getUser();
-  return response;
+  return supabaseResponse;
 }
 
-// Run on every real request; skip Next.js internals + static assets
 export const config = {
   matcher: [
+    // Run on every real request — exclude Next.js internals + static file extensions
     "/((?!_next/static|_next/image|favicon.ico|icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|woff|woff2|ttf|otf)$).*)",
   ],
 };

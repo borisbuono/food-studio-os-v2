@@ -41,6 +41,15 @@ export default async function FinanceDashboard() {
       <ChefContext context={{ kind: "finance_dashboard", entity: ec }} />
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Finance · {ec} · operational</p>
+      <nav aria-label="Finance sections" className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-b border-line pb-3 font-mono text-[11px] uppercase tracking-wide">
+        <a href="/administrate/finance/setup" className="text-ink hover:text-clay">⚙ Setup / Connect</a>
+        <a href="/administrate/finance/scans" className="text-ink-soft hover:text-clay">Invoices</a>
+        <a href="/administrate/finance/reconciliation" className="text-ink-soft hover:text-clay">Bank</a>
+        <a href="/administrate/finance/eod" className="text-ink-soft hover:text-clay">EOD</a>
+        <a href="/administrate/finance/integrations" className="text-ink-soft hover:text-clay">Substrate</a>
+        <a href="/administrate/chef-log" className="text-ink-soft hover:text-clay">Chef-log</a>
+      </nav>
+      {/* FINANCE_NAV_INJECTED */}
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">{ENTITY_LABEL[entity]}.</h1>
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">Today's pulse — what moved, what's stuck, what wants you.</p>
 
