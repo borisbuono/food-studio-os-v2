@@ -1,4 +1,24 @@
 "use client";
+// Nuclear reset: wipes localStorage session keys + all sb-* cookies. Use when
+// stuck in a bad state (legacy localStorage session that servers can't see).
+function hardResetSession() {
+  try {
+    // Wipe every localStorage key that looks Supabase-related
+    Object.keys(localStorage).forEach((k) => {
+      if (k.includes("supabase") || k.includes("sb-") || k.startsWith("fs-auth")) localStorage.removeItem(k);
+    });
+  } catch {}
+  try {
+    // Wipe every sb-* cookie
+    document.cookie.split(";").forEach((c) => {
+      const [n] = c.trim().split("=");
+      if (n.startsWith("sb-") || n.includes("supabase")) {
+        document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      }
+    });
+  } catch {}
+  window.location.href = "/login";
+}
 import FabHidden from "@/components/FabHidden";
 import { useState } from "react";
 import Link from "next/link";
@@ -24,7 +44,8 @@ export default function Login() {
   };
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12"><FabHidden />
+    <main className="mx-auto max-w-xl px-6 py-12">
+      <div className="flex justify-end px-6 py-2"><button onClick={hardResetSession} className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-tomato">↻ hard reset session</button></div><FabHidden />
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Sign in</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Food Studios</h1>

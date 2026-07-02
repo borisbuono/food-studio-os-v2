@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import TopBar from "@/components/TopBar";
 import AssistantFab from "@/components/AssistantFab";
+import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
 import { serverEntity } from "@/lib/serverVenue";
 import { ENTITY_ACCENT } from "@/lib/entities";
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <TopBar />
         <RouteGuard>{children}</RouteGuard>
+        <SessionMigrator />
         <AssistantFab />
       </body>
     </html>
