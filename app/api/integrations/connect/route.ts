@@ -10,7 +10,7 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
     // on api.holded.com/api/v2/*. v1 keys are 32 hex chars and use the "key:" header on v1 endpoints.
     const isV2 = apiKey.startsWith("pat_");
     const url = isV2
-      ? "https://api.holded.com/api/v2/invoicing/contacts?limit=1"
+      ? "https://api.holded.com/api/v2/contacts?limit=1"
       : "https://api.holded.com/api/invoicing/v1/contacts?limit=1";
     const headers: Record<string, string> = isV2
       ? { "Authorization": `Bearer ${apiKey}` }
