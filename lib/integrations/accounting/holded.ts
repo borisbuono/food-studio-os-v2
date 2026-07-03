@@ -5,7 +5,16 @@ import { getEntityCredential } from "@/lib/integrations/credentials";
 // Server-only — never imported from client components.
 // See memory [[holded_api_reference]] for header convention + base URL.
 
-const BASE = "https://api.holded.com/api/invoicing/v1";
+const V1_BASE = "https://api.holded.com/api/invoicing/v1";
+const V2_BASE = "https://api.holded.com/api/v2";
+
+async function callHolded(apiKey: string, v1Path: string, v2Path: string, opts: RequestInit = {}) {
+  const isV2 = apiKey.startsWith("pat_");
+  const base = isV2 ? V2_BASE : V1_BASE;
+  const path = isV2 ? v2Path : v1Path;
+  const auth: Record<string, string> = isV2 ? { "Authorization": `Bearer ${apiKey}` } : { "key": apiKey };
+  return fetch(`${base}${path}`, { ...opts, headers: { ...auth, ...(opts.headers || {}) } });
+}
 
 const ENTITY_KEY: Record<EntityCode, string | undefined> = {
   IFL: process.env.HOLDED_API_KEY_TALLER,
@@ -52,9 +61,9 @@ export const holdedAdapter: AccountingAdapter = {
       return { external_id: "dry-run-" + Date.now(), dryRun: true };
     }
 
-    const r = await fetch(`${BASE}/documents/salesreceipt`, {
+    const r = await callHolded(key, "/documents/salesreceipt", "/invoicing/salesreceipts", {
       method: "POST",
-      headers: { key, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Holded POST salesreceipt ${r.status}: ${await r.text()}`);
@@ -65,7 +74,7 @@ export const holdedAdapter: AccountingAdapter = {
   async listUnapprovedPurchases(entity: EntityCode): Promise<AccountingPurchase[]> {
     const key = await getEntityCredential(entity, "holded");
     if (!key) return [];
-    const r = await fetch(`${BASE}/documents/purchase?type=purchase`, { headers: { key } });
+    const r = await callHolded(key, "/documents/purchase?type=purchase", "/invoicing/purchases?type=purchase");
     if (!r.ok) return [];
     const docs = await r.json();
     return (docs || [])
@@ -83,7 +92,7 @@ export const holdedAdapter: AccountingAdapter = {
   async listMovementsSince(entity: EntityCode, sinceUnixSec: number): Promise<AccountingMovement[]> {
     const key = await getEntityCredential(entity, "holded");
     if (!key) return [];
-    const r = await fetch(`${BASE}/treasury/movements?starttmp=${sinceUnixSec}`, { headers: { key } });
+    const r = await callHolded(key, `/treasury/movements?starttmp=${sinceUnixSec}`, `/treasury/movements?starttmp=${sinceUnixSec}`);
     if (!r.ok) return [];
     const movs = await r.json();
     return (movs || []).map((m: any) => ({

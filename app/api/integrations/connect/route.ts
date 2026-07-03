@@ -6,11 +6,19 @@ export const runtime = "nodejs";
 // Vendor-specific test: return { ok, error, meta } — hits the vendor's identity/health endpoint
 async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; error?: string; meta?: any }> {
   if (vendor === "holded") {
-    // Holded doesn't have a canonical /me endpoint; contacts is a lightweight read
-    const r = await fetch("https://api.holded.com/api/invoicing/v1/contacts?limit=1", { headers: { key: apiKey } });
-    if (r.ok) return { ok: true };
-    if (r.status === 401) return { ok: false, error: "401 unauthorized — check the key was copied correctly and belongs to the right entity's Holded account" };
-    return { ok: false, error: `Holded returned ${r.status}: ${await r.text().catch(() => "")}` };
+    // Detect Holded v2 personal access tokens by the pat_ prefix. v2 uses Bearer auth
+    // on api.holded.com/api/v2/*. v1 keys are 32 hex chars and use the "key:" header on v1 endpoints.
+    const isV2 = apiKey.startsWith("pat_");
+    const url = isV2
+      ? "https://api.holded.com/api/v2/invoicing/contacts?limit=1"
+      : "https://api.holded.com/api/invoicing/v1/contacts?limit=1";
+    const headers: Record<string, string> = isV2
+      ? { "Authorization": `Bearer ${apiKey}` }
+      : { "key": apiKey };
+    const r = await fetch(url, { headers });
+    if (r.ok) return { ok: true, meta: { api_version: isV2 ? "v2" : "v1" } };
+    if (r.status === 401) return { ok: false, error: `401 unauthorized (${isV2 ? "v2 pat_" : "v1"} key) — check the key was copied correctly and belongs to the right entity's Holded account` };
+    return { ok: false, error: `Holded ${isV2 ? "v2" : "v1"} returned ${r.status}: ${await r.text().catch(() => "")}` };
   }
   // Unknown vendor: accept + store the key without a live test (better than blocking)
   return { ok: true, meta: { untested: true } };

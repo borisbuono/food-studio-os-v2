@@ -19,9 +19,12 @@ export async function POST(req: Request) {
     const apiKey = decryptSecret({ encrypted_key: row.encrypted_key, key_iv: row.key_iv, key_tag: row.key_tag });
     let ok = true, err: string | undefined;
     if (row.platform === "holded") {
-      const r = await fetch("https://api.holded.com/api/invoicing/v1/contacts?limit=1", { headers: { key: apiKey } });
+      const isV2 = apiKey.startsWith("pat_");
+      const url = isV2 ? "https://api.holded.com/api/v2/invoicing/contacts?limit=1" : "https://api.holded.com/api/invoicing/v1/contacts?limit=1";
+      const headers: Record<string, string> = isV2 ? { "Authorization": `Bearer ${apiKey}` } : { "key": apiKey };
+      const r = await fetch(url, { headers });
       ok = r.ok;
-      if (!ok) err = `Holded ${r.status}`;
+      if (!ok) err = `Holded ${isV2 ? "v2" : "v1"} ${r.status}`;
     }
 
     await sb.from("entity_integrations").update({
