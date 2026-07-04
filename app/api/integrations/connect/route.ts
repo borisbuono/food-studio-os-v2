@@ -17,8 +17,12 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
       : { "key": apiKey };
     const r = await fetch(url, { headers });
     if (r.ok) return { ok: true, meta: { api_version: isV2 ? "v2" : "v1" } };
-    if (r.status === 401) return { ok: false, error: `401 unauthorized (${isV2 ? "v2 pat_" : "v1"} key) — check the key was copied correctly and belongs to the right entity's Holded account` };
-    return { ok: false, error: `Holded ${isV2 ? "v2" : "v1"} returned ${r.status}: ${await r.text().catch(() => "")}` };
+    // 403 on v2 = token is recognized by Holded but lacks scope for /contacts.
+    // Accept as connected — token is real, downstream endpoints may still work per their granted scopes.
+    // 401 = token itself is invalid / rejected.
+    if (r.status === 403 && isV2) return { ok: true, meta: { api_version: "v2", warning: "token valid but /contacts scope not granted — add resource scopes in Holded → Developers if downstream calls fail" } };
+    if (r.status === 401) return { ok: false, error: `401 unauthorized (${isV2 ? "v2 pat_" : "v1"} key) — token is invalid or was revoked. Create a fresh token in Holded → Developers.` };
+    return { ok: false, error: `Holded ${isV2 ? "v2" : "v1"} returned ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}` };
   }
   // Unknown vendor: accept + store the key without a live test (better than blocking)
   return { ok: true, meta: { untested: true } };
