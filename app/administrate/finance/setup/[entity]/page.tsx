@@ -5,6 +5,7 @@ import { getBindings } from "@/lib/integrations/registry";
 import SyncCardClient from "./SyncCardClient";
 import BankImportClient from "./BankImportClient";
 import ConnectIntegration from "./ConnectIntegration";
+import ConnectApideck from "./ConnectApideck";
 
 export const dynamic = "force-dynamic";
 
@@ -79,9 +80,10 @@ export default async function SetupEntity({ params }: { params: { entity: string
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Integrations · connect</p>
         <p className="mt-2 font-serif italic text-[13px] text-muted">Paste the API key from the vendor. The OS tests it against the vendor, encrypts it, and stores it. Keys never leave the server. Audit trail in <a className="underline" href="/administrate/chef-log">chef-log</a>.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <ConnectIntegration entity={code} vendor="holded" kind="accounting" label="Holded" howto="From holded.com → Settings → Developers → API keys → Create. Copy the key that belongs to THIS entity's Holded account only." />
+          <ConnectIntegration entity={code} vendor="holded" kind="accounting" label="Holded (direct)" howto="From holded.com → Settings → Developers → API keys → Create. Copy the key that belongs to THIS entity's Holded account only." />
+          <ConnectApideck entity={code} />
         </div>
-        <p className="mt-3 font-mono text-[10px] text-muted">Chift becomes the primary abstraction in Phase 2 of the finance backbone spec — this Holded connect is the tactical bridge until then.</p>
+        <p className="mt-3 font-mono text-[10px] text-muted">Apideck is the primary abstraction (self-serve, supports Holded / QuickBooks / Xero / Sage). Holded direct stays as a bridge until Apideck coverage is verified.</p>
       </section>
 
       <section className="mt-6 rounded-2xl border border-line p-5">

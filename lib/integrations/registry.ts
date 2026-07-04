@@ -9,6 +9,7 @@ import { lightspeedAdapter } from "@/lib/integrations/pos/lightspeed";
 import { csvAdapter } from "@/lib/integrations/pos/csv";
 // Accounting
 import { holdedAdapter } from "@/lib/integrations/accounting/holded";
+import { apideckAdapter } from "@/lib/integrations/accounting/apideck";
 import { quickbooksAdapter } from "@/lib/integrations/accounting/quickbooks";
 import { xeroAdapter } from "@/lib/integrations/accounting/xero";
 import { sageAdapter } from "@/lib/integrations/accounting/sage";
@@ -29,7 +30,7 @@ import { tinkAdapter } from "@/lib/integrations/banking/tink";
 import { goCardlessAdapter } from "@/lib/integrations/banking/gocardless";
 
 const POS: Record<string, PosAdapter> = { fresto: frestoAdapter, square: squareAdapter, micros: microsAdapter, toast: toastAdapter, lightspeed: lightspeedAdapter, csv: csvAdapter };
-const ACCT: Record<string, AccountingAdapter> = { holded: holdedAdapter, quickbooks: quickbooksAdapter, xero: xeroAdapter, sage: sageAdapter };
+const ACCT: Record<string, AccountingAdapter> = { holded: holdedAdapter, apideck: apideckAdapter, quickbooks: quickbooksAdapter, xero: xeroAdapter, sage: sageAdapter };
 const BOOK: Record<string, BookingAdapter> = { covermanager: coverManagerAdapter, opentable: openTableAdapter, sevenrooms: sevenRoomsAdapter, thefork: theForkAdapter };
 const PAY: Record<string, PaymentAdapter> = { stripe: stripeAdapter, adyen: adyenAdapter, redsys: redsysAdapter, caixabank: caixaBankAdapter };
 const BANK: Record<string, BankingAdapter> = { caixabank: caixaBankBankingAdapter, plaid: plaidAdapter, tink: tinkAdapter, gocardless: goCardlessAdapter };
@@ -73,6 +74,7 @@ function hasAny(...keys: string[]) { const e = envBag(); return keys.some((k) =>
 function status(vendor: string, entity: EntityCode): "connected" | "stub" | "off" {
   switch (vendor) {
     case "holded":  return hasAny(`HOLDED_API_KEY_${entity === "IFL" ? "TALLER" : entity === "BM" ? "BISTRO_MONDO" : "HOLDINGS"}`) ? "connected" : "off";
+    case "apideck": return (hasAny("APIDECK_APP_ID") && hasAny("APIDECK_API_KEY")) ? "connected" : "off";
     case "fresto":  return "connected"; // upload path is always available
     case "csv":     return "connected";
     case "stripe":  return hasAny("STRIPE_SECRET_KEY") ? "connected" : "stub";
