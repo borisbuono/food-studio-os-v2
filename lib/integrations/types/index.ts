@@ -113,4 +113,67 @@ export interface IntegrationBinding {
   booking?: { vendor: string; status: "connected" | "stub" | "off" };
   payment?: { vendor: string; status: "connected" | "stub" | "off" };
   banking?: { vendor: string; status: "connected" | "stub" | "off" };
+  marketing?: { vendor: string; status: "connected" | "stub" | "off" };
+  social?: { vendor: string; status: "connected" | "stub" | "off" };
+  reviews?: { vendor: string; status: "connected" | "stub" | "off" };
+}
+
+// ---------- Marketing (Grow · Reach) ----------
+export interface GuestSegment {
+  id: string;                          // internal segment id or ad-hoc slug
+  name: string;                        // human label ("Wine club", "Birthday this month")
+  guests: Array<{
+    external_id?: string;              // vendor-side id if we've synced before
+    email?: string | null;
+    phone?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    tags?: string[];
+  }>;
+}
+export interface CampaignDraft {
+  channel: "email" | "sms" | "whatsapp";
+  subject?: string;                    // email only
+  body: string;                        // plain or HTML depending on channel
+  segment_id: string;                  // audience reference (matches GuestSegment.id)
+  send_at?: string;                    // ISO — omit for send-now
+  from_name?: string;
+  from_email?: string;
+}
+export interface MarketingAdapter {
+  name: string;
+  vendor: "klaviyo" | "mailchimp" | "hubspot" | string;
+  pushAudience(segment: GuestSegment): Promise<{ external_id: string; dryRun: boolean }>;
+  pushCampaign(campaign: CampaignDraft): Promise<{ external_id: string; dryRun: boolean }>;
+}
+
+// ---------- Social (Grow · Reach) ----------
+export interface SocialPost {
+  channels: Array<"instagram" | "facebook" | "tiktok" | "x" | "linkedin">;
+  caption: string;
+  media_urls: string[];                // absolute URLs to already-hosted media
+  scheduled_at?: string;               // ISO — omit for send-now / draft
+}
+export interface SocialAdapter {
+  name: string;
+  vendor: "buffer" | "later" | "postiz" | string;
+  schedulePost(post: SocialPost): Promise<{ external_id: string; dryRun: boolean }>;
+}
+
+// ---------- Reviews (Grow · Reputation) ----------
+export interface ReviewRecord {
+  external_id: string;
+  platform: "google" | "tripadvisor" | "thefork" | "yelp" | string;
+  author_name: string | null;
+  rating: number | null;               // 1..5, null if platform doesn't rate
+  body: string;
+  posted_at: string;                   // ISO
+  reply?: { body: string; posted_at: string } | null;
+  url?: string | null;
+}
+export interface ReviewsAdapter {
+  name: string;
+  vendor: "google-business" | "tripadvisor" | "thefork" | "yelp" | string;
+  listReviewsSince(entity: EntityCode, sinceUnixSec: number): Promise<ReviewRecord[]>;
+  postReply(entity: EntityCode, external_id: string, body: string): Promise<{ ok: boolean; dryRun: boolean }>;
 }
