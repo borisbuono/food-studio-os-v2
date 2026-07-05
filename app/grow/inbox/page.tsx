@@ -103,15 +103,15 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Inbox · everything that wants you</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">What needs a call</h1>
-      <p className="mt-2 font-sans text-[14px] text-ink-soft">{counts.all} open · {counts.external} from outside · {counts.feedback} from the team. One inbox — email, reviews, WhatsApp and the team's own notes. Outside channels are mirrored read-only.</p>
+      <p className="mt-6 font-sans text-xs font-medium text-tomato">Grow · inbox</p>
+      <h1 className="mt-2 font-serif text-3xl text-ink">Reviews & signals</h1>
+      <p className="mt-2 font-sans text-[14px] text-ink-soft">Google, TripAdvisor, Gmail flags, WhatsApp alerts — everything the outside world is saying, in one place. {counts.all} open · {counts.external} from outside · {counts.feedback} from the team. Outside channels are mirrored read-only.</p>
 
       <nav className="mt-6 flex flex-wrap gap-2">
         {TABS.map((t) => {
           const on = t.key === active;
           return (
-            <Link key={t.key} href={t.key === "all" ? "/administrate/decisions" : `/administrate/decisions?src=${t.key}`}
+            <Link key={t.key} href={t.key === "all" ? "/grow/inbox" : `/grow/inbox?src=${t.key}`}
               className={"rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wide " + (on ? "bg-ink text-paper" : "border border-black/10 text-ink-soft")}>
               {t.label} {tabCount(t.key) ? <span className={on ? "text-paper/70" : "text-clay"}>· {tabCount(t.key)}</span> : null}
             </Link>

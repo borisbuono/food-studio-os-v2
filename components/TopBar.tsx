@@ -39,6 +39,7 @@ export default function TopBar() {
   const isAdmin = !!profile?.isAdmin;
   const scoped = !!profile && !profile.isAdmin;          // a worker bound to one venue
   const canSwitch = isAdmin || !profile;                  // admins + signed-out preview
+  const isOffice = isAdmin || role === "office";          // pillars nav for office view
   const pick = (k: EntityKey) => { setEntityCtx(k); setEntity(k); setMenu(false); };
 
   return (
@@ -80,6 +81,16 @@ export default function TopBar() {
           <AuthStatus />
         </div>
       </div>
+
+      {/* Pillars — the four temporal pillars of the OS. Visible to Office (admins) as the top-level org map. */}
+      {loaded && isOffice ? (
+        <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
+          <Link href="/develop/menu-engineering" className="text-clay hover:text-ink">Develop</Link>
+          <Link href="/execute/handover" className="text-clay hover:text-ink">Execute</Link>
+          <Link href="/administrate/finance" className="text-clay hover:text-ink">Administrate</Link>
+          <Link href="/grow" className="text-tomato hover:text-ink">Grow</Link>
+        </nav>
+      ) : null}
 
       {/* admin "view as" role line — admins preview each world; workers don't see this */}
       {loaded && isAdmin ? (

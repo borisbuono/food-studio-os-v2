@@ -4,7 +4,7 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   office: {
     label: "Office",
     points: [
-      { href: "/administrate/decisions", label: "Inbox", blurb: "Emails, requests, reviews — what needs a reply or a call." },
+      { href: "/grow/inbox", label: "Inbox", blurb: "Emails, requests, reviews — what needs a reply or a call." },
       { href: "/messages", label: "Team", blurb: "Everyone the team, in one place: channels, roster, message anyone." },
       { href: "/administrate/finance", label: "The numbers", blurb: "What's moving — revenue, covers, costs to react to." },
       { href: "/administrate/suppliers", label: "Suppliers", blurb: "Orders, prices, deliveries." },
@@ -43,4 +43,4 @@ export function mapDbRole(dbRole: string | null | undefined): { world: World; is
 }
 
 // Routes only an admin (Office) may open. Non-admins are redirected home.
-export const OFFICE_ONLY_PREFIXES = ["/administrate"];
+export const OFFICE_ONLY_PREFIXES = ["/administrate", "/grow"];
