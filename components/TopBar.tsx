@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import AuthStatus from "@/components/AuthStatus";
 import LangChooser from "@/components/LangChooser";
 import CommandK from "@/components/CommandK";
@@ -18,6 +19,12 @@ export default function TopBar() {
   const [role, setRole] = useState<RoleKey>("office");
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const pathname = usePathname() || "";
+  const pillarActive: "develop" | "execute" | "administrate" | "grow" | null =
+    pathname.startsWith("/develop") ? "develop" :
+    pathname.startsWith("/execute") ? "execute" :
+    pathname.startsWith("/administrate") ? "administrate" :
+    pathname.startsWith("/grow") ? "grow" : null;
   const [menu, setMenu] = useState(false);
 
   // load profile once
@@ -85,10 +92,10 @@ export default function TopBar() {
       {/* Pillars — the four temporal pillars of the OS. Visible to Office (admins) as the top-level org map. */}
       {loaded && isOffice ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
-          <Link href="/develop/menu-engineering" className="text-clay hover:text-ink">Develop</Link>
-          <Link href="/execute/handover" className="text-clay hover:text-ink">Execute</Link>
-          <Link href="/administrate/finance" className="text-clay hover:text-ink">Administrate</Link>
-          <Link href="/grow" className="text-tomato hover:text-ink">Grow</Link>
+          <Link href="/develop/menu-engineering" className={(pillarActive === "develop" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Develop</Link>
+          <Link href="/execute/handover" className={(pillarActive === "execute" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Execute</Link>
+          <Link href="/administrate/finance" className={(pillarActive === "administrate" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Administrate</Link>
+          <Link href="/grow" className={(pillarActive === "grow" ? "font-semibold" : "hover:text-ink") + " text-tomato"}>Grow</Link>
         </nav>
       ) : null}
 
