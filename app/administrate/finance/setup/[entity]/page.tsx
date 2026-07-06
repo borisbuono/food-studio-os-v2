@@ -54,7 +54,7 @@ export default async function SetupEntity({ params }: { params: { entity: string
     sb.from("invoice_inbox").select("id", { count: "exact", head: true }).eq("entity_id", code).eq("match_status", "approved"),
     sb.from("bank_movements").select("id", { count: "exact", head: true }).eq("entity_id", code),
     sb.from("bank_movements").select("id", { count: "exact", head: true }).eq("entity_id", code).eq("reconciled_to", "unmatched"),
-    m.restaurant_id ? sb.from("eod_reports").select("id", { count: "exact", head: true }).eq("restaurant_id", m.restaurant_id) : Promise.resolve({ count: 0 } as any),
+    m.restaurant_id ? sb.from("eod_accounting").select("id", { count: "exact", head: true }).eq("restaurant_id", m.restaurant_id) : Promise.resolve({ count: 0 } as any),
   ]);
 
   return (

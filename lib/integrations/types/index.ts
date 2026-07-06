@@ -177,3 +177,60 @@ export interface ReviewsAdapter {
   listReviewsSince(entity: EntityCode, sinceUnixSec: number): Promise<ReviewRecord[]>;
   postReply(entity: EntityCode, external_id: string, body: string): Promise<{ ok: boolean; dryRun: boolean }>;
 }
+
+// ---------- EOD two-record split (2026-07-05) ----------
+// See supabase/migrations/20260705_eod_two_record_split.sql and
+// memory/pos_vs_accounting_separation.md.
+export type EodDeviationCategory =
+  | "comp" | "discount" | "credit_tab" | "staff_meal" | "waste"
+  | "pos_error" | "cash_deficit" | "rounding" | "other";
+
+export type EodAffectedLine =
+  | "food" | "wine" | "bar" | "softdrinks" | "tips" | "service" | "cash" | "card";
+
+export interface EodPosSnapshot {
+  id: string;
+  restaurant_id: string;
+  date: string;
+  source: "fresto" | "csv" | "manual";
+  source_ref?: string | null;
+  covers: number;
+  food_net_eur: number;
+  wine_net_eur: number;
+  bar_net_eur: number;
+  softdrinks_net_eur: number;
+  tips_eur: number;
+  service_charge_eur: number;
+  cash_declared_eur: number;
+  card_declared_eur: number;
+  total_gross_eur: number;
+  imported_at: string;
+  imported_by: string | null;
+  raw_payload?: any;
+}
+
+export interface AccountingEod {
+  id: string;
+  restaurant_id: string;
+  report_date: string;
+  eod_pos_id: string | null;             // link to the immutable POS snapshot
+  actual_covers: number;
+  revenue: number;
+  revenue_food: number;
+  revenue_wine: number;
+  revenue_bar: number;
+  eighty_six_notes?: string | null;
+  wastage_notes?: string | null;
+}
+
+export interface EodDeviation {
+  id: string;
+  eod_pos_id: string | null;
+  eod_accounting_id: string | null;
+  category: EodDeviationCategory;
+  affected_line: EodAffectedLine;
+  amount_eur: number;                    // signed
+  description?: string | null;
+  created_at: string;
+  created_by: string | null;
+}

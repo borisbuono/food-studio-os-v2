@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
       cookies: { get: (n) => cookieStore.get(n)?.value, set() {}, remove() {} },
     });
 
-    // 1) Source-of-truth write FIRST — survives any integration failure
-    const { data: row } = await supabase.from("eod_reports").upsert({
+    // 1) Source-of-truth write FIRST — survives any integration failure.
+    // Reads/writes eod_accounting (editable). If the caller carries an eod_pos_id, link it
+    // to the immutable POS snapshot so operational P&L resolves both sides.
+    const acctRow: Record<string, any> = {
       restaurant_id: body.restaurant_id || null,
       report_date: date,
       revenue: sum,
@@ -32,7 +34,10 @@ export async function POST(req: NextRequest) {
       revenue_wine: totals.wine,
       revenue_bar: totals.bar + totals.softdrinks,
       actual_covers: +(body.covers || 0),
-    }, { onConflict: "restaurant_id,report_date" }).select("id").maybeSingle();
+    };
+    if (body.eod_pos_id) acctRow.eod_pos_id = body.eod_pos_id;
+    const { data: row } = await supabase.from("eod_accounting").upsert(acctRow,
+      { onConflict: "restaurant_id,report_date" }).select("id").maybeSingle();
 
     // 2) Dispatch via the entity's active accounting adapter
     const adapter = getAccountingAdapter(entity);

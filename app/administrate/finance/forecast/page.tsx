@@ -11,7 +11,7 @@ type Point = { date: string; rev: number; kind: "actual" | "forecast" };
 export default async function Forecast() {
   
   const supabase = supabaseServer();const rid = serverRestaurantId();
-  const eod = (await supabase.from("eod_reports").select("report_date,revenue,actual_covers,revenue_labour").eq("restaurant_id", rid).order("report_date", { ascending: true })).data || [];
+  const eod = (await supabase.from("eod_accounting").select("report_date,revenue,actual_covers,revenue_labour").eq("restaurant_id", rid).order("report_date", { ascending: true })).data || [];
 
   if (!eod.length) {
     return (

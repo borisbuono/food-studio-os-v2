@@ -8,7 +8,7 @@ export default async function EodList() {
   
   const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
-  const eod = (await supabase.from("eod_reports").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes").order("report_date", { ascending: false }).limit(60)).data || [];
+  const eod = (await supabase.from("eod_accounting").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes").order("report_date", { ascending: false }).limit(60)).data || [];
 
   return (
     <main className="mx-auto max-w-xl px-6 py-12">

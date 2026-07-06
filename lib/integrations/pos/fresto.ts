@@ -14,13 +14,15 @@ const HEADER_ALIASES: Record<string, string> = {
   propinas: "tips", tips: "tips", tip: "tips",
   total: "total",
   cubiertos: "covers", covers: "covers",
+  efectivo: "cash", cash: "cash",
+  tarjeta: "card", card: "card",
 };
 
 function normalizeHeader(h: any): string {
   return HEADER_ALIASES[String(h || "").trim().toLowerCase()] || String(h || "").toLowerCase();
 }
 
-export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: number; food: number; wine: number; bar: number; softdrinks: number; tips: number; total: number }[] {
+export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: number; food: number; wine: number; bar: number; softdrinks: number; tips: number; total: number; cash: number; card: number }[] {
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
   const sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
@@ -37,7 +39,8 @@ export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: numbe
     if (!dateCell) continue;
     const date = dateCell instanceof Date ? dateCell.toISOString().slice(0, 10) : String(dateCell).slice(0, 10);
     const num = (k: string) => {
-      const v = row[idx(k)];
+      const j = idx(k); if (j < 0) return 0;
+      const v = row[j];
       const n = typeof v === "number" ? v : Number(String(v || "").replace(",", "."));
       return Number.isFinite(n) ? n : 0;
     };
@@ -50,14 +53,58 @@ export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: numbe
       softdrinks: num("softdrinks"),
       tips: num("tips"),
       total: num("total"),
+      cash: num("cash"),
+      card: num("card"),
     });
   }
   return out;
 }
 
-// PosAdapter for Fresto. pullDay reads from an upload-cached map keyed by restaurant_id:
-// in v1 the Fresto API isn't connected yet, so the adapter is fed by /api/pos/import upload.
-// Once Lars's API lands, pullDay calls the live endpoint instead.
+// Persist a parsed Fresto row to eod_pos (immutable POS snapshot). Idempotent per
+// (restaurant_id, date, source) — re-uploads for the same day return the existing row.
+// Returns the eod_pos id so the caller can chain into /api/finance/eod/create-accounting-from-pos.
+export async function persistFrestoRowToPos(params: {
+  restaurant_id: string;
+  row: ReturnType<typeof parseFrestoXlsx>[number];
+  source_ref?: string | null;
+  imported_by?: string | null;
+}): Promise<{ id: string; existed: boolean }> {
+  const { supabaseServer } = await import("@/lib/supabaseServer");
+  const sb = supabaseServer();
+  const { row } = params;
+  // Try to find an existing snapshot for the day+source first (immutable — do NOT overwrite).
+  const found = await sb.from("eod_pos")
+    .select("id")
+    .eq("restaurant_id", params.restaurant_id)
+    .eq("date", row.date)
+    .eq("source", "fresto")
+    .maybeSingle();
+  if (found.data?.id) return { id: found.data.id, existed: true };
+
+  const ins = await sb.from("eod_pos").insert({
+    restaurant_id: params.restaurant_id,
+    date: row.date,
+    source: "fresto",
+    source_ref: params.source_ref || null,
+    covers: row.covers || 0,
+    food_net_eur: row.food || 0,
+    wine_net_eur: row.wine || 0,
+    bar_net_eur: row.bar || 0,
+    softdrinks_net_eur: row.softdrinks || 0,
+    tips_eur: row.tips || 0,
+    service_charge_eur: 0,
+    cash_declared_eur: row.cash || 0,
+    card_declared_eur: row.card || 0,
+    total_gross_eur: row.total || 0,
+    imported_by: params.imported_by || null,
+    raw_payload: row as any,
+  }).select("id").single();
+  if (ins.error) throw new Error("eod_pos insert failed: " + ins.error.message);
+  return { id: ins.data.id, existed: false };
+}
+
+// PosAdapter for Fresto. parseUpload returns the substrate-agnostic shape. The API route
+// wraps this with persistFrestoRowToPos to land the immutable snapshot.
 
 export const frestoAdapter: PosAdapter = {
   name: "Fresto",
@@ -80,24 +127,31 @@ export const frestoAdapter: PosAdapter = {
     }));
   },
   async pullDay(restaurant_id: string, date: string): Promise<PosDailySale | null> {
-    // v1: data comes via upload, parsed and persisted by /api/pos/import into eod_reports.
-    // pullDay just reads back the eod_reports row.
+    // Reads the immutable POS snapshot for the day. Post EOD split (2026-07-05): eod_pos is
+    // the truth for what Fresto rang up. eod_accounting is what Boris booked.
     const { supabaseServer } = await import("@/lib/supabaseServer");
     const sb = supabaseServer();
-    const { data } = await sb.from("eod_reports").select("revenue,revenue_food,revenue_wine,revenue_bar,actual_covers").eq("restaurant_id", restaurant_id).eq("report_date", date).maybeSingle();
+    const { data } = await sb.from("eod_pos")
+      .select("food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur,covers")
+      .eq("restaurant_id", restaurant_id)
+      .eq("date", date)
+      .eq("source", "fresto")
+      .maybeSingle();
     if (!data) return null;
     const lines: PosSaleLine[] = [
-      { group: "food", net_eur: Number(data.revenue_food || 0), vat_rate: 10, vat_eur: Number(data.revenue_food || 0) * 0.10 },
-      { group: "wine", net_eur: Number(data.revenue_wine || 0), vat_rate: 10, vat_eur: Number(data.revenue_wine || 0) * 0.10 },
-      { group: "bar",  net_eur: Number(data.revenue_bar  || 0), vat_rate: 10, vat_eur: Number(data.revenue_bar  || 0) * 0.10 },
+      { group: "food",       net_eur: Number(data.food_net_eur       || 0), vat_rate: 10, vat_eur: Number(data.food_net_eur       || 0) * 0.10 },
+      { group: "wine",       net_eur: Number(data.wine_net_eur       || 0), vat_rate: 10, vat_eur: Number(data.wine_net_eur       || 0) * 0.10 },
+      { group: "bar",        net_eur: Number(data.bar_net_eur        || 0), vat_rate: 10, vat_eur: Number(data.bar_net_eur        || 0) * 0.10 },
+      { group: "softdrinks", net_eur: Number(data.softdrinks_net_eur || 0), vat_rate: 10, vat_eur: Number(data.softdrinks_net_eur || 0) * 0.10 },
+      { group: "tips",       net_eur: Number(data.tips_eur           || 0), vat_rate: 0,  vat_eur: 0 },
     ];
     return {
       date,
       restaurant_id,
-      covers: Number(data.actual_covers || 0),
+      covers: Number(data.covers || 0),
       lines,
-      total_eur: Number(data.revenue || 0),
-      source: { adapter: "fresto", raw_ref: "eod-cache" },
+      total_eur: Number(data.total_gross_eur || 0),
+      source: { adapter: "fresto", raw_ref: "eod_pos" },
     };
   },
 };

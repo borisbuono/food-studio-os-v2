@@ -17,7 +17,7 @@ export default async function SetupIndex() {
     const [{ count: invoices }, { count: bank }, { count: eods }] = await Promise.all([
       sb.from("invoice_inbox").select("id", { count: "exact", head: true }).eq("entity_id", e.code),
       sb.from("bank_movements").select("id", { count: "exact", head: true }).eq("entity_id", e.code),
-      e.restaurant_id ? sb.from("eod_reports").select("id", { count: "exact", head: true }).eq("restaurant_id", e.restaurant_id) : Promise.resolve({ count: 0 } as any),
+      e.restaurant_id ? sb.from("eod_accounting").select("id", { count: "exact", head: true }).eq("restaurant_id", e.restaurant_id) : Promise.resolve({ count: 0 } as any),
     ]);
     return { ...e, invoices: invoices || 0, bank: bank || 0, eods: eods || 0 };
   }));

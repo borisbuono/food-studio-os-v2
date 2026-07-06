@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // 1) Persist the EOD row in our own table FIRST (source of truth even if Holded errors)
     const supabase = supabaseServer();
     const { data: row, error: eodErr } = await supabase
-      .from("eod_reports")
+      .from("eod_accounting")
       .upsert(
         {
           restaurant_id,

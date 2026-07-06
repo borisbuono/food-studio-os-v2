@@ -20,7 +20,7 @@ export default async function FinanceDashboard() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [eodToday, unapproved, bankUnmatched, openOrders, stuckPaper] = await Promise.all([
-    supabase.from("eod_reports").select("revenue,actual_covers,revenue_food,revenue_wine,revenue_bar").eq("restaurant_id", restaurant_id).eq("report_date", today).maybeSingle(),
+    supabase.from("eod_accounting").select("revenue,actual_covers,revenue_food,revenue_wine,revenue_bar").eq("restaurant_id", restaurant_id).eq("report_date", today).maybeSingle(),
     supabase.from("invoice_inbox").select("id,amount_eur,arrived_at,sender:provider_id(name)", { count: "exact" }).eq("entity_id", ec).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,amount_eur,description,movement_date", { count: "exact" }).eq("entity_id", ec).eq("reconciled_to", "unmatched").order("movement_date", { ascending: false }).limit(5),
     supabase.from("orders").select("id,delivery_date,total,status,providers:provider_id(name)", { count: "exact" }).eq("restaurant_id", restaurant_id).in("status", ["sent","received"]),

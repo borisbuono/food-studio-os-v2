@@ -96,7 +96,7 @@ export default function ThePass() {
       const zmap = new Map((zs || []).map((z: any) => [z.id, z.name]));
 
       // forecast from trading history + tomorrow's events
-      const { data: eod } = await supabaseBrowser.from("eod_reports").select("report_date,actual_covers").eq("restaurant_id", restaurant).order("report_date", { ascending: false }).limit(60);
+      const { data: eod } = await supabaseBrowser.from("eod_accounting").select("report_date,actual_covers").eq("restaurant_id", restaurant).order("report_date", { ascending: false }).limit(60);
       const { data: ev } = await supabaseBrowser.from("sales_events").select("guests_count").eq("restaurant_id", restaurant).eq("event_date", tmwStr);
       const covsAll = (eod || []).map((e: any) => Number(e.actual_covers || 0)).filter((n: number) => n > 0);
       const sameDow = (eod || []).filter((e: any) => new Date(e.report_date + "T00:00").getDay() === tomorrow.getDay()).map((e: any) => Number(e.actual_covers || 0)).filter((n: number) => n > 0).slice(0, 6);
