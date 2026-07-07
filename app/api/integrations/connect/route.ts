@@ -24,6 +24,20 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
     if (r.status === 401) return { ok: false, error: `401 unauthorized (${isV2 ? "v2 pat_" : "v1"} key) — token is invalid or was revoked. Create a fresh token in Holded → Developers.` };
     return { ok: false, error: `Holded ${isV2 ? "v2" : "v1"} returned ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}` };
   }
+  if (vendor === "wix-newsletter") {
+    // Boris pastes `<account_id>:<api_key>`. We split on the first colon so the
+    // adapter can read both halves without a second field on the form.
+    const i = apiKey.indexOf(":");
+    const accountId = i > 0 ? apiKey.slice(0, i) : (process.env.WIX_ACCOUNT_ID || "");
+    const key = i > 0 ? apiKey.slice(i + 1) : apiKey;
+    if (!accountId) return { ok: false, error: "paste as `<wix_account_id>:<api_key>` (get both from Wix Dashboard → Settings → API Keys)" };
+    const r = await fetch("https://www.wixapis.com/email-marketing/v1/campaigns?paging.limit=1", {
+      headers: { "Authorization": key, "wix-account-id": accountId },
+    });
+    if (r.ok) return { ok: true, meta: { account_id: accountId } };
+    if (r.status === 401 || r.status === 403) return { ok: false, error: `Wix ${r.status} — token or account_id rejected. Regenerate the site API key with Email Marketing + Contacts scope.` };
+    return { ok: false, error: `Wix returned ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}` };
+  }
   // Unknown vendor: accept + store the key without a live test (better than blocking)
   return { ok: true, meta: { untested: true } };
 }
@@ -56,7 +70,7 @@ export async function POST(req: Request) {
     // 4) Insert new active row
     const { data: row, error } = await sb.from("entity_integrations").insert({
       entity_code: entity, platform: vendor,
-      integration_type: kind || (vendor === "holded" ? "accounting" : "unknown"),
+      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : vendor === "wix-newsletter" ? "marketing" : "unknown"),
       display_name: `${vendor} · ${entity}`,
       encrypted_key: enc.encrypted_key, key_iv: enc.key_iv, key_tag: enc.key_tag,
       status: "connected",

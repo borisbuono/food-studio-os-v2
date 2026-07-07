@@ -54,9 +54,9 @@ const REVIEWS: Record<string, ReviewsAdapter> = { "google-business": googleBusin
 
 // Default vendor map per entity. Env vars override (e.g. FS_POS_IFL=square).
 const DEFAULTS: Record<EntityCode, { pos: string; accounting: string; booking: string; payment: string; banking: string; marketing: string; social: string; reviews: string }> = {
-  IFL: { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "klaviyo", social: "buffer", reviews: "google-business" },
-  BM:  { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "klaviyo", social: "buffer", reviews: "google-business" },
-  BBH: { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "klaviyo", social: "buffer", reviews: "google-business" },
+  IFL: { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "wix-newsletter", social: "buffer", reviews: "google-business" },
+  BM:  { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "wix-newsletter", social: "buffer", reviews: "google-business" },
+  BBH: { pos: "fresto", accounting: "holded", booking: "covermanager", payment: "caixabank", banking: "caixabank", marketing: "wix-newsletter", social: "buffer", reviews: "google-business" }, // BBH = holding, marketing surface hidden in UI
 };
 
 const env = (k: string) => (typeof process !== "undefined" ? process.env[k] : undefined);
