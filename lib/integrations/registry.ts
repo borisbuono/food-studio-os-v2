@@ -33,6 +33,7 @@ import { klaviyoAdapter } from "@/lib/integrations/marketing/klaviyo";
 import { mailchimpAdapter } from "@/lib/integrations/marketing/mailchimp";
 import { hubspotAdapter } from "@/lib/integrations/marketing/hubspot";
 import { wixNewsletterAdapter } from "@/lib/integrations/marketing/wix-newsletter";
+import { metaAdsAdapter } from "@/lib/integrations/marketing/meta-ads";
 // Social (Grow · Reach)
 import { bufferAdapter } from "@/lib/integrations/social/buffer";
 import { laterAdapter } from "@/lib/integrations/social/later";
@@ -48,7 +49,7 @@ const ACCT: Record<string, AccountingAdapter> = { holded: holdedAdapter, apideck
 const BOOK: Record<string, BookingAdapter> = { covermanager: coverManagerAdapter, opentable: openTableAdapter, sevenrooms: sevenRoomsAdapter, thefork: theForkAdapter };
 const PAY: Record<string, PaymentAdapter> = { stripe: stripeAdapter, adyen: adyenAdapter, redsys: redsysAdapter, caixabank: caixaBankAdapter };
 const BANK: Record<string, BankingAdapter> = { caixabank: caixaBankBankingAdapter, plaid: plaidAdapter, tink: tinkAdapter, gocardless: goCardlessAdapter };
-const MKTG: Record<string, MarketingAdapter> = { klaviyo: klaviyoAdapter, mailchimp: mailchimpAdapter, hubspot: hubspotAdapter, "wix-newsletter": wixNewsletterAdapter };
+const MKTG: Record<string, MarketingAdapter> = { klaviyo: klaviyoAdapter, mailchimp: mailchimpAdapter, hubspot: hubspotAdapter, "wix-newsletter": wixNewsletterAdapter, "meta-ads": metaAdsAdapter };
 const SOCIAL: Record<string, SocialAdapter> = { buffer: bufferAdapter, later: laterAdapter, postiz: postizAdapter };
 const REVIEWS: Record<string, ReviewsAdapter> = { "google-business": googleBusinessAdapter, tripadvisor: tripAdvisorAdapter, thefork: theForkReviewsAdapter, yelp: yelpAdapter };
 
@@ -130,6 +131,7 @@ function status(vendor: string, entity: EntityCode): "connected" | "stub" | "off
     case "tripadvisor": return hasAny("TRIPADVISOR_API_KEY") ? "connected" : "stub";
     case "thefork": return hasAny("THEFORK_API_KEY") ? "connected" : "stub";
     case "yelp": return hasAny("YELP_API_KEY") ? "connected" : "stub";
+    case "meta-ads": return hasAny("META_ADS_ACCESS_TOKEN") ? "connected" : "stub";
     default: return "stub";
   }
 }

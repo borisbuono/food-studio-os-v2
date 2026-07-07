@@ -38,6 +38,20 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
     if (r.status === 401 || r.status === 403) return { ok: false, error: `Wix ${r.status} — token or account_id rejected. Regenerate the site API key with Email Marketing + Contacts scope.` };
     return { ok: false, error: `Wix returned ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}` };
   }
+  if (vendor === "meta-ads") {
+    // Meta Marketing API — Boris pastes a user or system-user access token that
+    // has ads_read on the ad account. Account id is fixed per entity in the
+    // adapter (BM = 605781129956113). Read-only for now.
+    const acct = process.env.META_AD_ACCOUNT_BM || "605781129956113";
+    const r = await fetch(`https://graph.facebook.com/v20.0/act_${acct}?fields=account_status,name,currency&access_token=${encodeURIComponent(apiKey)}`);
+    if (r.ok) {
+      const j = await r.json().catch(() => ({} as any));
+      return { ok: true, meta: { account_id: acct, account_status: j.account_status, name: j.name, currency: j.currency } };
+    }
+    const bodyText = (await r.text().catch(() => "")).slice(0, 400);
+    if (r.status === 401 || r.status === 403 || r.status === 400) return { ok: false, error: `Meta ${r.status} — token rejected or lacks ads_read on act_${acct}. ${bodyText}` };
+    return { ok: false, error: `Meta returned ${r.status}: ${bodyText}` };
+  }
   // Unknown vendor: accept + store the key without a live test (better than blocking)
   return { ok: true, meta: { untested: true } };
 }
@@ -70,7 +84,7 @@ export async function POST(req: Request) {
     // 4) Insert new active row
     const { data: row, error } = await sb.from("entity_integrations").insert({
       entity_code: entity, platform: vendor,
-      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : vendor === "wix-newsletter" ? "marketing" : "unknown"),
+      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : "unknown"),
       display_name: `${vendor} · ${entity}`,
       encrypted_key: enc.encrypted_key, key_iv: enc.key_iv, key_tag: enc.key_tag,
       status: "connected",
