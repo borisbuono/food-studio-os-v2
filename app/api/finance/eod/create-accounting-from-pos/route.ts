@@ -15,6 +15,13 @@ export const runtime = "nodejs";
 // The system deviation is visible + editable (in case of a legit exchange) but cannot
 // be deleted. Rule was broken on the 34-day BM backfill (2026-05-26 → 2026-07-03) —
 // see 02_Build/decisions/bm_34_day_cash_backfill_correction_2026-07-07.md.
+//
+// RULE UPDATE (2026-07-07 — supabase/migrations/20260707_restaurant_cash_rule.sql):
+// the deduction is now GATED on restaurants.deduct_pos_cash_from_food. Default TRUE
+// for IFL + BM (the two venues where the rule is confirmed correct), but venues with
+// real cash service can be flipped FALSE from /administrate/finance/setup/[entity].
+// When FALSE we skip the auto-insert entirely — no system deviation is created and
+// Food revenue stays as the POS reported it.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -30,6 +37,14 @@ export async function POST(req: NextRequest) {
     if (posErr) return NextResponse.json({ ok: false, error: "pos read: " + posErr.message }, { status: 500 });
     if (!pos)   return NextResponse.json({ ok: false, error: "eod_pos not found" }, { status: 404 });
 
+    // Per-restaurant cash-deduction toggle. Default TRUE if the column is missing
+    // or the row is not readable (defensive — matches migration default).
+    const restQ = await sb.from("restaurants")
+      .select("deduct_pos_cash_from_food")
+      .eq("id", pos.restaurant_id)
+      .maybeSingle();
+    const deductCash: boolean = restQ.data?.deduct_pos_cash_from_food !== false;
+
     // If an accounting row for this venue+day already exists, link it and return.
     const existing = await sb.from("eod_accounting")
       .select("id,eod_pos_id")
@@ -41,9 +56,10 @@ export async function POST(req: NextRequest) {
         await sb.from("eod_accounting").update({ eod_pos_id: pos.id }).eq("id", existing.data.id);
       }
       // Ensure the system cash-deduction row exists for this POS snapshot even if the
-      // accounting row was created before this rule shipped.
-      await ensureSystemCashDeduction(sb, pos, existing.data.id);
-      return NextResponse.json({ ok: true, id: existing.data.id, created: false });
+      // accounting row was created before this rule shipped — but only when the venue
+      // opts into the auto-deduction.
+      if (deductCash) await ensureSystemCashDeduction(sb, pos, existing.data.id);
+      return NextResponse.json({ ok: true, id: existing.data.id, created: false, cash_deducted: deductCash });
     }
 
     // Seed accounting record with POS totals. Boris edits from here; deviations are logged
@@ -61,10 +77,10 @@ export async function POST(req: NextRequest) {
     }).select("id").single();
     if (ins.error) return NextResponse.json({ ok: false, error: "acct insert: " + ins.error.message }, { status: 500 });
 
-    // Auto-insert the SYSTEM cash-deficit deviation (house rule).
-    await ensureSystemCashDeduction(sb, pos, ins.data.id);
+    // Auto-insert the SYSTEM cash-deficit deviation (house rule) — gated per restaurant.
+    if (deductCash) await ensureSystemCashDeduction(sb, pos, ins.data.id);
 
-    return NextResponse.json({ ok: true, id: ins.data.id, created: true });
+    return NextResponse.json({ ok: true, id: ins.data.id, created: true, cash_deducted: deductCash });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }

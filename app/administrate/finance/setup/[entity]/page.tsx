@@ -7,6 +7,7 @@ import BankImportClient from "./BankImportClient";
 import ConnectIntegration from "./ConnectIntegration";
 import ConnectApideck from "./ConnectApideck";
 import { BillingHealthMini } from "@/components/PaymentsTile";
+import CashRuleToggle from "@/components/CashRuleToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,13 @@ export default async function SetupEntity({ params }: { params: { entity: string
           <dt className="text-muted">Fiscal year</dt><dd className="text-ink">Calendar — FY2025 still open per fy2025_close_bank_anchored</dd>
           <dt className="text-muted">Gestoría</dt><dd className="text-ink">{m.gestoria}</dd>
         </dl>
+        {m.restaurant_id ? (
+          <CashRuleToggle restaurant_id={m.restaurant_id} restaurant_label={m.brand} />
+        ) : (
+          <p className="mt-3 border-t border-line pt-3 font-serif italic text-[13px] text-ink-soft">
+            No operating restaurant — cash-line rule does not apply.
+          </p>
+        )}
       </section>
 
       <section className="mt-6 rounded-2xl border border-line p-5">

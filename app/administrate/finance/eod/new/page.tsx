@@ -42,8 +42,22 @@ type Deviation = {
   amount_eur: number;
   description: string;
   is_system?: boolean;
+  is_system_override_reason?: string | null;
   _draft?: boolean;
+  // Track the amount the system originally set for the system row — used to detect
+  // an override so we can prompt for a reason before saving.
+  _system_default_amount?: number;
 };
+
+// Reasons a user might legitimately edit a system deviation amount on a given day.
+// LOCKED 2026-07-07 per per-restaurant cash rule migration.
+const SYSTEM_OVERRIDE_REASONS: { key: string; label: string; blurb: string }[] = [
+  { key: "legit_cash_exchange", label: "Legit cash exchange", blurb: "Real cash trade with a guest / staff." },
+  { key: "no_card_terminal",   label: "No card terminal",   blurb: "Terminal down — cash was the only channel." },
+  { key: "till_discrepancy",   label: "Till discrepancy",   blurb: "Counted cash differs from Fresto's line." },
+  { key: "corrected_pos_mistake", label: "Corrected POS mistake", blurb: "Ring-up error already reconciled elsewhere." },
+  { key: "other",              label: "Other",              blurb: "Free-text note in the description below." },
+];
 
 // Manual-EOD editable totals (when no POS snapshot exists — Boris punches numbers in).
 type ManualTotals = {
@@ -97,12 +111,16 @@ export default function NewEod() {
         const acctIdVal = acctQ.data?.id || null;
         setAcctId(acctIdVal);
         const devQ = await supabaseBrowser.from("eod_deviations")
-          .select("id,category,affected_line,amount_eur,description,is_system")
+          .select("id,category,affected_line,amount_eur,description,is_system,is_system_override_reason")
           .eq("eod_pos_id", posRow.id);
         setDevs((devQ.data || []).map((d: any) => ({
           id: d.id, category: d.category, affected_line: d.affected_line,
           amount_eur: Number(d.amount_eur), description: d.description || "",
           is_system: !!d.is_system,
+          is_system_override_reason: d.is_system_override_reason ?? null,
+          // For system rows we remember the original amount so an edit is
+          // detectable — a rewritten row (override) needs a reason.
+          _system_default_amount: d.is_system ? Number(d.amount_eur) : undefined,
         })));
       } else {
         setAcctId(null); setDevs([]); setManual(MANUAL_ZERO);
@@ -215,15 +233,35 @@ export default function NewEod() {
     setDevs((d) => [...d, { category: cat, affected_line: defaultLine, amount_eur: 0, description: "", _draft: true }]);
   };
 
+  // System-deviation edit prompt state: when the user edits the amount of an
+  // is_system=true row, we open a picker for the reason before persisting. The
+  // picker updates is_system_override_reason on the row.
+  const [reasonPrompt, setReasonPrompt] = useState<{ index: number } | null>(null);
+
   const saveDeviation = async (i: number) => {
     if (!pos) return;
     const d = devs[i];
     if (d.is_system) {
-      // System rows: only the amount + description are editable.
+      // If the amount was edited off the system default, require a reason. Open
+      // the picker and bail — the picker will re-invoke saveDeviation.
+      const defaultAmt = Number(d._system_default_amount ?? d.amount_eur);
+      const editedAmt = Number(d.amount_eur);
+      const drifted = Math.abs(editedAmt - defaultAmt) > 0.005;
+      if (drifted && !d.is_system_override_reason) {
+        setReasonPrompt({ index: i });
+        return;
+      }
+      // System rows: amount + description + override reason are editable; category /
+      // affected_line / is_system are immutable at the DB level (trigger + policy).
       const r = await supabaseBrowser.from("eod_deviations").update({
-        amount_eur: d.amount_eur, description: d.description || null,
+        amount_eur: d.amount_eur,
+        description: d.description || null,
+        is_system_override_reason: d.is_system_override_reason || null,
       }).eq("id", d.id!);
       if (r.error) { setErr(r.error.message); return; }
+      // After a successful override save the row's new "default" becomes the
+      // edited amount — further edits without a fresh reason are allowed.
+      setDevs((all) => all.map((x, j) => j === i ? { ...x, _system_default_amount: editedAmt } : x));
       return;
     }
     if (d.id) {
@@ -411,6 +449,14 @@ export default function NewEod() {
                             🔒 System
                           </span>
                         ) : null}
+                        {d.is_system && d.is_system_override_reason ? (
+                          <span
+                            title={"Override reason: " + (SYSTEM_OVERRIDE_REASONS.find((r) => r.key === d.is_system_override_reason)?.label || d.is_system_override_reason)}
+                            className="border border-clay px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-clay"
+                          >
+                            override · {SYSTEM_OVERRIDE_REASONS.find((r) => r.key === d.is_system_override_reason)?.label || d.is_system_override_reason}
+                          </span>
+                        ) : null}
                       </span>
                       <button
                         onClick={() => deleteDeviation(i)}
@@ -547,6 +593,59 @@ export default function NewEod() {
           ) : null}
           {uncategorised !== 0 ? <p className="mt-1 font-serif italic text-[13px] text-tomato">The delta between POS and accounting is not fully explained by categorised deviations. Add more rows or adjust amounts.</p> : null}
         </section>
+      ) : null}
+
+      {/* System-override reason picker — opens when the user edits a system
+          deviation's amount off its default. We block persisting until a reason
+          is picked (or the user cancels back to the original amount). */}
+      {reasonPrompt !== null ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-paper p-6">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Override reason · required</p>
+            <h2 className="mt-1 font-serif text-2xl text-ink">Why the change?</h2>
+            <p className="mt-2 font-serif italic text-[13px] text-ink-soft">
+              You are overriding a system-generated deviation. Record why so the audit trail explains this day.
+            </p>
+            <ul className="mt-4 divide-y divide-line border-t border-line">
+              {SYSTEM_OVERRIDE_REASONS.map((r) => (
+                <li key={r.key}>
+                  <button
+                    onClick={() => {
+                      const i = reasonPrompt.index;
+                      setDevs((all) => all.map((x, j) => j === i ? { ...x, is_system_override_reason: r.key } : x));
+                      setReasonPrompt(null);
+                      // Re-invoke save on the next tick so state has updated.
+                      setTimeout(() => saveDeviation(i), 0);
+                    }}
+                    className="w-full py-3 text-left hover:opacity-70"
+                  >
+                    <p className="font-serif text-[15px] text-ink">{r.label}</p>
+                    <p className="mt-0.5 font-serif italic text-[12px] text-ink-soft">{r.blurb}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex items-baseline justify-between border-t border-line pt-3">
+              <button
+                onClick={() => {
+                  // Cancel — revert the amount to the system default so the row is
+                  // clean again.
+                  const i = reasonPrompt.index;
+                  setDevs((all) => all.map((x, j) => {
+                    if (j !== i) return x;
+                    const def = Number(x._system_default_amount ?? 0);
+                    return { ...x, amount_eur: def };
+                  }));
+                  setReasonPrompt(null);
+                }}
+                className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-tomato"
+              >
+                Cancel — revert amount
+              </button>
+              <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Pick one to continue</span>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {err ? <p className="mt-6 font-mono text-[12px] text-tomato">⚠ {err}</p> : null}
