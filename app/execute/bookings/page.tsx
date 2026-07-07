@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { GuestChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,10 @@ export default async function Bookings() {
       {covers.length ? (
         <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
           {covers.map((c: any, i: number) => (
-            <li key={i} className="py-3 font-sans text-[15px] text-ink">{c.guest_name || c.name || "Guest"} · {c.party_size || c.covers || ""} {c.service_time || c.time || ""}</li>
+            <li key={i} className="py-3 font-sans text-[15px] text-ink">
+              <GuestChip id={c.guest_id || c.primary_guest_id} name={c.guest_name || c.name || "Guest"} />
+              {" · "}{c.party_size || c.covers || ""} {c.service_time || c.time || ""}
+            </li>
           ))}
         </ul>
       ) : (

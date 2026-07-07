@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
+import { SupplierChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +104,7 @@ export default async function Invoices() {
             return (
               <li key={r.order_id} className="py-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-serif text-[17px] text-ink">{noEmoji(r.provider_name)}</span>
+                  <span className="font-serif text-[17px] text-ink"><SupplierChip id={r.provider_id} name={noEmoji(r.provider_name)} /></span>
                   <span className={"font-mono text-[11px] uppercase tracking-wide " + (r.urgent ? "text-tomato" : "text-clay")}>{r.urgent ? "urgent · " : ""}{r.days}d</span>
                 </div>
                 <p className="mt-0.5 font-mono text-[11px] text-clay">{kindLabel} · {new Date(r.when).toLocaleDateString("en-GB")}{r.total ? " · " + eur(r.total) : ""}</p>

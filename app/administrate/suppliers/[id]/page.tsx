@@ -83,7 +83,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
         {p.category === "wine" ? (
           <Link href="/develop/wine/scan" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Scan label</Link>
         ) : (
-          <Link href="/administrate/invoices" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Invoices</Link>
+          <Link href={"/administrate/finance/scans?supplier=" + p.id} className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Invoices ({p.name})</Link>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { GuestChip } from "@/components/chips";
 import { supabaseBrowser as supabase } from "@/lib/supabaseBrowser";
 import { readEntityCookie } from "@/lib/ctx";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 type Zone = { id: string; name: string; sort: number };
 type Tbl = { id: string; label: string; seats: number; shape: string; x: number; y: number; w: number; h: number; zone_id: string | null };
-type Booking = { id: string; guest_name: string | null; party_size: number; service_time: string | null; table_id: string | null; status: string };
+type Booking = { id: string; guest_id?: string | null; guest_name: string | null; party_size: number; service_time: string | null; table_id: string | null; status: string };
 
 const VB = { w: 1000, h: 680 };
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -59,6 +60,7 @@ export default function FloorPlan() {
               .filter((x: any) => x.status !== "cancelled")
               .map((x: any) => ({
                 id: x.id,
+                guest_id: x.guestId ?? null,
                 guest_name: x.guestName ?? null,
                 party_size: x.partySize ?? 0,
                 service_time: x.time ?? null,
@@ -179,7 +181,7 @@ export default function FloorPlan() {
           {selected && (
             <div className="mt-4 rounded-lg border border-line p-4">
               <p className="font-sans text-sm text-ink">{selected.label} · {selected.seats} seats · {selected.shape}
-                {occupied[selected.id] ? ` · ${occupied[selected.id].guest_name || "Guest"} ${occupied[selected.id].service_time || ""}` : " · free"}</p>
+                {occupied[selected.id] ? (<> · <GuestChip id={occupied[selected.id].guest_id} name={occupied[selected.id].guest_name || "Guest"} /> {occupied[selected.id].service_time || ""}</>) : " · free"}</p>
             </div>
           )}
 
@@ -190,7 +192,7 @@ export default function FloorPlan() {
             <ul className="mt-3 divide-y divide-line border-t border-line">
               {bookings.map((b) => (
                 <li key={b.id} className="flex justify-between py-2 font-sans text-[15px] text-ink">
-                  <span>{b.guest_name || "Guest"} · {b.party_size}p {b.service_time || ""}</span>
+                  <span><GuestChip id={b.guest_id} name={b.guest_name || "Guest"} /> · {b.party_size}p {b.service_time || ""}</span>
                   <span className="font-mono text-xs text-clay">{b.table_id ? "seated" : "unassigned"}</span>
                 </li>
               ))}

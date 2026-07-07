@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { SupplierChip, PersonChip, RecipeChip, InvoiceChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,18 @@ export default async function ChefLog() {
     return new Date(tb).getTime() - new Date(ta).getTime();
   });
 
+
+  // Route target_table/target_id to a Chip so the audit becomes tappable — the
+  // whole cross-pillar linking principle applied to Chef's own log.
+  function targetChip(table: string | null, id: string | null) {
+    if (!id) return <span className="font-mono text-[10px] text-muted">—</span>;
+    if (table === "providers" || table === "provider") return <SupplierChip id={id} name={id.slice(0,8)} className="font-mono text-[10px]" />;
+    if (table === "profiles" || table === "team_members") return <PersonChip id={id} name={id.slice(0,8)} className="font-mono text-[10px]" />;
+    if (table === "menu_items" || table === "recipes") return <RecipeChip id={id} name={id.slice(0,8)} className="font-mono text-[10px]" />;
+    if (table === "invoice_inbox" || table === "invoices") return <InvoiceChip id={id} name={id.slice(0,8)} className="font-mono text-[10px]" />;
+    return <span className="font-mono text-[10px] text-muted">{id.slice(0,8)}</span>;
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
       <Link href="/administrate" className="font-mono text-[10px] uppercase tracking-wide text-clay">← administrate</Link>
@@ -61,7 +74,7 @@ export default async function ChefLog() {
             {actions.map((a: any) => (
               <li key={a.id} className="py-3">
                 <p className="font-serif text-[15px] text-ink">{a.action_type} {a.undone_at ? <span className="ml-2 font-mono text-[10px] text-tomato">UNDONE</span> : null}</p>
-                <p className="font-mono text-[10px] text-muted">{a.target_table || "—"} · {a.target_id || "—"} · {fmt(a.created_at)} {a.reversible && !a.undone_at ? "· reversible" : ""}</p>
+                <p className="font-mono text-[10px] text-muted">{a.target_table || "—"} · {targetChip(a.target_table, a.target_id)} · {fmt(a.created_at)} {a.reversible && !a.undone_at ? "· reversible" : ""}</p>
               </li>
             ))}
           </ul>

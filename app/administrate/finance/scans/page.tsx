@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
 import ChefContext from "@/components/ChefContext";
+import { SupplierChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ const FLAG_TONE: Record<string, string> = {
   high_value_no_doc: "tomato",
 };
 
-export default async function Scans({ searchParams }: { searchParams: { status?: string } }) {
+export default async function Scans({ searchParams }: { searchParams: { status?: string; supplier?: string; id?: string } }) {
   const supabase = supabaseServer();
   const entity = serverEntity();
   const ec = ENTITY_CODE[entity] || "IFL";
@@ -30,12 +31,15 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
 
   let query = supabase
     .from("invoice_inbox")
-    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider:provider_id(name)")
+    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider_id,provider:provider_id(name)")
     .eq("entity_id", ec)
     .order("arrived_at", { ascending: false })
     .limit(100);
   if (tab === "open") query = query.not("match_status", "in", "(approved,rejected,duplicate)");
   else if (tab === "approved") query = query.eq("match_status", "approved");
+  // Cross-pillar linking — supplier detail deep-links here with ?supplier=<id>
+  if (searchParams?.supplier) query = query.eq("provider_id", searchParams.supplier);
+  if (searchParams?.id) query = query.eq("id", searchParams.id);
 
   const { data: items } = await query;
   const rows: any[] = (items as any[]) || [];
@@ -87,7 +91,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
             return (
               <li key={r.id} className="py-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-serif text-[17px] text-ink">{r.provider?.name || r.supplier_name || "Unknown supplier"}</span>
+                  <span className="font-serif text-[17px] text-ink"><SupplierChip id={(r as any).provider_id} name={r.provider?.name || r.supplier_name || "Unknown supplier"} /></span>
                   <span className="font-mono text-[12px] text-ink-soft">{eur(r.amount_eur)}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
+import { GuestChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,10 @@ export default async function Events() {
                   <h2 className="font-serif text-2xl text-ink">{noEmoji(e.title || e.event_type || "Event")}</h2>
                   <span className="font-mono text-[11px] text-clay">{e.event_date || ""}</span>
                 </div>
-                <p className="mt-1 font-sans text-[14px] text-ink-soft">{[e.client_name, e.guests_count ? e.guests_count + " guests" : "", e.theme].filter(Boolean).join(" · ")}</p>
+                <p className="mt-1 font-sans text-[14px] text-ink-soft">
+                  {e.client_name ? <><GuestChip id={e.primary_guest_id} name={e.client_name} /></> : null}
+                  {[e.guests_count ? e.guests_count + " guests" : "", e.theme].filter(Boolean).map((t: any, k: number) => <span key={k}>{e.client_name || k > 0 ? " · " : ""}{t}</span>)}
+                </p>
                 {(e.estimated_revenue || e.estimated_gp_pct) ? (
                   <p className="mt-3 font-mono text-[12px] text-clay">{e.estimated_revenue ? eur(Number(e.estimated_revenue)) + " est." : ""}{e.estimated_gp_pct ? " · " + Math.round(Number(e.estimated_gp_pct)) + "% GP" : ""}</p>
                 ) : null}
