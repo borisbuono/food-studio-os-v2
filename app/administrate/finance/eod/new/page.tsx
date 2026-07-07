@@ -41,8 +41,20 @@ type Deviation = {
   affected_line: AffectedLine;
   amount_eur: number;
   description: string;
+  is_system?: boolean;
   _draft?: boolean;
 };
+
+// Manual-EOD editable totals (when no POS snapshot exists — Boris punches numbers in).
+type ManualTotals = {
+  covers: number;
+  food: number; wine: number; bar: number; softdrinks: number; tips: number;
+  cash_declared: number;
+};
+const MANUAL_ZERO: ManualTotals = { covers: 0, food: 0, wine: 0, bar: 0, softdrinks: 0, tips: 0, cash_declared: 0 };
+
+const SYSTEM_CASH_DESCRIPTION =
+  "Fresto Cash line deducted from Food (house rule — cash line = EOD mistakes, not revenue)";
 
 export default function NewEod() {
   const [entity, setEntity] = useState<EntityKey>("utopia");
@@ -52,6 +64,8 @@ export default function NewEod() {
   const [pos, setPos] = useState<PosSnapshot | null>(null);
   const [acctId, setAcctId] = useState<string | null>(null);
   const [devs, setDevs] = useState<Deviation[]>([]);
+  const [manual, setManual] = useState<ManualTotals>(MANUAL_ZERO);
+  const [manualMode, setManualMode] = useState(false);
   const [postDryRun, setPostDryRun] = useState(true);
   const [postApideck, setPostApideck] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -77,19 +91,21 @@ export default function NewEod() {
       const posRow = posQ.data as PosSnapshot | null;
       setPos(posRow);
       if (posRow) {
+        setManualMode(false);
         const acctQ = await supabaseBrowser.from("eod_accounting")
           .select("id").eq("restaurant_id", rid).eq("report_date", date).maybeSingle();
         const acctIdVal = acctQ.data?.id || null;
         setAcctId(acctIdVal);
         const devQ = await supabaseBrowser.from("eod_deviations")
-          .select("id,category,affected_line,amount_eur,description")
+          .select("id,category,affected_line,amount_eur,description,is_system")
           .eq("eod_pos_id", posRow.id);
         setDevs((devQ.data || []).map((d: any) => ({
           id: d.id, category: d.category, affected_line: d.affected_line,
           amount_eur: Number(d.amount_eur), description: d.description || "",
+          is_system: !!d.is_system,
         })));
       } else {
-        setAcctId(null); setDevs([]);
+        setAcctId(null); setDevs([]); setManual(MANUAL_ZERO);
       }
     })();
     return () => { cancelled = true; };
@@ -108,7 +124,8 @@ export default function NewEod() {
       const persisted = (d.persisted || []) as { date: string; eod_pos_id: string }[];
       const match = persisted.find((p) => p.date === date) || persisted[persisted.length - 1];
       if (match?.eod_pos_id) {
-        // Also create the accounting seed row so the right column has an id to write against
+        // Also create the accounting seed row so the right column has an id to write against.
+        // The seed route auto-inserts the SYSTEM cash-deduction deviation (house rule).
         await fetch("/api/finance/eod/create-accounting-from-pos", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -120,15 +137,27 @@ export default function NewEod() {
     setBusy(false);
   };
 
-  // Derive accounting totals: POS totals + signed deviations by affected line.
+  // Manual mode base totals (no POS snapshot). Auto cash-deduction applied to Food.
+  const manualBase = useMemo(() => ({
+    food: Math.max(0, Number(manual.food || 0) - Number(manual.cash_declared || 0)),
+    wine: Number(manual.wine || 0),
+    bar: Number(manual.bar || 0),
+    softdrinks: Number(manual.softdrinks || 0),
+    tips: Number(manual.tips || 0),
+  }), [manual]);
+
+  // Derive accounting totals: base (POS or manual) + signed deviations by affected line.
+  // In POS mode the system cash deviation is already in devs and reduces Food correctly.
+  // In manual mode we apply the cash deduction directly on the base (no persisted POS to
+  // hang a deviation off of), but still surface it in the delta summary as "1 system".
   const totals = useMemo(() => {
-    const start = {
-      food: pos ? Number(pos.food_net_eur) : 0,
-      wine: pos ? Number(pos.wine_net_eur) : 0,
-      bar: pos ? Number(pos.bar_net_eur) : 0,
-      softdrinks: pos ? Number(pos.softdrinks_net_eur) : 0,
-      tips: pos ? Number(pos.tips_eur) : 0,
-    };
+    const start = pos ? {
+      food: Number(pos.food_net_eur),
+      wine: Number(pos.wine_net_eur),
+      bar: Number(pos.bar_net_eur),
+      softdrinks: Number(pos.softdrinks_net_eur),
+      tips: Number(pos.tips_eur),
+    } : { ...manualBase };
     for (const d of devs) {
       if (d.affected_line === "food") start.food += d.amount_eur;
       if (d.affected_line === "wine") start.wine += d.amount_eur;
@@ -138,7 +167,7 @@ export default function NewEod() {
       // cash/card/service adjust totals only, not per-category revenue lines.
     }
     return start;
-  }, [pos, devs]);
+  }, [pos, devs, manualBase]);
 
   const totalNet = totals.food + totals.wine + totals.bar + totals.softdrinks + totals.tips;
 
@@ -167,7 +196,16 @@ export default function NewEod() {
   const posGross = pos ? Number(pos.total_gross_eur) : 0;
   const sumDevs = devs.reduce((a, d) => a + d.amount_eur, 0);
   const delta = totalNet + preview.totalVat - posGross;
-  const uncategorised = Math.abs(delta - sumDevs) > 0.01 ? +(delta - sumDevs).toFixed(2) : 0;
+  const uncategorised = pos && Math.abs(delta - sumDevs) > 0.01 ? +(delta - sumDevs).toFixed(2) : 0;
+
+  // Deviation counts — split system vs user for the delta summary.
+  const savedDevs = devs.filter((d) => !d._draft && d.id);
+  const savedSystem = savedDevs.filter((d) => d.is_system).length;
+  const savedUser = savedDevs.length - savedSystem;
+  // Manual mode: the cash deduction is applied directly, not persisted — count it as 1 system.
+  const manualSystemCount = !pos && manualMode && Number(manual.cash_declared || 0) > 0 ? 1 : 0;
+  const systemCount = savedSystem + manualSystemCount;
+  const totalCategorisedCount = savedUser + systemCount;
 
   const addDeviation = (cat: CategoryKey) => {
     const defaultLine: AffectedLine =
@@ -180,6 +218,14 @@ export default function NewEod() {
   const saveDeviation = async (i: number) => {
     if (!pos) return;
     const d = devs[i];
+    if (d.is_system) {
+      // System rows: only the amount + description are editable.
+      const r = await supabaseBrowser.from("eod_deviations").update({
+        amount_eur: d.amount_eur, description: d.description || null,
+      }).eq("id", d.id!);
+      if (r.error) { setErr(r.error.message); return; }
+      return;
+    }
     if (d.id) {
       const r = await supabaseBrowser.from("eod_deviations").update({
         category: d.category, affected_line: d.affected_line,
@@ -197,6 +243,7 @@ export default function NewEod() {
         amount_eur: d.amount_eur,
         description: d.description || null,
         created_by: uid,
+        is_system: false,
       }).select("id").single();
       if (ins.error) { setErr(ins.error.message); return; }
       setDevs((all) => all.map((x, idx) => idx === i ? { ...x, id: ins.data.id, _draft: false } : x));
@@ -205,8 +252,20 @@ export default function NewEod() {
 
   const deleteDeviation = async (i: number) => {
     const d = devs[i];
-    if (d.id) await supabaseBrowser.from("eod_deviations").delete().eq("id", d.id);
+    if (d.is_system) {
+      setErr("System deviations cannot be deleted (house rule). Edit the amount if the cash was a legit exchange.");
+      return;
+    }
+    if (d.id) {
+      const r = await supabaseBrowser.from("eod_deviations").delete().eq("id", d.id);
+      if (r.error) { setErr(r.error.message); return; }
+    }
     setDevs((all) => all.filter((_, idx) => idx !== i));
+  };
+
+  const startManual = async () => {
+    setManualMode(true);
+    setDevs([]);
   };
 
   const submit = async () => {
@@ -217,7 +276,7 @@ export default function NewEod() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           entity: ec, date, restaurant_id: rid,
-          covers: pos?.covers || 0,
+          covers: pos?.covers || manual.covers || 0,
           description: `EOD ${date}`,
           eod_pos_id: pos?.id || null,
           food: totals.food, wine: totals.wine, bar: totals.bar,
@@ -239,6 +298,8 @@ export default function NewEod() {
     </div>
   );
 
+  const showRight = pos || manualMode;
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <Link href="/administrate/finance/eod" className="font-sans text-sm text-ink-soft">← EOD list</Link>
@@ -252,14 +313,17 @@ export default function NewEod() {
           <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-transparent font-mono text-[14px] text-ink outline-none" />
         </label>
-        {!pos ? (
+        {!pos && !manualMode ? (
           <>
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" id="fresto-xlsx" onChange={(e) => onPickFresto(e.target.files?.[0])} />
             <label htmlFor="fresto-xlsx" className="cursor-pointer border border-line px-4 py-2 font-mono text-[11px] uppercase tracking-wide text-ink hover:border-ink-soft">Upload Fresto export</label>
             <span className="font-mono text-[10px] uppercase tracking-wide text-clay">or use Chef FAB camera on mobile</span>
+            <button onClick={startManual} className="border border-line px-4 py-2 font-mono text-[11px] uppercase tracking-wide text-ink hover:border-ink-soft">Enter manually</button>
           </>
-        ) : (
+        ) : pos ? (
           <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>POS snapshot loaded</span>
+        ) : (
+          <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Manual entry · no POS snapshot</span>
         )}
         {uploadErr ? <span className="font-mono text-[11px] text-tomato">⚠ {uploadErr}</span> : null}
       </div>
@@ -267,13 +331,15 @@ export default function NewEod() {
       {/* Three-column view */}
       <div className="mt-8 grid gap-8 md:grid-cols-3">
 
-        {/* LEFT — POS EOD (locked) */}
+        {/* LEFT — POS EOD (locked) or Manual entry form */}
         <section>
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">POS EOD · locked</p>
-          <h2 className="mt-1 font-serif text-2xl text-ink">Fresto snapshot</h2>
-          {!pos ? (
-            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">No POS snapshot for {date}. Upload the Fresto export or use the Chef FAB camera.</p>
-          ) : (
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
+            {pos ? "POS EOD · locked" : manualMode ? "Manual entry · editable" : "POS EOD"}
+          </p>
+          <h2 className="mt-1 font-serif text-2xl text-ink">
+            {pos ? "Fresto snapshot" : manualMode ? "What Boris books" : "Fresto snapshot"}
+          </h2>
+          {pos ? (
             <div className="mt-4">
               <Kv label="Covers"        value={String(pos.covers)} />
               <Kv label="Food net"      value={eur(pos.food_net_eur)} />
@@ -290,6 +356,26 @@ export default function NewEod() {
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">immutable · never edited</p>
             </div>
+          ) : manualMode ? (
+            <div className="mt-4">
+              <ManualField label="Covers"     value={manual.covers}      onChange={(v) => setManual({ ...manual, covers: v })} integer />
+              <ManualField label="Food"       value={manual.food}        onChange={(v) => setManual({ ...manual, food: v })} />
+              <ManualField label="Wine"       value={manual.wine}        onChange={(v) => setManual({ ...manual, wine: v })} />
+              <ManualField label="Bar"        value={manual.bar}         onChange={(v) => setManual({ ...manual, bar: v })} />
+              <ManualField label="Softdrinks" value={manual.softdrinks}  onChange={(v) => setManual({ ...manual, softdrinks: v })} />
+              <ManualField label="Tips"       value={manual.tips}        onChange={(v) => setManual({ ...manual, tips: v })} />
+              <ManualField
+                label="Cash declared"
+                value={manual.cash_declared}
+                onChange={(v) => setManual({ ...manual, cash_declared: v })}
+                tooltip="House rule: Fresto Cash line = EOD mistakes, deducted from Food. Edit only if legit exchange."
+              />
+              <p className="mt-3 font-serif italic text-[12px] text-ink-soft">
+                Cash declared is auto-deducted from Food (house rule).
+              </p>
+            </div>
+          ) : (
+            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">No POS snapshot for {date}. Upload the Fresto export, use the Chef FAB camera, or enter manually.</p>
           )}
         </section>
 
@@ -297,9 +383,9 @@ export default function NewEod() {
         <section>
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Deviations · categorised</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">What changed</h2>
-          {!pos ? (
-            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">Load a POS snapshot to log deviations.</p>
-          ) : (
+          {!showRight ? (
+            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">Load a POS snapshot or start manual entry to log deviations.</p>
+          ) : pos ? (
             <>
               <div className="mt-4 flex flex-wrap gap-2">
                 {CATEGORIES.map((c) => (
@@ -313,15 +399,37 @@ export default function NewEod() {
               <ul className="mt-4">
                 {devs.map((d, i) => (
                   <li key={d.id || `draft-${i}`} className="border-t border-line py-3">
-                    <div className="flex items-baseline justify-between">
-                      <span className="font-serif text-[15px] text-ink capitalize">{d.category.replace("_"," ")}</span>
-                      <button onClick={() => deleteDeviation(i)} className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-tomato">remove</button>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="flex items-baseline gap-2">
+                        <span className="font-serif text-[15px] text-ink capitalize">{d.category.replace("_"," ")}</span>
+                        {d.is_system ? (
+                          <span
+                            title={SYSTEM_CASH_DESCRIPTION}
+                            className="border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                          >
+                            🔒 System
+                          </span>
+                        ) : null}
+                      </span>
+                      <button
+                        onClick={() => deleteDeviation(i)}
+                        disabled={d.is_system}
+                        className={"font-mono text-[10px] uppercase tracking-wide " + (d.is_system ? "text-clay opacity-40 cursor-not-allowed" : "text-clay hover:text-tomato")}
+                        title={d.is_system ? "System deviations cannot be deleted — edit the amount if the cash was a legit exchange." : "remove"}
+                      >
+                        {d.is_system ? "locked" : "remove"}
+                      </button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-baseline gap-3">
                       <label className="flex items-baseline gap-2">
                         <span className="font-mono text-[10px] uppercase tracking-wide text-clay">line</span>
-                        <select value={d.affected_line} onChange={(e) => setDevs((all) => all.map((x, j) => j === i ? { ...x, affected_line: e.target.value as AffectedLine } : x))}
-                          className="bg-transparent font-mono text-[12px] text-ink outline-none">
+                        <select
+                          value={d.affected_line}
+                          disabled={d.is_system}
+                          onChange={(e) => setDevs((all) => all.map((x, j) => j === i ? { ...x, affected_line: e.target.value as AffectedLine } : x))}
+                          className={"bg-transparent font-mono text-[12px] text-ink outline-none " + (d.is_system ? "opacity-50" : "")}
+                        >
                           {AFFECTED_LINES.map((l) => <option key={l} value={l}>{l}</option>)}
                         </select>
                       </label>
@@ -331,9 +439,12 @@ export default function NewEod() {
                           onChange={(e) => setDevs((all) => all.map((x, j) => j === i ? { ...x, amount_eur: Number(String(e.target.value).replace(",", ".")) || 0 } : x))}
                           className="w-24 bg-transparent text-right font-mono text-[14px] text-ink outline-none border-b border-line" />
                       </label>
-                      <input placeholder="note" value={d.description}
+                      <input
+                        placeholder="note"
+                        value={d.description}
                         onChange={(e) => setDevs((all) => all.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
-                        className="flex-1 min-w-[120px] bg-transparent font-serif italic text-[13px] text-ink-soft outline-none border-b border-line" />
+                        className={"flex-1 min-w-[120px] bg-transparent font-serif italic text-[13px] outline-none border-b border-line " + (d.is_system ? "text-ink-soft" : "text-ink-soft")}
+                      />
                       <button onClick={() => saveDeviation(i)} className="border border-line px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft">
                         {d.id ? "update" : "save"}
                       </button>
@@ -343,6 +454,31 @@ export default function NewEod() {
                 {!devs.length ? <li className="mt-4 font-serif italic text-[13px] text-ink-soft">No deviations yet. If POS totals match reality exactly, book them as-is.</li> : null}
               </ul>
             </>
+          ) : (
+            // Manual mode — no persisted POS snapshot, so no manual-added deviations
+            // beyond the auto cash deduction (which is applied directly to Food above).
+            <div className="mt-4 border-t border-line pt-3">
+              {Number(manual.cash_declared || 0) > 0 ? (
+                <div className="border border-line px-3 py-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="flex items-baseline gap-2">
+                      <span className="font-serif text-[14px] text-ink">Cash deficit → Food</span>
+                      <span
+                        title={SYSTEM_CASH_DESCRIPTION}
+                        className="border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                        style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                      >
+                        🔒 System
+                      </span>
+                    </span>
+                    <span className="font-mono text-[13px] text-ink">{eurSigned(-Number(manual.cash_declared || 0))}</span>
+                  </div>
+                  <p className="mt-1 font-serif italic text-[12px] text-ink-soft">{SYSTEM_CASH_DESCRIPTION}</p>
+                </div>
+              ) : (
+                <p className="mt-2 font-serif italic text-[13px] text-ink-soft">Set a Cash declared amount to see the automatic Food deduction.</p>
+              )}
+            </div>
           )}
         </section>
 
@@ -350,8 +486,8 @@ export default function NewEod() {
         <section>
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Accounting EOD · editable</p>
           <h2 className="mt-1 font-serif text-2xl text-ink">Book to {ec}</h2>
-          {!pos ? (
-            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">Load a POS snapshot to compute the accounting entry.</p>
+          {!showRight ? (
+            <p className="mt-4 font-serif italic text-[14px] text-ink-soft">Load a POS snapshot or start manual entry to compute the accounting entry.</p>
           ) : (
             <>
               <div className="mt-4">
@@ -397,13 +533,18 @@ export default function NewEod() {
       </div>
 
       {/* Delta summary */}
-      {pos ? (
+      {showRight ? (
         <section className="mt-10 border-t border-line pt-4">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Delta summary</p>
           <p className="mt-2 font-serif text-[18px] text-ink">
-            Delta: {eurSigned(delta)} · {devs.filter((d) => !d._draft && d.id).length} categorised deviation{devs.filter((d) => !d._draft && d.id).length === 1 ? "" : "s"}
+            Delta: {pos ? eurSigned(delta) : eurSigned(-Number(manual.cash_declared || 0))} · {totalCategorisedCount} categorised deviation{totalCategorisedCount === 1 ? "" : "s"} ({systemCount} system)
             {uncategorised !== 0 ? <> · <span className="text-tomato">{eurSigned(uncategorised)} uncategorised</span></> : null}
           </p>
+          {systemCount > 0 ? (
+            <p className="mt-1 font-serif italic text-[13px] text-ink-soft">
+              House rule: Fresto Cash line = EOD mistakes, deducted from Food. Edit only if legit exchange.
+            </p>
+          ) : null}
           {uncategorised !== 0 ? <p className="mt-1 font-serif italic text-[13px] text-tomato">The delta between POS and accounting is not fully explained by categorised deviations. Add more rows or adjust amounts.</p> : null}
         </section>
       ) : null}
@@ -417,5 +558,37 @@ export default function NewEod() {
         </section>
       ) : null}
     </main>
+  );
+}
+
+// Small labelled numeric field used only in manual mode (POS mode uses <Kv/> read-only).
+function ManualField({
+  label, value, onChange, integer, tooltip,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  integer?: boolean;
+  tooltip?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between border-t border-line py-2">
+      <span className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+        {label}
+        {tooltip ? (
+          <span title={tooltip} className="cursor-help border border-line px-1 text-[9px]" style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>?</span>
+        ) : null}
+      </span>
+      <input
+        inputMode="decimal"
+        value={String(value)}
+        onChange={(e) => {
+          const raw = String(e.target.value).replace(",", ".");
+          const n = integer ? Math.max(0, Math.floor(Number(raw) || 0)) : Number(raw) || 0;
+          onChange(n);
+        }}
+        className="w-24 bg-transparent text-right font-serif text-[15px] text-ink outline-none border-b border-line"
+      />
+    </div>
   );
 }

@@ -7,6 +7,14 @@ export const runtime = "nodejs";
 // from the POS snapshot totals. Boris then edits it via /administrate/finance/eod/new and
 // posts it to Holded via /api/finance/post-eod. Deviations are logged separately.
 // See memory/pos_vs_accounting_separation.md.
+//
+// HOUSE RULE (LOCKED 2026-07-07 — memory/eod_posting_cash_deduction_rule.md):
+// when we seed an accounting row we ALSO auto-insert a system-generated eod_deviations
+// row that deducts the POS Cash line from Food. The Fresto Cash line is orphan cash —
+// EOD counting mistakes that Fresto defaults into Food. Real Food revenue = Food − Cash.
+// The system deviation is visible + editable (in case of a legit exchange) but cannot
+// be deleted. Rule was broken on the 34-day BM backfill (2026-05-26 → 2026-07-03) —
+// see 02_Build/decisions/bm_34_day_cash_backfill_correction_2026-07-07.md.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -16,7 +24,7 @@ export async function POST(req: NextRequest) {
     const sb = supabaseServer();
     const { data: pos, error: posErr } = await sb
       .from("eod_pos")
-      .select("id,restaurant_id,date,covers,food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur")
+      .select("id,restaurant_id,date,covers,food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur,cash_declared_eur")
       .eq("id", eod_pos_id)
       .maybeSingle();
     if (posErr) return NextResponse.json({ ok: false, error: "pos read: " + posErr.message }, { status: 500 });
@@ -32,6 +40,9 @@ export async function POST(req: NextRequest) {
       if (!existing.data.eod_pos_id) {
         await sb.from("eod_accounting").update({ eod_pos_id: pos.id }).eq("id", existing.data.id);
       }
+      // Ensure the system cash-deduction row exists for this POS snapshot even if the
+      // accounting row was created before this rule shipped.
+      await ensureSystemCashDeduction(sb, pos, existing.data.id);
       return NextResponse.json({ ok: true, id: existing.data.id, created: false });
     }
 
@@ -50,8 +61,38 @@ export async function POST(req: NextRequest) {
     }).select("id").single();
     if (ins.error) return NextResponse.json({ ok: false, error: "acct insert: " + ins.error.message }, { status: 500 });
 
+    // Auto-insert the SYSTEM cash-deficit deviation (house rule).
+    await ensureSystemCashDeduction(sb, pos, ins.data.id);
+
     return NextResponse.json({ ok: true, id: ins.data.id, created: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }
+}
+
+// Idempotent: creates the system cash-deficit deviation for this eod_pos_id + accounting
+// pair if one does not already exist. Amount = −cash_declared_eur (negative = reduces
+// Food revenue). Skipped when cash_declared is zero.
+async function ensureSystemCashDeduction(sb: ReturnType<typeof supabaseServer>, pos: any, acctId: string) {
+  const cash = Number(pos.cash_declared_eur || 0);
+  if (!(cash > 0)) return;
+
+  const existing = await sb.from("eod_deviations")
+    .select("id")
+    .eq("eod_pos_id", pos.id)
+    .eq("is_system", true)
+    .eq("category", "cash_deficit")
+    .maybeSingle();
+  if (existing.data?.id) return;
+
+  await sb.from("eod_deviations").insert({
+    eod_pos_id: pos.id,
+    eod_accounting_id: acctId,
+    category: "cash_deficit",
+    affected_line: "food",
+    amount_eur: -cash,
+    description: "Fresto Cash line deducted from Food (house rule — cash line = EOD mistakes, not revenue)",
+    is_system: true,
+    created_by: null,
+  });
 }
