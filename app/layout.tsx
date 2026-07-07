@@ -4,6 +4,7 @@ import TopBar from "@/components/TopBar";
 import AssistantFab from "@/components/AssistantFab";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
+import FlowStrip from "@/components/FlowStrip";
 import { serverEntity } from "@/lib/serverVenue";
 import { ENTITY_ACCENT } from "@/lib/entities";
 
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <TopBar />
         <RouteGuard>{children}</RouteGuard>
+        <FlowStrip />
         <SessionMigrator />
         <AssistantFab />
       </body>
