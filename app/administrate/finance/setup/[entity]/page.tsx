@@ -6,6 +6,7 @@ import SyncCardClient from "./SyncCardClient";
 import BankImportClient from "./BankImportClient";
 import ConnectIntegration from "./ConnectIntegration";
 import ConnectApideck from "./ConnectApideck";
+import { BillingHealthMini } from "@/components/PaymentsTile";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,11 @@ export default async function SetupEntity({ params }: { params: { entity: string
   const sb = supabaseServer();
   const bindings = getBindings();
   const b = bindings.find((x) => x.entity === code);
+
+  const billingRows = (await sb.from("platform_billing_status")
+    .select("id,entity_code,platform,state,card_last4,last_failure_at,failure_count_30d,notes,billing_url")
+    .eq("entity_code", code)
+    .order("state")).data || [];
 
   const [{ count: invIn }, { count: invApproved }, { count: bankAll }, { count: bankUnmatched }, { count: eods }] = await Promise.all([
     sb.from("invoice_inbox").select("id", { count: "exact", head: true }).eq("entity_id", code),
@@ -102,6 +108,12 @@ export default async function SetupEntity({ params }: { params: { entity: string
           <Tile n={bankAll || 0} sub={(bankUnmatched || 0) + " unmatched"} label="bank movements" />
           <Tile n={eods || 0} sub="" label="EOD reports" />
         </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-line p-5">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Billing health</p>
+        <p className="mt-2 font-serif italic text-[13px] text-muted">Which SaaS bills are landing. Anything not <span className="text-basil">healthy</span> means Boris's card is being declined for this entity's platforms — see <a className="underline" href="/administrate/finance/payments">payments →</a>.</p>
+        <BillingHealthMini rows={billingRows as any} />
       </section>
 
       <section className="mt-6 rounded-2xl border border-line p-5">

@@ -7,6 +7,7 @@ import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { t, getLang, Lang } from "@/lib/i18n";
 import { onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
+import PaymentsTile, { PaymentRow } from "@/components/PaymentsTile";
 
 export type PeriodAgg = { rev: number; cov: number; avg: number; n: number };
 export type PeriodKey = "week" | "lastWeek" | "month" | "ytd";
@@ -179,7 +180,7 @@ function Brief({ role, s, lang }: { role: RoleKey; s: EntityStats; lang: Lang })
 }
 
 
-export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKey, EntityStats> }) {
+export default function Home({ statsByEntity, paymentsRows }: { statsByEntity: Record<EntityKey, EntityStats>; paymentsRows?: PaymentRow[] }) {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [role, setRole] = useState<RoleKey>("office");
@@ -251,6 +252,20 @@ export default function Home({ statsByEntity }: { statsByEntity: Record<EntityKe
         </p>
         {isOffice ? <OfficeDashboard s={s} /> : <Brief role={role} s={s} lang={lang} />}
       </div>
+
+      {/* Payment health tile — the tile Boris didn't have on 2026-07-05 when
+          Wix / Meta Ads / Holded / Google Workspace were all failing silently.
+          Only surfaced on the Office role since it's an admin concern. */}
+      {isOffice && paymentsRows && paymentsRows.length ? (
+        <div className="mt-6">
+          <PaymentsTile rows={paymentsRows.filter((r) => {
+            if (entity === "holdings") return true;
+            if (entity === "bistro_mondo") return r.entity_code === "BM";
+            if (entity === "taller") return r.entity_code === "IFL";
+            return false; // utopia trial has no billing
+          })} />
+        </div>
+      ) : null}
 
       {/* Role actions — the few things this person reaches for */}
       <div className="mt-6 space-y-3">
