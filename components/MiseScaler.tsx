@@ -17,7 +17,7 @@ export default function MiseScaler({ ings, portions, recipeId }: { ings: Ing[]; 
     <section className="pt-14">
       <div className="flex items-baseline justify-between">
         <p className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">Mise{base ? " — for " : ""}{base ? <span className="text-ink"> {n}</span> : ""}</p>
-        {base ? <Link href={`/recipes/${recipeId}/cook?p=${n}`} className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-tomato">Cook at this size →</Link> : null}
+        {base ? <Link href={`/execute/cook/${recipeId}?p=${n}`} className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-tomato">Cook at this size →</Link> : null}
       </div>
 
       {base ? (

@@ -104,7 +104,7 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
           {recipeRows.map((r, i) => (
             <li key={i} className="py-3">
               <div className="flex items-baseline justify-between gap-4">
-                <Link href={"/recipes/" + r.id} className="font-serif text-[17px] text-ink hover:text-ink-soft">{noEmoji(r.name)}</Link>
+                <Link href={"/develop/menu/" + r.id} className="font-serif text-[17px] text-ink hover:text-ink-soft">{noEmoji(r.name)}</Link>
                 <span className={"font-mono text-[13px] " + (r.varEur > 0.5 ? "text-tomato" : r.varEur < -0.5 ? "text-basil" : "text-clay")}>{Math.abs(r.varEur) < 0.005 ? "ok" : eur(r.varEur)}</span>
               </div>
               {r.topIng ? <p className="mt-0.5 font-mono text-[11px] text-clay">mostly: {r.topIng}</p> : null}

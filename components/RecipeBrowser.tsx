@@ -48,7 +48,7 @@ export default function RecipeBrowser({ recipes }: { recipes: R[] }) {
     const name = noEmoji(r.name);
     const c = cover((r.section || "").trim() || name);
     return (
-      <a key={r.id} href={"/recipes/" + r.id} className="flex items-center gap-3 py-2.5 transition hover:opacity-70">
+      <a key={r.id} href={"/develop/menu/" + r.id} className="flex items-center gap-3 py-2.5 transition hover:opacity-70">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: r.hero_image_url ? undefined : c.bg }}>
           {r.hero_image_url
             ? <img src={r.hero_image_url} alt="" className="h-full w-full object-cover" />

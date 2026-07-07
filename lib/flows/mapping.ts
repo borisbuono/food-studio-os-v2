@@ -62,6 +62,11 @@ const TABLE: { prefix: string; flow: FlowKey; step: string }[] = [
   { prefix: "/develop/lexicon", flow: "menu_sale", step: "Ingredient lexicon step" },
   { prefix: "/develop", flow: "menu_sale", step: "Recipe editing step" },
   { prefix: "/menu", flow: "menu_sale", step: "Menu item step" },
+  { prefix: "/develop/menu", flow: "menu_sale", step: "Recipe editing step" },
+  { prefix: "/execute/cook", flow: "daily_loop", step: "Service step" },
+  // Legacy /recipes → transitional redirects. Kept so pages that
+  // temporarily land on the old URL still get a flow tag before the
+  // redirect fires. Remove after 2027-01-08.
   { prefix: "/recipes", flow: "menu_sale", step: "Recipe editing step" },
   { prefix: "/order", flow: "menu_sale", step: "Ordering step" },
   { prefix: "/administrate/suppliers", flow: "menu_sale", step: "Supplier profile step" },

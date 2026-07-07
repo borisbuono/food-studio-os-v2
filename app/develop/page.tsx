@@ -59,7 +59,7 @@ export default async function DevelopHome() {
           action="Open menu engineering →"
         />
         <PillarTile
-          href="/recipes"
+          href="/menu"
           kicker="Recipes · library"
           title="Recipes"
           value={recipesCount}

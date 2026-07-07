@@ -89,7 +89,7 @@ export default async function MenuPage() {
           <ul className="mt-3 divide-y divide-black/10">
             {library.map((r: any) => (
               <li key={r.id}>
-                <Link href={"/recipes/" + r.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
+                <Link href={"/develop/menu/" + r.id} className="flex items-baseline justify-between gap-4 py-3 transition hover:opacity-70">
                   <span className="font-serif text-lg text-ink">{r.name}</span>
                   {r.section ? <span className="font-mono text-[11px] uppercase tracking-wide text-clay">{r.section}</span> : null}
                 </Link>

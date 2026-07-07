@@ -38,13 +38,15 @@ export function SupplierChip({ id, name, fallback = "Supplier", className = "" }
 }
 
 // The recipe — menu, cook mode, calculation, POS category.
-// Menu items live at /menu/[id] today; recipes are folded into that surface
-// pending the develop-collapse follow-up.
+// Fold LOCKED 2026-07-08 (feature #4): recipe detail lives at
+// /develop/menu/[id]; Cook Mode at /execute/cook/[id]. This chip resolves to
+// the develop detail — from there users jump to Cook Mode or the sales-facing
+// /menu/[item_id] via the cross-links on that page.
 export function RecipeChip({ id, name, fallback = "Recipe", className = "" }: ChipProps) {
   const display = name || fallback;
   if (!id) return <span className={className}>{display}</span>;
   return (
-    <Link href={`/menu/${id}`} className={`${base} ${className}`}>
+    <Link href={`/develop/menu/${id}`} className={`${base} ${className}`}>
       {display}
     </Link>
   );

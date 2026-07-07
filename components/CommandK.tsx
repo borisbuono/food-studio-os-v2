@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 const ROUTES: { label: string; href: string }[] = [
   { label: "Home", href: "/" }, { label: "Menu", href: "/menu" }, { label: "Guest menu", href: "/m" },
-  { label: "Recipes", href: "/recipes" }, { label: "Lexicon", href: "/develop/lexicon" }, { label: "Repricing", href: "/develop/repricing" },
+  { label: "Recipes", href: "/menu" }, { label: "Lexicon", href: "/develop/lexicon" }, { label: "Repricing", href: "/develop/repricing" },
   { label: "Today", href: "/execute/today" }, { label: "Prep", href: "/execute/prep" }, { label: "Cleaning", href: "/execute/cleaning" },
   { label: "SOPs", href: "/execute/sops" }, { label: "Briefing", href: "/execute/briefing" }, { label: "Inventory", href: "/execute/inventory" },
   { label: "Receiving", href: "/execute/receiving" }, { label: "Bookings", href: "/execute/bookings" }, { label: "Handover", href: "/execute/handover" },
