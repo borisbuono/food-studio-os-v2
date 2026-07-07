@@ -38,6 +38,17 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
     if (r.status === 401 || r.status === 403) return { ok: false, error: `Wix ${r.status} — token or account_id rejected. Regenerate the site API key with Email Marketing + Contacts scope.` };
     return { ok: false, error: `Wix returned ${r.status}: ${(await r.text().catch(() => "")).slice(0, 300)}` };
   }
+  if (vendor === "buffer") {
+    // Buffer Publish API v1. `?access_token=<token>` on /1/user.json is the health check.
+    const r = await fetch(`https://api.bufferapp.com/1/user.json?access_token=${encodeURIComponent(apiKey)}`);
+    if (r.ok) {
+      const j = await r.json().catch(() => ({} as any));
+      return { ok: true, meta: { user_id: j?.id || j?._id || null, timezone: j?.timezone || null } };
+    }
+    const t = (await r.text().catch(() => "")).slice(0, 300);
+    if (r.status === 401 || r.status === 403) return { ok: false, error: `Buffer ${r.status} — token rejected. Regenerate a Personal Access Token at buffer.com/developers.` };
+    return { ok: false, error: `Buffer returned ${r.status}: ${t}` };
+  }
   if (vendor === "meta-ads") {
     // Meta Marketing API — Boris pastes a user or system-user access token that
     // has ads_read on the ad account. Account id is fixed per entity in the
@@ -84,7 +95,7 @@ export async function POST(req: Request) {
     // 4) Insert new active row
     const { data: row, error } = await sb.from("entity_integrations").insert({
       entity_code: entity, platform: vendor,
-      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : "unknown"),
+      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : vendor === "buffer" ? "social" : "unknown"),
       display_name: `${vendor} · ${entity}`,
       encrypted_key: enc.encrypted_key, key_iv: enc.key_iv, key_tag: enc.key_tag,
       status: "connected",
