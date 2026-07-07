@@ -93,7 +93,7 @@ export default function TopBar() {
       {loaded && isOffice ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
           <Link href="/develop/menu-engineering" className={(pillarActive === "develop" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Develop</Link>
-          <Link href="/execute/handover" className={(pillarActive === "execute" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Execute</Link>
+          <Link href="/execute/pass" className={(pillarActive === "execute" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Execute</Link>
           <Link href="/administrate/finance" className={(pillarActive === "administrate" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Administrate</Link>
           <Link href="/grow" className={(pillarActive === "grow" ? "font-semibold" : "hover:text-ink") + " text-tomato"}>Grow</Link>
         </nav>

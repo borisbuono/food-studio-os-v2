@@ -44,7 +44,7 @@ export type CompassData = Record<EntityKey, {
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
   { href: "/develop/menu-engineering", label: "Develop", blurb: "Menu, recipes, wine, lexicon" },
-  { href: "/execute/handover", label: "Execute", blurb: "Pass, prep, deliveries, service" },
+  { href: "/execute/pass", label: "Execute", blurb: "Pass, prep, deliveries, service" },
   { href: "/administrate/finance", label: "Administrate", blurb: "Numbers, invoices, team" },
   { href: "/grow", label: "Grow", blurb: "Guests, offers, reach, reviews" },
 ];

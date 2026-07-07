@@ -368,7 +368,7 @@ export default function AssistantFab() {
             </div>
 
             {orderDraft ? (
-              <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/order"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Borrador en Pedidos →" : "Draft this order in Ordering →"}</button>
+              <button onClick={() => { localStorage.setItem("fs_order_draft", JSON.stringify(orderDraft)); window.location.href = "/execute/orders"; }} style={{ background: "var(--accent)" }} className="mx-3 mb-2 rounded-xl px-4 py-2.5 text-center font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Borrador en Pedidos →" : "Draft this order in Ordering →"}</button>
             ) : null}
 
             <div className="flex items-center gap-3 border-t border-black/10 p-3">

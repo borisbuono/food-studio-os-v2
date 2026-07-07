@@ -159,7 +159,7 @@ export default async function Page() {
           : servicePhase === "before" ? "upcoming"
           : servicePhase === "during" ? "in_progress"
           : "done",
-        href: "/execute/handover",
+        href: "/execute/pass",
       },
       {
         key: "service",

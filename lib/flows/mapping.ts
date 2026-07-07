@@ -31,13 +31,19 @@ export const FLOW_LABEL: Record<FlowKey, string> = {
 const TABLE: { prefix: string; flow: FlowKey; step: string }[] = [
   // --- daily loop -----------------------------------------------------------
   { prefix: "/execute/receiving", flow: "daily_loop", step: "Deliveries step" },
-  { prefix: "/execute/handover", flow: "daily_loop", step: "Prep + pass step" },
+  { prefix: "/execute/pass", flow: "daily_loop", step: "Pass step" },
+  { prefix: "/execute/orders", flow: "daily_loop", step: "Ordering step" },
   { prefix: "/execute/floor", flow: "daily_loop", step: "Service step" },
   { prefix: "/execute/bookings", flow: "daily_loop", step: "Service step" },
   { prefix: "/execute/inventory", flow: "daily_loop", step: "Prep + pass step" },
   { prefix: "/execute/temp", flow: "daily_loop", step: "Service step" },
   { prefix: "/execute", flow: "daily_loop", step: "Service step" },
-  { prefix: "/schedule", flow: "daily_loop", step: "Roster step" },
+  // Legacy /execute/handover, /order, /schedule → transitional redirects.
+  // Kept so pages that temporarily land on the old URL still get a flow tag
+  // before the redirect fires. Remove after 2027-01-08.
+  { prefix: "/execute/handover", flow: "daily_loop", step: "Pass step" },
+  { prefix: "/order", flow: "daily_loop", step: "Ordering step" },
+  { prefix: "/schedule", flow: "team_arc", step: "Schedule step" },
 
   // --- invoice → close ------------------------------------------------------
   { prefix: "/administrate/finance/scans", flow: "invoice_close", step: "Inbox triage step" },
@@ -68,7 +74,6 @@ const TABLE: { prefix: string; flow: FlowKey; step: string }[] = [
   // temporarily land on the old URL still get a flow tag before the
   // redirect fires. Remove after 2027-01-08.
   { prefix: "/recipes", flow: "menu_sale", step: "Recipe editing step" },
-  { prefix: "/order", flow: "menu_sale", step: "Ordering step" },
   { prefix: "/administrate/suppliers", flow: "menu_sale", step: "Supplier profile step" },
 
   // --- guest arc ------------------------------------------------------------
@@ -83,6 +88,7 @@ const TABLE: { prefix: string; flow: FlowKey; step: string }[] = [
   { prefix: "/administrate/feedback", flow: "guest_arc", step: "Feedback step" },
 
   // --- team member arc -----------------------------------------------------
+  { prefix: "/administrate/team/schedule", flow: "team_arc", step: "Schedule step" },
   { prefix: "/administrate/team", flow: "team_arc", step: "Roster step" },
   { prefix: "/academy", flow: "team_arc", step: "Training step" },
   { prefix: "/messages", flow: "team_arc", step: "Team comms step" },

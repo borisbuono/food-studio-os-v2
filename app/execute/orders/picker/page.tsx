@@ -72,7 +72,7 @@ export default function Picker() {
               <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Best price</p>
               <p className="mt-1 font-serif text-2xl text-ink">{noEmoji(cheapest.name)} · {eur(cheapest.unit_price)}{cheapest.unit ? " / " + cheapest.unit : ""}</p>
               <p className="font-serif text-[14px] italic text-ink-soft">at {cheapest.provider_name}</p>
-              <Link href={"/order?supplier=" + cheapest.provider_id} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Open an order with them →</Link>
+              <Link href={"/execute/orders?supplier=" + cheapest.provider_id} className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Open an order with them →</Link>
             </div>
           ) : null}
 
@@ -86,7 +86,7 @@ export default function Picker() {
                 </div>
                 <div className="mt-0.5 flex items-baseline justify-between gap-3">
                   <span className="font-mono text-[11px] uppercase tracking-wide text-clay">{m.provider_name}</span>
-                  <Link href={"/order?supplier=" + m.provider_id} className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>order →</Link>
+                  <Link href={"/execute/orders?supplier=" + m.provider_id} className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>order →</Link>
                 </div>
               </li>
             ))}

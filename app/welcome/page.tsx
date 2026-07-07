@@ -41,7 +41,7 @@ export default function Welcome() {
       // straight to their first task instead. (auth/callback only guards new users.)
       try {
         const { data: fr } = await supabaseBrowser.from("profiles").select("first_run_done_at").eq("id", prof.id).maybeSingle();
-        if (fr?.first_run_done_at) { router.replace(prof.world === "office" ? "/" : "/execute/handover"); return; }
+        if (fr?.first_run_done_at) { router.replace(prof.world === "office" ? "/" : "/execute/pass"); return; }
       } catch {}
       // language: cookie wins; otherwise inherit the invite's language
       const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
@@ -69,7 +69,7 @@ export default function Welcome() {
   const world = ROLES[p.world];
   const firstTask = p.world === "office"
     ? { href: "/", label: tr("welcome.task.brief") }
-    : { href: "/execute/handover", label: tr("welcome.task.clockin") };
+    : { href: "/execute/pass", label: tr("welcome.task.clockin") };
 
   const steps = [tr("welcome.step.you"), tr("welcome.step.rules"), tr("welcome.step.os")];
 

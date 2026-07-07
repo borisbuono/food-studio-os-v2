@@ -17,7 +17,7 @@ export default async function Suppliers() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Suppliers · ordering</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{providers.length} suppliers</h1>
-      <Link href="/order/picker" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide text-ink-soft">Find a product across all suppliers →</Link>
+      <Link href="/execute/orders/picker" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide text-ink-soft">Find a product across all suppliers →</Link>
 
       <div className="mt-6 border-y border-dashed border-line py-5">
         <p className="font-sans text-[14px] text-ink-soft">{(orders.count ?? 0) === 0 ? "No orders placed through the OS yet — placing orders to suppliers arrives next." : (orders.count + " orders on record.")}</p>

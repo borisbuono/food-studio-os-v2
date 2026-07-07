@@ -77,8 +77,8 @@ export default async function SupplierHub({ params }: { params: { id: string } }
 
       {/* the three actions this surface absorbs */}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Link href={"/order?supplier=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
-        <Link href="/execute/handover#receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
+        <Link href={"/execute/orders?supplier=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
+        <Link href="/execute/pass#receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
         <Link href="/administrate/finance/costs" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
         {p.category === "wine" ? (
           <span className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-clay">Hold Chef to scan a label</span>

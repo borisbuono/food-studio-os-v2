@@ -39,7 +39,7 @@ export default async function ExecuteHome() {
 
       <section className="mt-10">
         <PillarTile
-          href="/execute/handover"
+          href="/execute/pass"
           kicker="The Pass · prep + cleaning"
           title="Handover"
           value={prep + cleaningDue}

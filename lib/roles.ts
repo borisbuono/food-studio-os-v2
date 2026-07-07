@@ -13,17 +13,17 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   boh: {
     label: "Back of House",
     points: [
-      { href: "/execute/handover", label: "The Pass", blurb: "Tonight's prep + cleaning + close-down, scaled to tomorrow's covers." },
+      { href: "/execute/pass", label: "The Pass", blurb: "Tonight's prep + cleaning + close-down, scaled to tomorrow's covers." },
       { href: "/menu", label: "Menu", blurb: "Every dish — recipe, Calculation, story, allergens, Cook Mode." },
     ],
   },
   foh: {
     label: "Front of House",
     points: [
-      { href: "/execute/handover", label: "The Pass", blurb: "Tonight: covers, specials, 86s, close-down." },
+      { href: "/execute/pass", label: "The Pass", blurb: "Tonight: covers, specials, 86s, close-down." },
       { href: "/menu", label: "Menu", blurb: "Sell and present every dish." },
       { href: "/administrate/events", label: "Events", blurb: "Private events and catering." },
-      { href: "/schedule", label: "Schedule", blurb: "Who is on, when." },
+      { href: "/administrate/team/schedule", label: "Schedule", blurb: "Who is on, when." },
     ],
   },
 };
