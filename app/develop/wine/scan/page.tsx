@@ -91,7 +91,7 @@ export default function ScanWine() {
       {err ? <p className="mt-3 font-mono text-[11px] text-ink-soft">{err}</p> : null}
 
       {w && !saved ? (
-        <div className="mt-6 rounded-2xl border border-black/10 bg-card p-5">
+        <div className="mt-6 rounded-2xl border border-line bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Check & edit, then save</p>
           {([["name", "Name"], ["producer", "Producer"], ["region", "Region / area"], ["grape", "Grape(s)"], ["cuvee", "Cuvée / bottling"], ["classification", "Cru / classification"], ["vintage", "Vintage"]] as const).map(([k, label]) => (
             <label key={k} className="mt-3 block">
@@ -123,7 +123,7 @@ export default function ScanWine() {
 
       {flag ? <p className="mt-4 rounded-xl border border-tomato/40 bg-tomato/5 p-3 font-sans text-[13px] text-tomato">{flag}</p> : null}
       {saved ? (
-        <div className="mt-4 rounded-xl border border-black/10 bg-card p-4">
+        <div className="mt-4 rounded-xl border border-line bg-card p-4">
           <p className="font-serif text-[16px] text-ink">Saved to the cellar.</p>
           <div className="mt-3 flex gap-3">
             <Link href={"/develop/wine/" + saved} className="rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Open the wine</Link>

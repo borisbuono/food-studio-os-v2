@@ -82,7 +82,7 @@ export default function PaymentsTile({ rows }: { rows: PaymentRow[] }) {
   const allGood = notHealthy === 0;
 
   return (
-    <Link href="/administrate/finance/payments" className="block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
+    <Link href="/administrate/finance/payments" className="block rounded-2xl border border-line bg-card p-5 transition hover:border-line">
       <div className="flex items-baseline justify-between">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Payments</p>
         <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>all →</span>

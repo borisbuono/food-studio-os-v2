@@ -9,7 +9,7 @@ export default function ClockIn() {
   const clockOut = () => { setInAt(null); localStorage.removeItem("fs_clockin"); };
 
   return (
-    <div className="rounded-2xl border border-black/10 bg-card p-6">
+    <div className="rounded-2xl border border-line bg-card p-6">
       <p className="font-sans text-xs font-medium text-ink-soft">Clock-in</p>
       {inAt ? (
         <>

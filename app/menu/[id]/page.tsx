@@ -67,7 +67,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
       <p className="mt-6 font-sans text-xs font-medium text-tomato">{sec || "Dish"}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(item.name)}</h1>
       <p className="mt-2 font-mono text-[12px] text-clay">{price ? "€" + price : "no price"}{recipe ? " · " + (recipe.portions || 0) + " portions base" : " · no recipe linked yet"}</p>
-      {mePos ? <div className="mt-3 rounded-xl border border-black/10 bg-card px-4 py-2.5"><span className="font-mono text-[11px] uppercase tracking-wide" style={{ color: mePos.color }}>{mePos.label}</span><span className="ml-2 font-sans text-[13px] text-ink-soft">{mePos.nudge}</span></div> : null}
+      {mePos ? <div className="mt-3 rounded-xl border border-line bg-card px-4 py-2.5"><span className="font-mono text-[11px] uppercase tracking-wide" style={{ color: mePos.color }}>{mePos.label}</span><span className="ml-2 font-sans text-[13px] text-ink-soft">{mePos.nudge}</span></div> : null}
 
       {recipe ? (
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -98,7 +98,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
         const fp = price ? Math.round((plate / Number(price)) * 1000) / 10 : null;
         const marg = price != null ? Number(price) - plate : null;
         return (
-          <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
+          <div className="mt-6 rounded-2xl border border-line bg-card p-6">
             <p className="font-sans text-xs font-medium text-ink-soft">Calculation · per portion</p>
             <ul className="mt-3 divide-y divide-black/10">
               {ings.filter((i: any) => Number(i.line_cost) > 0).map((i: any, n: number) => (

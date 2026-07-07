@@ -221,20 +221,20 @@ export default function ThePass() {
 
       {/* forecast banner */}
       {forecast != null ? (
-        <div className="mt-5 rounded-xl border border-black/10 bg-card p-4">
+        <div className="mt-5 rounded-xl border border-line bg-card p-4">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Tomorrow’s forecast</p>
           <p className="mt-1 font-serif text-5xl font-medium text-ink">≈ {forecast} <span className="text-2xl font-normal text-ink-soft">covers</span></p>
           <p className="font-sans text-[13px] text-ink-soft">{busierWord}{fcSource ? ` · from ${fcSource}` : ""}. Prep quantities below scale to this.</p>
         </div>
       ) : (
-        <div className="mt-5 rounded-xl border border-black/10 bg-card p-4">
+        <div className="mt-5 rounded-xl border border-line bg-card p-4">
           <p className="font-sans text-[13px] text-ink-soft">No trading history yet — connect your POS and the forecast will set tomorrow’s quantities for you.</p>
         </div>
       )}
 
       {/* Clock-in pulse — who's in, who's late */}
       {clockIn.total > 0 ? (
-        <div className="mt-3 flex items-baseline justify-between rounded-xl border border-black/10 bg-card p-4">
+        <div className="mt-3 flex items-baseline justify-between rounded-xl border border-line bg-card p-4">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">On shift today</p>
           <p className="font-sans text-[13px]">
             <span className="text-ink">{clockIn.inCount}/{clockIn.total} in</span>
@@ -251,7 +251,7 @@ export default function ThePass() {
               <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{SLOT_LABEL[s]}</p>
               <ul className="mt-2 space-y-2">
                 {grouped[s].map((i) => (
-                  <li key={i.key} className="rounded-xl border border-black/10 bg-card p-3">
+                  <li key={i.key} className="rounded-xl border border-line bg-card p-3">
                     <div className="flex items-start gap-3">
                       <button onClick={() => toggleDone(i)} aria-label="toggle" className="mt-0.5 h-5 w-5 shrink-0 rounded-md border transition" style={doneToday[i.key] ? { background: "var(--accent)", borderColor: "var(--accent)" } : { borderColor: "rgba(0,0,0,0.25)" }}>{doneToday[i.key] ? <span className="text-[12px] text-white">✓</span> : null}</button>
                       <div className="min-w-0 flex-1">
@@ -279,7 +279,7 @@ export default function ThePass() {
             {tomorrowItems.map((i) => {
               const st = plan[i.key] || "todo"; const q = qtyFor(i, forecast);
               return (
-                <li key={i.key} className="flex items-center justify-between gap-3 rounded-xl border border-black/10 bg-card p-3">
+                <li key={i.key} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-3">
                   <div className="min-w-0">
                     <p className="truncate font-sans text-[15px] text-ink">{i.name}{q ? <span className="ml-2 font-mono text-[11px]" style={{ color: "var(--accent)" }}>{q}</span> : null}</p>
                     <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{i.zone}{i.kind === "prep" ? " · prep" : " · clean"}</p>
@@ -299,7 +299,7 @@ export default function ThePass() {
         <div className="mt-6 space-y-6">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Tomorrow’s prep · {toDo.length}</p>
-            <ul className="mt-2 divide-y divide-black/10 border-y border-black/10">
+            <ul className="mt-2 divide-y divide-line border-y border-line">
               {toDo.length ? toDo.map((i) => { const q = qtyFor(i, forecast); return <li key={i.key} className="flex items-baseline justify-between py-2"><span className="font-sans text-[14px] text-ink">{i.name}</span><span className="font-mono text-[11px] text-clay">{q || i.zone}</span></li>; }) : <li className="py-2 font-sans text-[14px] text-clay">Nothing — all prepped ahead.</li>}
             </ul>
           </div>
@@ -316,7 +316,7 @@ export default function ThePass() {
         <div className="mt-6">
           <p className="font-sans text-[14px] text-ink-soft">A word for whoever opens tomorrow — VIPs, 86s, equipment, anything to walk into knowing. It lands on their briefing.</p>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tomorrow ≈40 covers, table 6 is a birthday. Fryer’s due a filter. Low on gambas — on the order. Crema set overnight, ready." className="mt-3 h-40 w-full rounded-2xl border border-black/15 bg-card p-4 font-serif text-[16px] leading-relaxed text-ink outline-none focus:border-ink" />
-          <div className="mt-4 rounded-xl border border-black/10 bg-card p-4">
+          <div className="mt-4 rounded-xl border border-line bg-card p-4">
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The pass</p>
             <p className="mt-1 font-sans text-[14px] text-ink-soft">{forecast ? `≈${forecast} covers · ` : ""}{items.filter((i) => !doneToday[i.key]).length} carried over · {toDo.length} prep for tomorrow · {shopping.length} to buy · closed by {profile.name}</p>
           </div>

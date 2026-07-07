@@ -42,7 +42,7 @@ export default async function Team() {
 
       <Link href="/administrate/team/invite" className="mt-4 inline-block rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">+ Add to team</Link>
 
-      <Link href="/schedule" className="mt-6 block rounded-2xl border border-black/10 bg-card p-5 transition hover:border-line">
+      <Link href="/schedule" className="mt-6 block rounded-2xl border border-line bg-card p-5 transition hover:border-line">
         <p className="font-sans text-xs font-medium text-ink-soft">Schedule</p>
         <h2 className="mt-1 font-serif text-xl text-ink">Weekly rota</h2>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">{(shifts.count ?? 0) === 0 ? "Browse by week — FOH / BOH, by zone." : (shifts.count + " shifts scheduled.")}</p>

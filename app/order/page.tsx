@@ -72,7 +72,7 @@ export default function Order() {
         <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Send · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Send the order</h1>
         <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">This opens your own WhatsApp or email with the order written out — you tap send. We log it as sent here so it shows in Receiving.</p>
-        <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-black/10 bg-card p-4 font-sans text-[14px] leading-relaxed text-ink">{message}</pre>
+        <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-line bg-card p-4 font-sans text-[14px] leading-relaxed text-ink">{message}</pre>
         <div className="mt-4 flex flex-col gap-3">
           {wa ? <button onClick={() => sendVia("whatsapp", wa)} className="w-full rounded-xl bg-[color:var(--accent)] px-6 py-4 font-sans text-[15px] font-medium text-[#F7F7F4]">Send on WhatsApp</button> : null}
           {mail ? <button onClick={() => sendVia("email", mail)} className="w-full rounded-xl border border-black/20 px-6 py-4 font-sans text-[15px] text-ink">Send by email</button> : null}

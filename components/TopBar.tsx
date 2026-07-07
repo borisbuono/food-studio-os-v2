@@ -66,7 +66,7 @@ export default function TopBar() {
                 <span className="text-clay">▾</span>
               </button>
               {menu ? (
-                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-black/10 bg-card shadow-xl shadow-black/15">
+                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-line bg-card shadow-xl shadow-black/15">
                   {ENTITY_ORDER.map((k) => (
                     <button key={k} onClick={() => pick(k)} className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition hover:bg-paper " + (k === entity ? "text-ink" : "text-ink-soft")}>
                       <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[k] }} />

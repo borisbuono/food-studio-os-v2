@@ -89,7 +89,7 @@ export default function WinePrices() {
           {rows.map((row, idx) => {
             const wine = wineById(row.wineId);
             return (
-              <div key={idx} className="rounded-xl border border-black/10 bg-card p-3">
+              <div key={idx} className="rounded-xl border border-line bg-card p-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-sans text-[15px] text-ink">{row.name}</span>
                   <span className="shrink-0 font-mono text-[12px]" style={{ color: "var(--accent)" }}>{eur(row.unit_price)}{row.unit ? " / " + row.unit : ""}</span>
@@ -110,7 +110,7 @@ export default function WinePrices() {
       ) : null}
 
       {done ? (
-        <div className="mt-5 rounded-2xl border border-black/10 bg-card p-5">
+        <div className="mt-5 rounded-2xl border border-line bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Costs updated</p>
           <ul className="mt-2 space-y-1">{done.length ? done.map((m, i) => <li key={i} className="font-sans text-[14px] text-ink-soft">{m}</li>) : <li className="font-sans text-[14px] text-clay">Nothing matched — try again or pick the wines manually.</li>}</ul>
           <Link href="/develop/wine" className="mt-4 inline-block rounded-xl px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>Back to cellar</Link>

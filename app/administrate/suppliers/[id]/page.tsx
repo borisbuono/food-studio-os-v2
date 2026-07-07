@@ -78,12 +78,12 @@ export default async function SupplierHub({ params }: { params: { id: string } }
       {/* the three actions this surface absorbs */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link href={"/order?supplier=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
-        <Link href="/execute/handover#receiving" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
-        <Link href="/administrate/finance/costs" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
+        <Link href="/execute/handover#receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
+        <Link href="/administrate/finance/costs" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
         {p.category === "wine" ? (
-          <Link href="/develop/wine/scan" className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Scan label</Link>
+          <Link href="/develop/wine/scan" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Scan label</Link>
         ) : (
-          <Link href={"/administrate/finance/scans?supplier=" + p.id} className="rounded-xl border border-black/10 bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Invoices ({p.name})</Link>
+          <Link href={"/administrate/finance/scans?supplier=" + p.id} className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Invoices ({p.name})</Link>
         )}
       </div>
 
@@ -97,7 +97,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
               const pct = m.pct as number;
               const up = pct > 0;
               return (
-                <div key={i} className="flex items-center justify-between rounded-xl border border-black/10 bg-card px-4 py-3">
+                <div key={i} className="flex items-center justify-between rounded-xl border border-line bg-card px-4 py-3">
                   <div>
                     <p className="font-sans text-[14px] text-ink">{m.name}</p>
                     <p className="font-mono text-[11px] text-clay">€{Number(m.latest.unit_price).toFixed(2)}/{m.latest.unit}</p>
@@ -117,7 +117,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
           <Link href={"/administrate/suppliers/" + params.id + "/add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">+ add</Link>
         </div>
         {!products.length ? <p className="mt-2 font-sans text-[14px] text-clay">No catalog yet. Build it from your last invoice.</p> : (
-          <ul className="mt-3 divide-y divide-black/5 rounded-2xl border border-black/10 bg-card">
+          <ul className="mt-3 divide-y divide-black/5 rounded-2xl border border-line bg-card">
             {products.slice(0, 30).map((pr: any) => {
               const k = (pr.name || "").toLowerCase();
               const mv = productMove[k];
@@ -143,7 +143,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
         {!orders.length ? <p className="mt-2 font-sans text-[14px] text-clay">No orders placed through the OS yet.</p> : (
           <ul className="mt-3 space-y-2">
             {orders.map((o: any) => (
-              <li key={o.id} className="rounded-xl border border-black/10 bg-card px-4 py-3">
+              <li key={o.id} className="rounded-xl border border-line bg-card px-4 py-3">
                 <div className="flex items-baseline justify-between">
                   <span className="font-sans text-[13px] text-ink">{o.sent_at ? new Date(o.sent_at).toLocaleDateString("en-GB") : "draft"} · {o.channel || "—"}</span>
                   <span className="font-mono text-[11px] text-clay">{o.total ? "€" + Number(o.total).toFixed(2) : ""}</span>

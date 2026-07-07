@@ -26,7 +26,7 @@ export default async function Command() {
 
       <div className="mt-6 grid grid-cols-3 gap-3">
         {tiles.map((t) => (
-          <Link key={t.href} href={t.href} className="rounded-2xl border border-black/10 bg-card p-4 text-center transition hover:border-line">
+          <Link key={t.href} href={t.href} className="rounded-2xl border border-line bg-card p-4 text-center transition hover:border-line">
             <p className="font-serif text-2xl text-ink">{t.n}</p>
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{t.label}</p>
           </Link>

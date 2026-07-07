@@ -162,7 +162,7 @@ export default function TempLog() {
       <p className="mt-1 font-sans text-[14px] text-ink-soft">Say it, glance, confirm. Hands can stay where they are.</p>
 
       {/* Capture card */}
-      <div className="mt-7 rounded-2xl border border-black/10 bg-card p-6">
+      <div className="mt-7 rounded-2xl border border-line bg-card p-6">
         {speechSupported() ? (
           <button onClick={listen} disabled={listening}
             className="w-full rounded-2xl bg-[color:var(--accent)] py-5 font-serif text-[20px] text-[#F7F7F4] transition active:scale-[0.99] disabled:opacity-60">
@@ -216,7 +216,7 @@ export default function TempLog() {
 
       {/* Today's log */}
       <p className="mt-9 font-mono text-[11px] uppercase tracking-[0.18em] text-basil">Logged today · {logs.length}</p>
-      <div className="mt-2 divide-y divide-black/10 overflow-hidden rounded-2xl border border-black/10 bg-card">
+      <div className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
         {logs.length === 0 && <p className="px-5 py-4 font-sans text-[14px] text-ink-soft">Nothing logged yet today.</p>}
         {logs.map((l, k) => (
           <div key={k} className="flex items-center justify-between px-5 py-3">

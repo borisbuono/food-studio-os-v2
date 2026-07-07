@@ -148,7 +148,7 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
             </>
           );
           return (
-            <li key={it.kind + ":" + it.id} className="rounded-2xl border border-black/10 bg-card p-5">
+            <li key={it.kind + ":" + it.id} className="rounded-2xl border border-line bg-card p-5">
               {it.url ? <a href={it.url} target="_blank" rel="noreferrer" className="block">{inner}</a> : inner}
             </li>
           );

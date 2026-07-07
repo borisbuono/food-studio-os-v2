@@ -62,7 +62,7 @@ export default function Schedule() {
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Schedule · weekly rota</p>
       {/* Today's roster — who's in, who's late */}
       {today.length ? (
-        <section className="mt-4 rounded-2xl border border-black/10 bg-card p-5">
+        <section className="mt-4 rounded-2xl border border-line bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">On today</p>
           <ul className="mt-2 divide-y divide-black/10">
             {today.map((sh: any) => {

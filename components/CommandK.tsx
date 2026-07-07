@@ -38,7 +38,7 @@ export default function CommandK() {
       <button onClick={() => setOpen(true)} className="font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ink-soft">search</button>
       {open ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/20 px-6 pt-24" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-black/10 bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Go to…" className="w-full border-b border-black/10 bg-card px-4 py-3 font-sans text-[15px] text-ink outline-none" />
             <ul className="max-h-72 overflow-y-auto py-1">
               {results.map((r) => (

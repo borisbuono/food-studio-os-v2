@@ -156,7 +156,7 @@ export default function Receiving() {
           {rows.map((row, idx) => {
             const t = tById(row.targetId);
             return (
-              <div key={idx} className="rounded-xl border border-black/10 bg-card p-3">
+              <div key={idx} className="rounded-xl border border-line bg-card p-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-sans text-[15px] text-ink">{row.name}</span>
                   <span className="shrink-0 font-mono text-[12px]" style={{ color: "var(--accent)" }}>{row.qty ?? "?"} {row.unit || ""} · {eur(row.unit_price)}</span>
@@ -175,7 +175,7 @@ export default function Receiving() {
       ) : null}
 
       {done ? (
-        <div className="mt-5 rounded-2xl border border-black/10 bg-card p-5">
+        <div className="mt-5 rounded-2xl border border-line bg-card p-5">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Received</p>
           <ul className="mt-2 space-y-1">{done.length ? done.map((m, i) => <li key={i} className="font-sans text-[14px] text-ink-soft">{m}</li>) : <li className="font-sans text-[14px] text-clay">Nothing matched — pick targets and try again.</li>}</ul>
           {albaranNote ? <p className="mt-3 font-serif italic text-[13px] text-ink-soft">{albaranNote}</p> : null}

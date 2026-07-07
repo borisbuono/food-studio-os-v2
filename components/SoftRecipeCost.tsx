@@ -30,7 +30,7 @@ export default function SoftRecipeCost({ id, initialCost, initialBasis, price }:
   };
 
   return (
-    <div className="mt-6 rounded-2xl border border-black/10 bg-card p-6">
+    <div className="mt-6 rounded-2xl border border-line bg-card p-6">
       <p className="font-sans text-xs font-medium text-ink-soft">Calculation · buy &amp; sell</p>
       {edit ? (
         <div className="mt-3 flex flex-wrap items-end gap-3">

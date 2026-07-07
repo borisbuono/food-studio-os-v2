@@ -39,7 +39,7 @@ export default function TrainWine() {
       <h1 className="mt-2 font-serif text-3xl text-ink">Know the list</h1>
       <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-clay">{i + 1} / {wines.length} · {(w.wine_style || "wine").replace("_", " ")}</p>
 
-      <button onClick={() => setShow((s) => !s)} className="mt-6 w-full rounded-2xl border border-black/10 bg-card p-8 text-left transition hover:border-tomato/40">
+      <button onClick={() => setShow((s) => !s)} className="mt-6 w-full rounded-2xl border border-line bg-card p-8 text-left transition hover:border-tomato/40">
         <p className="font-serif text-3xl font-light text-ink">{noEmoji(w.name)}</p>
         {!show ? (
           <p className="mt-4 font-mono text-[11px] uppercase tracking-wide text-clay">Tap to reveal — can you place it &amp; pitch it?</p>

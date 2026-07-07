@@ -127,7 +127,7 @@ export default function PaymentsClient({ rows }: { rows: Row[] }) {
               </tr>
             ))}
             {!filtered.length ? (
-              <tr><Td colSpan={9}><p className="py-6 text-center font-serif italic text-muted">No rows for this filter.</p></Td></tr>
+              <tr><Td colSpan={9}><p className="py-6 text-center font-serif italic text-muted">{rows.length === 0 ? "No billing rows yet — sync via POST /api/finance/payment-status/sync to seed." : "No rows for this filter."}</p></Td></tr>
             ) : null}
           </tbody>
         </table>

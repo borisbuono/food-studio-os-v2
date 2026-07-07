@@ -118,7 +118,7 @@ export default function Messages() {
             const mine = m.author_id === profile.id;
             return (
               <div key={m.id} className={"flex " + (mine ? "justify-end" : "justify-start")}>
-                <div className={"max-w-[80%] rounded-2xl px-4 py-2 " + (mine ? "text-[#F7F7F4]" : "border border-black/10 bg-card text-ink")} style={mine ? { background: "var(--accent)" } : undefined}>
+                <div className={"max-w-[80%] rounded-2xl px-4 py-2 " + (mine ? "text-[#F7F7F4]" : "border border-line bg-card text-ink")} style={mine ? { background: "var(--accent)" } : undefined}>
                   {!mine ? <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{m.author_name || "someone"}</p> : null}
                   <p className="font-serif text-[16px] leading-relaxed">{m.body}</p>
                   <p className={"mt-0.5 font-mono text-[9px] " + (mine ? "text-white/70" : "text-clay")}>{when(m.created_at)}</p>
@@ -155,7 +155,7 @@ export default function Messages() {
         </div>
       ) : null}
       {dmPick ? (
-        <div className="mt-3 rounded-xl border border-black/10 bg-card p-2">
+        <div className="mt-3 rounded-xl border border-line bg-card p-2">
           {people.length ? people.map((pp) => <button key={pp.id} onClick={() => startDm(pp)} className="block w-full rounded-lg px-3 py-2 text-left font-sans text-[14px] text-ink transition hover:bg-paper">{noEmoji(pp.name)}{pp.role ? " · " + pp.role : ""}</button>) : <p className="px-3 py-2 font-sans text-[13px] text-clay">No teammates signed up yet — they appear here once onboarded.</p>}
         </div>
       ) : null}
