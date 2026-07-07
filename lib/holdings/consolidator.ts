@@ -5,7 +5,7 @@ import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT } from "@/lib/entities";
 //
 // The console rolls up numbers across every operating entity into a group view.
 // Each helper reads the same operational tables the per-entity dashboards read
-// (bank_movements, invoice_inbox, eod_reports, providers, etc.), so there's no
+// (bank_movements, invoice_inbox, eod_accounting, providers, etc.), so there's no
 // new data store to maintain — the consolidation IS the value.
 //
 // Tolerant everywhere: if a source table is empty or missing a column, the
@@ -67,9 +67,10 @@ export async function getGroupCashToday(): Promise<{ by_entity: ByEntity<number>
 }
 
 // ─── Revenue MTD ─────────────────────────────────────────────────────────
-// Sums eod_reports.revenue for the current calendar month, grouped by entity
-// via restaurant_id → entity mapping (RESTAURANT_TO_ENTITY). If eod_accounting
-// lands as the canonical table later, add a preference for it above this.
+// Sums eod_accounting.total_gross_eur for the current calendar month, grouped
+// by entity via restaurant_id → entity mapping (RESTAURANT_TO_ENTITY). Falls back
+// to the pre-migration eod_reports table if eod_accounting hasn't been created yet
+// (envs during the 20260705 migration window).
 
 function monthStartISO(): string {
   const d = new Date();
@@ -102,7 +103,8 @@ export async function getGroupRevenueMTD(): Promise<{ by_entity: ByEntity<number
       if (ec) by_entity[ec] += Number(row.total_gross_eur || 0);
     }
   } else {
-    // Fallback to eod_reports.revenue — what the per-entity dashboards use.
+    // Fallback to the pre-migration eod_reports table (preserves this function
+    // for envs where the 20260705 rename migration hasn't run yet).
     const rep = await supabase.from("eod_reports").select("restaurant_id,revenue,report_date").gte("report_date", since);
     if (rep && !rep.error && Array.isArray(rep.data) && rep.data.length) {
       source = "eod_reports";

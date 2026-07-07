@@ -64,7 +64,7 @@ export default async function Page() {
     bankMovementsRes,
     platformBillingRes,
   ] = await Promise.all([
-    supabase.from("eod_reports").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
+    supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
     supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
     supabase.from("albarans").select("restaurant_id,received_at").gte("received_at", today + "T00:00:00").lt("received_at", today + "T23:59:59"),
     supabase.from("mep_dishes").select("zone_id,is_active,updated_at").eq("is_active", true),

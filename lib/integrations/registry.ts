@@ -115,7 +115,7 @@ function status(vendor: string, entity: EntityCode): "connected" | "stub" | "off
     case "opentable": return hasAny("OPENTABLE_API_KEY") ? "connected" : "stub";
     case "tink":    return hasAny("TINK_CLIENT_ID") ? "connected" : "stub";
     case "plaid":   return hasAny("PLAID_CLIENT_ID") ? "connected" : "stub";
-    case "gocardless": return hasAny("GOCARDLESS_BAD_TOKEN") ? "connected" : "stub";
+    case "gocardless": return hasAny("GOCARDLESS_ACCESS_TOKEN") ? "connected" : "stub";
     case "quickbooks": return hasAny("QBO_CLIENT_ID") ? "connected" : "stub";
     case "xero":    return hasAny("XERO_CLIENT_ID") ? "connected" : "stub";
     case "sage":    return hasAny("SAGE_API_KEY") ? "connected" : "stub";
@@ -132,6 +132,10 @@ function status(vendor: string, entity: EntityCode): "connected" | "stub" | "off
     case "thefork": return hasAny("THEFORK_API_KEY") ? "connected" : "stub";
     case "yelp": return hasAny("YELP_API_KEY") ? "connected" : "stub";
     case "meta-ads": return hasAny("META_ADS_ACCESS_TOKEN") ? "connected" : "stub";
+    case "micros":  return hasAny("MICROS_CLIENT_ID") ? "connected" : "stub";
+    case "lightspeed": return hasAny("LIGHTSPEED_CLIENT_ID") ? "connected" : "stub";
+    case "redsys":  return hasAny("REDSYS_MERCHANT_KEY") ? "connected" : "stub";
+    case "sevenrooms": return hasAny("SEVENROOMS_API_KEY") ? "connected" : "stub";
     default: return "stub";
   }
 }

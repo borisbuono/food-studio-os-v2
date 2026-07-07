@@ -20,7 +20,7 @@ export default async function AdministrateHome() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes] = await Promise.all([
-    supabase.from("eod_reports").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle(),
+    supabase.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle(),
     supabase.from("invoice_inbox").select("id,amount_eur,entity_id,match_status").eq("entity_id", ec).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,reconciled_to").eq("entity_id", ec).eq("reconciled_to", "unmatched"),
     supabase.from("providers").select("id"),
