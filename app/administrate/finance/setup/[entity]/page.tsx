@@ -119,7 +119,7 @@ export default async function SetupEntity({ params }: { params: { entity: string
       <section className="mt-6 rounded-2xl border border-line p-5">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Feed the backlog</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <ActionCard href="/capture" title="📷 Snap a photo" body="Camera intake. Invoice / albarán / EOD slip — files in the right table." />
+          <div className="rounded-xl border border-line bg-paper p-4"><p className="font-serif text-[15px] text-ink">📷 Snap a photo</p><p className="mt-1 font-serif italic text-[13px] text-muted">Hold the Chef button (bottom-right) — camera opens, invoice / albarán / EOD is filed automatically.</p></div>
           <SyncCardClient code={code} />
           <BankImportClient code={code} />
           <ActionCard href={`/administrate/finance/eod/new`} title="Type an EOD" body="Manual entry with live 4-line VAT split. Dry-run posting by default." />

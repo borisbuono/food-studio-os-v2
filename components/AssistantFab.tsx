@@ -49,6 +49,9 @@ export default function AssistantFab() {
   const pressTimer = useRef<any>(null);
   const longPressFired = useRef(false);
   const captureInputRef = useRef<HTMLInputElement>(null);
+  const wineInputRef = useRef<HTMLInputElement>(null);
+  const [wineDraft, setWineDraft] = useState<any | null>(null);
+  const [wineBusy, setWineBusy] = useState(false);
 
   useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); }, []);
 
@@ -120,14 +123,14 @@ export default function AssistantFab() {
     if (supported) startListen();
   };
 
-  // Long-press → camera
+  // Long-press → open sheet with camera actions strip (Collapse #2 redo)
   const fabPressDown = () => {
     longPressFired.current = false;
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       // Haptic
       if (navigator.vibrate) navigator.vibrate(15);
-      captureInputRef.current?.click();
+      setOpen(true);
     }, 500);
   };
   const fabPressUp = () => {
@@ -188,6 +191,61 @@ export default function AssistantFab() {
     } catch (e: any) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "upload failed") }]); }
   };
 
+  // Wine label scan — Collapse #2 second intent. Uses the same /api/wine-scan
+  // endpoint the (now-deleted) /develop/wine/scan page used. Shows the extracted
+  // wine in the sheet and hands off to the cellar for edit + full save.
+  const onWineCapture = async (file?: File | null) => {
+    if (!file) return;
+    setWineBusy(true); setWineDraft(null);
+    setLog((l) => [...l, { role: "sys", text: lang === "es" ? "🍷 Leyendo etiqueta…" : "🍷 Reading label…" }]);
+    try {
+      // Downscale in-browser (same recipe the old scan page used)
+      const bmp = await new Promise<{ data: string; media_type: string }>((resolve, reject) => {
+        const img = new Image(); const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const max = 1280; let { width, height } = img;
+          if (width > max || height > max) { const sc = max / Math.max(width, height); width = Math.round(width * sc); height = Math.round(height * sc); }
+          const c = document.createElement("canvas"); c.width = width; c.height = height;
+          c.getContext("2d")!.drawImage(img, 0, 0, width, height); URL.revokeObjectURL(url);
+          resolve({ data: c.toDataURL("image/jpeg", 0.82).split(",")[1], media_type: "image/jpeg" });
+        };
+        img.onerror = reject; img.src = url;
+      });
+      const r = await fetch("/api/wine-scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bmp) });
+      const d = await r.json();
+      if (!d.ok) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (d.error || "scan failed") }]); setWineBusy(false); return; }
+      const w = d.wine || {};
+      setWineDraft(w);
+      const summary = [w.producer, w.name, w.vintage].filter(Boolean).join(" · ") || "wine";
+      setLog((l) => [...l, { role: "sys", text: `🍷 ${lang === "es" ? "Etiqueta leída" : "Label read"}: ${summary}` }]);
+    } catch (e: any) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "scan failed") }]); }
+    setWineBusy(false);
+  };
+
+  const saveWineDraft = async () => {
+    if (!wineDraft?.name) return;
+    setWineBusy(true);
+    try {
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+      const rid = profile?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+      const sb = supabaseBrowser;
+      const desc = [wineDraft.description, wineDraft.grape ? "Grape: " + wineDraft.grape : "", wineDraft.cuvee ? "Cuvée: " + wineDraft.cuvee : "", wineDraft.classification ? "Classification: " + wineDraft.classification : ""].filter(Boolean).join("\n\n") || null;
+      const { data, error } = await sb.from("menu_items").insert({
+        restaurant_id: rid, category: "drink", section: "wine",
+        name: wineDraft.name, producer: wineDraft.producer || null, region: wineDraft.region || null, vintage: wineDraft.vintage || null,
+        wine_style: wineDraft.wine_style || "to_classify",
+        tasting_notes: wineDraft.tasting_notes || null, pitch: wineDraft.pitch || null,
+        description: desc, is_active: false,
+      }).select("id").maybeSingle();
+      if (error) { setLog((l) => [...l, { role: "sys", text: "⚠ " + error.message }]); setWineBusy(false); return; }
+      const id = data?.id;
+      setWineDraft(null);
+      setLog((l) => [...l, { role: "sys", text: (lang === "es" ? "✓ Borrador guardado en la bodega. " : "✓ Draft saved to cellar. ") }]);
+      if (id) window.location.href = `/develop/wine/${id}`;
+    } catch (e: any) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "save failed") }]); }
+    setWineBusy(false);
+  };
+
   // Bottom-sheet drag
   const onHandleDown = (e: React.PointerEvent) => {
     if (!sheetRef.current) return;
@@ -229,9 +287,10 @@ export default function AssistantFab() {
   return (
     <>
       <input ref={captureInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
+      <input ref={wineInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onWineCapture(e.target.files?.[0])} />
 
       <button
-        aria-label="Chef — tap to talk · hold for camera"
+        aria-label="Chef — tap to talk · hold to open"
         style={{ background: errorPulse ? "#9A3122" : "var(--accent)", touchAction: "manipulation" }}
         className={"fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95 " + ringClass}
         onPointerDown={fabPressDown}
@@ -260,6 +319,22 @@ export default function AssistantFab() {
                     {lang === "es" ? "Toca Chef y habla. Pausa para enviar." : "Tap Chef and talk. Pause to send."} {" "}
                     <span className="text-muted">{lang === "es" ? "Mantén pulsado = cámara." : "Hold the button = camera."}</span>
                   </p>
+                </div>
+              ) : null}
+              {/* Camera actions strip (Collapse #2 wiring) — always visible when sheet is open */}
+              <div className="mb-4 flex flex-wrap gap-2 border-b border-line pb-3">
+                <button onClick={() => captureInputRef.current?.click()} className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft">📷 {lang === "es" ? "Capturar factura / EOD" : "Capture doc / EOD"}</button>
+                <button onClick={() => wineInputRef.current?.click()} disabled={wineBusy} className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft disabled:opacity-50">🍷 {wineBusy ? (lang === "es" ? "leyendo…" : "reading…") : (lang === "es" ? "Escanear vino" : "Scan wine")}</button>
+              </div>
+              {wineDraft ? (
+                <div className="mb-4 rounded-xl border border-line bg-paper-deep/40 p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "Vino leído" : "Wine label read"}</p>
+                  <p className="mt-1 font-serif text-[15px] text-ink">{[wineDraft.producer, wineDraft.name, wineDraft.vintage].filter(Boolean).join(" · ") || "—"}</p>
+                  <p className="mt-1 font-mono text-[10px] text-clay">{[wineDraft.region, wineDraft.wine_style].filter(Boolean).join(" · ")}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={saveWineDraft} disabled={wineBusy || !wineDraft.name} className="rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40">{wineBusy ? (lang === "es" ? "guardando…" : "saving…") : (lang === "es" ? "✓ guardar borrador · abrir" : "✓ save draft · open")}</button>
+                    <button onClick={() => setWineDraft(null)} className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink">× {lang === "es" ? "descartar" : "dismiss"}</button>
+                  </div>
                 </div>
               ) : null}
               {log.map((m, i) => m.role === "sys"
@@ -300,7 +375,7 @@ export default function AssistantFab() {
               <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={lang === "es" ? "…o escribe a Chef" : "…or type to Chef"} className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
               {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Enviar" : "Send"}</button> : null}
             </div>
-            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold = camera") : (lang === "es" ? "Escribe arriba" : "Type above"))}</p>
+            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold to open") : (lang === "es" ? "Escribe arriba" : "Type above"))}</p>
           </div>
         </>
       ) : null}

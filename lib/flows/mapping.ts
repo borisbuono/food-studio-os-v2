@@ -65,7 +65,6 @@ const TABLE: { prefix: string; flow: FlowKey; step: string }[] = [
   { prefix: "/recipes", flow: "menu_sale", step: "Recipe editing step" },
   { prefix: "/order", flow: "menu_sale", step: "Ordering step" },
   { prefix: "/administrate/suppliers", flow: "menu_sale", step: "Supplier profile step" },
-  { prefix: "/capture", flow: "menu_sale", step: "Capture step" },
 
   // --- guest arc ------------------------------------------------------------
   { prefix: "/grow/relationships", flow: "guest_arc", step: "Profile step" },

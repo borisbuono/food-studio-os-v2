@@ -81,7 +81,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
         <Link href="/execute/handover#receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
         <Link href="/administrate/finance/costs" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
         {p.category === "wine" ? (
-          <Link href="/develop/wine/scan" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Scan label</Link>
+          <span className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-clay">Hold Chef to scan a label</span>
         ) : (
           <Link href={"/administrate/finance/scans?supplier=" + p.id} className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Invoices ({p.name})</Link>
         )}
