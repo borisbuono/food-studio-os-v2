@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
 import EmailTriageClient from "./EmailTriageClient";
+import WhatsAppInboxClient from "./WhatsAppInboxClient";
 
 export const dynamic = "force-dynamic";
 
@@ -63,9 +64,10 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
   // Load Gmail channels for the current user — used by the Email triage segment.
   const { data: u } = await supabase.auth.getUser();
   const { data: chans } = u.user?.id
-    ? await supabase.from("assistant_channels").select("id,account_ref,settings,channel_type,revoked_at").eq("user_id", u.user.id).eq("channel_type", "gmail").is("revoked_at", null).order("created_at", { ascending: false })
+    ? await supabase.from("assistant_channels").select("id,account_ref,settings,channel_type,revoked_at").eq("user_id", u.user.id).in("channel_type", ["gmail","whatsapp_personal","whatsapp_business"]).is("revoked_at", null).order("created_at", { ascending: false })
     : { data: [] as any[] };
-  const gmailChannels = (chans || []).map((c: any) => ({ id: c.id, account_ref: c.account_ref, settings: c.settings || {} }));
+  const gmailChannels = (chans || []).filter((c: any) => c.channel_type === "gmail").map((c: any) => ({ id: c.id, account_ref: c.account_ref, settings: c.settings || {} }));
+  const whatsAppChannels = (chans || []).filter((c: any) => c.channel_type === "whatsapp_personal" || c.channel_type === "whatsapp_business").map((c: any) => ({ id: c.id, account_ref: c.account_ref, channel_type: c.channel_type, settings: c.settings || {} }));
 
   const active = (searchParams?.src && SRC_TABS.some((t) => t.key === searchParams.src)) ? searchParams!.src! : "all";
   const [{ data: ext }, { data: fb }] = await Promise.all([
@@ -137,7 +139,7 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
           return (
             <Link key={s.key} href={s.key === "all" ? "/grow/inbox" : `/grow/inbox?tab=${s.key}`}
               className={"rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wide " + (on ? "bg-ink text-paper" : "border border-black/10 text-ink-soft")}>
-              {s.label}{s.key === "whatsapp" ? " · soon" : ""}
+              {s.label}
             </Link>
           );
         })}
@@ -146,15 +148,7 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
       {tab === "email" ? (
         <EmailTriageClient channels={gmailChannels} initialChannelId={gmailChannels[0]?.id} />
       ) : tab === "whatsapp" ? (
-        <div className="mt-10 border-t border-line pt-8">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">WhatsApp</p>
-          <p className="mt-2 font-serif italic text-[15px] text-ink-soft">
-            WhatsApp triage lands in Sprint 4 — pair a number in Assistant Settings, then triaged threads will appear here alongside email.
-          </p>
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">
-            <Link href="/administrate/settings/assistant" className="hover:text-ink">Configure channels →</Link>
-          </p>
-        </div>
+        <WhatsAppInboxClient channels={whatsAppChannels} />
       ) : tab === "reviews" ? (
         <>
           <p className="mt-6 font-sans text-[13px] text-ink-soft">{counts.external} external signals in the last window.</p>

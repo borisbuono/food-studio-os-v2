@@ -154,12 +154,30 @@ export default function AssistantFab() {
     //   window.__fsAssistantInboxHooks.draftForHint(text) → { ok, ... }
     // and the FAB will run page-owned execution before falling through to the
     // orchestrator when the phrasing sounds like an email-draft request.
+    //
+    // Sprint 4 · #3 — the WhatsApp tab exposes __fsAssistantWhatsAppHooks with
+    // the same shape. If the phrase mentions WhatsApp we prefer that hook.
     try {
-      const hooks = (typeof window !== "undefined" ? (window as any).__fsAssistantInboxHooks : null) as any;
+      const waHooks = (typeof window !== "undefined" ? (window as any).__fsAssistantWhatsAppHooks : null) as any;
+      const emailHooks = (typeof window !== "undefined" ? (window as any).__fsAssistantInboxHooks : null) as any;
       const onInbox = (pathname || "").startsWith("/grow/inbox");
-      const looksLikeDraft = /\b(draft|reply|respond|answer|write)\b/i.test(t);
-      if (onInbox && hooks?.draftForHint && looksLikeDraft) {
-        const out = await hooks.draftForHint(t);
+      const looksLikeDraft = /\b(draft|reply|respond|answer|write|message|text)\b/i.test(t);
+      const looksLikeWa = /\b(whatsapp|wa|voice ?note)\b/i.test(t);
+
+      if (onInbox && looksLikeDraft && looksLikeWa && waHooks?.draftForHint) {
+        const out = await waHooks.draftForHint(t);
+        if (out?.ok) {
+          const reply = (lang === "es" ? "Borrador de WhatsApp listo abajo" : "WhatsApp draft ready below")
+            + (out.chat_id ? "\n" + (lang === "es" ? "Para +" : "To +") + out.chat_id : "");
+          setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: "order", confidence: 1, userText: t }; return n; });
+          setThinking(false);
+          return;
+        }
+        // fall through if the WhatsApp hook couldn't handle it (e.g. no phone number in the phrase)
+      }
+
+      if (onInbox && emailHooks?.draftForHint && looksLikeDraft && !looksLikeWa) {
+        const out = await emailHooks.draftForHint(t);
         if (out?.ok) {
           const reply = (lang === "es" ? "Borrador listo abajo — asunto: " : "Draft ready below — subject: ") + (out.subject || "(no subject)") + (out.from ? "\n" + (lang === "es" ? "Para " : "To ") + out.from : "");
           setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: "order", confidence: 1, userText: t }; return n; });

@@ -39,6 +39,15 @@ export default function AssistantSettingsClient(props: {
   const [addChan, setAddChan] = useState<null | { channel_type: string; account_ref: string }>(null);
   const [chanBusy, setChanBusy] = useState(false);
 
+  // WhatsApp Business Cloud API connect drawer.
+  // Boris pastes access_token + phone_number_id + app_secret + optional
+  // waba_id. The pasted blob flows through /api/integrations/connect →
+  // testWaBusinessAccessToken → vault. We then create the assistant_channels
+  // row referencing that vault row.
+  const [waBiz, setWaBiz] = useState<null | { access_token: string; phone_number_id: string; app_secret: string; waba_id: string }>(null);
+  const [waBizBusy, setWaBizBusy] = useState(false);
+  const [waBizErr, setWaBizErr] = useState<string | null>(null);
+
   async function saveConfig() {
     setSavingCfg(true); setCfgFlash(null);
     try {
@@ -93,6 +102,36 @@ export default function AssistantSettingsClient(props: {
       if (d.ok && d.channel) { setChannels((arr) => [d.channel, ...arr]); setAddChan(null); }
     } catch {}
     setChanBusy(false);
+  }
+
+  async function connectWaBusiness() {
+    if (!waBiz?.access_token || !waBiz?.phone_number_id) return;
+    setWaBizBusy(true); setWaBizErr(null);
+    try {
+      // Step 1: probe + vault via the integrations connect route.
+      const combined = [waBiz.access_token, waBiz.phone_number_id, waBiz.app_secret || "", waBiz.waba_id || ""].join(":");
+      const r1 = await fetch("/api/integrations/connect", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entity: props.entityCode, vendor: "whatsapp-business", api_key: combined, kind: "messaging" }) });
+      const d1 = await r1.json();
+      if (!d1.ok) { setWaBizErr(d1.error || "connect failed"); setWaBizBusy(false); return; }
+
+      // Step 2: create the assistant_channels row referencing the new vault row.
+      const displayNumber = d1?.meta?.display_number || waBiz.phone_number_id;
+      const r2 = await fetch("/api/assistant/channels", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          channel_type: "whatsapp_business",
+          account_ref: displayNumber,
+          auth_ref: d1.id,
+          settings: { triage_enabled: true, auto_draft: true, auto_send: false, supervised_send: false, entity_code: props.entityCode },
+        }) });
+      const d2 = await r2.json();
+      if (!d2.ok || !d2.channel) { setWaBizErr(d2.error || "channel create failed"); setWaBizBusy(false); return; }
+      setChannels((arr) => [d2.channel, ...arr]);
+      setWaBiz(null);
+    } catch (e: any) {
+      setWaBizErr(e?.message || "connect failed");
+    }
+    setWaBizBusy(false);
   }
 
   async function updateChannelSettings(id: string, settings: any) {
@@ -279,9 +318,13 @@ export default function AssistantSettingsClient(props: {
               href={`/api/assistant/channels/gmail/start?entity=${encodeURIComponent(props.entityCode)}&return=${encodeURIComponent("/administrate/settings/assistant")}`}
               className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}
               title="Connect Gmail through Google OAuth (redirects to Google)"
-            >Connect Gmail →</a>
+            >Connect Gmail &rarr;</a>
+            <button onClick={() => setWaBiz({ access_token: "", phone_number_id: "", app_secret: "", waba_id: "" })}
+              className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}
+              title="Connect a WhatsApp Business number via Meta's Cloud API">Connect WhatsApp Business</button>
             <button onClick={() => setAddChan({ channel_type: "whatsapp_personal", account_ref: "" })}
-              className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>+ WhatsApp</button>
+              className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}
+              title="Register a personal WhatsApp line for the desktop-assist path">+ Personal WhatsApp</button>
           </div>
         </div>
 
@@ -319,12 +362,66 @@ export default function AssistantSettingsClient(props: {
                         onChange={() => updateChannelSettings(c.id, { ...settings, auto_draft: true, supervised_send: true })} />
                       <span className="font-mono text-[10px] uppercase tracking-wide text-ink">Supervised send</span>
                     </label>
+                    {c.channel_type === "whatsapp_personal" ? (
+                      <label className="flex items-baseline gap-2">
+                        <input type="checkbox" checked={!!settings.desktop_assist}
+                          onChange={(e) => updateChannelSettings(c.id, { ...settings, desktop_assist: e.target.checked })} />
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-ink">Enable desktop assist</span>
+                      </label>
+                    ) : null}
                   </div>
+                  {c.channel_type === "whatsapp_personal" ? (
+                    <p className="mt-2 font-serif italic text-[13px] text-ink-soft">
+                      Desktop assist writes drafts to a queue on <a href="/grow/inbox?tab=whatsapp" className="underline">/grow/inbox &rarr; WhatsApp</a>. You copy each draft into WhatsApp Web yourself &mdash; nothing is sent from the server.
+                    </p>
+                  ) : null}
+                  {c.channel_type === "whatsapp_business" ? (
+                    <p className="mt-2 font-serif italic text-[13px] text-ink-soft">
+                      Business Cloud API. Webhook receiver at <span className="font-mono text-[11px]">/api/assistant/channels/whatsapp/webhook</span> &mdash; point Meta&rsquo;s app subscriptions here.
+                    </p>
+                  ) : null}
                 </li>
               );
             })}
           </ul>
         )}
+
+        {waBiz ? (
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Connect WhatsApp Business</p>
+            <p className="mt-1 font-serif italic text-[13px] text-ink-soft">
+              Meta Business account &rarr; App &rarr; WhatsApp product. Paste the system-user access token, the phone_number_id, and the app_secret (for webhook signature verification). WABA id optional.{" "}
+              <a className="underline" href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noreferrer">Meta setup guide &rarr;</a>
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <input value={waBiz.access_token} onChange={(e) => setWaBiz({ ...waBiz, access_token: e.target.value })}
+                placeholder="access_token — paste from Meta &rarr; System users &rarr; Generate"
+                className="border-0 border-b border-line bg-transparent px-0 py-2 font-mono text-[12px] text-ink outline-none focus:border-ink" />
+              <input value={waBiz.phone_number_id} onChange={(e) => setWaBiz({ ...waBiz, phone_number_id: e.target.value })}
+                placeholder="phone_number_id — from WhatsApp &rarr; API setup"
+                className="border-0 border-b border-line bg-transparent px-0 py-2 font-mono text-[12px] text-ink outline-none focus:border-ink" />
+              <input value={waBiz.app_secret} onChange={(e) => setWaBiz({ ...waBiz, app_secret: e.target.value })}
+                placeholder="app_secret — App settings &rarr; Basic (used to verify webhook signatures)"
+                className="border-0 border-b border-line bg-transparent px-0 py-2 font-mono text-[12px] text-ink outline-none focus:border-ink" />
+              <input value={waBiz.waba_id} onChange={(e) => setWaBiz({ ...waBiz, waba_id: e.target.value })}
+                placeholder="business_account_id (optional)"
+                className="border-0 border-b border-line bg-transparent px-0 py-2 font-mono text-[12px] text-ink outline-none focus:border-ink" />
+              <p className="font-mono text-[10px] uppercase tracking-wide text-muted">
+                Webhook URL to configure in Meta: <span className="font-mono">{typeof window !== "undefined" ? window.location.origin : ""}/api/assistant/channels/whatsapp/webhook</span> &mdash; use the same verify_token you set as META_WA_VERIFY_TOKEN on the server.
+              </p>
+              {waBizErr ? <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "#B03A2E" }}>&#9888; {waBizErr}</p> : null}
+              <div className="flex items-baseline gap-3">
+                <button onClick={connectWaBusiness} disabled={waBizBusy || !waBiz.access_token || !waBiz.phone_number_id}
+                  style={{ background: "var(--accent)" }}
+                  className="rounded-full px-4 py-2 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40">
+                  {waBizBusy ? "connecting..." : "connect"}
+                </button>
+                <button onClick={() => { setWaBiz(null); setWaBizErr(null); }}
+                  className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink">cancel</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {addChan ? (
           <div className="mt-4 border-t border-line pt-4">
@@ -332,15 +429,13 @@ export default function AssistantSettingsClient(props: {
             <div className="mt-3 grid grid-cols-1 gap-3">
               <select value={addChan.channel_type} onChange={(e) => setAddChan({ ...addChan, channel_type: e.target.value })}
                 className="border-0 border-b border-line bg-transparent px-0 py-2 font-serif text-[15px] text-ink outline-none focus:border-ink">
-                <option value="gmail">Gmail</option>
-                <option value="whatsapp_personal">WhatsApp — personal</option>
-                <option value="whatsapp_business">WhatsApp — business</option>
+                <option value="whatsapp_personal">WhatsApp &mdash; personal (desktop assist)</option>
               </select>
               <input value={addChan.account_ref} onChange={(e) => setAddChan({ ...addChan, account_ref: e.target.value })}
-                placeholder={addChan.channel_type === "gmail" ? "you@yourdomain.com" : "+34 600 000 000"}
+                placeholder={"+34 600 000 000"}
                 className="border-0 border-b border-line bg-transparent px-0 py-2 font-serif text-[15px] text-ink outline-none focus:border-ink" />
               <p className="font-mono text-[10px] uppercase tracking-wide text-muted">
-                Gmail uses OAuth — use the "Connect Gmail" button above. WhatsApp records the phone number for now; device pairing lands with the WhatsApp edge connector (Sprint 4).
+                Personal WhatsApp is a desktop-assist queue &mdash; the assistant drafts, you copy each draft into WhatsApp Web. Nothing is sent from the server. For company lines use the &ldquo;Connect WhatsApp Business&rdquo; button above.
               </p>
               <div className="flex items-baseline gap-3">
                 <button onClick={addChannel} disabled={chanBusy || !addChan.account_ref}
