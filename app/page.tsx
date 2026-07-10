@@ -63,6 +63,7 @@ export default async function Page() {
     invoiceInboxRes,
     bankMovementsRes,
     platformBillingRes,
+    financeAnomaliesRes,
   ] = await Promise.all([
     supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
     supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
@@ -76,6 +77,7 @@ export default async function Page() {
     supabase.from("invoice_inbox").select("id,entity_id,amount_eur,sender:provider_id(name),arrived_at").gt("amount_eur", 500).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,amount_eur,description,movement_date,reconciled_to").eq("reconciled_to", "unmatched"),
     supabase.from("platform_billing_status").select("entity_id,platform,state,note").in("state", ["failing", "disabled"]),
+    supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
   ]);
 
   // Some of the newer tables may not exist yet in every environment; treat null as empty.
@@ -88,6 +90,7 @@ export default async function Page() {
   const invoiceInbox: any[] = invoiceInboxRes.data || [];
   const bankUnmatched: any[] = bankMovementsRes.data || [];
   const platformBilling: any[] = platformBillingRes.data || [];
+  const financeAnomalies: any[] = financeAnomaliesRes.data || [];
 
   // Age > 7 days on bank movements
   const sevenDaysAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
@@ -223,6 +226,20 @@ export default async function Page() {
         kicker: `Platform · ${p.platform}`,
         title: p.note ? String(p.note) : `${p.platform} ${p.state}`,
         href: "/administrate/settings",
+      });
+    }
+
+    // Finance anomalies — surface the count as a compass alert. The detail
+    // page /administrate/finance/anomalies has the full triage table + drawer.
+    const myAnoms = financeAnomalies.filter((r) => r.entity_code === ec);
+    if (myAnoms.length) {
+      const sev4 = myAnoms.filter((r) => Number(r.severity || 0) >= 4).length;
+      const kicker = sev4 > 0 ? "Anomalies · " + sev4 + " urgent" : "Anomalies · to triage";
+      alerts.push({
+        key: `anomalies-${ec}`,
+        kicker,
+        title: myAnoms.length + " finance anomal" + (myAnoms.length === 1 ? "y" : "ies") + " open — " + (myAnoms[0]?.description || "review the triage table").slice(0, 90),
+        href: "/administrate/finance/anomalies",
       });
     }
 
