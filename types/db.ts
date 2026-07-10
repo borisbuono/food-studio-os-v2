@@ -89,7 +89,7 @@ export type AssistantChannelRow = {
   channel_type: "gmail" | "whatsapp_personal" | "whatsapp_business";
   account_ref: string;
   auth_ref: string | null;
-  settings: { triage_enabled?: boolean; auto_draft?: boolean; supervised_send?: boolean; quiet_hours_override?: boolean };
+  settings: { triage_enabled?: boolean; auto_draft?: boolean; supervised_send?: boolean; auto_send?: boolean; quiet_hours_override?: boolean; entity_code?: 'IFL' | 'BM' | 'BBH'; desktop_assist?: boolean };
   created_at: string;
   revoked_at: string | null;
 };
