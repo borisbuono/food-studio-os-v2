@@ -119,6 +119,13 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
         </nav>
       </div>
 
+      <nav className="mt-6 flex flex-wrap items-baseline gap-2 border-t border-line pt-6 font-mono text-[10px] uppercase tracking-wide">
+        <span className="text-clay">social workstream ·</span>
+        <Link href={`/grow/reach/calendar?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">calendar →</Link>
+        <Link href={`/grow/reach/generator?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">AI generator →</Link>
+        <Link href={`/grow/reach/ads?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">Meta ads →</Link>
+      </nav>
+
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* -------- LEFT: Wix Newsletter -------- */}
         <section className="rounded-2xl border border-line bg-paper p-5">

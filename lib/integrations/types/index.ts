@@ -149,7 +149,7 @@ export interface MarketingAdapter {
 
 // ---------- Social (Grow · Reach) ----------
 export interface SocialPost {
-  channels: Array<"instagram" | "facebook" | "tiktok" | "x" | "linkedin">;
+  channels: Array<"instagram" | "facebook" | "tiktok" | "threads" | "x" | "linkedin">;
   caption: string;
   media_urls: string[];                // absolute URLs to already-hosted media
   scheduled_at?: string;               // ISO — omit for send-now / draft
