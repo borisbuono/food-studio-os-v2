@@ -70,7 +70,7 @@ export default async function Page() {
     supabase.from("mep_dishes").select("zone_id,is_active,updated_at").eq("is_active", true),
     supabase.from("zones").select("id,restaurant_id"),
     // Any chef conversation today between 07:00–11:00 = morning-brief signal.
-    supabase.from("chef_conversations").select("user_id,created_at").gte("created_at", today + "T07:00:00").lt("created_at", today + "T11:00:00"),
+    supabase.from("assistant_conversations").select("user_id,created_at").gte("created_at", today + "T07:00:00").lt("created_at", today + "T11:00:00"),
     // Alerts sources — invoice_inbox big-ticket without match, bank_movements unmatched
     // (age > 7d), platform_billing_status failing/disabled.
     supabase.from("invoice_inbox").select("id,entity_id,amount_eur,sender:provider_id(name),arrived_at").gt("amount_eur", 500).not("match_status", "in", "(approved,rejected,duplicate)"),
@@ -121,7 +121,7 @@ export default async function Page() {
     else if (now.minutes < closeMin) { servicePhase = "during"; minutesToService = 0; }
     else { servicePhase = "after"; minutesToService = null; }
 
-    // Morning-brief signal: any chef_conversations turn today 07-11 (user-agnostic; a real
+    // Morning-brief signal: any assistant_conversations turn today 07-11 (user-agnostic; a real
     // brief involves the operator opening the OS + typing to Chef).
     const morningDone = chefConv.length > 0;
 

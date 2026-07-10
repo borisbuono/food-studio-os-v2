@@ -15,9 +15,9 @@ export default async function ChefLog() {
   );
 
   const [{ data: turns }, { data: memory }, { data: actions }] = await Promise.all([
-    sb.from("chef_conversations").select("id,turn_role,text,intent,confidence,session_id,route,created_at").order("created_at", { ascending: false }).limit(200),
-    sb.from("chef_memory").select("id,fact,scope,confirmed_at,retired_at,source_conversation_id").is("retired_at", null).order("confirmed_at", { ascending: false }).limit(50),
-    sb.from("chef_actions").select("id,action_type,target_table,target_id,payload,reversible,undone_at,created_at").order("created_at", { ascending: false }).limit(50),
+    sb.from("assistant_conversations").select("id,turn_role,text,intent,confidence,session_id,route,created_at").order("created_at", { ascending: false }).limit(200),
+    sb.from("assistant_memory").select("id,fact,scope,confirmed_at,retired_at,source_conversation_id").is("retired_at", null).order("confirmed_at", { ascending: false }).limit(50),
+    sb.from("assistant_actions").select("id,action_type,target_table,target_id,payload,reversible,undone_at,created_at").order("created_at", { ascending: false }).limit(50),
   ]);
 
   // Group turns by session
