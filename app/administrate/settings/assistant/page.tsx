@@ -48,6 +48,18 @@ export default async function AssistantSettingsPage() {
         <Link href="/administrate/settings/assistant/onboard?entity=NEW" className="text-ink border-b border-ink/40 pb-0.5">add advisory client</Link>
       </p>
 
+      <section className="mt-6 border-t border-black/10 pt-4">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Learning loop</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">
+          What the Assistant is learning about you and how much it&apos;s doing on your behalf. Curate memory, audit every action.
+        </p>
+        <p className="mt-3 font-mono text-[10px] uppercase tracking-wide">
+          <Link href="/administrate/settings/assistant/memory" className="text-ink border-b border-ink/40 pb-0.5">what the assistant knows</Link>
+          <span className="text-clay mx-2">·</span>
+          <Link href="/administrate/settings/assistant/audit" className="text-ink border-b border-ink/40 pb-0.5">what the assistant did</Link>
+        </p>
+      </section>
+
       <AssistantSettingsClient
         entityCode={ec}
         initialConfig={config || null}
