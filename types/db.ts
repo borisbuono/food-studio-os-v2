@@ -107,9 +107,28 @@ export type AssistantPlaybookRow = {
 
 export type AssistantBriefRow = {
   id: string;
-  entity_code: "IFL" | "BM" | "BBH";
+  entity_code: string;
   user_id: string | null;
   date: string;
   body: string | null;
+  headline: string | null;
+  signals: any | null;
+  created_at: string;
+};
+
+export type AssistantMemoryExtractionRow = {
+  id: string;
+  session_id: string;
+  user_id: string | null;
+  entity_code: string | null;
+  turn_count: number;
+  facts_extracted: number;
+  facts_inserted: number;
+  cost_eur: number | null;
+  latency_ms: number | null;
+  model: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  error: string | null;
   created_at: string;
 };
