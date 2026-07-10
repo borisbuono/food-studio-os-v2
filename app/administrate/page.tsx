@@ -19,7 +19,7 @@ export default async function AdministrateHome() {
   const ec = ENTITY_CODE[entity] || "IFL";
   const today = new Date().toISOString().slice(0, 10);
 
-  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes] = await Promise.all([
+  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes, advisoryRes] = await Promise.all([
     supabase.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle(),
     supabase.from("invoice_inbox").select("id,amount_eur,entity_id,match_status").eq("entity_id", ec).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,reconciled_to").eq("entity_id", ec).eq("reconciled_to", "unmatched"),
@@ -27,6 +27,7 @@ export default async function AdministrateHome() {
     supabase.from("team_members").select("name,status"),
     // decisions is an inbox-ish table; count anything not resolved.
     supabase.from("decisions").select("id,resolved_at"),
+    supabase.from("v_advisory_clients_overview").select("id,status"),
   ]);
 
   const todayRev = Number(eodRes.data?.revenue || 0);
@@ -37,6 +38,8 @@ export default async function AdministrateHome() {
   const team = (teamRes.data || []).length;
   const pendingInvites = (teamRes.data || []).filter((m: any) => (m.status || "invited") === "invited").length;
   const openDecisions = (decisionsRes.data || []).filter((d: any) => !d.resolved_at).length;
+  const advClients = (advisoryRes.data || []) as { id: string; status: string }[];
+  const advActive  = advClients.filter((c) => c.status === "active" || c.status === "onboarding").length;
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -90,6 +93,16 @@ export default async function AdministrateHome() {
             ? "Nothing waiting — the inbox is clear."
             : `${openDecisions} decision${openDecisions === 1 ? "" : "s"} waiting on you`}
           action="Open decisions →"
+        />
+        <PillarTile
+          href="/administrate/advisor"
+          kicker="Advisor · client book"
+          title="Advisory"
+          value={advClients.length}
+          status={advClients.length === 0
+            ? "No advisory clients yet — bring the first one on."
+            : `${advClients.length} on the book · ${advActive} live`}
+          action="Open advisor console →"
         />
       </section>
     </main>
