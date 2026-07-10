@@ -233,7 +233,15 @@ export default async function HoldingsConsole() {
         </p>
       </section>
 
-      {/* ─── LAYER 5 · advisory clients placeholder ──────────────────── */}
+      {/* ─── LAYER 5 · Assistant Layer (Sprint 6) ──────────────────── */}
+      <section className="mt-12 border-t border-line pt-6">
+        <div className="flex items-baseline justify-between">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The Brain across the group</p>
+          <Link href="/administrate/holdings/console/assistant" className="font-mono text-[10px] uppercase tracking-wide text-ink border-b border-ink/40 hover:border-ink pb-0.5">open Assistant admin →</Link>
+        </div>
+      </section>
+
+      {/* ─── LAYER 6 · advisory clients placeholder ──────────────────── */}
       <section className="mt-12 border-t border-line pt-6">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Advisory clients</p>
         <div className="mt-4 border border-dashed border-line px-6 py-8 text-center">
