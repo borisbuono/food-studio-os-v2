@@ -31,7 +31,9 @@ export async function POST(req: Request) {
   }
 
   const entity = String(body?.entity_code || "").toUpperCase();
-  if (!["IFL","BM","BBH"].includes(entity)) return Response.json({ ok: false, error: "entity_code required" }, { status: 400 });
+  const isKnown = ["IFL","BM","BBH"].includes(entity);
+  const isAdv   = entity.startsWith("ADV-");
+  if (!isKnown && !isAdv) return Response.json({ ok: false, error: "entity_code required" }, { status: 400 });
   if (!body?.name) return Response.json({ ok: false, error: "name required" }, { status: 400 });
 
   const { data, error } = await sb.from("assistant_playbooks").insert({

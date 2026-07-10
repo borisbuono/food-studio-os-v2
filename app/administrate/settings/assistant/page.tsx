@@ -42,6 +42,11 @@ export default async function AssistantSettingsPage() {
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">
         The Assistant Layer configuration for this entity. Voice, hours, playbooks, and your personal channels.
       </p>
+      <p className="mt-4 font-mono text-[10px] uppercase tracking-wide">
+        <Link href="/administrate/settings/assistant/onboard" className="text-ink border-b border-ink/40 pb-0.5">bring a new profile online</Link>
+        <span className="text-clay mx-2">·</span>
+        <Link href="/administrate/settings/assistant/onboard?entity=NEW" className="text-ink border-b border-ink/40 pb-0.5">add advisory client</Link>
+      </p>
 
       <AssistantSettingsClient
         entityCode={ec}

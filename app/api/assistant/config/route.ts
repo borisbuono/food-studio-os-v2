@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const entity = String(body?.entity_code || "").toUpperCase();
-  if (!["IFL","BM","BBH"].includes(entity)) return Response.json({ ok: false, error: "entity_code required" }, { status: 400 });
+  const isKnown = ["IFL","BM","BBH"].includes(entity);
+  const isAdv   = entity.startsWith("ADV-");
+  if (!isKnown && !isAdv) return Response.json({ ok: false, error: "entity_code required" }, { status: 400 });
 
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
