@@ -1,10 +1,21 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { encryptSecret } from "@/lib/integrations/vault";
+import { testGmailAccessToken } from "@/lib/assistant/channels/gmail";
 
 export const runtime = "nodejs";
 
 // Vendor-specific test: return { ok, error, meta } — hits the vendor's identity/health endpoint
 async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; error?: string; meta?: any }> {
+  if (vendor === "gmail") {
+    // For gmail the "api_key" is an OAuth access token — the browser flow at
+    // /api/assistant/channels/gmail/start is preferred, but this arm is kept
+    // so a token pasted by a script can still be verified. It just probes
+    // /users/me/profile — the refresh_token side of the auth is not handled
+    // here and belongs to the OAuth callback route.
+    const t = await testGmailAccessToken(apiKey);
+    if (!t.ok) return { ok: false, error: t.error || "gmail probe failed" };
+    return { ok: true, meta: { email: t.email, note: "gmail access token probed — use /api/assistant/channels/gmail/start for the full OAuth flow." } };
+  }
   if (vendor === "holded") {
     // Detect Holded v2 personal access tokens by the pat_ prefix. v2 uses Bearer auth
     // on api.holded.com/api/v2/*. v1 keys are 32 hex chars and use the "key:" header on v1 endpoints.
@@ -95,7 +106,7 @@ export async function POST(req: Request) {
     // 4) Insert new active row
     const { data: row, error } = await sb.from("entity_integrations").insert({
       entity_code: entity, platform: vendor,
-      integration_type: kind || (vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : vendor === "buffer" ? "social" : "unknown"),
+      integration_type: kind || (vendor === "gmail" ? "email" : vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : vendor === "buffer" ? "social" : "unknown"),
       display_name: `${vendor} · ${entity}`,
       encrypted_key: enc.encrypted_key, key_iv: enc.key_iv, key_tag: enc.key_tag,
       status: "connected",

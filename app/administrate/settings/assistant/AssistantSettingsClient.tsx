@@ -274,8 +274,15 @@ export default function AssistantSettingsClient(props: {
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Channels</p>
             <p className="mt-1 font-serif italic text-[14px] text-ink-soft">Where the assistant may read + draft on your behalf. You connect them one at a time.</p>
           </div>
-          <button onClick={() => setAddChan({ channel_type: "gmail", account_ref: "" })}
-            className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>+ add</button>
+          <div className="flex items-baseline gap-4">
+            <a
+              href={`/api/assistant/channels/gmail/start?entity=${encodeURIComponent(props.entityCode)}&return=${encodeURIComponent("/administrate/settings/assistant")}`}
+              className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}
+              title="Connect Gmail through Google OAuth (redirects to Google)"
+            >Connect Gmail →</a>
+            <button onClick={() => setAddChan({ channel_type: "whatsapp_personal", account_ref: "" })}
+              className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>+ WhatsApp</button>
+          </div>
         </div>
 
         {!channels.length ? (
@@ -333,7 +340,7 @@ export default function AssistantSettingsClient(props: {
                 placeholder={addChan.channel_type === "gmail" ? "you@yourdomain.com" : "+34 600 000 000"}
                 className="border-0 border-b border-line bg-transparent px-0 py-2 font-serif text-[15px] text-ink outline-none focus:border-ink" />
               <p className="font-mono text-[10px] uppercase tracking-wide text-muted">
-                OAuth / device pairing lands in Sprints 3–4 (Email + WhatsApp edge connectors). For now this records the account so the playbook editor can reference it.
+                Gmail uses OAuth — use the "Connect Gmail" button above. WhatsApp records the phone number for now; device pairing lands with the WhatsApp edge connector (Sprint 4).
               </p>
               <div className="flex items-baseline gap-3">
                 <button onClick={addChannel} disabled={chanBusy || !addChan.account_ref}
