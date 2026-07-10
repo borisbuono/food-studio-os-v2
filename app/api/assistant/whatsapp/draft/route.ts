@@ -82,12 +82,20 @@ Voice must match the Voice block. No emojis. Keep under 90 words unless the oper
     await sb.from("assistant_actions").insert({
       user_id: u.user.id,
       action_type: "whatsapp.draft",
+      action_kind: "draft",
+      entity_code: entity,
       target_table: "assistant_wa_drafts",
       target_id: draft.id,
+      cost_eur: result.cost_eur,
+      latency_ms: result.latency_ms,
+      model: result.model,
+      input_tokens:  result.input_tokens,
+      output_tokens: result.output_tokens,
       payload: {
         entity, channel_id: channel.id, chat_id,
         draft_id: draft.id, body_preview: draftBody.slice(0, 400),
-        cost_usd: result.cost_usd, latency_ms: result.latency_ms, model: result.model,
+        cost_usd: result.cost_usd, cost_eur: result.cost_eur,
+        latency_ms: result.latency_ms, model: result.model,
       },
       reversible: true,
     });

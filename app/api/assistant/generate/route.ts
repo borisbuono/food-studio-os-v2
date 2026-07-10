@@ -23,6 +23,23 @@ export async function POST(req: Request) {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
 
+  // Sprint 6 — cap check. If the entity has burned through the tier's
+  // monthly action or cost cap, refuse the call. Owner can lift by upgrading
+  // the tier in /administrate/settings/assistant.
+  const cap = await orchestrator.getBillingCap(entity);
+  if (cap?.exceeded) {
+    return Response.json({
+      ok: false,
+      error: "billing_cap_exceeded",
+      cap,
+      message:
+        "This entity has reached its monthly assistant cap (" +
+        cap.actions_used + " / " + cap.actions_cap + " actions, €" +
+        cap.cost_used_eur.toFixed(2) + " / €" + cap.cost_cap_eur.toFixed(2) +
+        "). Upgrade the tier under Settings → Assistant to continue.",
+    }, { status: 402 });
+  }
+
   const [context, memory, config, history] = await Promise.all([
     orchestrator.getContext(entity, uid, pageContext),
     orchestrator.getMemory(entity, uid),

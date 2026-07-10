@@ -47,10 +47,20 @@ export async function POST(req: Request) {
     .select("*").maybeSingle();
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
 
-  // Meter the generation.
+  // Meter the generation — Sprint 6 columns.
   await sb.from("assistant_actions").insert({
-    user_id: uid, action_type: "brief_generate", target_table: "assistant_briefs", target_id: brief?.id || null,
-    payload: { entity, date, mode: "brief", model: result.model, latency_ms: result.latency_ms, cost_usd: result.cost_usd },
+    user_id: uid,
+    action_type: "brief_generate",
+    action_kind: "brief",
+    entity_code: entity,
+    target_table: "assistant_briefs",
+    target_id: brief?.id || null,
+    cost_eur: result.cost_eur,
+    latency_ms: result.latency_ms,
+    model: result.model,
+    input_tokens:  result.input_tokens,
+    output_tokens: result.output_tokens,
+    payload: { entity, date, mode: "brief", model: result.model, latency_ms: result.latency_ms, cost_usd: result.cost_usd, cost_eur: result.cost_eur },
     reversible: false,
   });
 

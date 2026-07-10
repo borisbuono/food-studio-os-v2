@@ -62,16 +62,40 @@ export type GenerateOutput = {
   actions: any[];
   raw_json: any | null;
   cost_usd: number | null;
+  cost_eur: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
   latency_ms: number;
   model: string;
+  cap_exceeded?: boolean;
+};
+
+export type BillingCap = {
+  tier: string;
+  actions_used: number;
+  actions_cap: number;
+  cost_used_eur: number;
+  cost_cap_eur: number;
+  exceeded: boolean;
 };
 
 const CHAT_MODEL   = "claude-haiku-4-5-20251001";
 const BRIEF_MODEL  = "claude-haiku-4-5-20251001";
 const DRAFT_MODEL  = "claude-haiku-4-5-20251001";
 
-const PRICE_IN_PER_MTOK  = 1.0;
-const PRICE_OUT_PER_MTOK = 5.0;
+// Anthropic Haiku 4.5 published pricing (USD per million tokens).
+// Sprint 6 bills in EUR — convert at a conservative fixed rate that we
+// re-tune quarterly. Kept as a constant so the whole billing math is
+// auditable in one place.
+const PRICE_IN_PER_MTOK_USD  = 0.80;
+const PRICE_OUT_PER_MTOK_USD = 4.00;
+const USD_EUR_RATE           = 0.92;
+const PRICE_IN_PER_MTOK_EUR  = PRICE_IN_PER_MTOK_USD  * USD_EUR_RATE;
+const PRICE_OUT_PER_MTOK_EUR = PRICE_OUT_PER_MTOK_USD * USD_EUR_RATE;
+// The pre-existing USD math stays alongside so cost_usd in the response
+// payload keeps its meaning across the codebase.
+const PRICE_IN_PER_MTOK  = PRICE_IN_PER_MTOK_USD;
+const PRICE_OUT_PER_MTOK = PRICE_OUT_PER_MTOK_USD;
 
 const ENTITY_TO_RID: Record<EntityCode, string> = {
   IFL: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
@@ -224,7 +248,7 @@ export class AssistantOrchestrator {
   async generate(input: GenerateInput): Promise<GenerateOutput> {
     const key = process.env.ANTHROPIC_API_KEY;
     const model = this.modelFor(input.mode);
-    if (!key) return { ok: false, text: "Assistant isn't switched on yet (needs ANTHROPIC_API_KEY).", intent: null, confidence: 0, actions: [], raw_json: null, cost_usd: null, latency_ms: 0, model };
+    if (!key) return { ok: false, text: "Assistant isn't switched on yet (needs ANTHROPIC_API_KEY).", intent: null, confidence: 0, actions: [], raw_json: null, cost_usd: null, cost_eur: null, input_tokens: null, output_tokens: null, latency_ms: 0, model };
 
     const system = this.buildSystem(input.mode, input);
     const messages: { role: "user" | "assistant"; content: string }[] = [];
@@ -244,7 +268,7 @@ export class AssistantOrchestrator {
       text = data?.content?.[0]?.text || data?.error?.message || "";
       usage = data?.usage || null;
     } catch (e: any) {
-      return { ok: false, text: "Assistant error: " + (e?.message || "unknown"), intent: null, confidence: 0, actions: [], raw_json: null, cost_usd: null, latency_ms: Date.now() - t0, model };
+      return { ok: false, text: "Assistant error: " + (e?.message || "unknown"), intent: null, confidence: 0, actions: [], raw_json: null, cost_usd: null, cost_eur: null, input_tokens: null, output_tokens: null, latency_ms: Date.now() - t0, model };
     }
     const latency = Date.now() - t0;
 
@@ -268,13 +292,48 @@ export class AssistantOrchestrator {
     }
 
     let cost: number | null = null;
+    let costEur: number | null = null;
+    let inTok: number | null = null;
+    let outTok: number | null = null;
     if (usage) {
-      const it = Number(usage.input_tokens || 0);
-      const ot = Number(usage.output_tokens || 0);
-      cost = (it / 1_000_000) * PRICE_IN_PER_MTOK + (ot / 1_000_000) * PRICE_OUT_PER_MTOK;
+      inTok  = Number(usage.input_tokens  || 0);
+      outTok = Number(usage.output_tokens || 0);
+      cost    = (inTok / 1_000_000) * PRICE_IN_PER_MTOK     + (outTok / 1_000_000) * PRICE_OUT_PER_MTOK;
+      costEur = (inTok / 1_000_000) * PRICE_IN_PER_MTOK_EUR + (outTok / 1_000_000) * PRICE_OUT_PER_MTOK_EUR;
     }
 
-    return { ok: true, text, intent, confidence, actions, raw_json: rawJson, cost_usd: cost, latency_ms: latency, model };
+    return {
+      ok: true, text, intent, confidence, actions, raw_json: rawJson,
+      cost_usd: cost, cost_eur: costEur,
+      input_tokens: inTok, output_tokens: outTok,
+      latency_ms: latency, model,
+    };
+  }
+
+  // Read the entity's billing tier and month-to-date usage. Returns the
+  // cap state so callers can refuse to generate when a cap is exceeded.
+  async getBillingCap(entity: EntityCode | string): Promise<BillingCap | null> {
+    const sb = supabaseServer();
+    const { data: cfg } = await sb.from("assistant_config")
+      .select("billing_tier").eq("entity_code", entity).maybeSingle();
+    const tierName = ((cfg as any)?.billing_tier as string) || "pro";
+    const { data: tier } = await sb.from("assistant_billing_tiers")
+      .select("monthly_action_cap,monthly_cost_cap_eur").eq("name", tierName).maybeSingle();
+    if (!tier) return null;
+    const { data: mtd } = await sb.from("v_assistant_entity_mtd")
+      .select("actions,cost_eur").eq("entity_code", entity).maybeSingle();
+    const actionsUsed = Number((mtd as any)?.actions || 0);
+    const costUsed    = Number((mtd as any)?.cost_eur || 0);
+    const actionsCap  = Number((tier as any).monthly_action_cap);
+    const costCap     = Number((tier as any).monthly_cost_cap_eur);
+    return {
+      tier: tierName,
+      actions_used: actionsUsed,
+      actions_cap:  actionsCap,
+      cost_used_eur: costUsed,
+      cost_cap_eur:  costCap,
+      exceeded: actionsUsed >= actionsCap || costUsed >= costCap,
+    };
   }
 
   async logInteraction(opts: {
@@ -299,11 +358,51 @@ export class AssistantOrchestrator {
       user_id: opts.userId,
       conversation_id: userTurn.data?.id || null,
       action_type: "generate",
+      action_kind: opts.mode,
+      entity_code: opts.entity,
       target_table: "assistant_conversations",
-      payload: { mode: opts.mode, model: opts.result.model, latency_ms: opts.result.latency_ms, cost_usd: opts.result.cost_usd, entity: opts.entity },
+      cost_eur: opts.result.cost_eur,
+      latency_ms: opts.result.latency_ms,
+      model: opts.result.model,
+      input_tokens:  opts.result.input_tokens,
+      output_tokens: opts.result.output_tokens,
+      payload: {
+        mode: opts.mode, model: opts.result.model,
+        latency_ms: opts.result.latency_ms,
+        cost_usd: opts.result.cost_usd, cost_eur: opts.result.cost_eur,
+        entity: opts.entity,
+      },
       reversible: false,
     });
     return { user_turn_id: userTurn.data?.id as string | undefined };
+  }
+
+  // Metering-only insert for non-chat action kinds (send, webhook_receive,
+  // triage) that don't have a matching conversation row. Called by the
+  // webhook receivers and the send edges.
+  async logAction(opts: {
+    userId?: string | null;
+    entity: EntityCode | string;
+    kind: "chat" | "brief" | "draft" | "triage" | "send" | "webhook_receive";
+    route?: string | null;
+    payload?: any;
+    result?: Partial<GenerateOutput> | null;
+  }) {
+    const sb = supabaseServer();
+    await sb.from("assistant_actions").insert({
+      user_id: opts.userId || null,
+      action_type: opts.kind === "webhook_receive" ? "webhook" : "generate",
+      action_kind: opts.kind,
+      entity_code: opts.entity,
+      target_table: opts.route || null,
+      cost_eur: opts.result?.cost_eur ?? 0,
+      latency_ms: opts.result?.latency_ms ?? null,
+      model: opts.result?.model || null,
+      input_tokens:  opts.result?.input_tokens  ?? null,
+      output_tokens: opts.result?.output_tokens ?? null,
+      payload: opts.payload || {},
+      reversible: false,
+    });
   }
 }
 
