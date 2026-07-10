@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { encryptSecret } from "@/lib/integrations/vault";
 import { testGmailAccessToken } from "@/lib/assistant/channels/gmail";
+import { testWaBusinessAccessToken } from "@/lib/assistant/channels/whatsapp-business";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,20 @@ async function testKey(vendor: string, apiKey: string): Promise<{ ok: boolean; e
     const t = await testGmailAccessToken(apiKey);
     if (!t.ok) return { ok: false, error: t.error || "gmail probe failed" };
     return { ok: true, meta: { email: t.email, note: "gmail access token probed — use /api/assistant/channels/gmail/start for the full OAuth flow." } };
+  }
+  if (vendor === "whatsapp-business") {
+    // WhatsApp Business Cloud API. Boris pastes `<access_token>:<phone_number_id>[:<app_secret>[:<waba_id>]]`.
+    // Access token is required. phone_number_id lets us probe /{phone_number_id}. app_secret is
+    // stored so the inbound webhook receiver can verify Meta's X-Hub-Signature-256.
+    const parts = apiKey.split(":");
+    const access_token = parts[0] || "";
+    const phone_number_id = parts[1] || "";
+    const app_secret = parts[2] || "";
+    const waba_id = parts[3] || "";
+    if (!access_token) return { ok: false, error: "paste as `<access_token>:<phone_number_id>[:<app_secret>[:<waba_id>]]`" };
+    const t = await testWaBusinessAccessToken(access_token, phone_number_id);
+    if (!t.ok) return { ok: false, error: t.error || "whatsapp probe failed" };
+    return { ok: true, meta: { phone_number_id, display_number: t.display_number, app_secret_present: !!app_secret, business_account_id: waba_id || null, note: "whatsapp-business token probed — use /administrate/settings/assistant → Connect WhatsApp Business to wire the assistant_channels row." } };
   }
   if (vendor === "holded") {
     // Detect Holded v2 personal access tokens by the pat_ prefix. v2 uses Bearer auth
@@ -106,7 +121,7 @@ export async function POST(req: Request) {
     // 4) Insert new active row
     const { data: row, error } = await sb.from("entity_integrations").insert({
       entity_code: entity, platform: vendor,
-      integration_type: kind || (vendor === "gmail" ? "email" : vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : vendor === "buffer" ? "social" : "unknown"),
+      integration_type: kind || (vendor === "gmail" ? "email" : vendor === "whatsapp-business" ? "messaging" : vendor === "holded" || vendor === "apideck" ? "accounting" : (vendor === "wix-newsletter" || vendor === "meta-ads") ? "marketing" : vendor === "buffer" ? "social" : "unknown"),
       display_name: `${vendor} · ${entity}`,
       encrypted_key: enc.encrypted_key, key_iv: enc.key_iv, key_tag: enc.key_tag,
       status: "connected",
