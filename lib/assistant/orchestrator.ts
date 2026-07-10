@@ -29,6 +29,8 @@ export type AssistantContext = {
   active_mep_dishes: number;
   urgent_tasks_count: number;
   low_inventory_count: number;
+  open_anomalies_count: number;
+  top_anomalies: Array<{ kind: string; severity: number; description: string }>;
   page_context: any | null;
 };
 
@@ -119,13 +121,14 @@ export class AssistantOrchestrator {
     const today = madridToday();
     const rid = ENTITY_TO_RID[entity] || null;
 
-    const [eod, bookings, invInbox, bank, mep, tasks] = await Promise.all([
+    const [eod, bookings, invInbox, bank, mep, tasks, anomalies] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
       sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
       sb.from("bank_movements").select("id").eq("entity_id", entity).eq("reconciled_to", "unmatched"),
       rid ? sb.from("mep_dishes").select("id,is_active").eq("is_active", true) : Promise.resolve({ data: [] } as any),
       rid ? sb.from("tasks").select("id,priority,status").in("status", ["open", "in_progress"]).limit(50) : Promise.resolve({ data: [] } as any),
+      sb.from("v_finance_anomalies_open").select("kind,severity,description").eq("entity_code", entity).limit(6),
     ]);
 
     const covers = (bookings.data || [])
@@ -154,6 +157,10 @@ export class AssistantOrchestrator {
       active_mep_dishes: mepOpen,
       urgent_tasks_count: tasksOpen,
       low_inventory_count: 0,
+      open_anomalies_count: (anomalies.data || []).length,
+      top_anomalies: (anomalies.data || []).slice(0, 3).map((a: any) => ({
+        kind: String(a.kind), severity: Number(a.severity || 2), description: String(a.description || "").slice(0, 200),
+      })),
       page_context: pageContext,
     };
   }
@@ -229,7 +236,11 @@ export class AssistantOrchestrator {
         + "- invoices waiting: " + ctx.open_invoices_count + " (€" + Math.round(ctx.open_invoices_total_eur) + ")\n"
         + "- bank unmatched: " + ctx.bank_unmatched_count + "\n"
         + "- active MEP dishes: " + ctx.active_mep_dishes + "\n"
-        + "- urgent tasks: " + ctx.urgent_tasks_count
+        + "- urgent tasks: " + ctx.urgent_tasks_count + "\n"
+        + "- open finance anomalies: " + ctx.open_anomalies_count
+        + (ctx.top_anomalies && ctx.top_anomalies.length
+          ? "\n- top anomalies:\n" + ctx.top_anomalies.map((a: any) => "    · [S" + a.severity + "] " + a.kind + " — " + a.description).join("\n")
+          : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";

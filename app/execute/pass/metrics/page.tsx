@@ -4,6 +4,11 @@ import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 
+// Kitchen anomaly tile — reads finance_anomalies rows of kind eod_cash_ratio_high for
+// the current entity. Surfaces the "cash > 15% of gross" case straight on the pass so
+// it never lives only in the finance corner of the OS. Rule: memory/pos_vs_accounting_separation.md.
+const ENTITY_TO_CODE: Record<EntityKey, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+
 // Kitchen dashboard tiles — comp %, staff-meal %, waste % — the leading indicators the team
 // sees every service. Reads from v_operational_pnl (POS snapshot minus categorised deviations).
 // Rule: memory/pos_vs_accounting_separation.md.
@@ -24,6 +29,7 @@ export default function KitchenPass() {
   const [entity, setEntity] = useState<EntityKey>("utopia");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cashAnoms, setCashAnoms] = useState<Array<{ id: string; description: string; severity: number; last_seen_date: string }>>([]);
 
   useEffect(() => {
     const e = (typeof window !== "undefined" ? localStorage.getItem("fs_entity") : null) as EntityKey | null;
@@ -41,6 +47,16 @@ export default function KitchenPass() {
         .limit(30);
       setRows((q.data as any) || []);
       setLoading(false);
+    })();
+    (async () => {
+      const code = ENTITY_TO_CODE[entity];
+      const a = await supabaseBrowser.from("v_finance_anomalies_open")
+        .select("id,description,severity,last_seen_date")
+        .eq("entity_code", code)
+        .eq("kind", "eod_cash_ratio_high")
+        .order("last_seen_date", { ascending: false })
+        .limit(5);
+      setCashAnoms(((a.data as any) || []));
     })();
   }, [entity]);
 
@@ -78,6 +94,23 @@ export default function KitchenPass() {
           avgVal={loading ? "—" : pct(avg("waste_pct"))}
           sub={today ? `${eur(today.waste_eur)} today` : undefined} />
       </div>
+
+      <section className="mt-10 border-t border-line pt-4">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Cash-ratio anomalies</p>
+        {cashAnoms.length === 0 ? (
+          <p className="mt-3 font-serif italic text-[13px] text-ink-soft">Nothing to flag. Cash stayed under 15% of gross on every recent service.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line border-t border-line">
+            {cashAnoms.map((a) => (
+              <li key={a.id} className="flex items-baseline justify-between py-2">
+                <span className="font-mono text-[11px] text-clay">{a.last_seen_date}</span>
+                <span className="font-serif italic text-[12px] text-ink-soft ml-3 flex-1">{a.description}</span>
+                <Link href="/administrate/finance/anomalies" className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Triage →</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="mt-10 border-t border-line pt-4">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Last 14 days</p>
