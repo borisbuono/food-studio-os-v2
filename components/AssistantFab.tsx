@@ -45,6 +45,8 @@ export default function AssistantFab() {
   const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
   const [lang, setLang] = useState<"en" | "es">("en");
   const sessionRef = useRef<string>(newSessionId());
+  const lastExtractRef = useRef<string | null>(null);
+  const userTurnCountRef = useRef<number>(0);
   const recRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -321,6 +323,54 @@ export default function AssistantFab() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [open]);
+
+  // Assistant Polish #1 — quietly distil the finished chat into memory.
+  // Fires on FAB close and on navigation-away. Session id is the boundary;
+  // the extractor short-circuits below 2 user turns and rate-limits per
+  // session so this is safe to over-fire. Fire-and-forget — the response
+  // does not block the UI.
+  useEffect(() => {
+    userTurnCountRef.current = log.filter((m) => m.role === "you").length;
+  }, [log]);
+
+  const fireExtract = useCallback(() => {
+    const sid = sessionRef.current;
+    if (!sid) return;
+    if (lastExtractRef.current === sid) return;
+    if (userTurnCountRef.current < 2) return;
+    lastExtractRef.current = sid;
+    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+    const ENTITY_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+    const entity_code = ENTITY_CODE[ent as string] || "IFL";
+    try {
+      fetch("/api/assistant/memory/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({ session_id: sid, entity: entity_code }),
+      }).catch(() => {});
+    } catch {}
+  }, [profile]);
+
+  // Trigger extraction when the sheet transitions open → closed.
+  useEffect(() => {
+    if (open) return;
+    fireExtract();
+  }, [open, fireExtract]);
+
+  // Trigger extraction on navigation-away (pathname changes).
+  useEffect(() => {
+    return () => { fireExtract(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Also fire on tab hide, so a browser close doesn't lose the session.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVis = () => { if (document.visibilityState === "hidden") fireExtract(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [fireExtract]);
 
   if (hidden) return null;
 
