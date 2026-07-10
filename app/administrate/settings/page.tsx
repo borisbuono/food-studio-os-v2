@@ -36,6 +36,12 @@ export default async function Settings() {
       </section>
 
       <section className="mt-10">
+        <p className="font-sans text-xs font-medium text-clay">Assistant Layer</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">The Brain — voice, hours, playbooks, channels.</p>
+        <Link href="/administrate/settings/assistant" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Configure the assistant ›</Link>
+      </section>
+
+      <section className="mt-10">
         <p className="font-sans text-xs font-medium text-clay">AI skills · {skills.length} <span className="text-clay/70">(admin)</span></p>
         <ul className="mt-2 divide-y divide-black/10">
           {skills.map((s: any, i: number) => (
