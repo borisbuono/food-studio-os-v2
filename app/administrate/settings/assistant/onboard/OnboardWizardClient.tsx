@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { ADVISORY_TEMPLATES } from "@/lib/advisory/templates";
 import { useRouter } from "next/navigation";
 
 // The six-step wizard. State is held here — a single POST to
@@ -80,6 +81,24 @@ export default function OnboardWizardClient(props: {
   const [advName, setAdvName]   = useState("");
   const [advCity, setAdvCity]   = useState("");
   const [advCountry, setAdvCountry] = useState("Spain");
+  const [advFiscalName, setAdvFiscalName] = useState("");
+  const [advCif, setAdvCif] = useState("");
+  const [advEmail, setAdvEmail] = useState("");
+  const [advPhone, setAdvPhone] = useState("");
+  const [templateKey, setTemplateKey] = useState<string>("blank");
+
+  // Apply a template — prefill voice, dials, tier, playbooks. Additive:
+  // the advisor can still edit anything in the later steps.
+  function applyTemplate(key: string) {
+    setTemplateKey(key);
+    const t = ADVISORY_TEMPLATES.find((tpl) => tpl.key === key);
+    if (!t) return;
+    setVoice(t.voice_profile);
+    setDials(t.personality_dials);
+    setTimezone(t.timezone);
+    setPlaybooks(t.playbooks.map((p) => ({ ...p, enabled: true })));
+    setTier(t.suggested_tier);
+  }
 
   // Step 2 — voice + dials.
   const [voice, setVoice] = useState("");
@@ -119,7 +138,16 @@ export default function OnboardWizardClient(props: {
       };
       if (mode === "new") {
         payload.entity_code = "NEW";
-        payload.advisory = { name: advName, city: advCity || null, country: advCountry || null };
+        payload.advisory = {
+          name: advName,
+          city: advCity || null,
+          country: advCountry || null,
+          fiscal_name: advFiscalName || null,
+          cif: advCif || null,
+          contact_email: advEmail || null,
+          contact_phone: advPhone || null,
+        };
+        payload.template_key = templateKey;
       } else {
         payload.entity_code = entityCode;
       }
@@ -196,13 +224,46 @@ export default function OnboardWizardClient(props: {
                   className="font-serif text-[16px] bg-transparent border-b border-black/20 py-1 min-w-[240px]" />
               </div>
               {mode==="new" && (
-                <div className="mt-3 flex items-center gap-3">
-                  <input value={advCity} onChange={(e) => setAdvCity(e.target.value)} placeholder="City" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
-                  <input value={advCountry} onChange={(e) => setAdvCountry(e.target.value)} placeholder="Country" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input value={advCity} onChange={(e) => setAdvCity(e.target.value)} placeholder="City" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
+                    <input value={advCountry} onChange={(e) => setAdvCountry(e.target.value)} placeholder="Country" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input value={advFiscalName} onChange={(e) => setAdvFiscalName(e.target.value)} placeholder="Fiscal name (optional)" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1 min-w-[240px]" />
+                    <input value={advCif} onChange={(e) => setAdvCif(e.target.value)} placeholder="CIF (optional)" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input value={advEmail} onChange={(e) => setAdvEmail(e.target.value)} placeholder="Contact email" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1 min-w-[240px]" />
+                    <input value={advPhone} onChange={(e) => setAdvPhone(e.target.value)} placeholder="Contact phone" className="font-serif text-[15px] bg-transparent border-b border-black/20 py-1" />
+                  </div>
                 </div>
               )}
             </label>
           </div>
+
+          {mode === "new" && (
+            <div className="mt-8 border-t border-black/10 pt-6">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Pick a template</p>
+              <p className="mt-2 font-serif italic text-[14px] text-ink-soft">
+                A template pre-fills voice, playbooks and a menu skeleton. You can edit anything in the next steps.
+              </p>
+              <div className="mt-4 divide-y divide-black/10">
+                {ADVISORY_TEMPLATES.map((t) => (
+                  <label key={t.key} className="flex items-start gap-3 py-4 cursor-pointer">
+                    <input type="radio" checked={templateKey===t.key} onChange={() => applyTemplate(t.key)} className="mt-1" />
+                    <div className="flex-1">
+                      <p className="font-serif text-[16px] text-ink">{t.label}</p>
+                      <p className="mt-1 font-serif italic text-[13px] text-ink-soft">{t.short_description}</p>
+                      <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
+                        {t.suggested_tier} tier · {t.playbooks.length} playbook{t.playbooks.length===1?"":"s"} · {t.common_suppliers.length ? t.common_suppliers.length + " supplier seeds" : "no supplier seeds"}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

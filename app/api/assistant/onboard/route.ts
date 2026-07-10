@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, EntityCode } from "@/lib/assistant/orchestrator";
+import { findTemplate } from "@/lib/advisory/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
 
   // 1. Resolve entity_code — either an existing one or a new ADV-<slug>.
   let entity: EntityCode | string = String(body?.entity_code || "").toUpperCase();
-  const advisory = body?.advisory as { name?: string; city?: string; country?: string } | undefined;
+  const advisory = body?.advisory as { name?: string; city?: string; country?: string; fiscal_name?: string; cif?: string; contact_email?: string; contact_phone?: string } | undefined;
   const wantsNew = entity === "NEW" || entity === "" || entity === "ADVISORY";
 
   if (wantsNew) {
@@ -50,6 +51,45 @@ export async function POST(req: Request) {
       owner_user_id: uid,
     }, { onConflict: "entity_code" });
     if (advErr) return Response.json({ ok: false, error: "advisory: " + advErr.message }, { status: 500 });
+
+    // Sprint #3 — also upsert into the productised advisory_clients table so
+    // the row shows up in /administrate/advisor with its full shape (status
+    // funnel, template key, contact block). Idempotent by entity_code.
+    const templateKey = String((body?.template_key || "blank")).toLowerCase();
+    const { error: prodErr } = await sb.from("advisory_clients").upsert({
+      entity_code: entity,
+      name,
+      fiscal_name:   advisory?.fiscal_name   || null,
+      cif:           advisory?.cif           || null,
+      contact_email: advisory?.contact_email || null,
+      contact_phone: advisory?.contact_phone || null,
+      primary_advisor_user_id: uid,
+      status: "onboarding",
+      tier:   ["advisory","pro","enterprise"].includes(body?.billing_tier) ? body.billing_tier : "advisory",
+      template_key: templateKey,
+    }, { onConflict: "entity_code" });
+    if (prodErr) return Response.json({ ok: false, error: "advisory_clients: " + prodErr.message }, { status: 500 });
+
+    // Seed the activation checklist from the template. Additive — repeats
+    // are no-ops via the (client, step_key) uniqueness constraint.
+    const tpl = findTemplate(templateKey);
+    if (tpl) {
+      const { data: newClient } = await sb.from("advisory_clients").select("id").eq("entity_code", entity).maybeSingle();
+      if (newClient?.id) {
+        const rows = tpl.checklist_steps.map((step, i) => ({
+          advisory_client_id: newClient.id,
+          step_key: step.key,
+          label: step.label,
+          hint: step.hint || null,
+          sort_order: i,
+          // The first step ("entity_created") is done by definition — we
+          // just created the entity. Everything else starts todo.
+          status: step.key === "entity_created" ? "done" : "todo",
+          completed_at: step.key === "entity_created" ? new Date().toISOString() : null,
+        }));
+        await sb.from("advisory_checklist_items").upsert(rows, { onConflict: "advisory_client_id,step_key" });
+      }
+    }
   } else if (!["IFL","BM","BBH"].includes(entity)) {
     return Response.json({ ok: false, error: "unknown entity_code" }, { status: 400 });
   }
