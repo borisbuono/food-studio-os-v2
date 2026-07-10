@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
+import EmailTriageClient from "./EmailTriageClient";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +33,21 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   agent_dispatch: { label: "Agent", color: "#9C9282" },
 };
 const sourceKey = (s: string) => (s === "gmail" ? "gmail" : s === "google_reviews" ? "google_reviews" : s === "whatsapp" ? "whatsapp" : "other");
-const stars = (n: number) => "★★★★★☆☆☆☆☆".slice(5 - n, 10 - n); // n filled then (5-n) empty
+const stars = (n: number) => "★★★★★☆☆☆☆☆".slice(5 - n, 10 - n);
 
-const TABS: { key: string; label: string }[] = [
+// Sprint 3 · #3 — segment tabs. Email triage is the new default surface,
+// Reviews mirrors what was here before, WhatsApp is a ghost tab lit up by
+// Sprint 4. "All signals" is the legacy inbox_items / feedback view.
+type Segment = "all" | "email" | "reviews" | "whatsapp";
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: "all",      label: "All signals" },
+  { key: "email",    label: "Email triage" },
+  { key: "reviews",  label: "Reviews" },
+  { key: "whatsapp", label: "WhatsApp" },
+];
+
+// Legacy source-filter tabs (kept for the All signals view).
+const SRC_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
   { key: "gmail", label: "Email" },
   { key: "google_reviews", label: "Reviews" },
@@ -42,11 +55,19 @@ const TABS: { key: string; label: string }[] = [
   { key: "team", label: "Team" },
 ];
 
-export default async function Inbox({ searchParams }: { searchParams?: { src?: string } }) {
-  
-  const supabase = supabaseServer();const rid = serverRestaurantId();
-  const active = (searchParams?.src && TABS.some((t) => t.key === searchParams.src)) ? searchParams!.src! : "all";
+export default async function Inbox({ searchParams }: { searchParams?: { src?: string; tab?: string } }) {
+  const supabase = supabaseServer();
+  const rid = serverRestaurantId();
+  const tab: Segment = (SEGMENTS.some((s) => s.key === (searchParams?.tab as Segment)) ? (searchParams!.tab as Segment) : "all");
 
+  // Load Gmail channels for the current user — used by the Email triage segment.
+  const { data: u } = await supabase.auth.getUser();
+  const { data: chans } = u.user?.id
+    ? await supabase.from("assistant_channels").select("id,account_ref,settings,channel_type,revoked_at").eq("user_id", u.user.id).eq("channel_type", "gmail").is("revoked_at", null).order("created_at", { ascending: false })
+    : { data: [] as any[] };
+  const gmailChannels = (chans || []).map((c: any) => ({ id: c.id, account_ref: c.account_ref, settings: c.settings || {} }));
+
+  const active = (searchParams?.src && SRC_TABS.some((t) => t.key === searchParams.src)) ? searchParams!.src! : "all";
   const [{ data: ext }, { data: fb }] = await Promise.all([
     supabase.from("inbox_items").select("id,source,category,sender_name,sender_handle,subject,body,received_at,status,priority,external_url,metadata").eq("restaurant_id", rid).order("received_at", { ascending: false }),
     supabase.from("feedback").select("id,route,kind,status,priority,author_name,author_role,body,created_at").eq("restaurant_id", rid).neq("status", "done").neq("status", "wontfix").order("created_at", { ascending: false }),
@@ -92,7 +113,6 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
   ].sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 
   const items = active === "all" ? all : all.filter((i) => i.src === active);
-
   const counts = {
     all: all.length,
     external: all.filter((i) => i.kind === "external").length,
@@ -104,57 +124,97 @@ export default async function Inbox({ searchParams }: { searchParams?: { src?: s
     <main className="mx-auto max-w-xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Grow · inbox</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">Reviews & signals</h1>
-      <p className="mt-2 font-sans text-[14px] text-ink-soft">Google, TripAdvisor, Gmail flags, WhatsApp alerts — everything the outside world is saying, in one place. {counts.all} open · {counts.external} from outside · {counts.feedback} from the team. Outside channels are mirrored read-only.</p>
+      <h1 className="mt-2 font-serif text-3xl text-ink">The signal layer</h1>
+      <p className="mt-2 font-sans text-[14px] text-ink-soft">
+        Every channel your business is speaking through — email, reviews, WhatsApp, feedback from the team.
+        The assistant triages them so you can spend your day on the right ones.
+      </p>
 
-      <nav className="mt-6 flex flex-wrap gap-2">
-        {TABS.map((t) => {
-          const on = t.key === active;
+      {/* Segment tabs — Sprint 3 · #3 */}
+      <nav className="mt-6 flex flex-wrap gap-2 border-b border-line pb-3">
+        {SEGMENTS.map((s) => {
+          const on = s.key === tab;
           return (
-            <Link key={t.key} href={t.key === "all" ? "/grow/inbox" : `/grow/inbox?src=${t.key}`}
+            <Link key={s.key} href={s.key === "all" ? "/grow/inbox" : `/grow/inbox?tab=${s.key}`}
               className={"rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wide " + (on ? "bg-ink text-paper" : "border border-black/10 text-ink-soft")}>
-              {t.label} {tabCount(t.key) ? <span className={on ? "text-paper/70" : "text-clay"}>· {tabCount(t.key)}</span> : null}
+              {s.label}{s.key === "whatsapp" ? " · soon" : ""}
             </Link>
           );
         })}
       </nav>
 
-      <ul className="mt-8 space-y-3">
-        {items.map((it) => {
-          const sm = it.kind === "external" ? (SOURCE_META[it.src === "google_reviews" ? "google_reviews" : it.src === "gmail" ? "gmail" : it.src === "whatsapp" ? "whatsapp" : "agent_dispatch"]) : null;
-          const color = it.kind === "feedback" ? "#0E7C86" : (sm?.color || "#B5701C");
-          const inner = (
-            <>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color }}>
-                  {it.label}{it.flag && it.flag !== "new" ? " · " + it.flag : ""}
-                  {it.kind === "external" ? <span className="text-clay"> · mirror</span> : null}
-                </span>
-                <span className="font-mono text-[10px] text-clay">{when(it.at)} ago{it.route ? " · " + it.route : ""}</span>
-              </div>
-
-              {it.kind === "external" && it.rating != null ? (
-                <p className="mt-2 font-mono text-[13px] tracking-[0.15em]" style={{ color: "#B5701C" }}>{stars(Math.max(0, Math.min(5, it.rating)))} <span className="text-clay text-[10px]">{it.rating}/5</span></p>
-              ) : null}
-
-              <p className="mt-2 font-serif text-[17px] leading-relaxed text-ink">{it.title}</p>
-              {it.kind === "external" && it.body ? <p className="mt-1 font-serif text-[15px] leading-relaxed text-ink-soft">{clip(it.body)}</p> : null}
-
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-                {it.who || (it.kind === "feedback" ? "someone on the team" : "outside")}
-                {it.handle ? " · " + it.handle : ""}
-                {it.url ? " · open ↗" : ""}
-              </p>
-            </>
-          );
-          return (
-            <li key={it.kind + ":" + it.id} className="rounded-2xl border border-line bg-card p-5">
-              {it.url ? <a href={it.url} target="_blank" rel="noreferrer" className="block">{inner}</a> : inner}
-            </li>
-          );
-        })}
-        {!items.length ? <li className="font-sans text-[14px] text-clay">{active === "all" ? "Inbox is clear." : "Nothing here right now."}</li> : null}
-      </ul>
+      {tab === "email" ? (
+        <EmailTriageClient channels={gmailChannels} initialChannelId={gmailChannels[0]?.id} />
+      ) : tab === "whatsapp" ? (
+        <div className="mt-10 border-t border-line pt-8">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">WhatsApp</p>
+          <p className="mt-2 font-serif italic text-[15px] text-ink-soft">
+            WhatsApp triage lands in Sprint 4 — pair a number in Assistant Settings, then triaged threads will appear here alongside email.
+          </p>
+          <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">
+            <Link href="/administrate/settings/assistant" className="hover:text-ink">Configure channels →</Link>
+          </p>
+        </div>
+      ) : tab === "reviews" ? (
+        <>
+          <p className="mt-6 font-sans text-[13px] text-ink-soft">{counts.external} external signals in the last window.</p>
+          <ul className="mt-6 space-y-3">
+            {all.filter((i) => i.src === "google_reviews").map((it) => renderItem(it))}
+            {!all.filter((i) => i.src === "google_reviews").length ? <li className="font-sans text-[14px] text-clay">No reviews right now.</li> : null}
+          </ul>
+        </>
+      ) : (
+        <>
+          {/* Legacy All-signals — kept as the "all" tab so nothing is lost */}
+          <p className="mt-2 font-sans text-[13px] text-ink-soft">{counts.all} open · {counts.external} from outside · {counts.feedback} from the team. Outside channels are mirrored read-only.</p>
+          <nav className="mt-6 flex flex-wrap gap-2">
+            {SRC_TABS.map((t) => {
+              const on = t.key === active;
+              return (
+                <Link key={t.key} href={t.key === "all" ? "/grow/inbox" : `/grow/inbox?src=${t.key}`}
+                  className={"rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wide " + (on ? "bg-ink text-paper" : "border border-black/10 text-ink-soft")}>
+                  {t.label} {tabCount(t.key) ? <span className={on ? "text-paper/70" : "text-clay"}>· {tabCount(t.key)}</span> : null}
+                </Link>
+              );
+            })}
+          </nav>
+          <ul className="mt-8 space-y-3">
+            {items.map((it) => renderItem(it))}
+            {!items.length ? <li className="font-sans text-[14px] text-clay">{active === "all" ? "Inbox is clear." : "Nothing here right now."}</li> : null}
+          </ul>
+        </>
+      )}
     </main>
+  );
+}
+
+function renderItem(it: Item) {
+  const sm = it.kind === "external" ? (SOURCE_META[it.src === "google_reviews" ? "google_reviews" : it.src === "gmail" ? "gmail" : it.src === "whatsapp" ? "whatsapp" : "agent_dispatch"]) : null;
+  const color = it.kind === "feedback" ? "#0E7C86" : (sm?.color || "#B5701C");
+  const inner = (
+    <>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-wide" style={{ color }}>
+          {it.label}{it.flag && it.flag !== "new" ? " · " + it.flag : ""}
+          {it.kind === "external" ? <span className="text-clay"> · mirror</span> : null}
+        </span>
+        <span className="font-mono text-[10px] text-clay">{when(it.at)} ago{it.route ? " · " + it.route : ""}</span>
+      </div>
+      {it.kind === "external" && it.rating != null ? (
+        <p className="mt-2 font-mono text-[13px] tracking-[0.15em]" style={{ color: "#B5701C" }}>{stars(Math.max(0, Math.min(5, it.rating)))} <span className="text-clay text-[10px]">{it.rating}/5</span></p>
+      ) : null}
+      <p className="mt-2 font-serif text-[17px] leading-relaxed text-ink">{it.title}</p>
+      {it.kind === "external" && it.body ? <p className="mt-1 font-serif text-[15px] leading-relaxed text-ink-soft">{clip(it.body)}</p> : null}
+      <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
+        {it.who || (it.kind === "feedback" ? "someone on the team" : "outside")}
+        {it.handle ? " · " + it.handle : ""}
+        {it.url ? " · open ↗" : ""}
+      </p>
+    </>
+  );
+  return (
+    <li key={it.kind + ":" + it.id} className="rounded-2xl border border-line bg-card p-5">
+      {it.url ? <a href={it.url} target="_blank" rel="noreferrer" className="block">{inner}</a> : inner}
+    </li>
   );
 }

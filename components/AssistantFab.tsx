@@ -150,6 +150,25 @@ export default function AssistantFab() {
     setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
     setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "···", userText: t }]);
     setThinking(true);
+    // Sprint 3 · #3 — /grow/inbox integration. Pages can expose
+    //   window.__fsAssistantInboxHooks.draftForHint(text) → { ok, ... }
+    // and the FAB will run page-owned execution before falling through to the
+    // orchestrator when the phrasing sounds like an email-draft request.
+    try {
+      const hooks = (typeof window !== "undefined" ? (window as any).__fsAssistantInboxHooks : null) as any;
+      const onInbox = (pathname || "").startsWith("/grow/inbox");
+      const looksLikeDraft = /\b(draft|reply|respond|answer|write)\b/i.test(t);
+      if (onInbox && hooks?.draftForHint && looksLikeDraft) {
+        const out = await hooks.draftForHint(t);
+        if (out?.ok) {
+          const reply = (lang === "es" ? "Borrador listo abajo — asunto: " : "Draft ready below — subject: ") + (out.subject || "(no subject)") + (out.from ? "\n" + (lang === "es" ? "Para " : "To ") + out.from : "");
+          setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: "order", confidence: 1, userText: t }; return n; });
+          setThinking(false);
+          return;
+        }
+        // fall through if the hook couldn't handle it
+      }
+    } catch {}
     try {
       const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
