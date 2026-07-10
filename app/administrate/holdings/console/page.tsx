@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import ChefContext from "@/components/ChefContext";
+import AssistantContext from "@/components/AssistantContext";
 import {
   ENTITY_CODES,
   getGroupCashToday,
@@ -58,7 +58,7 @@ export default async function HoldingsConsole() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" /* olive — holdings */ }}>
-      <ChefContext
+      <AssistantContext
         context={{
           kind: "holdings_console",
           entity: "BBH",

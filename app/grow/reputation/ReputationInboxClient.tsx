@@ -59,7 +59,7 @@ export default function ReputationInboxClient({ reviews }: { reviews: ReviewRow[
   // Chef FAB page context — feeds "draft a reply" prompts from the FAB itself
   useEffect(() => {
     if (typeof window === "undefined") return;
-    (window as any).__fsChefContext = {
+    (window as any).__fsAssistantContext = {
       route: "/grow/reputation",
       selected_review: selected ? {
         platform: PLATFORM_LABEL[selected.platform] || selected.platform,
@@ -69,7 +69,7 @@ export default function ReputationInboxClient({ reviews }: { reviews: ReviewRow[
         language: selected.language,
       } : null,
     };
-    return () => { if (typeof window !== "undefined") (window as any).__fsChefContext = null; };
+    return () => { if (typeof window !== "undefined") (window as any).__fsAssistantContext = null; };
   }, [selected]);
 
   const filtered = useMemo(() => reviews.filter((r) => {

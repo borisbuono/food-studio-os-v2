@@ -105,8 +105,8 @@ export async function POST(req: Request) {
     }).select("id").maybeSingle();
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
 
-    // 5) Audit — chef_actions
-    await sb.from("chef_actions").insert({
+    // 5) Audit — assistant_actions
+    await sb.from("assistant_actions").insert({
       user_id: u.user.id,
       action_type: "integrations.connect",
       target_table: "entity_integrations",

@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const { error } = await sb.from("entity_integrations").update({ revoked_at: new Date().toISOString(), status: "revoked" }).eq("id", id);
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
 
-    await sb.from("chef_actions").insert({
+    await sb.from("assistant_actions").insert({
       user_id: u.user.id,
       action_type: "integrations.revoke",
       target_table: "entity_integrations",

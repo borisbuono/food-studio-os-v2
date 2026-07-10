@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import ChefContext from "@/components/ChefContext";
+import AssistantContext from "@/components/AssistantContext";
 import { SupplierChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <ChefContext context={{ kind: "invoices", entity: ec, openInvoices: rows.slice(0, 20).map((r) => ({ id: r.id, supplier: r.supplier_name || r.provider?.name || null, amount_eur: r.amount_eur, flagged_reason: r.flagged_reason, match_status: r.match_status })), topId: rows[0]?.id || null }} />
+      <AssistantContext context={{ kind: "invoices", entity: ec, openInvoices: rows.slice(0, 20).map((r) => ({ id: r.id, supplier: r.supplier_name || r.provider?.name || null, amount_eur: r.amount_eur, flagged_reason: r.flagged_reason, match_status: r.match_status })), topId: rows[0]?.id || null }} />
       <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
       <span className="ml-3 inline-block font-mono text-sm text-clay">Hold Chef to snap a doc.</span>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Scans · {ec} · invoice triage</p>

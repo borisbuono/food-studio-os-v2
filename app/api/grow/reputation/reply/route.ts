@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     .eq("platform", review.platform);
 
   // Audit
-  await sb.from("chef_actions").insert({
+  await sb.from("assistant_actions").insert({
     user_id: u.user.id,
     action_type: "reputation.reply",
     target_table: "reviews",

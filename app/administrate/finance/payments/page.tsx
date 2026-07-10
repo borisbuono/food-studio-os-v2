@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
-import ChefContext from "@/components/ChefContext";
+import AssistantContext from "@/components/AssistantContext";
 import PaymentsClient from "./PaymentsClient";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function PaymentsPage() {
 
   return (
     <>
-      <ChefContext context={chefContext} />
+      <AssistantContext context={chefContext} />
       <main className="mx-auto max-w-4xl px-6 py-10">
         <Link href="/administrate/finance" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
         <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">Command Center · Payment health</p>

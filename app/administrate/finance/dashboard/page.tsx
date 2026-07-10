@@ -2,7 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
 import { ENTITY_LABEL } from "@/lib/entities";
-import ChefContext from "@/components/ChefContext";
+import AssistantContext from "@/components/AssistantContext";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,7 @@ export default async function FinanceDashboard() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <ChefContext context={{ kind: "finance_dashboard", entity: ec }} />
+      <AssistantContext context={{ kind: "finance_dashboard", entity: ec }} />
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Finance · {ec} · operational</p>
       <nav aria-label="Finance sections" className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-b border-line pb-3 font-mono text-[11px] uppercase tracking-wide">

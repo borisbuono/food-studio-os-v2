@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import ChefContext from "@/components/ChefContext";
+import AssistantContext from "@/components/AssistantContext";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function Reconciliation() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <ChefContext context={{ kind: "bank_movements", entity: ec, unmatched: (unmatched || []).slice(0, 50).map((m: any) => ({ id: m.id, date: m.movement_date, description: m.description, amount_eur: m.amount_eur, bank_account: m.bank_account })) }} />
+      <AssistantContext context={{ kind: "bank_movements", entity: ec, unmatched: (unmatched || []).slice(0, 50).map((m: any) => ({ id: m.id, date: m.movement_date, description: m.description, amount_eur: m.amount_eur, bank_account: m.bank_account })) }} />
       <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Bank · {ec} · reconciliation</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">What's in motion.</h1>

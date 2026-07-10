@@ -4,6 +4,11 @@ import { SupplierChip, PersonChip, RecipeChip, InvoiceChip } from "@/components/
 
 export const dynamic = "force-dynamic";
 
+// URL note: this route stays at /administrate/chef-log for continuity —
+// operators have bookmarked it. Internal reads now target the renamed
+// assistant_* tables (Sprint 1 rename). The URL will move to
+// /administrate/assistant-log in Sprint 6 with a 308 redirect from here.
+
 const eur = (n: any) => n == null ? "—" : "€" + Number(n).toFixed(2);
 const fmt = (d: any) => { try { const x = new Date(d); return x.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
 

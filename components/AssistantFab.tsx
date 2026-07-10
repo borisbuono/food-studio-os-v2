@@ -5,12 +5,18 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
 
-// Chef FAB v2 — Siri-style tap-to-start, bottom-sheet drawer, long-press = camera,
-// confidence-gated intent chips with autolearning, language follows the OS i18n
-// setting (fs_lang cookie), hides on pages that set data-fab="hidden" on <body>.
-// Foundation contract: /api/ask returns { reply, intent, confidence, order,
-// feedback, memory, user_turn_id }. /api/chef/{confirm-intent,save-memory,log-action}
-// for the loop tails.
+// Assistant FAB (formerly Chef FAB v2) — Siri-style tap-to-start, bottom-sheet
+// drawer, long-press = camera, confidence-gated intent chips with autolearning.
+// Language follows the OS i18n setting (fs_lang cookie), hides on pages that set
+// data-fab="hidden" on <body>.
+//
+// Foundation contract: /api/ask delegates to the Assistant Layer orchestrator
+// and returns { reply, intent, confidence, order, feedback, memory,
+// user_turn_id }. /api/chef/{confirm-intent,save-memory,log-action} continue
+// to work (kept for continuity; write to the renamed assistant_* tables).
+//
+// Persona label ("Chef") is intentionally preserved — that's how operators
+// address the assistant. Under the hood, everything is now Assistant Layer.
 
 type Msg = { role: "you" | "chef" | "sys"; text: string; intent?: string | null; confidence?: number | null; userText?: string; turnId?: string; needsConfirm?: boolean; memoryProposal?: any; orderDraft?: any; feedback?: any };
 const CONFIDENCE_THRESHOLD = 0.75;
@@ -148,7 +154,7 @@ export default function AssistantFab() {
       const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         message: t, route: pathname || "", session_id: sessionRef.current, entity_id: ent, language: lang,
-        page_context: (typeof window !== "undefined" ? (window as any).__fsChefContext : null),
+        page_context: (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null),
       })});
       const d = await r.json();
       const reply = d.reply || "…";
