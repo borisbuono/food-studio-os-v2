@@ -76,7 +76,7 @@ export default async function Page() {
     // (age > 7d), platform_billing_status failing/disabled.
     supabase.from("invoice_inbox").select("id,entity_id,amount_eur,sender:provider_id(name),arrived_at").gt("amount_eur", 500).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,amount_eur,description,movement_date,reconciled_to").eq("reconciled_to", "unmatched"),
-    supabase.from("platform_billing_status").select("entity_id,platform,state,note").in("state", ["failing", "disabled"]),
+    supabase.from("platform_billing_status").select("entity_code,platform,state,notes,failure_count_30d,last_failure_at").in("state", ["failing", "disabled"]),
     supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
   ]);
 
@@ -219,13 +219,15 @@ export default async function Page() {
       });
     }
 
-    const myPlatform = platformBilling.filter((r) => r.entity_id === ec);
+    const myPlatform = platformBilling.filter((r) => r.entity_code === ec);
     for (const p of myPlatform) {
+      const kicker = p.state === "disabled" ? `Platform · ${p.platform} disabled` : `Platform · ${p.platform}`;
+      const title = p.notes ? String(p.notes).slice(0, 140) : `${p.platform} ${p.state}` + (Number(p.failure_count_30d || 0) > 0 ? ` · ${p.failure_count_30d} fails/30d` : "");
       alerts.push({
         key: `platform-${p.platform}-${ec}`,
-        kicker: `Platform · ${p.platform}`,
-        title: p.note ? String(p.note) : `${p.platform} ${p.state}`,
-        href: "/administrate/settings",
+        kicker,
+        title,
+        href: "/administrate/finance/payments",
       });
     }
 

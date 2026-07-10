@@ -43,6 +43,8 @@ const shortDate = (s: string | null) => s ? s.slice(0, 10) : "—";
 
 export default function PaymentsClient({ rows }: { rows: Row[] }) {
   const [entity, setEntity] = useState<"" | "IFL" | "BM" | "BBH">("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanResult, setScanResult] = useState<{ hits: number; updated: number; channels: number } | null>(null);
   const filtered = useMemo(() => {
     const r = entity ? rows.filter((x) => x.entity_code === entity) : rows;
     return r.slice().sort((a, b) => {
@@ -60,10 +62,35 @@ export default function PaymentsClient({ rows }: { rows: Row[] }) {
     return c;
   }, [rows]);
 
+  async function scanNow() {
+    setScanBusy(true);
+    setScanResult(null);
+    try {
+      const res = await fetch("/api/finance/payment-status/scan-gmail", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScanResult({
+          hits: Number(j?.hits_total || 0),
+          updated: Number(j?.updated_total || 0),
+          channels: Number(j?.channels_seen || 0),
+        });
+        // Refresh so the updated rows land in the table.
+        setTimeout(() => window.location.reload(), 800);
+      }
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
   return (
     <>
-      {/* Filter chips per entity */}
-      <div className="mt-6 flex flex-wrap gap-1.5">
+      {/* Filter chips per entity + scan-now */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-1.5">
         {[
           { key: "" as const, label: `All (${counts.total})` },
           { key: "IFL" as const, label: `IFL (${counts.IFL})` },
@@ -79,6 +106,21 @@ export default function PaymentsClient({ rows }: { rows: Row[] }) {
             {c.label}
           </button>
         ))}
+        </div>
+        <button
+          onClick={scanNow}
+          disabled={scanBusy}
+          className="ml-auto rounded-full border border-black/10 px-3 py-1 font-mono text-[11px] uppercase tracking-wide hover:border-ink-soft disabled:opacity-50"
+          style={{ color: "var(--accent)" }}
+          title="Sweep every connected Gmail mailbox for billing-failure emails and update platform_billing_status."
+        >
+          {scanBusy ? "Scanning…" : "Scan now"}
+        </button>
+        {scanResult ? (
+          <span className="font-mono text-[10px] uppercase tracking-wide text-clay">
+            {scanResult.channels} channel{scanResult.channels === 1 ? "" : "s"} · {scanResult.hits} hit{scanResult.hits === 1 ? "" : "s"} · {scanResult.updated} updated
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-line">
@@ -133,7 +175,7 @@ export default function PaymentsClient({ rows }: { rows: Row[] }) {
         </table>
       </div>
       <p className="mt-4 font-mono text-[10px] text-muted">
-        Data is seeded from the 2026-07-05 marketing invoice map. Manual updates via <code>POST /api/finance/payment-status/sync</code>. Gmail-based auto-detection is a follow-up.
+        Data is seeded from the 2026-07-05 marketing invoice map. Manual updates via <code>POST /api/finance/payment-status/sync</code>. Gmail-based auto-detection sweeps every connected mailbox — nightly + on demand via the Scan now button.
       </p>
     </>
   );

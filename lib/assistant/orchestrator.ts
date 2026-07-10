@@ -13,7 +13,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 // billing metering (Sprint 6) can meter tokens by user, by entity, by mode.
 
 export type EntityCode = "IFL" | "BM" | "BBH";
-export type AssistantMode = "chat" | "brief" | "draft";
+export type AssistantMode = "chat" | "brief" | "draft" | "extract";
 
 export type AssistantContext = {
   entity: EntityCode;
@@ -84,6 +84,7 @@ export type BillingCap = {
 const CHAT_MODEL   = "claude-haiku-4-5-20251001";
 const BRIEF_MODEL  = "claude-haiku-4-5-20251001";
 const DRAFT_MODEL  = "claude-haiku-4-5-20251001";
+const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 
 // Anthropic Haiku 4.5 published pricing (USD per million tokens).
 // Sprint 6 bills in EUR — convert at a conservative fixed rate that we
@@ -245,14 +246,16 @@ export class AssistantOrchestrator {
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";
 
-    if (mode === "chat")  return CHAT_BASE  + voice + dials + memBlock + ctxBlock + extra;
-    if (mode === "brief") return BRIEF_BASE + voice + dials + memBlock + ctxBlock + extra;
+    if (mode === "chat")    return CHAT_BASE    + voice + dials + memBlock + ctxBlock + extra;
+    if (mode === "brief")   return BRIEF_BASE   + voice + dials + memBlock + ctxBlock + extra;
+    if (mode === "extract") return EXTRACT_BASE + extra;
     return DRAFT_BASE + voice + dials + memBlock + ctxBlock + extra;
   }
 
   private modelFor(mode: AssistantMode) {
     if (mode === "chat")  return CHAT_MODEL;
     if (mode === "brief") return BRIEF_MODEL;
+    if (mode === "extract") return EXTRACT_MODEL;
     return DRAFT_MODEL;
   }
 
@@ -450,5 +453,7 @@ Rules:
 - Keep it short — the reader is running a restaurant.
 - Never invent numbers or facts not in the OS state block.
 - Sign off with the operator's first name (given in the prompt) or leave it unsigned.`;
+
+const EXTRACT_BASE = `You are an extraction agent. Given a short piece of input (typically an email or a document snippet), you return STRICT JSON matching the schema in the user prompt. No prose, no code fences, no commentary. If the input does not match the shape being asked about, return the JSON with null / false fields — never invent.`;
 
 export const orchestrator = new AssistantOrchestrator();
