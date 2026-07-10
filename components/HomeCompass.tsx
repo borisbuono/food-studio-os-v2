@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
+import AssistantBriefPanel from "@/components/AssistantBriefPanel";
 import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_ORDER, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -41,6 +42,8 @@ export type CompassData = Record<EntityKey, {
   // owner-only tile
   cashToday: number | null;
 }>;
+
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
   { href: "/develop/menu-engineering", label: "Develop", blurb: "Menu, recipes, wine, lexicon" },
@@ -230,6 +233,9 @@ export default function HomeCompass({ data }: { data: CompassData }) {
       <div className="mt-6 border-t border-b border-black/10 py-5">
         <Header label={ENTITY_LABEL[entity]} data={d} />
       </div>
+
+      {/* Today's Brief — Assistant Layer Sprint 2 */}
+      <AssistantBriefPanel entity={ENTITY_CODE[entity]} />
 
       {/* THE COMPASS — where in today's loop we are */}
       <section className="mt-2">
