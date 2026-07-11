@@ -40,6 +40,9 @@ export type AssistantContext = {
     ready: boolean;
     disabled_since: string | null;
   } | null;
+  // PA integration Sprint 1 — top open Master_ToDo rows so the FAB can answer
+  // "what's on my plate today" without a separate round trip.
+  top_master_todos: { title: string; impact_score: number; source: string; due_at: string | null }[];
   page_context: any | null;
 };
 
@@ -132,7 +135,7 @@ export class AssistantOrchestrator {
     const rid = ENTITY_TO_RID[entity] || null;
 
     const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations] = await Promise.all([
+    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
       sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
@@ -148,6 +151,8 @@ export class AssistantOrchestrator {
         .gte("accepted_at", cutoff14)
         .order("accepted_at", { ascending: false })
         .limit(10),
+      // PA integration Sprint 1 — pull top-impact open master_todos.
+      sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20),
     ]);
 
     // Resolve per-hire step counts so "What is Alberto's onboarding status?"
@@ -188,6 +193,11 @@ export class AssistantOrchestrator {
     const bankOpen = (bank.data || []).length;
     const mepOpen  = (mep.data || []).length;
     const tasksOpen = (tasks.data || []).filter((t: any) => (t.priority || "") === "urgent" || (t.priority || "") === "high").length;
+
+    const topTodos = ((masterTodos as any).data || [])
+      .filter((t: any) => !t.entity_code || t.entity_code === entity)
+      .slice(0, 5)
+      .map((t: any) => ({ title: t.title, impact_score: t.impact_score, source: t.source, due_at: t.due_at }));
 
     const hh = Number(madridHHmm().slice(0, 2));
     const svc: AssistantContext["service_phase"] = hh < 19 ? "before" : hh < 24 ? "during" : "after";
@@ -236,6 +246,7 @@ export class AssistantOrchestrator {
         kind: String(a.kind), severity: Number(a.severity || 2), description: String(a.description || "").slice(0, 200),
       })),
       ad_reactivation: adReactivation,
+      top_master_todos: topTodos,
       page_context: pageContext,
     };
   }
@@ -329,6 +340,9 @@ export class AssistantOrchestrator {
               + ctx.ad_reactivation.steps_done + "/" + ctx.ad_reactivation.steps_total + " steps "
               + (ctx.ad_reactivation.ready ? "· reactivate ready" : "· not ready")
               + (ctx.ad_reactivation.disabled_since ? " · disabled since " + ctx.ad_reactivation.disabled_since : "")
+            : "")
+        + (ctx.top_master_todos && ctx.top_master_todos.length
+            ? "\n- highest-impact plate items:\n" + ctx.top_master_todos.map((t, i) => "  " + (i+1) + ". " + t.title + " (impact " + t.impact_score + ", " + t.source + ")").join("\n")
             : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";

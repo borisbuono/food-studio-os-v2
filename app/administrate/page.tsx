@@ -19,7 +19,7 @@ export default async function AdministrateHome() {
   const ec = ENTITY_CODE[entity] || "IFL";
   const today = new Date().toISOString().slice(0, 10);
 
-  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes, advisoryRes] = await Promise.all([
+  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes, advisoryRes, masterTodoRes] = await Promise.all([
     supabase.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle(),
     supabase.from("invoice_inbox").select("id,amount_eur,entity_id,match_status").eq("entity_id", ec).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,reconciled_to").eq("entity_id", ec).eq("reconciled_to", "unmatched"),
@@ -28,6 +28,8 @@ export default async function AdministrateHome() {
     // decisions is an inbox-ish table; count anything not resolved.
     supabase.from("decisions").select("id,resolved_at"),
     supabase.from("v_advisory_clients_overview").select("id,status"),
+    // PA integration Sprint 1 — Master_ToDo pending count for the sub-strip.
+    supabase.from("master_todos").select("id,title,impact_score,entity_code,status").not("status", "in", "(completed,deferred)"),
   ]);
 
   const todayRev = Number(eodRes.data?.revenue || 0);
@@ -40,6 +42,8 @@ export default async function AdministrateHome() {
   const openDecisions = (decisionsRes.data || []).filter((d: any) => !d.resolved_at).length;
   const advClients = (advisoryRes.data || []) as { id: string; status: string }[];
   const advActive  = advClients.filter((c) => c.status === "active" || c.status === "onboarding").length;
+  const masterTodos = (masterTodoRes.data || []).filter((t: any) => !t.entity_code || t.entity_code === ec);
+  const topTodo = masterTodos.slice().sort((a: any, b: any) => (b.impact_score || 0) - (a.impact_score || 0))[0];
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -103,6 +107,18 @@ export default async function AdministrateHome() {
             ? "No advisory clients yet — bring the first one on."
             : `${advClients.length} on the book · ${advActive} live`}
           action="Open advisor console →"
+        />
+        <PillarTile
+          href="/administrate/master-todo"
+          kicker="Master ToDo · what the PA is holding"
+          title="Master ToDo"
+          value={masterTodos.length}
+          status={masterTodos.length === 0
+            ? "Nothing on the plate — the PA is quiet."
+            : topTodo
+              ? `Top move · ${String(topTodo.title || "").slice(0, 60)}`
+              : `${masterTodos.length} open`}
+          action="Open the plate →"
         />
       </section>
     </main>

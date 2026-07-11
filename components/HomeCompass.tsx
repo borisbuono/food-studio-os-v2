@@ -29,6 +29,13 @@ export type CompassAlert = {
   href: string;
 };
 
+export type MasterTodoLite = {
+  id: string;
+  title: string;
+  impact_score: number;
+  due_at: string | null;
+};
+
 export type CompassData = Record<EntityKey, {
   label: string;
   now: { hhmm: string; dateLabel: string };
@@ -42,6 +49,8 @@ export type CompassData = Record<EntityKey, {
   alertsTotal: number;
   // owner-only tile
   cashToday: number | null;
+  // PA integration Sprint 1 — top 3 highest-impact open Master_ToDo rows.
+  highestImpact: MasterTodoLite[];
 }>;
 
 const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
@@ -137,6 +146,38 @@ function AlertsStrip({ alerts, total }: { alerts: CompassAlert[]; total: number 
           <li className="py-2 font-mono text-[11px] text-clay">+ {total - 3} more waiting</li>
         ) : null}
       </ul>
+    </div>
+  );
+}
+
+function HighestImpactStrip({ todos }: { todos: MasterTodoLite[] }) {
+  if (!todos || todos.length === 0) {
+    return (
+      <div className="mt-6 border-t border-black/10 pt-4">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Highest impact</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Nothing on the plate — the PA is quiet.</p>
+        <Link href="/administrate/master-todo" className="mt-2 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+          Open Master ToDo ›
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 border-t border-black/10 pt-4">
+      <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Highest impact · {todos.length}</p>
+      <ul className="mt-2 divide-y divide-black/5">
+        {todos.map((t) => (
+          <li key={t.id}>
+            <Link href="/administrate/master-todo" className="block py-2.5 transition hover:opacity-80">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-clay">impact {"·".repeat(t.impact_score)}</p>
+              <p className="mt-0.5 font-sans text-[14px] text-ink">{t.title}</p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <Link href="/administrate/master-todo" className="mt-2 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+        Open Master ToDo ›
+      </Link>
     </div>
   );
 }
@@ -254,6 +295,9 @@ export default function HomeCompass({ data }: { data: CompassData }) {
           </Link>
         </div>
       ) : null}
+
+      {/* Highest-impact strip — Master_ToDo top 3 */}
+      <HighestImpactStrip todos={d.highestImpact} />
 
       {/* Alerts strip */}
       <AlertsStrip alerts={d.alerts} total={d.alertsTotal} />

@@ -65,6 +65,7 @@ export default async function Page() {
     platformBillingRes,
     financeAnomaliesRes,
     bankMatchesOpenRes,
+    masterTodosRes,
   ] = await Promise.all([
     supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
     supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
@@ -81,6 +82,8 @@ export default async function Page() {
     supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
     // Bank matches that have a proposed candidate waiting for the operator to accept / reject.
     supabase.from("v_bank_matches_open").select("movement_id,entity_code,top_confidence").not("top_candidate_id", "is", null),
+    // PA integration Sprint 1 — Master_ToDo highest-impact open rows for the strip.
+    supabase.from("master_todos").select("id,title,impact_score,entity_code,due_at").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(30),
   ]);
 
   // Some of the newer tables may not exist yet in every environment; treat null as empty.
@@ -95,6 +98,7 @@ export default async function Page() {
   const platformBilling: any[] = platformBillingRes.data || [];
   const financeAnomalies: any[] = financeAnomaliesRes.data || [];
   const bankProposed: any[] = bankMatchesOpenRes.data || [];
+  const masterTodos: any[] = masterTodosRes.data || [];
 
   // Age > 7 days on bank movements
   const sevenDaysAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
@@ -273,6 +277,10 @@ export default async function Page() {
       alerts,
       alertsTotal: alerts.length,
       cashToday: eod ? Number(eod.revenue || 0) : null,
+      highestImpact: masterTodos
+        .filter((t) => !t.entity_code || t.entity_code === ec)
+        .slice(0, 3)
+        .map((t) => ({ id: t.id, title: String(t.title), impact_score: Number(t.impact_score || 3), due_at: t.due_at || null })),
     };
   }
 
@@ -305,6 +313,7 @@ export default async function Page() {
     alerts: holdingsAlerts,
     alertsTotal: holdingsAlerts.length,
     cashToday: (bm.cashToday || 0) + (taller.cashToday || 0),
+    highestImpact: [...bm.highestImpact, ...taller.highestImpact].sort((a, b) => b.impact_score - a.impact_score).slice(0, 3),
   };
 
   const data: CompassData = { holdings, bistro_mondo: bm, taller, utopia };
