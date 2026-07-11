@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import TopBar from "@/components/TopBar";
 import AssistantFab from "@/components/AssistantFab";
+import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
 import FlowStrip from "@/components/FlowStrip";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <FlowStrip />
         <SessionMigrator />
         <AssistantFab />
+        <NewHireAssistantNudge />
       </body>
     </html>
   );

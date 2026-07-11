@@ -77,6 +77,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
         <Link href={"/messages?to=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
         <Link href="/administrate/team/schedule" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Schedule</Link>
         <Link href="/academy" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Skill ladder</Link>
+        <Link href={"/administrate/team/" + p.id + "/training"} className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Training</Link>
         <Link href="/clock" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Clock</Link>
       </div>
     </main>
