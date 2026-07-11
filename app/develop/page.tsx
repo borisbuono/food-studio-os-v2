@@ -10,17 +10,22 @@ export default async function DevelopHome() {
   const supabase = supabaseServer();
   const rid = serverRestaurantId();
 
-  const [menuRes, recipesRes, wineRes, priceRes] = await Promise.all([
+  const [menuRes, recipesRes, wineRes, priceRes, academyRes] = await Promise.all([
     supabase.from("menu_items").select("id,category,is_active").eq("restaurant_id", rid).eq("is_active", true),
     supabase.from("recipes").select("id"),
     supabase.from("menu_items").select("id,category,beverage_type,is_active").eq("restaurant_id", rid).eq("is_active", true).eq("beverage_type", "wine"),
     // recent supplier price moves in the last 30 days — a repricing signal
     supabase.from("price_history").select("name,unit_price,captured_at").gte("captured_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(500),
+    // PA integration Sprint 3 — Academy lesson count + today's lesson.
+    supabase.from("academy_lessons").select("id,title,delivered_at").order("delivered_at", { ascending: false }).limit(200),
   ]);
 
   const menuCount = (menuRes.data || []).length;
   const recipesCount = (recipesRes.data || []).length;
   const wineCount = (wineRes.data || []).length;
+  const academyLessons = academyRes.data || [];
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const todaysLesson = academyLessons.find((l: any) => l.delivered_at === todayISO) || academyLessons[0];
 
   // Count how many products moved > ±5% in the last 30 days
   const byName: Record<string, any[]> = {};
@@ -87,6 +92,18 @@ export default async function DevelopHome() {
             ? "Prices stable this month — no repricing needed."
             : `${bigMovers} ingredient${bigMovers === 1 ? "" : "s"} moved ≥5% in the last 30 days`}
           action="Review repricing →"
+        />
+        <PillarTile
+          href="/develop/academy"
+          kicker="Academy · one lesson a day"
+          title="Academy"
+          value={academyLessons.length}
+          status={academyLessons.length === 0
+            ? "No lessons yet — the Academy is quiet."
+            : todaysLesson
+              ? `Today · ${String(todaysLesson.title || "").slice(0, 60)}`
+              : `${academyLessons.length} in the library`}
+          action="Open the Academy →"
         />
       </section>
     </main>

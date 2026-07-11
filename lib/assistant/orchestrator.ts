@@ -43,6 +43,13 @@ export type AssistantContext = {
   // PA integration Sprint 1 — top open Master_ToDo rows so the FAB can answer
   // "what's on my plate today" without a separate round trip.
   top_master_todos: { title: string; impact_score: number; source: string; due_at: string | null }[];
+  // PA integration Sprint 3 — so voice "when's my morning brief?" reads.
+  pa_schedule: {
+    morning_brief_time?: string;
+    evening_debrief_time?: string;
+    daily_academy_time?: string;
+    whatsapp_triage_hourly?: boolean;
+  } | null;
   page_context: any | null;
 };
 
@@ -148,13 +155,13 @@ export class AssistantOrchestrator {
     return data || null;
   }
 
-  async getContext(entity: EntityCode, _userId: string | null, pageContext: any | null): Promise<AssistantContext> {
+  async getContext(entity: EntityCode, userId: string | null, pageContext: any | null): Promise<AssistantContext> {
     const sb = supabaseServer();
     const today = madridToday();
     const rid = ENTITY_TO_RID[entity] || null;
 
     const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos] = await Promise.all([
+    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos, paSchedule] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
       sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
@@ -172,6 +179,7 @@ export class AssistantOrchestrator {
         .limit(10),
       // PA integration Sprint 1 — pull top-impact open master_todos.
       sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20),
+      userId ? sb.from("pa_schedule_state").select("morning_brief_time,evening_debrief_time,daily_academy_time,whatsapp_triage_hourly").eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null } as any),
     ]);
 
     // Resolve per-hire step counts so "What is Alberto's onboarding status?"
@@ -266,6 +274,7 @@ export class AssistantOrchestrator {
       })),
       ad_reactivation: adReactivation,
       top_master_todos: topTodos,
+      pa_schedule: (paSchedule as any).data || null,
       page_context: pageContext,
     };
   }
@@ -362,6 +371,12 @@ export class AssistantOrchestrator {
             : "")
         + (ctx.top_master_todos && ctx.top_master_todos.length
             ? "\n- highest-impact plate items:\n" + ctx.top_master_todos.map((t, i) => "  " + (i+1) + ". " + t.title + " (impact " + t.impact_score + ", " + t.source + ")").join("\n")
+            : "")
+        + (ctx.pa_schedule
+            ? "\n- PA schedule: morning brief " + (ctx.pa_schedule.morning_brief_time || "09:00")
+              + " · evening debrief " + (ctx.pa_schedule.evening_debrief_time || "21:00")
+              + " · daily academy " + (ctx.pa_schedule.daily_academy_time || "08:30")
+              + " · WhatsApp triage " + (ctx.pa_schedule.whatsapp_triage_hourly ? "hourly" : "off")
             : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";

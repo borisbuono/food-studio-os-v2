@@ -42,6 +42,12 @@ export default async function Settings() {
       </section>
 
       <section className="mt-10">
+        <p className="font-sans text-xs font-medium text-clay">PA scheduled tasks</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">WhatsApp triage, morning brief, evening debrief, daily Academy.</p>
+        <Link href="/administrate/settings/pa" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Configure the PA ›</Link>
+      </section>
+
+      <section className="mt-10">
         <p className="font-sans text-xs font-medium text-clay">AI skills · {skills.length} <span className="text-clay/70">(admin)</span></p>
         <ul className="mt-2 divide-y divide-black/10">
           {skills.map((s: any, i: number) => (
