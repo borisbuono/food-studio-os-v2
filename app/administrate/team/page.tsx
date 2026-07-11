@@ -40,7 +40,11 @@ export default async function Team() {
 
       <InviteTeammate venues={venues} />
 
-      <Link href="/administrate/team/invite" className="mt-4 inline-block rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">+ Add to team</Link>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link href="/administrate/team/onboard/new" className="rounded-xl bg-[color:var(--accent)] px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]">+ Onboard a new hire</Link>
+        <Link href="/administrate/team/invite" className="rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">Quick invite</Link>
+        <Link href="/administrate/team/onboarding" className="rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink-soft transition hover:border-black/30">Onboarding pipeline →</Link>
+      </div>
 
       <Link href="/administrate/team/schedule" className="mt-6 block rounded-2xl border border-line bg-card p-5 transition hover:border-line">
         <p className="font-sans text-xs font-medium text-ink-soft">Schedule</p>

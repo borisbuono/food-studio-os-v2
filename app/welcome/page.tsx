@@ -35,6 +35,21 @@ export default function Welcome() {
   useEffect(() => {
     getMyProfile().then(async (prof) => {
       if (!prof) { router.replace("/login"); return; }
+      // Team onboarding finalize — if the user got here via /team/join, a
+      // session-stashed invitation token is waiting to be consumed.
+      try {
+        const stashKey = Object.keys(sessionStorage).find((k) => k.startsWith("fs_join_"));
+        if (stashKey) {
+          const token = stashKey.slice("fs_join_".length);
+          const payload = JSON.parse(sessionStorage.getItem(stashKey) || "{}");
+          await fetch("/api/team/join/finalize", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ token, payload }),
+          }).catch(() => {});
+          try { sessionStorage.removeItem(stashKey); } catch {}
+        }
+      } catch {}
       setP(prof); setName(prof.name || "");
       // Idempotent: anyone who already finished the first run should not be made
       // to repeat the tour (stale /welcome link, manual nav, re-login). Send them
