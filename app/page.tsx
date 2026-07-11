@@ -64,6 +64,7 @@ export default async function Page() {
     bankMovementsRes,
     platformBillingRes,
     financeAnomaliesRes,
+    bankMatchesOpenRes,
   ] = await Promise.all([
     supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
     supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
@@ -78,6 +79,8 @@ export default async function Page() {
     supabase.from("bank_movements").select("id,entity_id,amount_eur,description,movement_date,reconciled_to").eq("reconciled_to", "unmatched"),
     supabase.from("platform_billing_status").select("entity_code,platform,state,notes,failure_count_30d,last_failure_at").in("state", ["failing", "disabled"]),
     supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
+    // Bank matches that have a proposed candidate waiting for the operator to accept / reject.
+    supabase.from("v_bank_matches_open").select("movement_id,entity_code,top_confidence").not("top_candidate_id", "is", null),
   ]);
 
   // Some of the newer tables may not exist yet in every environment; treat null as empty.
@@ -91,6 +94,7 @@ export default async function Page() {
   const bankUnmatched: any[] = bankMovementsRes.data || [];
   const platformBilling: any[] = platformBillingRes.data || [];
   const financeAnomalies: any[] = financeAnomaliesRes.data || [];
+  const bankProposed: any[] = bankMatchesOpenRes.data || [];
 
   // Age > 7 days on bank movements
   const sevenDaysAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
@@ -215,6 +219,22 @@ export default async function Page() {
         key: `bank-${ec}`,
         kicker: "Bank · unmatched > 7d",
         title: `${myBank.length} movement${myBank.length === 1 ? "" : "s"} unmatched for more than a week`,
+        href: "/administrate/finance/reconciliation",
+      });
+    }
+
+    // Bank matches proposed by the matcher waiting for the operator to accept.
+    // (Distinct from the "> 7d" alert above — this one fires the instant a
+    // candidate is produced so the operator can bulk-accept high-confidence
+    // rows without letting them age.)
+    const myProposed = bankProposed.filter((r) => r.entity_code === ec);
+    if (myProposed.length) {
+      const highConf = myProposed.filter((r) => Number(r.top_confidence || 0) >= 0.9).length;
+      const kicker = highConf > 0 ? "Bank · " + highConf + " ≥ 90% ready" : "Bank · matches to review";
+      alerts.push({
+        key: `bank-proposed-${ec}`,
+        kicker,
+        title: myProposed.length + " bank movement" + (myProposed.length === 1 ? "" : "s") + " with proposed matches waiting for review",
         href: "/administrate/finance/reconciliation",
       });
     }

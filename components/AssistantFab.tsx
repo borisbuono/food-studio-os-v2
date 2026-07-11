@@ -188,6 +188,33 @@ export default function AssistantFab() {
         }
         // fall through if the hook couldn't handle it
       }
+
+      // Bank reconciliation intent — "reconcile bank" / "match bank" / "run
+      // reconciliation" runs the matcher server-side and reports the summary.
+      // Cheap intent-recognition (regex) so the FAB doesn't have to round-trip
+      // for a well-known operator phrase.
+      const looksLikeRecon = /\b(reconcile|reconciliation|match)\b.*\b(bank|movements?|transacc?ions?)\b|\b(bank|movements?)\b.*\b(reconcile|match)\b|\brun\s+(the\s+)?matcher\b/i.test(t);
+      if (looksLikeRecon) {
+        const rawEnt = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+        const entityCode = rawEnt === "bistro_mondo" ? "BM" : rawEnt === "holdings" ? "BBH" : "IFL";
+        const rr = await fetch("/api/finance/reconciliation/match", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ entity_code: entityCode, limit: 200 }),
+        });
+        const dd = await rr.json();
+        if (dd?.ok && dd?.summary) {
+          const s = dd.summary;
+          const byType = Object.entries(s.by_type || {}).map(([k, v]) => k + ":" + v).join(", ") || "no candidates";
+          const reply = (lang === "es"
+            ? "Escaneé " + s.scanned + " movimientos · " + s.candidates_upserted + " candidatos · " + s.ai_fallbacks + " con IA. Revisa en /administrate/finance/reconciliation."
+            : "Scanned " + s.scanned + " movements · " + s.candidates_upserted + " candidates · " + s.ai_fallbacks + " AI fallbacks. Triage them at /administrate/finance/reconciliation.")
+            + "\n" + byType;
+          setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: "order", confidence: 1, userText: t }; return n; });
+          setThinking(false);
+          return;
+        }
+      }
     } catch {}
     try {
       const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
