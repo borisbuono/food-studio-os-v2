@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { learnFromAccepted, markPatternHit } from "@/lib/finance/pattern-learner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +78,20 @@ async function acceptCandidate(sb: any, candidateId: string, uid: string | null)
     payload: { movement_id: cand.bank_movement_id, match_type: cand.match_type, target: cand.match_target_id, label: cand.match_target_label },
     reversible: true,
   });
+
+  // If the accepted candidate was produced by the pattern engine, bump the
+  // hit counter so the patterns dashboard shows fresh learning. Fetch the
+  // movement date + candidate meta lazily (the earlier select didn't grab it).
+  try {
+    const { data: full } = await sb
+      .from("bank_match_candidates")
+      .select("meta,bank_movements:bank_movement_id(movement_date)")
+      .eq("id", candidateId)
+      .maybeSingle();
+    const patternId = (full as any)?.meta?.pattern_id;
+    const mvDate = ((Array.isArray((full as any)?.bank_movements) ? (full as any).bank_movements[0] : (full as any)?.bank_movements) as any)?.movement_date;
+    if (patternId && mvDate) await markPatternHit(String(patternId), String(mvDate).slice(0, 10));
+  } catch {}
   return { ok: true, movement_id: cand.bank_movement_id };
 }
 
@@ -152,6 +167,14 @@ export async function POST(req: NextRequest) {
         results.push({ id: String(id), ok: r.ok, error: r.error });
       }
       const okCount = results.filter((r) => r.ok).length;
+      // After bulk accept, try to promote any newly-recurring pattern.
+      try {
+        // Best-effort — the movement rows we just accepted are on one entity
+        // in most workflows. Fetch it from the first candidate.
+        const first = body.candidate_ids[0];
+        const { data: any0 } = await sb.from("bank_match_candidates").select("entity_code").eq("id", String(first)).maybeSingle();
+        if (any0?.entity_code) await learnFromAccepted(any0.entity_code as any);
+      } catch {}
       return NextResponse.json({ ok: okCount === results.length, accepted: okCount, results });
     }
     if (body?.candidate_id) {
@@ -159,6 +182,13 @@ export async function POST(req: NextRequest) {
         ? await acceptCandidate(sb, String(body.candidate_id), uid)
         : await rejectCandidate(sb, String(body.candidate_id), uid);
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 500 });
+      // After every single accept, run the pattern learner best-effort.
+      if (decision === "accept") {
+        try {
+          const { data: c0 } = await sb.from("bank_match_candidates").select("entity_code").eq("id", String(body.candidate_id)).maybeSingle();
+          if (c0?.entity_code) await learnFromAccepted(c0.entity_code as any);
+        } catch {}
+      }
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ ok: false, error: "provide candidate_id, candidate_ids, or movement_id" }, { status: 400 });

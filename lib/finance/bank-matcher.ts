@@ -46,6 +46,7 @@
 import { createHash } from "node:crypto";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { AssistantOrchestrator } from "@/lib/assistant/orchestrator";
+import { matchAgainstPatterns } from "./pattern-learner";
 
 export type EntityCode = "IFL" | "BM" | "BBH";
 
@@ -152,6 +153,17 @@ export async function matchMovement(m: BankMovement): Promise<MatchResult> {
   }
   const sb = supabaseServer();
   const candidates: MatchCandidate[] = [];
+
+  // Pattern-first — a learned recurring pattern (salary / subscription /
+  // tax / intercompany / manual) trumps the plain finders because the
+  // operator has already accepted the shape at least LEARN_THRESHOLD times.
+  const patternHit = await matchAgainstPatterns(entity, {
+    id: m.id,
+    description: m.description,
+    amount_eur: Number(m.amount_eur),
+    bank_account: m.bank_account,
+  });
+  if (patternHit) candidates.push(patternHit);
 
   candidates.push(...await findInvoiceCandidates(sb, m, entity));
   candidates.push(...await findEodCandidates(sb, m, entity));

@@ -166,16 +166,23 @@ export class AssistantOrchestrator {
     };
   }
 
-  async getMemory(_entity: EntityCode, userId: string | null): Promise<AssistantMemoryFact[]> {
-    if (!userId) return [];
+  async getMemory(entity: EntityCode, userId: string | null): Promise<AssistantMemoryFact[]> {
     const sb = supabaseServer();
-    const { data } = await sb.from("assistant_memory")
-      .select("fact,scope")
-      .eq("user_id", userId)
-      .is("retired_at", null)
-      .order("confirmed_at", { ascending: false })
-      .limit(20);
-    return (data || []).map((m: any) => ({ fact: m.fact, scope: m.scope }));
+    const [memRes, patRes] = await Promise.all([
+      userId
+        ? sb.from("assistant_memory").select("fact,scope").eq("user_id", userId).is("retired_at", null).order("confirmed_at", { ascending: false }).limit(20)
+        : Promise.resolve({ data: [] } as any),
+      // Bank reconciliation intelligence #3 — active recurring patterns become
+      // memory hints so the FAB can reason about "what does this movement look
+      // like?" using institutional knowledge.
+      sb.from("recurring_bank_patterns").select("label,pattern_type,expected_frequency,times_matched,bank_account").eq("entity_code", entity).is("disabled_at", null).order("times_matched", { ascending: false }).limit(15),
+    ]);
+    const mem: AssistantMemoryFact[] = ((memRes.data as any[]) || []).map((m: any) => ({ fact: m.fact, scope: m.scope }));
+    const patternHints: AssistantMemoryFact[] = ((patRes.data as any[]) || []).map((p: any) => ({
+      fact: "Recurring bank pattern (" + p.pattern_type + ", " + p.expected_frequency + ", " + Number(p.times_matched || 0) + "x): " + p.label + (p.bank_account ? " on " + p.bank_account : ""),
+      scope: "bank_pattern",
+    }));
+    return [...mem, ...patternHints];
   }
 
   async getConfig(entity: EntityCode): Promise<AssistantConfig | null> {
