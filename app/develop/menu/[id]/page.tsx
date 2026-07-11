@@ -102,7 +102,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
         <div className="flex items-stretch gap-3 pb-16">
           <Link href={`/execute/cook/${r.id}`} className="flex-1 rounded-sm border border-ink py-4 text-center font-serif text-[18px] font-light italic text-ink transition hover:bg-ink hover:text-paper">Begin Cook Mode</Link>
           <Link href={`/develop/menu/${r.id}/edit`} className="flex items-center rounded-sm border border-ink/30 px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft transition hover:border-ink/60">Edit</Link>
-          {dish ? <Link href={`/menu/${dish.id}`} className="flex items-center rounded-sm bg-ink px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-paper">Calculation</Link> : null}
+          <Link href={`/develop/menu/${r.id}/calculation`} className="flex items-center rounded-sm bg-ink px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-paper">Calculation</Link>
         </div>
       </div>
     </main>
