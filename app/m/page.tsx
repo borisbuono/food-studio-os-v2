@@ -1,49 +1,40 @@
-import FabHidden from "@/components/FabHidden";
+import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { noEmoji } from "@/lib/text";
+import FabHidden from "@/components/FabHidden";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-const FOOD = ["breakfast", "lunch", "dinner", "specials"];
-const LABEL: Record<string, string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", specials: "Specials" };
 
-export default async function PublicMenu() {
-  const items = (await supabase.from("menu_items").select("name,section,price,category,course,is_eighty_six").eq("is_active", true)).data || [];
-  const food = items.filter((i: any) => i.category === "food" && !i.is_eighty_six);
-  const drink = items.filter((i: any) => i.category === "drink" && !i.is_eighty_six);
+// Root /m — with no slug, forward to the first venue with a public slug set
+// (in practice: bistrot-mondo). Falls through to a picker if multiple exist
+// and no clear default. Legacy printed QRs that point at bare /m keep working.
+export default async function GuestMenuIndex() {
+  const { data } = await supabase
+    .from("restaurants")
+    .select("public_slug, name")
+    .not("public_slug", "is", null);
+  const rows = (data || []) as { public_slug: string; name: string | null }[];
+
+  // Prefer Bistrot Mondo (the venue the printed QR currently points at).
+  const bm = rows.find((r) => r.public_slug === "bistrot-mondo");
+  if (bm) redirect(`/m/${bm.public_slug}`);
+  if (rows.length === 1) redirect(`/m/${rows[0].public_slug}`);
 
   return (
-    <main className="mx-auto max-w-lg px-8 py-16"><FabHidden />
-      <h1 className="text-center font-serif text-4xl text-ink">Bistro Mondo</h1>
-      <p className="mt-2 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-clay">Menu</p>
-
-      {FOOD.filter((s) => food.some((i: any) => i.section === s)).map((s) => (
-        <section key={s} className="mt-10">
-          <h2 className="font-serif text-xl text-ink">{LABEL[s] || s}</h2>
-          <ul className="mt-3">
-            {food.filter((i: any) => i.section === s).map((i: any, n: number) => (
-              <li key={n} className="flex items-baseline justify-between gap-3 py-1.5">
-                <span className="font-serif text-[17px] text-ink-soft">{noEmoji(i.name)}</span>
-                <span className="font-mono text-[13px] text-clay">{i.price ? "€" + i.price : ""}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {drink.length ? (
-        <section className="mt-10">
-          <h2 className="font-serif text-xl text-ink">Drinks</h2>
-          <ul className="mt-3">
-            {drink.map((i: any, n: number) => (
-              <li key={n} className="flex items-baseline justify-between gap-3 py-1.5">
-                <span className="font-serif text-[17px] text-ink-soft">{noEmoji(i.name)}</span>
-                <span className="font-mono text-[13px] text-clay">{i.price ? "€" + i.price : ""}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-wide text-clay">Food Studios</p>
+    <main className="mx-auto max-w-lg px-8 py-16">
+      <FabHidden />
+      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-clay">Food Studios</p>
+      <h1 className="mt-3 font-serif text-3xl text-ink">Choose a venue</h1>
+      <ul className="mt-8 divide-y divide-black/10">
+        {rows.map((r) => (
+          <li key={r.public_slug}>
+            <Link href={`/m/${r.public_slug}`} className="flex items-baseline justify-between py-4 transition hover:opacity-70">
+              <span className="font-serif text-[18px] text-ink">{r.name || r.public_slug}</span>
+              <span className="font-mono text-[11px] uppercase tracking-wide text-clay">Open ›</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }
