@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
 import AssistantBriefPanel from "@/components/AssistantBriefPanel";
+import NewHiresStrip from "@/components/NewHiresStrip";
 import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_ORDER, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -256,6 +257,9 @@ export default function HomeCompass({ data }: { data: CompassData }) {
 
       {/* Alerts strip */}
       <AlertsStrip alerts={d.alerts} total={d.alertsTotal} />
+
+      {/* New hires this week — Office-only, zero-state hidden */}
+      <NewHiresStrip />
 
       {/* 4-pillar quick jump — for when you know what you want */}
       <div className="mt-8 border-t border-black/10 pt-4">

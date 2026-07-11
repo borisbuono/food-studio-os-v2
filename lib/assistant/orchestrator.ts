@@ -31,6 +31,7 @@ export type AssistantContext = {
   low_inventory_count: number;
   open_anomalies_count: number;
   top_anomalies: Array<{ kind: string; severity: number; description: string }>;
+  onboarding_in_progress: Array<{ name: string; role: string; step_count: number; started: string | null }>;
   page_context: any | null;
 };
 
@@ -122,7 +123,8 @@ export class AssistantOrchestrator {
     const today = madridToday();
     const rid = ENTITY_TO_RID[entity] || null;
 
-    const [eod, bookings, invInbox, bank, mep, tasks, anomalies] = await Promise.all([
+    const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
       sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
@@ -130,7 +132,45 @@ export class AssistantOrchestrator {
       rid ? sb.from("mep_dishes").select("id,is_active").eq("is_active", true) : Promise.resolve({ data: [] } as any),
       rid ? sb.from("tasks").select("id,priority,status").in("status", ["open", "in_progress"]).limit(50) : Promise.resolve({ data: [] } as any),
       sb.from("v_finance_anomalies_open").select("kind,severity,description").eq("entity_code", entity).limit(6),
+      sb.from("team_invitations")
+        .select("invited_email,invited_name,role,starting_date,accepted_at")
+        .eq("entity_code", entity)
+        .not("accepted_at", "is", null)
+        .is("revoked_at", null)
+        .gte("accepted_at", cutoff14)
+        .order("accepted_at", { ascending: false })
+        .limit(10),
     ]);
+
+    // Resolve per-hire step counts so "What is Alberto's onboarding status?"
+    // has a real answer for the assistant to summarise.
+    const invRows = ((invitations && (invitations as any).data) || []) as any[];
+    const invEmails = invRows.map((i) => (i.invited_email || "").toLowerCase()).filter(Boolean);
+    let onboardingInProgress: Array<{ name: string; role: string; step_count: number; started: string | null }> = [];
+    if (invEmails.length) {
+      const { data: profs } = await sb.from("profiles").select("id,email,name").in("email", invEmails);
+      const byEmail = new Map<string, { id: string; name: string }>();
+      (profs || []).forEach((pf: any) => { if (pf.email) byEmail.set(pf.email.toLowerCase(), { id: pf.id, name: pf.name }); });
+      const uids = Array.from(byEmail.values()).map((v) => v.id);
+      const stepCount = new Map<string, number>();
+      if (uids.length) {
+        const { data: steps } = await sb.from("onboarding_steps").select("user_id").in("user_id", uids).not("done_at", "is", null);
+        (steps || []).forEach((r: any) => stepCount.set(r.user_id, (stepCount.get(r.user_id) || 0) + 1));
+      }
+      for (const inv of invRows) {
+        const prof = byEmail.get((inv.invited_email || "").toLowerCase());
+        if (!prof) continue;
+        const sc = stepCount.get(prof.id) || 0;
+        if (sc >= 8) continue;
+        onboardingInProgress.push({
+          name: prof.name || inv.invited_name || inv.invited_email,
+          role: inv.role || "other",
+          step_count: sc,
+          started: inv.starting_date || inv.accepted_at || null,
+        });
+        if (onboardingInProgress.length >= 5) break;
+      }
+    }
 
     const covers = (bookings.data || [])
       .filter((b: any) => !["cancelled","no_show"].includes(String(b.status || "").toLowerCase()))
@@ -159,6 +199,7 @@ export class AssistantOrchestrator {
       urgent_tasks_count: tasksOpen,
       low_inventory_count: 0,
       open_anomalies_count: (anomalies.data || []).length,
+      onboarding_in_progress: onboardingInProgress,
       top_anomalies: (anomalies.data || []).slice(0, 3).map((a: any) => ({
         kind: String(a.kind), severity: Number(a.severity || 2), description: String(a.description || "").slice(0, 200),
       })),
