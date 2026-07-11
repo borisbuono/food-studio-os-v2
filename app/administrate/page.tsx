@@ -19,7 +19,7 @@ export default async function AdministrateHome() {
   const ec = ENTITY_CODE[entity] || "IFL";
   const today = new Date().toISOString().slice(0, 10);
 
-  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes, advisoryRes, masterTodoRes] = await Promise.all([
+  const [eodRes, unapprovedRes, bankRes, providersRes, teamRes, decisionsRes, advisoryRes, masterTodoRes, chartersRes] = await Promise.all([
     supabase.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle(),
     supabase.from("invoice_inbox").select("id,amount_eur,entity_id,match_status").eq("entity_id", ec).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,reconciled_to").eq("entity_id", ec).eq("reconciled_to", "unmatched"),
@@ -30,6 +30,8 @@ export default async function AdministrateHome() {
     supabase.from("v_advisory_clients_overview").select("id,status"),
     // PA integration Sprint 1 — Master_ToDo pending count for the sub-strip.
     supabase.from("master_todos").select("id,title,impact_score,entity_code,status").not("status", "in", "(completed,deferred)"),
+    // PA integration Sprint 2 — Agent charter tile.
+    supabase.from("agent_charters").select("id,entity_code,status").in("status", ["ready","running"]),
   ]);
 
   const todayRev = Number(eodRes.data?.revenue || 0);
@@ -44,6 +46,7 @@ export default async function AdministrateHome() {
   const advActive  = advClients.filter((c) => c.status === "active" || c.status === "onboarding").length;
   const masterTodos = (masterTodoRes.data || []).filter((t: any) => !t.entity_code || t.entity_code === ec);
   const topTodo = masterTodos.slice().sort((a: any, b: any) => (b.impact_score || 0) - (a.impact_score || 0))[0];
+  const openCharters = (chartersRes.data || []).filter((c: any) => !c.entity_code || c.entity_code === ec).length;
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -119,6 +122,16 @@ export default async function AdministrateHome() {
               ? `Top move · ${String(topTodo.title || "").slice(0, 60)}`
               : `${masterTodos.length} open`}
           action="Open the plate →"
+        />
+        <PillarTile
+          href="/administrate/agent-charters"
+          kicker="Agent charters · scope every task"
+          title="Charters"
+          value={openCharters}
+          status={openCharters === 0
+            ? "No charters running — spawn one to scope an agent task."
+            : `${openCharters} charter${openCharters === 1 ? "" : "s"} in flight`}
+          action="Open charters →"
         />
       </section>
     </main>

@@ -66,6 +66,16 @@ export type GenerateInput = {
   mode: AssistantMode;
   language?: "en" | "es";
   system_extra?: string;
+  // PA integration Sprint 2 — when spawning a sub-agent, pass the
+  // charter row so the system prompt binds the agent to its scope.
+  charter?: {
+    agent_type: string;
+    objective: string;
+    scope?: string | null;
+    constraints?: string | null;
+    success_criteria?: string | null;
+    deliverables?: any[];
+  } | null;
 };
 
 export type GenerateOutput = {
@@ -129,6 +139,15 @@ function madridHHmm() {
 }
 
 export class AssistantOrchestrator {
+  // PA integration Sprint 2 — fetch a charter row so a sub-agent knows its
+  // scope before it runs. Returns null if no charter exists.
+  async getCharter(charterId: string): Promise<any | null> {
+    if (!charterId) return null;
+    const sb = supabaseServer();
+    const { data } = await sb.from("agent_charters").select("*").eq("id", charterId).maybeSingle();
+    return data || null;
+  }
+
   async getContext(entity: EntityCode, _userId: string | null, pageContext: any | null): Promise<AssistantContext> {
     const sb = supabaseServer();
     const today = madridToday();
@@ -347,11 +366,24 @@ export class AssistantOrchestrator {
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";
+    // PA Sprint 2 — the charter binds a sub-agent to its scope.
+    const ch = input.charter;
+    const charterBlock = ch
+      ? "\n\nAgent Task Charter (this is your contract — do not exceed scope):\n"
+        + "- type: " + ch.agent_type + "\n"
+        + "- objective: " + ch.objective + "\n"
+        + (ch.scope ? "- scope: " + ch.scope + "\n" : "")
+        + (ch.constraints ? "- constraints: " + ch.constraints + "\n" : "")
+        + (ch.success_criteria ? "- success criteria: " + ch.success_criteria + "\n" : "")
+        + (ch.deliverables && ch.deliverables.length
+            ? "- deliverables: " + ch.deliverables.map((d: any) => typeof d === "string" ? d : d?.description || JSON.stringify(d)).join("; ")
+            : "")
+      : "";
 
-    if (mode === "chat")    return CHAT_BASE    + voice + dials + memBlock + ctxBlock + extra;
-    if (mode === "brief")   return BRIEF_BASE   + voice + dials + memBlock + ctxBlock + extra;
+    if (mode === "chat")    return CHAT_BASE    + voice + dials + memBlock + ctxBlock + charterBlock + extra;
+    if (mode === "brief")   return BRIEF_BASE   + voice + dials + memBlock + ctxBlock + charterBlock + extra;
     if (mode === "extract") return EXTRACT_BASE + extra;
-    return DRAFT_BASE + voice + dials + memBlock + ctxBlock + extra;
+    return DRAFT_BASE + voice + dials + memBlock + ctxBlock + charterBlock + extra;
   }
 
   private modelFor(mode: AssistantMode) {
