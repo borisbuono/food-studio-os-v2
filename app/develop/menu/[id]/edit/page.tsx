@@ -22,6 +22,8 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const [method, setMethod] = useState("");
   const [allergens, setAllergens] = useState("");
   const [hero, setHero] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [cover, setCover] = useState("");
   const [ings, setIngs] = useState<Ing[]>([]);
   const [comps, setComps] = useState<Comp[]>([]);
   const [recOpts, setRecOpts] = useState<RecOpt[]>([]);
@@ -38,6 +40,8 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
         setPitch(r.voice_statement || ""); setMethod((r.description || "").trim());
         setAllergens(Array.isArray(r.allergens) ? r.allergens.join(", ") : (r.allergens || ""));
         setHero(r.hero_image_url || "");
+        setTagline(r.tagline || "");
+        setCover(r.cover_photo_url || "");
       }
       const { data: ig } = await supabaseBrowser.from("recipe_ingredients").select("id,name,quantity,unit,sort_order,sub_recipe_id").eq("recipe_id", params.id).order("sort_order");
       const all = ig || [];
@@ -75,6 +79,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
       portions: portions.trim() && !isNaN(Number(portions)) ? Number(portions) : null,
       voice_statement: pitch.trim() || null, description: method.trim() || null,
       allergens: allergensArr.length ? allergensArr : null, hero_image_url: hero.trim() || null,
+      tagline: tagline.trim() || null, cover_photo_url: cover.trim() || null,
     }).eq("id", params.id);
     if (e1) { setErr("Couldn't save recipe — " + e1.message); setSaving(false); return; }
 
@@ -164,6 +169,12 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
 
       <p className={label}>Photo URL (optional)</p>
       <input className={field} value={hero} onChange={(e) => setHero(e.target.value)} placeholder="https://…" />
+
+      <p className={label}>Cover photo URL (optional — overrides legacy hero on v3 surface)</p>
+      <input className={field} value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://…" />
+
+      <p className={label}>Tagline (optional — italic caption on the moody cover)</p>
+      <input className={field} value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Fisherman, 6am. Twelve minutes later, dinner." />
 
       {err && <p className="mt-4 font-sans text-[13px] text-tomato">{err}</p>}
 
