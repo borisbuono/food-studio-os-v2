@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Bistro Mondo placeholder monogram — Fraunces italic BM. Boris drops in the real mark at this same path. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="Bistro Mondo">
+  <style>
+    .mono { font-family: 'Fraunces', 'Georgia', serif; font-weight: 400; font-style: italic; font-size: 128px; fill: currentColor; letter-spacing: -0.03em; }
+    .caption { font-family: 'DM Mono', 'Menlo', monospace; font-size: 12px; fill: currentColor; opacity: 0.6; letter-spacing: 0.24em; text-transform: uppercase; }
+  </style>
+  <text x="120" y="140" text-anchor="middle" class="mono">BM</text>
+  <text x="120" y="188" text-anchor="middle" class="caption">Bistro Mondo</text>
+</svg>

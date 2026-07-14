@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Food Studios generic fallback wordmark — Fraunces. Renders on the moody hero when no venue is known. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 240" width="300" height="240" role="img" aria-label="Food Studios">
+  <style>
+    .word { font-family: 'Fraunces', 'Georgia', serif; font-weight: 400; font-size: 34px; fill: currentColor; letter-spacing: -0.01em; }
+    .caption { font-family: 'DM Mono', 'Menlo', monospace; font-size: 10.5px; fill: currentColor; opacity: 0.6; letter-spacing: 0.28em; text-transform: uppercase; }
+  </style>
+  <text x="150" y="124" text-anchor="middle" class="word">Food Studios</text>
+  <text x="150" y="164" text-anchor="middle" class="caption">Operating System</text>
+</svg>

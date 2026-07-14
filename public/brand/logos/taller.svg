@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Taller Sa Penya placeholder — Inter uppercase wordmark. Boris drops in the real mark at this same path. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 240" width="260" height="240" role="img" aria-label="Taller Sa Penya">
+  <style>
+    .word { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 30px; fill: currentColor; letter-spacing: 0.08em; }
+    .caption { font-family: 'DM Mono', 'Menlo', monospace; font-size: 11px; fill: currentColor; opacity: 0.6; letter-spacing: 0.24em; text-transform: uppercase; }
+  </style>
+  <text x="130" y="128" text-anchor="middle" class="word">TALLER</text>
+  <text x="130" y="172" text-anchor="middle" class="caption">Sa Penya</text>
+</svg>
