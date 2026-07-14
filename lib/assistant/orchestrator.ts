@@ -32,6 +32,14 @@ export type AssistantContext = {
   open_anomalies_count: number;
   top_anomalies: Array<{ kind: string; severity: number; description: string }>;
   onboarding_in_progress: Array<{ name: string; role: string; step_count: number; started: string | null }>;
+  ad_reactivation: {
+    platform: string;
+    status_label: string | null;
+    steps_done: number;
+    steps_total: number;
+    ready: boolean;
+    disabled_since: string | null;
+  } | null;
   page_context: any | null;
 };
 
@@ -184,6 +192,30 @@ export class AssistantOrchestrator {
     const hh = Number(madridHHmm().slice(0, 2));
     const svc: AssistantContext["service_phase"] = hh < 19 ? "before" : hh < 24 ? "during" : "after";
 
+    // Ad reactivation summary — best-effort, only surfaces when there are
+    // rows in platform_reactivation_state for meta-ads. Powers Chef FAB's
+    // "how's the BM ad situation" answer.
+    let adReactivation: AssistantContext["ad_reactivation"] = null;
+    try {
+      const { data: prRows } = await sb.from("platform_reactivation_state")
+        .select("step_key,done")
+        .eq("entity_code", entity).eq("platform", "meta-ads");
+      const steps = prRows || [];
+      const REACT_KEYS = ["card_rotated","campaigns_audited","creative_refreshed","budget_set"];
+      const doneKeys = new Set(steps.filter((r: any) => r.done).map((r: any) => r.step_key));
+      const stepsDone = REACT_KEYS.filter((k) => doneKeys.has(k)).length;
+      if (steps.length > 0 || entity === "BM") {
+        adReactivation = {
+          platform: "meta-ads",
+          status_label: entity === "BM" ? "Disabled" : null,
+          steps_done: stepsDone,
+          steps_total: REACT_KEYS.length,
+          ready: stepsDone === REACT_KEYS.length,
+          disabled_since: entity === "BM" ? "2026-04-04" : null,
+        };
+      }
+    } catch {}
+
     return {
       entity,
       today,
@@ -203,6 +235,7 @@ export class AssistantOrchestrator {
       top_anomalies: (anomalies.data || []).slice(0, 3).map((a: any) => ({
         kind: String(a.kind), severity: Number(a.severity || 2), description: String(a.description || "").slice(0, 200),
       })),
+      ad_reactivation: adReactivation,
       page_context: pageContext,
     };
   }
@@ -290,6 +323,13 @@ export class AssistantOrchestrator {
         + (ctx.top_anomalies && ctx.top_anomalies.length
           ? "\n- top anomalies:\n" + ctx.top_anomalies.map((a: any) => "    · [S" + a.severity + "] " + a.kind + " — " + a.description).join("\n")
           : "")
+        + (ctx.ad_reactivation
+            ? "\n- ad reactivation (" + ctx.ad_reactivation.platform + "): "
+              + (ctx.ad_reactivation.status_label ? ctx.ad_reactivation.status_label + " · " : "")
+              + ctx.ad_reactivation.steps_done + "/" + ctx.ad_reactivation.steps_total + " steps "
+              + (ctx.ad_reactivation.ready ? "· reactivate ready" : "· not ready")
+              + (ctx.ad_reactivation.disabled_since ? " · disabled since " + ctx.ad_reactivation.disabled_since : "")
+            : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";
