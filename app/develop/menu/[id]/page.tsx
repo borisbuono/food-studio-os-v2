@@ -73,56 +73,8 @@ export default async function RecipePage({ params }: { params: { id: string } })
     <main className="bg-paper" style={{ ["--fs-accent" as any]: accent }}>
       <AssistantContext context={{ kind: "recipe", id: r.id, name: r.name, entity, portions, cost_per_portion: costPerPortion }} />
 
-<<<<<<< HEAD
-      <div className="mx-auto max-w-xl px-7">
-        {story ? (
-          <section className="pt-16">
-            <p className="mb-5 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">The story</p>
-            <p className="font-serif text-[21px] font-light leading-relaxed text-ink-soft">{story}</p>
-          </section>
-        ) : null}
-
-        {comps.length ? (
-          <section className="pt-14">
-            <p className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">Built from</p>
-            <div>
-              {comps.map((c: any, n: number) => (
-                <a key={n} href={`/develop/menu/${c.sub_recipe_id}`} className="flex items-baseline justify-between gap-4 border-b border-line py-4 first:border-t transition hover:opacity-70">
-                  <span className="flex-1 font-serif text-[20px] text-ink">{noEmoji(c.name)}</span>
-                  <span className="font-sans text-[12.5px] tracking-wide text-clay">{c.quantity} {String(c.quantity) === "1" ? "portion" : "portions"} ›</span>
-                </a>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <MiseScaler ings={ings as any} portions={(r.portions as number) ?? null} recipeId={r.id} />
-
-        {steps.length ? (
-          <section className="pt-14">
-            <p className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">The making</p>
-            {steps.map((s, n) => (
-              <div key={n} className="grid grid-cols-[54px_1fr] gap-1.5 border-b border-line py-6">
-                <span className="font-serif text-[30px] font-light italic leading-none text-tomato">{ROMAN[n] || n + 1}</span>
-                <span className="font-serif text-[20px] font-light leading-snug text-ink">{s}</span>
-              </div>
-            ))}
-          </section>
-        ) : null}
-
-        {allergens.length ? <p className="pt-10 font-mono text-[11px] uppercase tracking-[0.18em] text-clay">Contains · {allergens.join(" · ")}</p> : null}
-
-        <div className="py-14 text-center font-serif text-[26px] text-line">·&nbsp;&nbsp;·&nbsp;&nbsp;·</div>
-
-        <div className="flex items-stretch gap-3 pb-16">
-          <Link href={`/execute/cook/${r.id}`} className="flex-1 rounded-sm border border-ink py-4 text-center font-serif text-[18px] font-light italic text-ink transition hover:bg-ink hover:text-paper">Begin Cook Mode</Link>
-          <Link href={`/develop/menu/${r.id}/edit`} className="flex items-center rounded-sm border border-ink/30 px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft transition hover:border-ink/60">Edit</Link>
-          <Link href={`/develop/menu/${r.id}/calculation`} className="flex items-center rounded-sm bg-ink px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-paper">Calculation</Link>
-        </div>
-=======
       <div className="mx-auto max-w-[1400px] px-8 pt-6">
         <Link href="/develop/menu" className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay hover:text-ink">← the repertoire</Link>
->>>>>>> Recipe v3 #2 — route wiring for detail/calculation/cook/list
       </div>
 
       <section className="mx-auto grid max-w-[1400px] grid-cols-1 gap-14 px-8 pb-24 pt-10 lg:grid-cols-[1.1fr_1fr]">
