@@ -51,7 +51,7 @@ export default function CookMode({ name, panels, backHref }: { name: string; pan
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-night text-night-ink outline-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onKeyDown={(e) => { if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); }} tabIndex={0}>
       <div className="relative z-20 flex items-center justify-between px-7 pt-14">
-        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-night-ink/50">{p.label}</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-night-ink/50">{name}</span>
         <div className="flex items-center gap-2">
           <button aria-label="read this step aloud" onClick={() => { const nv = !readAloud; setReadAloud(nv); haptic(HAPTIC.tap); if (nv) readCurrent(); }} className={toggle + (readAloud ? " border-amber text-amber" : " border-night-ink/25 text-night-ink/70")}>read</button>
           <button aria-label="hands-free voice control" onClick={() => { setVoiceOn((v) => !v); haptic(HAPTIC.tap); }} className={toggle + (voiceOn ? " border-amber text-amber" : " border-night-ink/25 text-night-ink/70")}>voice</button>
@@ -66,10 +66,11 @@ export default function CookMode({ name, panels, backHref }: { name: string; pan
       </div>
 
       <div className="flex flex-1 flex-col justify-center px-8">
-        <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-night-ink/40">{name}</p>
-        <div className="mt-6 space-y-4">
+        <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.15em] text-amber">{name} · Cook Mode</p>
+        <p className="mb-8 font-mono text-[14px] uppercase tracking-[0.1em] text-amber">{p.label}</p>
+        <div className="space-y-4">
           {p.lines.map((l, k) => (
-            <p key={k} className="font-serif text-[34px] font-light leading-[1.18] text-night-ink">{l}</p>
+            <p key={k} className="max-w-[780px] font-serif text-[clamp(28px,5vw,44px)] font-normal leading-[1.25] tracking-[-0.6px] text-night-ink">{l}</p>
           ))}
         </div>
       </div>
