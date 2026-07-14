@@ -29,9 +29,9 @@ const MID_SHIFT = [
   { hour: 3, label: "Pre-close check-in",   blurb: "Are they still with us? Anything to slow down for?" },
 ];
 
-export default async function FirstShift({ params }: { params: { user_id: string } }) {
+export default async function FirstShift({ params }: { params: { id: string } }) {
   const sb = supabaseServer();
-  const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.user_id).maybeSingle();
+  const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/team");
   const { data: venue } = await sb.from("restaurants").select("name").eq("id", p.restaurant_id).maybeSingle();
 

@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 // Manager's first-week checklist for a specific new hire.
 // Reads live from onboarding_steps + team_invitations, no derived cache.
 
-export default async function FirstWeek({ params }: { params: { user_id: string } }) {
+export default async function FirstWeek({ params }: { params: { id: string } }) {
   const sb = supabaseServer();
-  const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.user_id).maybeSingle();
+  const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/team");
   const { data: venue } = await sb.from("restaurants").select("name").eq("id", p.restaurant_id).maybeSingle();
 
