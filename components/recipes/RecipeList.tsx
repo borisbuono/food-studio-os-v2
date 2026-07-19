@@ -11,6 +11,7 @@ type Recipe = {
   name: string;
   section?: string | null;
   category?: string | null;
+  beverage_type?: string | null;
   tagline?: string | null;
   cover_photo_url?: string | null;
   hero_image_url?: string | null;
@@ -27,6 +28,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   veg: "Vegetables",
   dessert: "Dessert",
   wine: "Wine",
+  drinks: "Bar & Drinks",
   default: "Other",
 };
 
