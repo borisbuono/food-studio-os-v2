@@ -50,6 +50,17 @@ export type AssistantContext = {
     daily_academy_time?: string;
     whatsapp_triage_hourly?: boolean;
   } | null;
+  // Pillars #3 — the user's Academy progress in the current module. Lets the
+  // FAB answer "have I finished today's lesson?" / "what am I next in
+  // training?" without an extra round trip. Filled from academy_lesson_progress
+  // joined against the module_scope tag on academy_lessons.
+  academy_progress_current_module: {
+    module_scope: "foh" | "boh" | "office" | null;
+    total: number;
+    done: number;
+    in_progress: number;
+    next_lesson_title: string | null;
+  } | null;
   page_context: any | null;
 };
 
@@ -161,7 +172,7 @@ export class AssistantOrchestrator {
     const rid = ENTITY_TO_RID[entity] || null;
 
     const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos, paSchedule] = await Promise.all([
+    const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos, paSchedule, academyModuleLessons, academyProgress] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
       sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
@@ -180,6 +191,13 @@ export class AssistantOrchestrator {
       // PA integration Sprint 1 — pull top-impact open master_todos.
       sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20),
       userId ? sb.from("pa_schedule_state").select("morning_brief_time,evening_debrief_time,daily_academy_time,whatsapp_triage_hourly").eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null } as any),
+      // Pillars #3 — Academy progress bundle for the current pillar / module.
+      // We read the module from page_context.active_pillar; if we don't know
+      // it (e.g. voice input before a route change) we skip the join.
+      (userId && pageContext && (pageContext.active_pillar === "foh" || pageContext.active_pillar === "boh" || pageContext.active_pillar === "office"))
+        ? sb.from("academy_lessons").select("id,title,module_scope,delivered_at").contains("module_scope", [pageContext.active_pillar]).order("delivered_at", { ascending: false }).limit(100)
+        : Promise.resolve({ data: [] } as any),
+      userId ? sb.from("academy_lesson_progress").select("lesson_id,status").eq("user_id", userId) : Promise.resolve({ data: [] } as any),
     ]);
 
     // Resolve per-hire step counts so "What is Alberto's onboarding status?"
@@ -275,6 +293,25 @@ export class AssistantOrchestrator {
       ad_reactivation: adReactivation,
       top_master_todos: topTodos,
       pa_schedule: (paSchedule as any).data || null,
+      academy_progress_current_module: (() => {
+        const scope = pageContext && (pageContext.active_pillar === "foh" || pageContext.active_pillar === "boh" || pageContext.active_pillar === "office") ? pageContext.active_pillar : null;
+        if (!scope) return null;
+        const lessons: any[] = ((academyModuleLessons as any)?.data) || [];
+        const progress: any[] = ((academyProgress as any)?.data) || [];
+        const byLesson = new Map<string, string>();
+        for (const p of progress) byLesson.set(p.lesson_id, p.status);
+        const total = lessons.length;
+        const done = lessons.filter((l) => byLesson.get(l.id) === "done").length;
+        const inProg = lessons.filter((l) => byLesson.get(l.id) === "in_progress").length;
+        const next = lessons.find((l) => byLesson.get(l.id) !== "done");
+        return {
+          module_scope: scope as "foh" | "boh" | "office",
+          total,
+          done,
+          in_progress: inProg,
+          next_lesson_title: next?.title ?? null,
+        };
+      })(),
       page_context: pageContext,
     };
   }
@@ -379,6 +416,7 @@ export class AssistantOrchestrator {
               + " · WhatsApp triage " + (ctx.pa_schedule.whatsapp_triage_hourly ? "hourly" : "off")
             : "")
         + (ctx.page_context && ctx.page_context.active_pillar ? "\n- active pillar: " + ctx.page_context.active_pillar + " (FOH=service, BOH=kitchen, Office=books)" : "")
+        + (ctx.academy_progress_current_module ? "\n- academy (" + ctx.academy_progress_current_module.module_scope + "): " + ctx.academy_progress_current_module.done + "/" + ctx.academy_progress_current_module.total + " done" + (ctx.academy_progress_current_module.next_lesson_title ? " · next: " + ctx.academy_progress_current_module.next_lesson_title : "") : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";
