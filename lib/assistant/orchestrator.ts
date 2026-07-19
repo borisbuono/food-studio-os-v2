@@ -378,6 +378,7 @@ export class AssistantOrchestrator {
               + " · daily academy " + (ctx.pa_schedule.daily_academy_time || "08:30")
               + " · WhatsApp triage " + (ctx.pa_schedule.whatsapp_triage_hourly ? "hourly" : "off")
             : "")
+        + (ctx.page_context && ctx.page_context.active_pillar ? "\n- active pillar: " + ctx.page_context.active_pillar + " (FOH=service, BOH=kitchen, Office=books)" : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";

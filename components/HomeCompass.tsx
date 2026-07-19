@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
 import AssistantBriefPanel from "@/components/AssistantBriefPanel";
 import NewHiresStrip from "@/components/NewHiresStrip";
@@ -8,6 +9,7 @@ import { ROLES, RoleKey } from "@/lib/roles";
 import { EntityKey, ENTITY_ORDER, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
+import { pillarForRole, PILLAR_LANDING } from "@/lib/routing/pillar-map";
 
 // Architecture v2 — the Home compass.
 // This replaces the modular tile grid with a daily-loop timeline + alerts strip.
@@ -209,8 +211,13 @@ function Header({ label, data }: { label: string; data: CompassData[EntityKey] }
 }
 
 export default function HomeCompass({ data }: { data: CompassData }) {
+  const router = useRouter();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Auto-landing gate: once a signed-in profile is loaded we redirect to the
+  // matching pillar. `redirected` prevents the compass from flashing before the
+  // route change lands. Signed-out preview keeps the compass visible.
+  const [redirected, setRedirected] = useState(false);
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>(() => {
     const c = readEntityCookie() as EntityKey | null;
@@ -231,8 +238,26 @@ export default function HomeCompass({ data }: { data: CompassData }) {
         const ua = localStorage.getItem("fs_user_accent"); setUserAccent(ua);
         if (p && p.color && !ua) setUserAccent(p.color);
       }
+      // Role-based auto-landing (Pillars #1). A signed-in profile with a
+      // known role goes straight to its pillar landing. Opt-out via the
+      // `?compass=1` query param so admins can still see the daily compass
+      // from the home button. Signed-out preview keeps the compass.
+      if (p) {
+        try {
+          const sp = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+          if (sp.get("compass") === "1") return;
+          const pillar = pillarForRole(p.dbRole, p.world);
+          const target = PILLAR_LANDING[pillar];
+          // Only redirect if we're actually on / (defensive — HomeCompass
+          // is only mounted at /, but future embedding shouldn't nuke the page).
+          if (typeof window !== "undefined" && window.location.pathname === "/") {
+            setRedirected(true);
+            router.replace(target);
+          }
+        } catch {}
+      }
     });
-  }, [data]);
+  }, [data, router]);
 
   // Sync with TopBar entity/role changes
   useEffect(() => onCtx(() => {
@@ -251,6 +276,16 @@ export default function HomeCompass({ data }: { data: CompassData }) {
   const d = data[entity];
   const greeting = profile?.name ? profile.name.split(" ")[0] : null;
   const isOffice = role === "office";
+
+  // While we're bouncing to the role-matched pillar, render a quiet holding
+  // frame instead of the full compass to avoid a flash of the wrong home.
+  if (redirected) {
+    return (
+      <main className="mx-auto max-w-xl px-6 py-12">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Loading your world…</p>
+      </main>
+    );
+  }
 
   if (scopedNoVenue) {
     return (

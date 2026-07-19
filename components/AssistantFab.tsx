@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { pillarForRoute } from "@/lib/routing/pillar-map";
 
 // Assistant FAB (formerly Chef FAB v2) — Siri-style tap-to-start, bottom-sheet
 // drawer, long-press = camera, confidence-gated intent chips with autolearning.
@@ -218,9 +219,15 @@ export default function AssistantFab() {
     } catch {}
     try {
       const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+      // Pillars #1 — always pass active_pillar so the orchestrator knows
+      // which world the user is in (FOH / BOH / Office). We merge it onto
+      // the existing page_context so any page-set intent is preserved.
+      const basePageCtx = (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null) || {};
+      const activePillar = pillarForRoute(pathname || "");
+      const pageContextWithPillar = { ...basePageCtx, active_pillar: activePillar };
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         message: t, route: pathname || "", session_id: sessionRef.current, entity_id: ent, language: lang,
-        page_context: (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null),
+        page_context: pageContextWithPillar,
       })});
       const d = await r.json();
       const reply = d.reply || "…";

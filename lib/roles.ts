@@ -43,4 +43,14 @@ export function mapDbRole(dbRole: string | null | undefined): { world: World; is
 }
 
 // Routes only an admin (Office) may open. Non-admins are redirected home.
-export const OFFICE_ONLY_PREFIXES = ["/administrate", "/grow"];
+// Pillars #1 — Office-only prefixes for the RouteGuard defence-in-depth.
+// The Office pillar is /office + /administrate/*. Some /grow branches
+// (reach, commercials) are Office too; FOH-relevant /grow branches
+// (relationships, reputation, inbox) stay open. The pillar-map is the
+// canonical routing source; this list is the shorter "hard block" set.
+export const OFFICE_ONLY_PREFIXES = [
+  "/administrate",
+  "/office",
+  "/grow/reach",
+  "/grow/commercials",
+];

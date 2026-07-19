@@ -10,6 +10,22 @@ import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
+import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
+
+// Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
+// The old Develop/Execute/Administrate/Grow labels are gone from the nav;
+// their temporal semantics live on tile-level "flow" chips.
+//
+// A small Files icon sits far-left of the pillar row (universal, above the
+// pillars in the information hierarchy). The pillar the current route
+// belongs to is highlighted with the pillar's accent line.
+
+// The 3 top-level pillar entries.
+const PILLARS: { key: Pillar; href: string; label: string }[] = [
+  { key: "foh",    href: "/foh",    label: PILLAR_LABEL.foh },
+  { key: "boh",    href: "/boh",    label: PILLAR_LABEL.boh },
+  { key: "office", href: "/office", label: PILLAR_LABEL.office },
+];
 
 export default function TopBar() {
   const [entity, setEntity] = useState<EntityKey>(() => {
@@ -20,11 +36,7 @@ export default function TopBar() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const pathname = usePathname() || "";
-  const pillarActive: "develop" | "execute" | "administrate" | "grow" | null =
-    pathname.startsWith("/develop") ? "develop" :
-    pathname.startsWith("/execute") ? "execute" :
-    pathname.startsWith("/administrate") ? "administrate" :
-    pathname.startsWith("/grow") ? "grow" : null;
+  const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
 
   // load profile once
@@ -46,8 +58,12 @@ export default function TopBar() {
   const isAdmin = !!profile?.isAdmin;
   const scoped = !!profile && !profile.isAdmin;          // a worker bound to one venue
   const canSwitch = isAdmin || !profile;                  // admins + signed-out preview
-  const isOffice = isAdmin || role === "office";          // pillars nav for office view
+  // The pillar nav is universal — every role now sees the three pillars,
+  // gated at the DB (RLS) + at the route guard (RouteGuard) for Office-only screens.
   const pick = (k: EntityKey) => { setEntityCtx(k); setEntity(k); setMenu(false); };
+
+  // Per-pillar accent for the active chip's underline / dot.
+  const activeAccent = activePillar ? PILLAR_ACCENT[activePillar] : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur">
@@ -89,13 +105,36 @@ export default function TopBar() {
         </div>
       </div>
 
-      {/* Pillars — the four temporal pillars of the OS. Visible to Office (admins) as the top-level org map. */}
-      {loaded && isOffice ? (
+      {/* Pillars — the THREE pillars of the OS. Files icon sits far-left as a
+         universal escape hatch. The active pillar is underlined with its
+         accent colour. */}
+      {loaded ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
-          <Link href="/develop/menu-engineering" className={(pillarActive === "develop" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Develop</Link>
-          <Link href="/execute/pass" className={(pillarActive === "execute" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Execute</Link>
-          <Link href="/administrate/finance" className={(pillarActive === "administrate" ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}>Administrate</Link>
-          <Link href="/grow" className={(pillarActive === "grow" ? "font-semibold" : "hover:text-ink") + " text-tomato"}>Grow</Link>
+          <Link
+            href="/files"
+            title="Files — HACCP, contracts, brand, gestoría"
+            className={"flex items-center " + (pathname.startsWith("/files") ? "text-ink" : "text-clay hover:text-ink")}
+            aria-label="Files"
+          >
+            {/* Simple folder glyph. Kept as inline SVG so the nav stays a single
+                render with no image request. */}
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M2.5 5.75c0-.69.56-1.25 1.25-1.25h4l1.5 1.75h6.5c.69 0 1.25.56 1.25 1.25v7.75c0 .69-.56 1.25-1.25 1.25H3.75c-.69 0-1.25-.56-1.25-1.25V5.75z" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+          </Link>
+          {PILLARS.map((p) => {
+            const isActive = activePillar === p.key;
+            return (
+              <Link
+                key={p.key}
+                href={p.href}
+                className={(isActive ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}
+                style={isActive && activeAccent ? { borderBottom: "1.5px solid", borderColor: activeAccent, paddingBottom: 1 } : undefined}
+              >
+                {p.label}
+              </Link>
+            );
+          })}
         </nav>
       ) : null}
 
