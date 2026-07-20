@@ -38,7 +38,10 @@ export default async function FilesHome({ searchParams }: { searchParams: { q?: 
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Files · universal</p>
       <div className="mt-2 flex items-baseline justify-between gap-4">
         <h1 className="font-serif text-4xl leading-tight text-ink">The file room.</h1>
-        <Link href="/files/upload" className="font-mono text-[10px] uppercase tracking-wide text-ink hover:underline decoration-black/20 underline-offset-2">Upload →</Link>
+        <div className="flex items-baseline gap-3">
+          <Link href="/files/inbox" className="font-mono text-[10px] uppercase tracking-wide text-ink hover:underline decoration-black/20 underline-offset-2">Inbox →</Link>
+          <Link href="/files/upload" className="font-mono text-[10px] uppercase tracking-wide text-ink hover:underline decoration-black/20 underline-offset-2">Upload →</Link>
+        </div>
       </div>
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">
         HACCP, contracts, brand, gestoría, statements, insurance, certifications. One place for {ENTITY_SHORT[entity]}.

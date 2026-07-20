@@ -66,6 +66,7 @@ export default async function Page() {
     financeAnomaliesRes,
     bankMatchesOpenRes,
     masterTodosRes,
+    filesInboxRes,
   ] = await Promise.all([
     supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
     supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
@@ -84,6 +85,8 @@ export default async function Page() {
     supabase.from("v_bank_matches_open").select("movement_id,entity_code,top_confidence").not("top_candidate_id", "is", null),
     // PA integration Sprint 1 — Master_ToDo highest-impact open rows for the strip.
     supabase.from("master_todos").select("id,title,impact_score,entity_code,due_at").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(30),
+    // Files inbox — needs_triage counter per entity for the compass alerts strip.
+    supabase.from("files_inbox").select("suggested_entity,status").eq("status", "needs_triage").limit(500),
   ]);
 
   // Some of the newer tables may not exist yet in every environment; treat null as empty.
@@ -99,6 +102,7 @@ export default async function Page() {
   const financeAnomalies: any[] = financeAnomaliesRes.data || [];
   const bankProposed: any[] = bankMatchesOpenRes.data || [];
   const masterTodos: any[] = masterTodosRes.data || [];
+  const filesInboxRows: any[] = filesInboxRes.data || [];
 
   // Age > 7 days on bank movements
   const sevenDaysAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
@@ -266,6 +270,20 @@ export default async function Page() {
         kicker,
         title: myAnoms.length + " finance anomal" + (myAnoms.length === 1 ? "y" : "ies") + " open — " + (myAnoms[0]?.description || "review the triage table").slice(0, 90),
         href: "/administrate/finance/anomalies",
+      });
+    }
+
+    // Files inbox — attachments waiting for a manual category / entity /
+    // title confirmation before promotion to the library. Include rows
+    // suggested for this entity plus un-classified rows (which every
+    // operator can help route).
+    const myInbox = filesInboxRows.filter((r) => !r.suggested_entity || r.suggested_entity === ec);
+    if (myInbox.length) {
+      alerts.push({
+        key: `files-inbox-${ec}`,
+        kicker: "Files · to triage",
+        title: myInbox.length + " file" + (myInbox.length === 1 ? "" : "s") + " awaiting triage — confirm category and file to the library",
+        href: "/files/inbox",
       });
     }
 

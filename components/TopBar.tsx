@@ -38,9 +38,28 @@ export default function TopBar() {
   const pathname = usePathname() || "";
   const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
+  const [inboxCount, setInboxCount] = useState<number>(0);
 
   // load profile once
   useEffect(() => { getMyProfile().then((p) => { setProfile(p); setLoaded(true); }); }, []);
+
+  // Poll the Files inbox needs-triage counter. Cheap: one indexed count, and
+  // only when the user is signed in. Refreshes when the entity changes.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/files/inbox?status=needs_triage&limit=250", { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setInboxCount(Array.isArray(j?.rows) ? j.rows.length : 0);
+      } catch { /* silent — the chip just stays at 0 */ }
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [loaded, entity]);
 
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
@@ -111,16 +130,25 @@ export default function TopBar() {
       {loaded ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
           <Link
-            href="/files"
-            title="Files — HACCP, contracts, brand, gestoría"
+            href={inboxCount > 0 ? "/files/inbox" : "/files"}
+            title={inboxCount > 0 ? `Files inbox — ${inboxCount} awaiting triage` : "Files — HACCP, contracts, brand, gestoría"}
             className={"flex items-center " + (pathname.startsWith("/files") ? "text-ink" : "text-clay hover:text-ink")}
-            aria-label="Files"
+            aria-label={inboxCount > 0 ? `Files inbox, ${inboxCount} awaiting triage` : "Files"}
           >
             {/* Simple folder glyph. Kept as inline SVG so the nav stays a single
                 render with no image request. */}
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M2.5 5.75c0-.69.56-1.25 1.25-1.25h4l1.5 1.75h6.5c.69 0 1.25.56 1.25 1.25v7.75c0 .69-.56 1.25-1.25 1.25H3.75c-.69 0-1.25-.56-1.25-1.25V5.75z" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
+            {inboxCount > 0 ? (
+              <span
+                className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-tomato px-1 font-mono text-[9px] leading-none text-paper"
+                aria-hidden="true"
+                title={`${inboxCount} awaiting triage`}
+              >
+                {inboxCount > 99 ? "99+" : inboxCount}
+              </span>
+            ) : null}
           </Link>
           {PILLARS.map((p) => {
             const isActive = activePillar === p.key;
