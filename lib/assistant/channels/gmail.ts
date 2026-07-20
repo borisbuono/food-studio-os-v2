@@ -432,3 +432,126 @@ export async function testGmailAccessToken(access_token: string): Promise<{ ok: 
     return { ok: false, error: e?.message || "gmail probe failed" };
   }
 }
+
+// ==========================================================================
+// Attachments — used by the Files INBOX auto-ingest.
+//
+// listMessagesWithAttachments returns light message metadata for messages
+// received within a window that have at least one attachment. downloadAttachment
+// pulls the raw bytes for one part. We keep these read-only so ingest never
+// mutates Gmail state.
+// ==========================================================================
+
+export type GmailAttachmentDescriptor = {
+  message_id: string;
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  size: number | null;
+};
+
+export type GmailMessageWithAttachments = {
+  message_id: string;
+  from: string;
+  subject: string;
+  received_at: string; // ISO
+  attachments: GmailAttachmentDescriptor[];
+};
+
+// Walk a Gmail payload tree, collecting every part whose body carries an
+// attachmentId (which is Gmail's convention for "this part is a binary
+// attachment, fetch it separately").
+function collectAttachmentParts(
+  message_id: string,
+  payload: any,
+  out: GmailAttachmentDescriptor[],
+) {
+  if (!payload) return;
+  const body = payload.body;
+  const attId = body?.attachmentId;
+  if (attId) {
+    out.push({
+      message_id,
+      attachment_id: attId,
+      filename: String(payload.filename || "attachment"),
+      mime_type: String(payload.mimeType || "application/octet-stream"),
+      size: typeof body?.size === "number" ? body.size : null,
+    });
+  }
+  if (Array.isArray(payload.parts)) {
+    for (const p of payload.parts) collectAttachmentParts(message_id, p, out);
+  }
+}
+
+// List messages that landed in the mailbox within the given window and
+// have at least one attachment. Uses Gmail's `has:attachment` query so we
+// don't pull irrelevant chatter.
+export async function listMessagesWithAttachments(
+  channel: AssistantChannelRow,
+  sinceMinutes: number,
+): Promise<GmailMessageWithAttachments[]> {
+  const minutes = Math.max(1, Math.round(sinceMinutes));
+  const days = Math.max(1, Math.ceil(minutes / 60 / 24));
+  // Gmail's `newer_than` only resolves to days, so we over-fetch and
+  // filter on internalDate below.
+  const q = encodeURIComponent(`newer_than:${days}d in:inbox has:attachment`);
+  const list = await gmailFetch(
+    channel,
+    `/users/me/messages?q=${q}&maxResults=50`,
+  );
+  const messages: any[] = list.messages || [];
+  const cutoff = Date.now() - minutes * 60_000;
+
+  const out: GmailMessageWithAttachments[] = [];
+  for (const m of messages) {
+    try {
+      const full = await gmailFetch(
+        channel,
+        `/users/me/messages/${m.id}?format=full`,
+      );
+      const internal = Number(full.internalDate || 0);
+      if (internal && internal < cutoff) continue;
+      const headers = full.payload?.headers || [];
+      const from = findHeader(headers, "From");
+      const subject = findHeader(headers, "Subject");
+      const dateHdr = findHeader(headers, "Date");
+      const iso = dateHdr
+        ? new Date(dateHdr).toISOString()
+        : new Date(internal || Date.now()).toISOString();
+      const atts: GmailAttachmentDescriptor[] = [];
+      collectAttachmentParts(m.id, full.payload, atts);
+      if (!atts.length) continue;
+      out.push({
+        message_id: m.id,
+        from,
+        subject: subject || "(no subject)",
+        received_at: iso,
+        attachments: atts,
+      });
+    } catch (e: any) {
+      console.warn(
+        "[gmail] listMessagesWithAttachments message fetch failed",
+        m.id,
+        e?.message,
+      );
+    }
+  }
+  return out;
+}
+
+// Fetch the raw bytes for a single attachment. Returns a Uint8Array.
+export async function downloadAttachment(
+  channel: AssistantChannelRow,
+  message_id: string,
+  attachment_id: string,
+): Promise<Uint8Array> {
+  noteCall(channel.id, 5);
+  const j = await gmailFetch(
+    channel,
+    `/users/me/messages/${encodeURIComponent(message_id)}/attachments/${encodeURIComponent(attachment_id)}`,
+  );
+  const dataStr = String(j.data || "");
+  const norm = dataStr.replace(/-/g, "+").replace(/_/g, "/") +
+    "==".slice((dataStr.length + 3) % 4);
+  return new Uint8Array(Buffer.from(norm, "base64"));
+}

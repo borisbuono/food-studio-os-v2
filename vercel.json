@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/finance/nightly-scan",
       "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/cron/files-inbox",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
