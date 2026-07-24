@@ -6,6 +6,9 @@ import SyncCardClient from "./SyncCardClient";
 import BankImportClient from "./BankImportClient";
 import ConnectIntegration from "./ConnectIntegration";
 import ConnectApideck from "./ConnectApideck";
+import FrestoSyncCard from "./FrestoSyncCard";
+import { frestoStatus } from "@/lib/integrations/pos/fresto";
+import { headers } from "next/headers";
 import { BillingHealthMini } from "@/components/PaymentsTile";
 import CashRuleToggle from "@/components/CashRuleToggle";
 
@@ -49,6 +52,10 @@ export default async function SetupEntity({ params }: { params: { entity: string
   if (!m) notFound();
   const sb = supabaseServer();
   const bindings = getBindings();
+  const h = headers();
+  const host = h.get("x-forwarded-host") || h.get("host") || "foodstudio.ai";
+  const proto = h.get("x-forwarded-proto") || "https";
+  const appOrigin = `${proto}://${host}`;
   const b = bindings.find((x) => x.entity === code);
 
   const billingRows = (await sb.from("platform_billing_status")
@@ -92,6 +99,8 @@ export default async function SetupEntity({ params }: { params: { entity: string
         </div>
         <p className="mt-3 font-mono text-[10px] text-muted">Apideck is the primary abstraction (self-serve, supports Holded / QuickBooks / Xero / Sage). Holded direct stays as a bridge until Apideck coverage is verified.</p>
       </section>
+
+      <FrestoSyncCard entity={code as any} status={frestoStatus(code as any)} appOrigin={appOrigin} />
 
       <section className="mt-6 rounded-2xl border border-line p-5">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Fiscal</p>
