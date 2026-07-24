@@ -105,7 +105,7 @@ function status(vendor: string, entity: EntityCode): "connected" | "stub" | "off
   switch (vendor) {
     case "holded":  return hasAny(`HOLDED_API_KEY_${entity === "IFL" ? "TALLER" : entity === "BM" ? "BISTRO_MONDO" : "HOLDINGS"}`) ? "connected" : "off";
     case "apideck": return (hasAny("APIDECK_APP_ID") && hasAny("APIDECK_API_KEY")) ? "connected" : "off";
-    case "fresto":  return "connected"; // upload path is always available
+    case "fresto":  return hasAny(`FRESTO_CLIENT_ID_${entity}`) && hasAny(`FRESTO_CLIENT_SECRET_${entity}`) ? "connected" : "stub"; // XLSX upload always works; "connected" means the live OAuth API is wired
     case "csv":     return "connected";
     case "stripe":  return hasAny("STRIPE_SECRET_KEY") ? "connected" : "stub";
     case "adyen":   return hasAny("ADYEN_API_KEY") ? "connected" : "stub";
