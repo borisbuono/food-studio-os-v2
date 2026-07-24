@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/cron/files-inbox",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
