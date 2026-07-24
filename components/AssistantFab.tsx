@@ -29,6 +29,44 @@ const SNAP_POINTS = [0.4, 0.7, 0.95]; // viewport fractions
 const FAB_DEBUG = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_FAB_DEBUG === "true");
 const dbg = (...args: any[]) => { if (FAB_DEBUG && typeof console !== "undefined") console.log("[FAB voice]", ...args); };
 
+// PWA #2 (2026-07-28) — voice-engine selection. Web Speech API is great on
+// desktop Chrome but broken on iOS Safari: mic permission never sticks, the
+// engine cuts off on the first ~2s of silence, and there's no config knob
+// for either. On iOS (and any browser missing SpeechRecognition) we swap in
+// server-side Whisper: MediaRecorder captures a clip, we POST it to
+// /api/assistant/voice/transcribe, Whisper returns the text.
+type VoiceEngine = "web-speech" | "whisper" | "none";
+function detectIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && (navigator as any).maxTouchPoints > 1);
+}
+function pickVoiceEngine(): VoiceEngine {
+  if (typeof window === "undefined") return "none";
+  const w = window as any;
+  const hasWebSpeech = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  const hasMediaRecorder = typeof w.MediaRecorder === "function" && !!navigator.mediaDevices?.getUserMedia;
+  const ios = detectIOS();
+  // On iOS we always prefer Whisper — even if the browser exposes
+  // SpeechRecognition, the behavior is unusable. Elsewhere: Web Speech first,
+  // Whisper as a fallback, "none" if we can't do either.
+  if (ios && hasMediaRecorder) return "whisper";
+  if (hasWebSpeech) return "web-speech";
+  if (hasMediaRecorder) return "whisper";
+  return "none";
+}
+function pickMediaMime(): string {
+  if (typeof MediaRecorder === "undefined") return "audio/webm";
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/ogg;codecs=opus"];
+  for (const m of candidates) {
+    try { if ((MediaRecorder as any).isTypeSupported?.(m)) return m; } catch {}
+  }
+  return "";
+}
+// PWA #3 — Whisper cap raised to 60s so Boris can dictate longer notes on
+// the go. Web Speech stays effectively unbounded (the browser controls it).
+const WHISPER_MAX_MS = 60_000;
+
 function readLang(): "en" | "es" {
   if (typeof document === "undefined") return "en";
   const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
@@ -101,7 +139,19 @@ export default function AssistantFab() {
   const rafRef = useRef<number | null>(null);
   const stillListeningTimer = useRef<any>(null);
 
-  useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); }, []);
+  // PWA #2 — voice-engine state. Decided once on mount (client-only). While
+  // transcribing over Whisper the FAB shows a spinner; edit-then-send lets
+  // Boris fix a mistranscription before it hits the assistant.
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>("none");
+  const [transcribing, setTranscribing] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStopReasonRef = useRef<"user" | "timeout" | "cancel">("user");
+  const recordingTimeoutRef = useRef<any>(null);
+  const recordingStartRef = useRef<number>(0);
+
+  useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); setVoiceEngine(pickVoiceEngine()); }, []);
 
   // Hide-on-route via body[data-fab="hidden"] (read on path change)
   useEffect(() => {
@@ -117,6 +167,18 @@ export default function AssistantFab() {
   // depend on `listening` — see wantListenRef comment above.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // PWA #2 — skip Web Speech entirely on iOS or when the engine picker
+    // chose Whisper. We still need `supported` to reflect voice capability,
+    // so set it based on whether ANY engine is available.
+    if (voiceEngine === "whisper") {
+      setSupported(true);
+      return;
+    }
+    if (voiceEngine === "none") {
+      setSupported(false);
+      setStatus(lang === "es" ? "Voz no disponible en este navegador" : "Voice unavailable on this browser");
+      return;
+    }
     const w = window as any;
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) {
@@ -125,7 +187,7 @@ export default function AssistantFab() {
       // Try to at least warn the user which browser to use. We don't actually
       // request the mic here (that would prompt for no reason), we just check
       // whether the API surface exists at all. Firefox lands here today.
-      setStatus(lang === "es" ? "Voz no soportada — usa Chrome" : "Voice not supported — try Chrome");
+      setStatus(lang === "es" ? "Voz no soportada aquí — instala la app" : "Voice not supported here — install the app");
       return;
     }
     let r: any;
@@ -252,9 +314,9 @@ export default function AssistantFab() {
       // into React setState calls after unmount.
       try { r.onend = null; r.onresult = null; r.onerror = null; r.abort(); } catch {}
     };
-    // Deps: lang only. `listening` intentionally omitted — see wantListenRef.
+    // Deps: lang + voiceEngine. `listening` intentionally omitted — see wantListenRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
+  }, [lang, voiceEngine]);
 
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [log, text]);
 
@@ -311,7 +373,132 @@ export default function AssistantFab() {
     try { audioCtxRef.current?.close(); } catch {}
   }, []);
 
+  // PWA #2 — Whisper recording pipeline. Uses the same MediaStream the
+  // amplitude meter opens (so no double-prompt for mic permission). While the
+  // recorder is live the meter runs; on stop we assemble the blob and POST
+  // it. The transcript lands in `text` — we DO NOT auto-send it. Boris asked
+  // for edit-then-send so he can fix a mistranscription before it hits the
+  // assistant. Cap the clip at WHISPER_MAX_MS (60s) so a stuck press doesn't
+  // upload a 10-minute file.
+  const startWhisperRecording = useCallback(async () => {
+    setMicDenied(false);
+    setStatus(lang === "es" ? "Escuchando…" : "Listening…");
+    wantListenRef.current = true;
+    setStillListening(false);
+    finalRef.current = ""; textRef.current = ""; setText("");
+    recordedChunksRef.current = [];
+    recordingStopReasonRef.current = "user";
+    if (stillListeningTimer.current) clearTimeout(stillListeningTimer.current);
+    stillListeningTimer.current = setTimeout(() => {
+      if (wantListenRef.current && !textRef.current) setStillListening(true);
+    }, 4000);
+    try {
+      // startMeter opens the mic stream we can share.
+      await startMeter();
+      const stream = micStreamRef.current;
+      if (!stream) throw new Error("mic stream unavailable");
+      const mime = pickMediaMime();
+      const opts: MediaRecorderOptions = mime ? { mimeType: mime } : {};
+      const mr = new MediaRecorder(stream, opts);
+      mediaRecorderRef.current = mr;
+      recordingStartRef.current = Date.now();
+      mr.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) recordedChunksRef.current.push(ev.data);
+      };
+      mr.onstop = async () => {
+        // Regardless of reason, if we've got audio we transcribe.
+        const chunks = recordedChunksRef.current;
+        recordedChunksRef.current = [];
+        setListening(false);
+        stopMeter();
+        wantListenRef.current = false;
+        setStillListening(false);
+        if (recordingStopReasonRef.current === "cancel") { dbg("whisper cancelled"); return; }
+        if (!chunks.length) {
+          setStatus(lang === "es" ? "No oí nada — vuelve a intentarlo" : "Didn't catch that — try again");
+          return;
+        }
+        const blob = new Blob(chunks, { type: mime || chunks[0]?.type || "audio/webm" });
+        // Very short clips (< 500ms) are usually accidental double-taps.
+        if (blob.size < 800) {
+          setStatus(lang === "es" ? "Muy corto — vuelve a hablar" : "Too short — try again");
+          return;
+        }
+        setTranscribing(true);
+        setStatus(lang === "es" ? "Transcribiendo…" : "Transcribing…");
+        try {
+          const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+          const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+          const entityCode = ENT_CODE[ent as string] || "IFL";
+          const fd = new FormData();
+          fd.append("audio", blob, `voice.${(mime.split("/")[1] || "webm").split(";")[0]}`);
+          fd.append("lang", lang);
+          fd.append("entity", entityCode);
+          fd.append("route", pathname || "");
+          const r = await fetch("/api/assistant/voice/transcribe", { method: "POST", body: fd });
+          const d = await r.json();
+          if (!d?.ok || !d?.text) {
+            const errMsg = d?.error || (lang === "es" ? "No pude transcribir" : "Couldn't transcribe");
+            setStatus(errMsg);
+            setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+          } else {
+            // Edit-then-send: land the transcript in the input so Boris can
+            // fix it before the assistant sees it.
+            setText(d.text); textRef.current = d.text; finalRef.current = d.text;
+            setStatus(lang === "es" ? "Revisa y toca Enviar" : "Review and tap Send");
+          }
+        } catch (err: any) {
+          setStatus((lang === "es" ? "Error de voz: " : "Voice error: ") + (err?.message || "unknown"));
+          setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+        }
+        setTranscribing(false);
+      };
+      mr.onerror = (ev: any) => {
+        dbg("MediaRecorder error", ev?.error);
+        setStatus((lang === "es" ? "Error de micro: " : "Mic error: ") + (ev?.error?.name || "unknown"));
+      };
+      mr.start(250); // small chunks so onstop has data even on quick releases
+      setListening(true);
+      // Auto-stop after WHISPER_MAX_MS so a stuck press doesn't record forever.
+      recordingTimeoutRef.current = setTimeout(() => {
+        recordingStopReasonRef.current = "timeout";
+        try { mr.state !== "inactive" && mr.stop(); } catch {}
+      }, WHISPER_MAX_MS);
+    } catch (err: any) {
+      dbg("whisper start failed", err?.message);
+      if (String(err?.name || "").includes("NotAllowed") || /denied/i.test(String(err?.message || ""))) {
+        setMicDenied(true);
+        setStatus(lang === "es"
+          ? "Micro bloqueado — ábrelo en Ajustes → Safari → Micrófono."
+          : "Mic blocked — allow it in Settings → Safari → Microphone.");
+      } else {
+        setStatus(lang === "es" ? "No pude arrancar el micro." : "Couldn't start the mic.");
+      }
+      setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+      wantListenRef.current = false;
+      setListening(false);
+    }
+  }, [lang, pathname, profile, startMeter, stopMeter]);
+
+  const stopWhisperRecording = useCallback((reason: "user" | "cancel" = "user") => {
+    if (recordingTimeoutRef.current) { clearTimeout(recordingTimeoutRef.current); recordingTimeoutRef.current = null; }
+    if (stillListeningTimer.current) { clearTimeout(stillListeningTimer.current); stillListeningTimer.current = null; }
+    recordingStopReasonRef.current = reason;
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") {
+      try { mr.stop(); } catch {}
+    } else {
+      // Nothing to stop — pull the UI back ourselves.
+      setListening(false);
+      stopMeter();
+      wantListenRef.current = false;
+    }
+  }, [stopMeter]);
+
   const startListen = useCallback(() => {
+    // PWA #2 — engine-aware entry point.
+    if (voiceEngine === "whisper") { startWhisperRecording(); return; }
+    if (voiceEngine === "none") { setStatus(lang === "es" ? "Voz no disponible — escribe abajo" : "Voice unavailable — type below"); return; }
     const r = recRef.current;
     if (!r) { dbg("startListen: no recognition instance"); return; }
     finalRef.current = ""; textRef.current = ""; setText("");
@@ -345,9 +532,12 @@ export default function AssistantFab() {
         }
       }, 120);
     }
-  }, [lang]);
+  }, [lang, voiceEngine, startWhisperRecording]);
 
   const stopAndSend = useCallback(() => {
+    // PWA #2 — Whisper path: stop the recorder; the onstop handler puts the
+    // transcript in the input and waits for Boris to tap Send (edit-then-send).
+    if (voiceEngine === "whisper") { stopWhisperRecording("user"); return; }
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
     if (stillListeningTimer.current) { clearTimeout(stillListeningTimer.current); stillListeningTimer.current = null; }
     setStillListening(false);
@@ -362,7 +552,7 @@ export default function AssistantFab() {
     setListening(false);
     if (textRef.current.trim()) send();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [voiceEngine, stopWhisperRecording]);
   // Keep the ref pointing at the freshest closure so the onresult silence
   // timer and onend callback both use the current send(), not the first-render
   // one they'd otherwise capture through useCallback([])'s stale scope.
@@ -770,6 +960,19 @@ export default function AssistantFab() {
                   {lang === "es" ? "Sigo escuchando… habla cuando quieras." : "Still listening… speak whenever you're ready."}
                 </p>
               ) : null}
+              {transcribing ? (
+                <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
+                  {lang === "es" ? "Transcribiendo con Whisper…" : "Transcribing with Whisper…"}
+                </p>
+              ) : null}
+              {micDenied ? (
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-tomato">
+                  {lang === "es"
+                    ? "Micro bloqueado. iOS: Ajustes → Safari → Micrófono → Permitir. Chrome: candado en la barra."
+                    : "Mic blocked. iOS: Settings → Safari → Microphone → Allow. Chrome: click the padlock in the address bar."}
+                </p>
+              ) : null}
             </div>
 
             {orderDraft ? (
@@ -780,7 +983,7 @@ export default function AssistantFab() {
               <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={lang === "es" ? "…o escribe a Chef" : "…or type to Chef"} className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
               {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Enviar" : "Send"}</button> : null}
             </div>
-            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold to open") : (lang === "es" ? "Escribe arriba — voz mejor en Chrome" : "Type above — voice works best in Chrome"))}</p>
+            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold to open") : (lang === "es" ? "Escribe arriba — voz mejor en Chrome" : "Type above — voice works best in Chrome"))}{voiceEngine !== "none" ? (voiceEngine === "whisper" ? " · Whisper" : " · Web Speech") : ""}</p>
           </div>
         </>
       ) : null}
