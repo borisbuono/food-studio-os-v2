@@ -23,10 +23,24 @@ type Msg = { role: "you" | "chef" | "sys"; text: string; intent?: string | null;
 const CONFIDENCE_THRESHOLD = 0.75;
 const SNAP_POINTS = [0.4, 0.7, 0.95]; // viewport fractions
 
+// FAB voice #1 (2026-07-28) — DEBUG gate. Boris flipped the flag on prod to
+// trace the recognition lifecycle in the console. Cheap to keep in place; the
+// checks are compiled away as no-ops when the env var is unset.
+const FAB_DEBUG = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_FAB_DEBUG === "true");
+const dbg = (...args: any[]) => { if (FAB_DEBUG && typeof console !== "undefined") console.log("[FAB voice]", ...args); };
+
 function readLang(): "en" | "es" {
   if (typeof document === "undefined") return "en";
   const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
-  return (m?.[1] as any) || "en";
+  if (m?.[1]) return m[1] as "en" | "es";
+  // Fall back to the browser language. Boris usually speaks English, but he
+  // sometimes borrows a phone with an es-* OS — a mismatched recognition
+  // language is one of the failure modes we've seen. When the cookie is
+  // absent we take the browser's word for it.
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+  }
+  return "en";
 }
 function newSessionId() { return (typeof crypto !== "undefined" && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : String(Date.now()) + "-" + Math.random().toString(36).slice(2); }
 
@@ -61,6 +75,18 @@ export default function AssistantFab() {
   const wineInputRef = useRef<HTMLInputElement>(null);
   const [wineDraft, setWineDraft] = useState<any | null>(null);
   const [wineBusy, setWineBusy] = useState(false);
+  // FAB voice #1 (2026-07-28) — the previous build tore down the recognition
+  // instance every time `listening` flipped (because `listening` was in the
+  // effect deps). The cleanup's r.stop() killed the just-started session
+  // before onresult could fire — Boris saw "Listening" but the mic captured
+  // nothing. We now hold the "want to keep listening" intent in a ref so the
+  // onend auto-restart works without re-creating the recognition object, and
+  // the effect only re-runs when `lang` changes.
+  const wantListenRef = useRef(false);
+  // Keep the latest handlers reachable from the recognition callbacks without
+  // re-subscribing. onresult needs a fresh reference to stopAndSend so a
+  // pause-triggered send doesn't call a stale closure.
+  const stopAndSendRef = useRef<() => void>(() => {});
 
   useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); }, []);
 
@@ -74,57 +100,195 @@ export default function AssistantFab() {
     return () => mo.disconnect();
   }, [pathname]);
 
-  // Speech recognition — language from i18n
+  // Speech recognition — language from i18n. IMPORTANT: this effect must NOT
+  // depend on `listening` — see wantListenRef comment above.
   useEffect(() => {
-    const SR = (typeof window !== "undefined") && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition);
-    if (!SR) { setSupported(false); return; }
-    const r = new SR();
-    r.continuous = true; r.interimResults = true; r.lang = lang === "es" ? "es-ES" : "en-GB";
-    r.onstart = () => { setListening(true); setStatus(lang === "es" ? "Escuchando" : "Listening"); };
+    if (typeof window === "undefined") return;
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) {
+      dbg("SpeechRecognition unavailable — falling back to type-only");
+      setSupported(false);
+      // Try to at least warn the user which browser to use. We don't actually
+      // request the mic here (that would prompt for no reason), we just check
+      // whether the API surface exists at all. Firefox lands here today.
+      setStatus(lang === "es" ? "Voz no soportada — usa Chrome" : "Voice not supported — try Chrome");
+      return;
+    }
+    let r: any;
+    try {
+      r = new SR();
+    } catch (err) {
+      dbg("SpeechRecognition constructor threw", err);
+      setSupported(false);
+      setStatus(lang === "es" ? "Voz no disponible en este navegador" : "Voice unavailable on this browser");
+      return;
+    }
+    // Siri-style tap-to-speak: single utterance, but we still ask for interim
+    // results so the sheet can echo the transcript live as Boris speaks.
+    r.continuous = false;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+    r.lang = lang === "es" ? "es-ES" : "en-US";
+    dbg("recognition ready", { lang: r.lang, continuous: r.continuous });
+
+    // Handlers MUST be attached before .start() — otherwise a fast utterance
+    // (or a browser that fires onstart synchronously) can drop the first event.
+    r.onstart = () => {
+      dbg("onstart");
+      setListening(true);
+      setStatus(lang === "es" ? "Escuchando…" : "Listening…");
+    };
+    r.onaudiostart = () => dbg("onaudiostart");
+    r.onsoundstart = () => dbg("onsoundstart");
+    r.onspeechstart = () => {
+      dbg("onspeechstart");
+      setStatus(lang === "es" ? "Te escucho" : "Got you");
+    };
+    r.onspeechend = () => {
+      // Fired by the engine when it thinks you've stopped. With continuous=false
+      // this is normal — the engine will follow with onend shortly. We DON'T
+      // stop() here because that races the internal finalisation.
+      dbg("onspeechend");
+    };
+    r.onnomatch = () => {
+      dbg("onnomatch");
+      setStatus(lang === "es" ? "No entendí — vuelve a intentarlo" : "Didn't catch that — try again");
+    };
     r.onresult = (e: any) => {
-      let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-      const full = (finalRef.current + t).replace(/\s+/g, " ").trim();
+      // With continuous=false the engine still fires interim results in the
+      // same event stream; we walk every result and stitch the transcript.
+      let interim = "";
+      let finalPiece = "";
+      for (let i = e.resultIndex ?? 0; i < e.results.length; i++) {
+        const res = e.results[i];
+        const seg = (res[0]?.transcript || "");
+        if (res.isFinal) finalPiece += seg; else interim += seg;
+      }
+      if (finalPiece) {
+        finalRef.current = (finalRef.current + " " + finalPiece).replace(/\s+/g, " ").trim();
+      }
+      const full = (finalRef.current + " " + interim).replace(/\s+/g, " ").trim();
+      dbg("onresult", { interim, finalPiece, full });
       setText(full); textRef.current = full;
-      // Auto-send-on-pause: reset 1.5s silence timer on every new chunk
+      // Safety-net silence timer — 2.5s pause auto-sends. continuous=false
+      // usually fires onend on its own, but Chrome-desktop occasionally sits
+      // on an unfinalised interim for longer than Boris expects. This nudge
+      // also gives us a deterministic pause length across browsers.
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
-      if (full) silenceTimer.current = setTimeout(() => stopAndSend(), 1500);
+      if (full) silenceTimer.current = setTimeout(() => {
+        dbg("silence timer -> stopAndSend");
+        stopAndSendRef.current();
+      }, 2500);
     };
     r.onerror = (e: any) => {
       const code = e?.error || "";
-      if (code === "not-allowed" || code === "service-not-allowed" || code === "audio-capture") {
+      dbg("onerror", code, e?.message);
+      // "no-speech" and "aborted" are benign — the engine timed out or we
+      // stopped it ourselves. Everything else deserves visible feedback so
+      // Boris knows why the mic went quiet.
+      if (code === "no-speech") {
+        setStatus(lang === "es" ? "No oí nada — toca de nuevo" : "Didn't hear you — tap again");
         setListening(false);
-        setStatus(code === "audio-capture" ? (lang === "es" ? "Sin micrófono — escribe abajo." : "No microphone — type below.") : (lang === "es" ? "Permiso del micro bloqueado — tócalo para permitir." : "Mic blocked — tap to allow."));
-        setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
-      }
-    };
-    r.onend = () => {
-      // Auto-restart only if we still want to listen (defeats iOS Safari early stop)
-      if (listening && !silenceTimer.current) {
-        finalRef.current = textRef.current ? textRef.current + " " : finalRef.current;
-        try { r.start(); } catch { setTimeout(() => { try { r.start(); } catch {} }, 300); }
+        wantListenRef.current = false;
         return;
       }
+      if (code === "aborted") {
+        // Deliberate stop() — don't surface as an error.
+        return;
+      }
+      if (code === "not-allowed" || code === "service-not-allowed") {
+        setStatus(lang === "es" ? "Permiso del micro bloqueado — tócalo para permitir." : "Mic blocked — allow it in the address bar.");
+      } else if (code === "audio-capture") {
+        setStatus(lang === "es" ? "Sin micrófono conectado." : "No microphone connected.");
+      } else if (code === "network") {
+        setStatus(lang === "es" ? "Red caída — reintenta." : "Network down — try again.");
+      } else if (code === "language-not-supported") {
+        setStatus(lang === "es" ? "Idioma no soportado en este navegador." : "Language not supported by this browser.");
+      } else {
+        setStatus((lang === "es" ? "Error de voz: " : "Voice error: ") + code);
+      }
       setListening(false);
+      wantListenRef.current = false;
+      setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+    };
+    r.onend = () => {
+      dbg("onend", { want: wantListenRef.current, hasText: !!textRef.current });
+      // With continuous=false, onend is the natural terminus of a single
+      // utterance. If we have text we ship it; if we don't and the user still
+      // wants to be listening (e.g. iOS Safari cut us off), restart.
+      if (wantListenRef.current && !textRef.current) {
+        try { r.start(); dbg("auto-restart after empty onend"); return; }
+        catch (err) { dbg("auto-restart failed", err); }
+      }
+      setListening(false);
+      if (textRef.current.trim()) {
+        // Send whatever we finalised. Guard against the silence timer having
+        // already scheduled a send — we clear it here.
+        if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
+        stopAndSendRef.current();
+      }
+      wantListenRef.current = false;
     };
     recRef.current = r;
-    return () => { try { r.stop(); } catch {} };
-  }, [lang, listening]);
+    return () => {
+      dbg("effect cleanup — lang changed or unmount");
+      wantListenRef.current = false;
+      // Detach handlers before abort so the aborted event doesn't ripple back
+      // into React setState calls after unmount.
+      try { r.onend = null; r.onresult = null; r.onerror = null; r.abort(); } catch {}
+    };
+    // Deps: lang only. `listening` intentionally omitted — see wantListenRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [log, text]);
 
   const startListen = useCallback(() => {
-    const r = recRef.current; if (!r) return;
+    const r = recRef.current;
+    if (!r) { dbg("startListen: no recognition instance"); return; }
     finalRef.current = ""; textRef.current = ""; setText("");
-    setStatus(lang === "es" ? "Escuchando" : "Listening");
-    try { r.start(); setListening(true); } catch {}
+    setStatus(lang === "es" ? "Escuchando…" : "Listening…");
+    wantListenRef.current = true;
+    try {
+      r.start();
+      setListening(true);
+      dbg("start() called");
+    } catch (err: any) {
+      // Chrome throws InvalidStateError when start() is called on an already
+      // running instance. Best recovery is to abort and try once more on the
+      // next tick — quietly, no error UI unless the retry also fails.
+      dbg("start() threw, retrying via abort+start", err?.message);
+      try { r.abort(); } catch {}
+      setTimeout(() => {
+        try { r.start(); setListening(true); dbg("retry start() ok"); }
+        catch (err2: any) {
+          dbg("retry start() failed", err2?.message);
+          setStatus(lang === "es" ? "No pude arrancar el micro — recarga la página." : "Couldn't start mic — reload the page.");
+          setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
+          wantListenRef.current = false;
+        }
+      }, 120);
+    }
   }, [lang]);
 
   const stopAndSend = useCallback(() => {
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
-    const r = recRef.current; if (r) { try { r.stop(); } catch {} }
+    wantListenRef.current = false;
+    const r = recRef.current;
+    if (r) {
+      // stop() drains the pending result; abort() would DISCARD it. Boris
+      // wants the words to survive the pause, so stop() is the right call.
+      try { r.stop(); } catch {}
+    }
     setListening(false);
     if (textRef.current.trim()) send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Keep the ref pointing at the freshest closure so the onresult silence
+  // timer and onend callback both use the current send(), not the first-render
+  // one they'd otherwise capture through useCallback([])'s stale scope.
+  useEffect(() => { stopAndSendRef.current = stopAndSend; }, [stopAndSend]);
 
   const fabTap = () => {
     if (!open) setOpen(true);
@@ -502,7 +666,7 @@ export default function AssistantFab() {
               <input value={text} onChange={(e) => { setText(e.target.value); textRef.current = e.target.value; }} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={lang === "es" ? "…o escribe a Chef" : "…or type to Chef"} className="min-w-0 flex-1 rounded-full border border-black/15 bg-paper px-4 py-2 font-sans text-[14px] text-ink outline-none focus:border-ink" />
               {text ? <button onClick={send} style={{ background: "var(--accent)" }} className="shrink-0 rounded-full px-4 py-2 font-sans text-[13px] font-medium text-[#F7F7F4]">{lang === "es" ? "Enviar" : "Send"}</button> : null}
             </div>
-            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold to open") : (lang === "es" ? "Escribe arriba" : "Type above"))}</p>
+            <p className="px-4 pb-2 text-center font-mono text-[9px] uppercase tracking-wide text-clay">{status || (supported ? (lang === "es" ? "Toca Chef · mantén = cámara" : "Tap Chef · hold to open") : (lang === "es" ? "Escribe arriba — voz mejor en Chrome" : "Type above — voice works best in Chrome"))}</p>
           </div>
         </>
       ) : null}
