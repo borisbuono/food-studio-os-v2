@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import VoiceEngineIndicator from "@/components/VoiceEngineIndicator";
 
 // Voice + personality + hours + playbooks + channels editor.
 // Every save goes to /api/assistant/{config,playbooks,channels}.
@@ -185,6 +186,17 @@ export default function AssistantSettingsClient(props: {
           </button>
           {cfgFlash ? <span className="font-mono text-[10px] uppercase tracking-wide text-clay">{cfgFlash}</span> : null}
         </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/* VOICE ENGINE + INSTALL STATUS (PWA #3)                       */}
+      {/* ============================================================ */}
+      <section className="mt-12 border-t border-line pt-6">
+        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Voice engine</p>
+        <p className="mt-1 font-serif italic text-[14px] text-ink-soft">
+          Which transcription engine the FAB is using on this device, and whether FS OS is installed. Read-only — the app picks the right engine for the browser.
+        </p>
+        <VoiceEngineIndicator />
       </section>
 
       {/* ============================================================ */}

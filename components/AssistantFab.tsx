@@ -439,7 +439,14 @@ export default function AssistantFab() {
           const d = await r.json();
           if (!d?.ok || !d?.text) {
             const errMsg = d?.error || (lang === "es" ? "No pude transcribir" : "Couldn't transcribe");
-            setStatus(errMsg);
+            // PWA #3 — if the server is missing OPENAI_API_KEY, be explicit
+            // about it so Boris knows this is a config gap, not a bug.
+            const missingKey = typeof errMsg === "string" && /OPENAI_API_KEY/i.test(errMsg);
+            setStatus(missingKey
+              ? (lang === "es"
+                ? "Voz degradada — falta OPENAI_API_KEY en el servidor."
+                : "Voice degraded — server is missing OPENAI_API_KEY.")
+              : errMsg);
             setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
           } else {
             // Edit-then-send: land the transcript in the input so Boris can
