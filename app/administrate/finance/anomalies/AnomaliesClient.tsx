@@ -199,7 +199,8 @@ export default function AnomaliesClient({ rows }: { rows: Row[] }) {
         </button>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-line">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="overflow-x-auto rounded-2xl border border-line">
         <table className="min-w-full text-left font-sans text-[13px]">
           <thead className="bg-paper-deep">
             <tr>
@@ -241,11 +242,16 @@ export default function AnomaliesClient({ rows }: { rows: Row[] }) {
             ) : null}
           </tbody>
         </table>
+        </div>
+        {drawerRow ? (
+          <Drawer row={drawerRow} pending={pending} onClose={() => setDrawerId(null)} onResolve={markResolved} onSnooze={snooze7d} />
+        ) : (
+          <div className="hidden lg:block rounded-2xl border border-line bg-paper-deep/40 p-6">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-clay">No selection</p>
+            <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Pick a row on the left to inspect meta, resolve, or snooze.</p>
+          </div>
+        )}
       </div>
-
-      {drawerRow ? (
-        <Drawer row={drawerRow} pending={pending} onClose={() => setDrawerId(null)} onResolve={markResolved} onSnooze={snooze7d} />
-      ) : null}
     </>
   );
 }
@@ -260,9 +266,9 @@ function Drawer({
 }) {
   const href = sourceHref(row);
   return (
-    <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true">
-      <button aria-label="Close drawer" onClick={onClose} className="absolute inset-0 bg-ink/30" />
-      <aside className="relative z-10 h-full w-full max-w-lg overflow-y-auto bg-paper px-6 py-8 shadow-xl">
+    <div className="fixed inset-0 z-40 flex justify-end lg:relative lg:inset-auto lg:z-auto lg:block" role="dialog" aria-modal="true">
+      <button aria-label="Close drawer" onClick={onClose} className="absolute inset-0 bg-ink/30 lg:hidden" />
+      <aside className="relative z-10 h-full w-full max-w-lg overflow-y-auto bg-paper px-6 py-8 shadow-xl lg:h-auto lg:max-w-none lg:rounded-2xl lg:border lg:border-line lg:shadow-none lg:py-6">
         <button onClick={onClose} className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink">← back</button>
         <div className="mt-4 flex items-center gap-2">
           <span className={"rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide " + sevPill(row.severity)}>

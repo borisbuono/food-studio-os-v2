@@ -207,6 +207,8 @@ export default function ProposedMatchesClient({
                       className="mt-1 h-3 w-3"
                     />
                     <button
+                      onMouseEnter={() => { try { window.dispatchEvent(new CustomEvent("fs:recon:preview", { detail: { movementId: r.movement_id, description: r.description, amount_eur: r.amount_eur, movement_date: r.movement_date, bank_account: r.bank_account, top_match_target_label: r.top_match_target_label, top_match_type: r.top_match_type, top_confidence: r.top_confidence, top_rationale: r.top_rationale } })); } catch {} }}
+                      onFocus={() => { try { window.dispatchEvent(new CustomEvent("fs:recon:preview", { detail: { movementId: r.movement_id, description: r.description, amount_eur: r.amount_eur, movement_date: r.movement_date, bank_account: r.bank_account, top_match_target_label: r.top_match_target_label, top_match_type: r.top_match_type, top_confidence: r.top_confidence, top_rationale: r.top_rationale } })); } catch {} }}
                       onClick={() => setDrawerFor(r.movement_id)}
                       className="grow text-left">
                       <div className="flex items-baseline justify-between gap-3">

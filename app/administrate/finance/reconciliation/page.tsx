@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
 import AssistantContext from "@/components/AssistantContext";
 import ProposedMatchesClient, { type OpenMatch, type AltCandidate } from "./ProposedMatchesClient";
+import ReconciliationSourcePreview from "./ReconciliationSourcePreview";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,10 @@ export default async function Reconciliation() {
         <p className="mt-1 font-serif italic text-[14px] text-ink-soft">
           Nothing is reconciled without you. Every row here is a suggestion — accept to write it to the ledger, reject to send the finder back to work, or reconcile manually if the answer isn't in the list.
         </p>
-        <ProposedMatchesClient rows={openList} altsByMovement={altsByMovement} entityCode={ec} />
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0"><ProposedMatchesClient rows={openList} altsByMovement={altsByMovement} entityCode={ec} /></div>
+          <ReconciliationSourcePreview />
+        </div>
       </section>
 
       {rows.length === 0 ? (
