@@ -30,7 +30,7 @@ const WHISPER_PRICE_PER_MIN_USD = 0.006;
 export async function transcribeAudio(
   audioBuffer: ArrayBuffer,
   contentType: string,
-  langHint?: "en" | "es",
+  langHint?: "en" | "es" | "da",
 ): Promise<TranscribeResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false, error: "OPENAI_API_KEY not set — voice transcription unavailable." };

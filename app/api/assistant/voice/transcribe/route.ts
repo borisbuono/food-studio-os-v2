@@ -32,10 +32,16 @@ export async function POST(req: NextRequest) {
 
   const file = form.get("audio") as File | null;
   const langRaw = (form.get("lang") as string | null) || "en";
-  const lang: "en" | "es" = langRaw === "es" ? "es" : "en";
+  // FAB voice #3 — accept da alongside en/es. Whisper handles many more
+  // languages; we only expose the ones the UI actually offers.
+  const lang: "en" | "es" | "da" = langRaw === "es" ? "es" : langRaw === "da" ? "da" : "en";
   const entityRaw = (form.get("entity") as string | null) || "IFL";
   const entity: EntityCode = VALID_ENTITY[entityRaw] || "IFL";
   const route = (form.get("route") as string | null) || null;
+  // FAB voice #3 — streaming interim uploads (every ~3s during recording).
+  // We still transcribe them but skip the assistant_actions log write so we
+  // don't spam the billing table. The final blob on release DOES get logged.
+  const interim = ((form.get("interim") as string | null) || "").toLowerCase() === "true";
 
   if (!file || typeof file.arrayBuffer !== "function") {
     return NextResponse.json({ ok: false, error: "No audio file in the request." }, { status: 400 });
@@ -49,7 +55,8 @@ export async function POST(req: NextRequest) {
 
   // Fire-and-forget log (do not block the response). We swallow log errors —
   // if Supabase is briefly down the transcript still comes back.
-  try {
+  // Interim chunk uploads bypass the log — see FAB voice #3 comment above.
+  if (!interim) try {
     const sb = supabaseServer();
     const { data: u } = await sb.auth.getUser();
     const uid = u.user?.id || null;

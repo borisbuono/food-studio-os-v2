@@ -67,16 +67,19 @@ function pickMediaMime(): string {
 // the go. Web Speech stays effectively unbounded (the browser controls it).
 const WHISPER_MAX_MS = 60_000;
 
-function readLang(): "en" | "es" {
+function readLang(): "en" | "es" | "da" {
   if (typeof document === "undefined") return "en";
-  const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es)/);
-  if (m?.[1]) return m[1] as "en" | "es";
+  const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es|da)/);
+  if (m?.[1]) return m[1] as "en" | "es" | "da";
   // Fall back to the browser language. Boris usually speaks English, but he
   // sometimes borrows a phone with an es-* OS — a mismatched recognition
   // language is one of the failure modes we've seen. When the cookie is
   // absent we take the browser's word for it.
   if (typeof navigator !== "undefined" && navigator.language) {
-    return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+    const bl = navigator.language.toLowerCase();
+    if (bl.startsWith("es")) return "es";
+    if (bl.startsWith("da")) return "da";
+    return "en";
   }
   return "en";
 }
@@ -96,7 +99,7 @@ export default function AssistantFab() {
   const [log, setLog] = useState<Msg[]>([]);
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [orderDraft, setOrderDraft] = useState<any[] | null>(null);
-  const [lang, setLang] = useState<"en" | "es">("en");
+  const [lang, setLang] = useState<"en" | "es" | "da">("en");
   const sessionRef = useRef<string>(newSessionId());
   const lastExtractRef = useRef<string | null>(null);
   const userTurnCountRef = useRef<number>(0);
@@ -151,6 +154,23 @@ export default function AssistantFab() {
   const recordingTimeoutRef = useRef<any>(null);
   const recordingStartRef = useRef<number>(0);
 
+  // FAB voice #3 (2026-07-28) — visible live transcript panel + edit-before-send.
+  // Boris was hearing the mic tick on and off but seeing nothing on-screen; the
+  // Web Speech interim text was buried inside the bottom sheet and Whisper only
+  // showed anything AFTER the release. This panel is the fix: floating overlay
+  // above the FAB, live-populated as the user speaks, editable at any time.
+  // The panel is the primary voice surface — the bottom sheet stays for chat
+  // history, camera and wine scan (long-press to reach it).
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [editBeforeSend, setEditBeforeSend] = useState(true); // default ON — safer
+  const [sending, setSending] = useState(false);
+  const [lastPair, setLastPair] = useState<{ you: string; chef: string } | null>(null);
+  const chunkTimerRef = useRef<any>(null);
+  const interimInFlightRef = useRef<boolean>(false);
+  const autoSendPendingRef = useRef<boolean>(false);
+  const userEditedRef = useRef<boolean>(false); // once true, interim upstream will not overwrite
+  const panelTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); setVoiceEngine(pickVoiceEngine()); }, []);
 
   // Hide-on-route via body[data-fab="hidden"] (read on path change)
@@ -204,7 +224,7 @@ export default function AssistantFab() {
     r.continuous = false;
     r.interimResults = true;
     r.maxAlternatives = 1;
-    r.lang = lang === "es" ? "es-ES" : "en-US";
+    r.lang = lang === "es" ? "es-ES" : lang === "da" ? "da-DK" : "en-US";
     dbg("recognition ready", { lang: r.lang, continuous: r.continuous });
 
     // Handlers MUST be attached before .start() — otherwise a fast utterance
@@ -254,6 +274,9 @@ export default function AssistantFab() {
       if (full) setStillListening(false);
       if (full) silenceTimer.current = setTimeout(() => {
         dbg("silence timer -> stopAndSend");
+        // FAB voice #3 — the silence auto-send fires only when the user
+        // has NOT enabled edit-before-send. In edit mode we simply stop
+        // the recognition but leave the transcript for review.
         stopAndSendRef.current();
       }, 2500);
     };
@@ -369,9 +392,49 @@ export default function AssistantFab() {
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (stillListeningTimer.current) clearTimeout(stillListeningTimer.current);
+    if (chunkTimerRef.current) clearInterval(chunkTimerRef.current);
     try { micStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch {}
     try { audioCtxRef.current?.close(); } catch {}
   }, []);
+
+  // FAB voice #3 — streaming-ish Whisper. MediaRecorder is already emitting
+  // 250ms chunks (mr.start(250)). Every 3s while recording, we build a blob
+  // from ALL chunks collected so far (webm containers are transcribable while
+  // in-progress — Whisper is tolerant of the missing cues) and POST it with an
+  // `interim=true` marker so the server skips the assistant_actions log entry.
+  // The interim transcript lands in the panel textarea unless the operator
+  // has already tapped to edit — userEditedRef guards against clobbering an
+  // in-progress edit. Final blob on release still goes through mr.onstop and
+  // replaces the interim text with the full-quality transcription.
+  const submitInterimWhisper = useCallback(async () => {
+    if (interimInFlightRef.current) return;
+    const chunks = recordedChunksRef.current;
+    if (!chunks.length) return;
+    const mime = mediaRecorderRef.current?.mimeType || chunks[0]?.type || "audio/webm";
+    // Snapshot copy — DO NOT splice the array (mr.onstop still needs every chunk).
+    const blob = new Blob(chunks.slice(), { type: mime });
+    if (blob.size < 2400) return; // too short for a useful transcription
+    interimInFlightRef.current = true;
+    try {
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+      const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+      const entityCode = ENT_CODE[ent as string] || "IFL";
+      const fd = new FormData();
+      fd.append("audio", blob, `interim.${(mime.split("/")[1] || "webm").split(";")[0]}`);
+      fd.append("lang", lang);
+      fd.append("entity", entityCode);
+      fd.append("interim", "true");
+      fd.append("route", pathname || "");
+      const r = await fetch("/api/assistant/voice/transcribe", { method: "POST", body: fd });
+      const d = await r.json();
+      if (d?.ok && typeof d?.text === "string" && d.text.trim()) {
+        if (!userEditedRef.current) {
+          setText(d.text); textRef.current = d.text; finalRef.current = d.text;
+        }
+      }
+    } catch (err) { dbg("interim whisper failed", err); }
+    finally { interimInFlightRef.current = false; }
+  }, [lang, pathname, profile]);
 
   // PWA #2 — Whisper recording pipeline. Uses the same MediaStream the
   // amplitude meter opens (so no double-prompt for mic permission). While the
@@ -413,6 +476,7 @@ export default function AssistantFab() {
         stopMeter();
         wantListenRef.current = false;
         setStillListening(false);
+        if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
         if (recordingStopReasonRef.current === "cancel") { dbg("whisper cancelled"); return; }
         if (!chunks.length) {
           setStatus(lang === "es" ? "No oí nada — vuelve a intentarlo" : "Didn't catch that — try again");
@@ -450,9 +514,18 @@ export default function AssistantFab() {
             setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
           } else {
             // Edit-then-send: land the transcript in the input so Boris can
-            // fix it before the assistant sees it.
+            // fix it before the assistant sees it. FAB voice #3 — if
+            // autoSendPendingRef fired (Stop & Send with editBeforeSend=off),
+            // we forward straight to the orchestrator.
             setText(d.text); textRef.current = d.text; finalRef.current = d.text;
-            setStatus(lang === "es" ? "Revisa y toca Enviar" : "Review and tap Send");
+            userEditedRef.current = false;
+            if (autoSendPendingRef.current) {
+              autoSendPendingRef.current = false;
+              setStatus(lang === "es" ? "Enviando…" : "Sending…");
+              setTimeout(() => { void send(); }, 0);
+            } else {
+              setStatus(lang === "es" ? "Revisa y toca Enviar" : "Review and tap Send");
+            }
           }
         } catch (err: any) {
           setStatus((lang === "es" ? "Error de voz: " : "Voice error: ") + (err?.message || "unknown"));
@@ -466,6 +539,11 @@ export default function AssistantFab() {
       };
       mr.start(250); // small chunks so onstop has data even on quick releases
       setListening(true);
+      // FAB voice #3 — kick off streaming interim uploads every 3s so the
+      // panel textarea grows as Boris talks instead of sitting blank until
+      // release. Cleared in stopWhisperRecording + mr.onstop cleanup.
+      if (chunkTimerRef.current) clearInterval(chunkTimerRef.current);
+      chunkTimerRef.current = setInterval(() => { void submitInterimWhisper(); }, 3000);
       // Auto-stop after WHISPER_MAX_MS so a stuck press doesn't record forever.
       recordingTimeoutRef.current = setTimeout(() => {
         recordingStopReasonRef.current = "timeout";
@@ -490,6 +568,7 @@ export default function AssistantFab() {
   const stopWhisperRecording = useCallback((reason: "user" | "cancel" = "user") => {
     if (recordingTimeoutRef.current) { clearTimeout(recordingTimeoutRef.current); recordingTimeoutRef.current = null; }
     if (stillListeningTimer.current) { clearTimeout(stillListeningTimer.current); stillListeningTimer.current = null; }
+    if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
     recordingStopReasonRef.current = reason;
     const mr = mediaRecorderRef.current;
     if (mr && mr.state !== "inactive") {
@@ -542,9 +621,14 @@ export default function AssistantFab() {
   }, [lang, voiceEngine, startWhisperRecording]);
 
   const stopAndSend = useCallback(() => {
-    // PWA #2 — Whisper path: stop the recorder; the onstop handler puts the
-    // transcript in the input and waits for Boris to tap Send (edit-then-send).
-    if (voiceEngine === "whisper") { stopWhisperRecording("user"); return; }
+    // FAB voice #3 — Whisper path: if editBeforeSend is OFF, flag the auto-send
+    // so mr.onstop fires send() as soon as the final transcript replaces the
+    // interim one. If ON (default), we just stop and wait for a manual send.
+    if (voiceEngine === "whisper") {
+      if (!editBeforeSend) autoSendPendingRef.current = true;
+      stopWhisperRecording("user");
+      return;
+    }
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
     if (stillListeningTimer.current) { clearTimeout(stillListeningTimer.current); stillListeningTimer.current = null; }
     setStillListening(false);
@@ -557,18 +641,25 @@ export default function AssistantFab() {
       try { r.stop(); } catch {}
     }
     setListening(false);
-    if (textRef.current.trim()) send();
+    if (textRef.current.trim() && !editBeforeSend) send();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceEngine, stopWhisperRecording]);
+  }, [voiceEngine, stopWhisperRecording, editBeforeSend]);
   // Keep the ref pointing at the freshest closure so the onresult silence
   // timer and onend callback both use the current send(), not the first-render
   // one they'd otherwise capture through useCallback([])'s stale scope.
   useEffect(() => { stopAndSendRef.current = stopAndSend; }, [stopAndSend]);
 
   const fabTap = () => {
-    if (!open) setOpen(true);
+    // FAB voice #3 — a plain tap now opens the VOICE PANEL, not the full
+    // chat sheet. Boris was tapping to talk and instead getting the sheet
+    // (which hides the transcript below the fold). Long-press still opens
+    // the sheet for camera / wine / history.
     if (listening) { stopAndSend(); return; }
-    if (supported) startListen();
+    if (!supported) { setOpen(true); return; } // no voice — fall back to sheet type-only
+    userEditedRef.current = false;
+    setLastPair(null);
+    setVoicePanelOpen(true);
+    startListen();
   };
 
   // Long-press → open sheet with camera actions strip (Collapse #2 redo)
@@ -590,8 +681,15 @@ export default function AssistantFab() {
   const send = async () => {
     const t = (textRef.current.trim() || text.trim()); if (!t) return;
     setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
+    userEditedRef.current = false;
     setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "···", userText: t }]);
     setThinking(true);
+    // FAB voice #3 — mini-chat continuity in the voice panel. Show the sent
+    // message immediately, replace the "…" placeholder with the real reply
+    // once /api/ask returns. lastPair is what the panel renders under the
+    // transcript row so Boris sees the round-trip without opening the sheet.
+    setSending(true);
+    setLastPair({ you: t, chef: "" });
     // Sprint 3 · #3 — /grow/inbox integration. Pages can expose
     //   window.__fsAssistantInboxHooks.draftForHint(text) → { ok, ... }
     // and the FAB will run page-owned execution before falling through to the
@@ -673,11 +771,14 @@ export default function AssistantFab() {
       const needsConfirm = d.intent && typeof d.confidence === "number" && d.confidence < CONFIDENCE_THRESHOLD;
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: d.intent, confidence: d.confidence, userText: t, turnId: d.user_turn_id, needsConfirm, memoryProposal: d.memory, orderDraft: d.order, feedback: d.feedback }; return n; });
       if (d.order) setOrderDraft(d.order);
+      setLastPair({ you: t, chef: reply });
     } catch (e: any) {
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "sys", text: "⚠ " + (e?.message || "Chef offline") }; return n; });
+      setLastPair({ you: t, chef: "⚠ " + (e?.message || (lang === "es" ? "Sin conexión" : "Chef offline")) });
       setErrorPulse(true); setTimeout(() => setErrorPulse(false), 4000);
     }
     setThinking(false);
+    setSending(false);
   };
 
   const confirmIntent = async (msgIdx: number, confirmedIntent: string) => {
@@ -867,6 +968,252 @@ export default function AssistantFab() {
       >
         {label}
       </button>
+
+      {voicePanelOpen ? (
+        <div
+          role="dialog"
+          aria-label={lang === "es" ? "Panel de voz" : "Voice panel"}
+          className="fixed z-[55] flex flex-col gap-3 border border-black/10 bg-paper p-3 shadow-2xl shadow-black/25 md:right-6 md:bottom-24 md:w-[380px] md:rounded-2xl inset-x-0 bottom-24 mx-0"
+          style={{
+            // Editorial identity — hairline, not soft card. On mobile the
+            // panel is a full-width bottom bar; on desktop a floating right
+            // card that doesn't cover main content.
+            borderColor: "var(--line, rgba(0,0,0,.12))",
+          }}
+        >
+          {/* Header: engine chip + lang selector + close */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="rounded-full border border-line bg-paper-deep/40 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-clay"
+                aria-label={lang === "es" ? "motor de voz" : "voice engine"}
+              >
+                {voiceEngine === "whisper" ? "Whisper" : voiceEngine === "web-speech" ? "Web Speech" : (lang === "es" ? "Fallback" : "Fallback")}
+              </span>
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value as "en" | "es" | "da")}
+                aria-label={lang === "es" ? "idioma" : "language"}
+                className="rounded-full border border-line bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ink outline-none focus:border-ink"
+              >
+                <option value="en">EN</option>
+                <option value="es">ES</option>
+                <option value="da">DA</option>
+              </select>
+              {listening ? (
+                <span
+                  className="ml-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide text-clay"
+                  aria-live="polite"
+                >
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
+                  {lang === "es" ? "Escuchando" : "Listening"}
+                </span>
+              ) : transcribing ? (
+                <span
+                  className="ml-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide text-clay"
+                  aria-live="polite"
+                >
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
+                  {lang === "es" ? "Transcribiendo" : "Transcribing"}
+                </span>
+              ) : sending ? (
+                <span
+                  className="ml-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide text-clay"
+                  aria-live="polite"
+                >
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
+                  {lang === "es" ? "Enviando" : "Sending"}
+                </span>
+              ) : null}
+            </div>
+            <button
+              onClick={() => {
+                // Cancel any in-flight recording and close the panel.
+                if (voiceEngine === "whisper") stopWhisperRecording("cancel");
+                else {
+                  try { recRef.current?.abort?.(); } catch {}
+                  setListening(false);
+                  stopMeter();
+                  wantListenRef.current = false;
+                }
+                if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
+                autoSendPendingRef.current = false;
+                setVoicePanelOpen(false);
+                setStatus("");
+                setText(""); textRef.current = ""; finalRef.current = "";
+                userEditedRef.current = false;
+                setLastPair(null);
+              }}
+              aria-label={lang === "es" ? "cerrar" : "close"}
+              className="font-mono text-[14px] leading-none text-clay hover:text-ink"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Amplitude meter — 12 segments */}
+          <div className="flex h-2.5 items-center gap-[3px]" aria-label={lang === "es" ? "nivel del micro" : "microphone level"}>
+            {Array.from({ length: 12 }).map((_, i) => {
+              const threshold = (i + 1) / 12;
+              const on = listening && amplitude >= threshold - 0.06;
+              return (
+                <span
+                  key={i}
+                  className="h-full flex-1 rounded-full transition-opacity"
+                  style={{ background: "var(--accent)", opacity: on ? 0.9 : 0.15 }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Big editable transcript textbox */}
+          <textarea
+            ref={panelTextareaRef}
+            value={text}
+            onChange={(e) => {
+              userEditedRef.current = true;
+              setText(e.target.value); textRef.current = e.target.value; finalRef.current = e.target.value;
+            }}
+            onKeyDown={(e) => {
+              // Accessibility — ⌘⏎ / Ctrl⏎ sends from the transcript box.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                if (listening) { stopAndSend(); }
+                else if (text.trim()) { void send(); }
+              }
+            }}
+            rows={3}
+            placeholder={
+              listening
+                ? (lang === "es" ? "Habla… el texto aparecerá aquí" : "Speak… your words will appear here")
+                : (lang === "es" ? "Toca el micro y habla — o escribe aquí" : "Tap the mic and speak — or type here")
+            }
+            aria-label={lang === "es" ? "Transcripción" : "Transcript"}
+            className="min-h-[72px] w-full resize-none border border-line bg-paper-deep/20 px-3 py-2 font-serif text-[16px] leading-relaxed text-ink outline-none focus:border-ink"
+            style={{ borderColor: "var(--line, rgba(0,0,0,.12))" }}
+          />
+
+          {/* Status line — small live-region for screen readers */}
+          {status ? (
+            <p className="font-mono text-[10px] uppercase tracking-wide text-clay" aria-live="polite">{status}</p>
+          ) : null}
+          {micDenied ? (
+            <p className="font-mono text-[10px] uppercase tracking-wide text-tomato">
+              {lang === "es"
+                ? "Micro bloqueado. iOS: Ajustes → Safari → Micrófono → Permitir."
+                : "Mic blocked. iOS: Settings → Safari → Microphone → Allow."}
+            </p>
+          ) : null}
+
+          {/* Bottom actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                if (listening) {
+                  // Stop & (optionally) Send. Whisper waits for the final
+                  // transcription before send() fires — handled in mr.onstop
+                  // via autoSendPendingRef.
+                  if (!editBeforeSend) autoSendPendingRef.current = true;
+                  stopAndSend();
+                } else if (text.trim()) {
+                  void send();
+                }
+              }}
+              disabled={sending || transcribing || (!listening && !text.trim())}
+              style={{ background: "var(--ink, #1a1a1a)" }}
+              className="rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40"
+              aria-label={listening ? (lang === "es" ? "Detener y enviar" : "Stop and send") : (lang === "es" ? "Enviar" : "Send")}
+            >
+              {listening ? (editBeforeSend ? (lang === "es" ? "■ detener" : "■ stop") : (lang === "es" ? "■ enviar" : "■ stop & send")) : sending ? (lang === "es" ? "enviando…" : "sending…") : (lang === "es" ? "↑ enviar" : "↑ send")}
+            </button>
+            <button
+              onClick={() => {
+                if (voiceEngine === "whisper") stopWhisperRecording("cancel");
+                else {
+                  try { recRef.current?.abort?.(); } catch {}
+                  setListening(false);
+                  stopMeter();
+                  wantListenRef.current = false;
+                }
+                if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
+                autoSendPendingRef.current = false;
+                setText(""); textRef.current = ""; finalRef.current = "";
+                userEditedRef.current = false;
+                setStatus("");
+                setVoicePanelOpen(false);
+                setLastPair(null);
+              }}
+              className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft"
+              aria-label={lang === "es" ? "cancelar" : "cancel"}
+            >
+              × {lang === "es" ? "cancelar" : "cancel"}
+            </button>
+            <button
+              onClick={() => {
+                // Restart — cancel current, wipe transcript, kick a fresh session.
+                if (voiceEngine === "whisper") stopWhisperRecording("cancel");
+                else {
+                  try { recRef.current?.abort?.(); } catch {}
+                  setListening(false);
+                }
+                if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
+                autoSendPendingRef.current = false;
+                setText(""); textRef.current = ""; finalRef.current = "";
+                userEditedRef.current = false;
+                setStatus("");
+                setTimeout(() => { if (supported) startListen(); }, 120);
+              }}
+              className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft"
+              aria-label={lang === "es" ? "reiniciar" : "restart"}
+            >
+              ↻ {lang === "es" ? "reiniciar" : "restart"}
+            </button>
+            <label className="ml-auto flex cursor-pointer items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">
+              <input
+                type="checkbox"
+                checked={editBeforeSend}
+                onChange={(e) => setEditBeforeSend(e.target.checked)}
+                className="h-3 w-3 accent-ink"
+                aria-label={lang === "es" ? "editar antes de enviar" : "edit before send"}
+              />
+              ⇧ {lang === "es" ? "editar antes de enviar" : "edit before send"}
+            </label>
+          </div>
+
+          {/* Mini-chat continuity — last sent + reply */}
+          {lastPair ? (
+            <div className="mt-1 border-t border-line pt-2">
+              <p className="font-mono text-[9px] uppercase tracking-wide text-clay">{lang === "es" ? "Tú" : "You"}</p>
+              <p className="mt-0.5 whitespace-pre-line font-serif text-[14px] leading-snug text-ink">{lastPair.you}</p>
+              <p className="mt-2 font-mono text-[9px] uppercase tracking-wide text-clay">Chef</p>
+              <p className="mt-0.5 whitespace-pre-line font-serif text-[14px] leading-snug text-ink-soft">
+                {lastPair.chef || (sending ? (lang === "es" ? "pensando…" : "thinking…") : "")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    // + New question — clear the pair, wipe transcript, start listening again.
+                    setLastPair(null);
+                    setText(""); textRef.current = ""; finalRef.current = "";
+                    userEditedRef.current = false;
+                    setStatus("");
+                    if (supported) startListen();
+                  }}
+                  className="rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper"
+                >
+                  + {lang === "es" ? "nueva pregunta" : "new question"}
+                </button>
+                <button
+                  onClick={() => { setOpen(true); }}
+                  className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft"
+                >
+                  {lang === "es" ? "ver historial →" : "open history →"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {open ? (
         <>
