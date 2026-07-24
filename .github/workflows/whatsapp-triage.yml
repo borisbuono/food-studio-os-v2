@@ -1,0 +1,19 @@
+# Runs hourly 08-22 UTC to trigger WhatsApp inbox triage on Vercel.
+# Endpoint to be added when the WhatsApp cron route ships.
+name: WhatsApp Triage (hourly 08-22 UTC)
+
+on:
+  schedule:
+    - cron: "0 8-22 * * *"
+  workflow_dispatch:
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/cron/whatsapp-triage
+        run: |
+          curl -sSf -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://www.foodstudio.ai/api/cron/whatsapp-triage \
+            || echo "trigger failed (non-fatal)"
