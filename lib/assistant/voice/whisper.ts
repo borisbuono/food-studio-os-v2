@@ -32,7 +32,7 @@ export async function transcribeAudio(
   contentType: string,
   langHint?: "en" | "es" | "da",
 ): Promise<TranscribeResult> {
-  const key = process.env.OPENAI_API_KEY;
+  const key = (process.env.OPENAI_API_KEY || process.env.openai);
   if (!key) return { ok: false, error: "OPENAI_API_KEY not set — voice transcription unavailable." };
   if (!audioBuffer || audioBuffer.byteLength < 400) {
     return { ok: false, error: "Audio clip too short to transcribe." };
