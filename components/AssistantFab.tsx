@@ -87,6 +87,19 @@ export default function AssistantFab() {
   // re-subscribing. onresult needs a fresh reference to stopAndSend so a
   // pause-triggered send doesn't call a stale closure.
   const stopAndSendRef = useRef<() => void>(() => {});
+  // FAB voice #2 (2026-07-28) — live amplitude meter (waveform substitute)
+  // and "still listening…" hint so Boris SEES the mic working, not just a
+  // pulsing dot. amplitude ranges 0..1 and is sampled from an AnalyserNode
+  // attached to a MediaStream we open alongside SpeechRecognition (they
+  // share the same mic-permission grant, so no second prompt).
+  // stillListening flips true after 4s of listening with no finalised text.
+  const [amplitude, setAmplitude] = useState(0);
+  const [stillListening, setStillListening] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const stillListeningTimer = useRef<any>(null);
 
   useEffect(() => { getMyProfile().then(setProfile); setLang(readLang()); }, []);
 
@@ -176,6 +189,7 @@ export default function AssistantFab() {
       // on an unfinalised interim for longer than Boris expects. This nudge
       // also gives us a deterministic pause length across browsers.
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      if (full) setStillListening(false);
       if (full) silenceTimer.current = setTimeout(() => {
         dbg("silence timer -> stopAndSend");
         stopAndSendRef.current();
@@ -244,12 +258,73 @@ export default function AssistantFab() {
 
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [log, text]);
 
+  // FAB voice #2 — start/stop the amplitude meter. We keep this deliberately
+  // small: getUserMedia({audio}), pipe through an AnalyserNode, sample RMS in a
+  // rAF loop, normalise to 0..1 for the CSS bar. If the user has already
+  // granted SpeechRecognition permission, this doesn't reprompt — same origin,
+  // same mic. If getUserMedia rejects (rare, permission race), we silently
+  // fall back to a static bar; recognition itself is unaffected.
+  const startMeter = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      if (!micStreamRef.current) {
+        micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      if (!audioCtxRef.current) {
+        const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AC) return;
+        audioCtxRef.current = new AC();
+      }
+      const ctx = audioCtxRef.current!;
+      if (ctx.state === "suspended") { try { await ctx.resume(); } catch {} }
+      if (!analyserRef.current) {
+        const src = ctx.createMediaStreamSource(micStreamRef.current!);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+        analyserRef.current = analyser;
+      }
+      const analyser = analyserRef.current!;
+      const buf = new Uint8Array(analyser.fftSize);
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        // RMS around 128 (silence), scale to 0..1
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+        const rms = Math.sqrt(sum / buf.length);
+        setAmplitude(Math.min(1, rms * 4));
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch (err) { dbg("meter unavailable", err); }
+  }, []);
+  const stopMeter = useCallback(() => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    setAmplitude(0);
+    // We keep the MediaStream open across sessions so the mic tab indicator
+    // stays cool; if the FAB unmounts we'll tear it down in the effect below.
+  }, []);
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (stillListeningTimer.current) clearTimeout(stillListeningTimer.current);
+    try { micStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch {}
+    try { audioCtxRef.current?.close(); } catch {}
+  }, []);
+
   const startListen = useCallback(() => {
     const r = recRef.current;
     if (!r) { dbg("startListen: no recognition instance"); return; }
     finalRef.current = ""; textRef.current = ""; setText("");
     setStatus(lang === "es" ? "Escuchando…" : "Listening…");
     wantListenRef.current = true;
+    setStillListening(false);
+    if (stillListeningTimer.current) clearTimeout(stillListeningTimer.current);
+    stillListeningTimer.current = setTimeout(() => {
+      // If we're still recording with nothing finalised after 4s, tell Boris
+      // we're not stuck — some browsers keep the mic hot with zero feedback.
+      if (wantListenRef.current && !textRef.current) setStillListening(true);
+    }, 4000);
+    startMeter();
     try {
       r.start();
       setListening(true);
@@ -274,6 +349,9 @@ export default function AssistantFab() {
 
   const stopAndSend = useCallback(() => {
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
+    if (stillListeningTimer.current) { clearTimeout(stillListeningTimer.current); stillListeningTimer.current = null; }
+    setStillListening(false);
+    stopMeter();
     wantListenRef.current = false;
     const r = recRef.current;
     if (r) {
@@ -655,7 +733,43 @@ export default function AssistantFab() {
                     ) : null}
                   </div>
                 ))}
-              {text ? <p className="font-serif text-[17px] leading-relaxed text-ink">{text}</p> : null}
+              {text ? (
+                <p className="font-serif text-[17px] leading-relaxed text-ink">
+                  {text}
+                  {listening ? <span className="ml-1 inline-block h-[1em] w-[2px] animate-pulse bg-ink align-middle" /> : null}
+                </p>
+              ) : null}
+              {listening ? (
+                <div className="mt-3 flex items-center gap-3">
+                  {/* Live amplitude bar — 12 segments, filled proportionally.
+                      This is our waveform stand-in until we ship a proper canvas. */}
+                  <div className="flex h-3 flex-1 items-center gap-[3px]" aria-label="microphone level">
+                    {Array.from({ length: 12 }).map((_, i) => {
+                      const threshold = (i + 1) / 12;
+                      const on = amplitude >= threshold - 0.06;
+                      return (
+                        <span
+                          key={i}
+                          className="h-full flex-1 rounded-full transition-opacity"
+                          style={{ background: "var(--accent)", opacity: on ? 0.9 : 0.15 }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => stopAndSend()}
+                    className="shrink-0 rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper"
+                    aria-label={lang === "es" ? "Detener y enviar" : "Stop and send"}
+                  >
+                    {lang === "es" ? "■ enviar" : "■ send"}
+                  </button>
+                </div>
+              ) : null}
+              {listening && stillListening ? (
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                  {lang === "es" ? "Sigo escuchando… habla cuando quieras." : "Still listening… speak whenever you're ready."}
+                </p>
+              ) : null}
             </div>
 
             {orderDraft ? (
