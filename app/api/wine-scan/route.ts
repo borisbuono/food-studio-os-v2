@@ -6,9 +6,34 @@ const SYSTEM = `You are a sommelier reading a wine label from a photo. From the 
 Use the label's language for names; write tasting_notes, pitch and description in English. If a field isn't legible, infer conservatively from what is visible or leave it "". vintage is the year only.`;
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}));
-  const image = String(body?.image || "");
-  const media_type = String(body?.media_type || "image/jpeg");
+  // iOS Safari kills large JSON POSTs with "Load failed" — accept multipart
+  // FormData too so the client can stream a Blob directly. Falls back to the
+  // legacy JSON-base64 shape for any older caller.
+  let image = "";
+  let media_type = "image/jpeg";
+  const ct = req.headers.get("content-type") || "";
+  try {
+    if (ct.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const file = form.get("file");
+      if (file instanceof Blob) {
+        const buf = await file.arrayBuffer();
+        const u8 = new Uint8Array(buf);
+        image = typeof Buffer !== "undefined" ? Buffer.from(u8).toString("base64") : (() => {
+          let bin = ""; const CHUNK = 0x8000;
+          for (let i = 0; i < u8.length; i += CHUNK) bin += String.fromCharCode.apply(null, Array.from(u8.subarray(i, i + CHUNK)) as any);
+          return btoa(bin);
+        })();
+        media_type = (file as any).type || "image/jpeg";
+      }
+    } else {
+      const body = await req.json().catch(() => ({}));
+      image = String(body?.image || body?.data || "");
+      media_type = String(body?.media_type || "image/jpeg");
+    }
+  } catch {
+    return Response.json({ ok: false, error: "Couldn't read the photo — try again." });
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return Response.json({ ok: false, error: "Vision isn't switched on yet (ANTHROPIC_API_KEY)." });
   if (!image) return Response.json({ ok: false, error: "No image." });
