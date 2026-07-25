@@ -532,7 +532,13 @@ export default function AssistantFab() {
             // fix it before the assistant sees it. FAB voice #3 — if
             // autoSendPendingRef fired (Stop & Send with editBeforeSend=off),
             // we forward straight to the orchestrator.
-            setText(cleaned); textRef.current = cleaned; finalRef.current = cleaned;            userEditedRef.current = false;
+            const cleaned = scrubWhisper(d.text);
+            if (!cleaned) {
+              setStatus(lang === "es" ? "No captó voz — intenta de nuevo." : "No speech detected — try again.");
+              setErrorPulse(true); setTimeout(() => setErrorPulse(false), 3000);
+              return;
+            }
+            setText(cleaned); textRef.current = cleaned; finalRef.current = cleaned; userEditedRef.current = false;
             if (autoSendPendingRef.current) {
               autoSendPendingRef.current = false;
               setStatus(lang === "es" ? "Enviando…" : "Sending…");
