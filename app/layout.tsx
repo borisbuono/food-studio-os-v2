@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import TopBar from "@/components/TopBar";
-import AssistantFab from "@/components/AssistantFab";
+import ChefSwitch from "@/components/ChefSwitch";
 import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RouteGuard>{children}</RouteGuard>
         <FlowStrip />
         <SessionMigrator />
-        <AssistantFab />
+        <ChefSwitch />
         <NewHireAssistantNudge />
         <InstallPrompt />
       </body>
