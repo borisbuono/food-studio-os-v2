@@ -983,7 +983,7 @@ export default function AssistantFab() {
       <button
         aria-label="Chef — tap to talk · hold to open"
         style={{ background: errorPulse ? "#9A3122" : "var(--accent)", touchAction: "manipulation" }}
-        className={"fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95 " + ringClass}
+        className={"fs-fab-safe fixed bottom-5 right-5 z-[60] h-16 w-16 select-none rounded-full font-serif text-[15px] text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95 " + ringClass}
         onPointerDown={fabPressDown}
         onPointerUp={fabPressUp}
         onPointerCancel={fabPressCancel}

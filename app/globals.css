@@ -6,3 +6,13 @@
 :root { color-scheme: light; --accent: #0E7C86; }
 html, body { background: #EFEEEB; }
 body { color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 300; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* iOS safe-area — TopBar padding is inline; body edges keep min-safe insets. */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    /* extend paper background under notch/gesture-bar so no white flash */
+    background-color: #EFEEEB;
+  }
+  /* Chef FAB anchors above the iOS gesture bar */
+  .fs-fab-safe { bottom: calc(env(safe-area-inset-bottom, 0px) + 20px) !important; }
+}

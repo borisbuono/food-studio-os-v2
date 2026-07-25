@@ -85,7 +85,7 @@ export default function TopBar() {
   const activeAccent = activePillar ? PILLAR_ACCENT[activePillar] : null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
         <Link href="/" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
 
