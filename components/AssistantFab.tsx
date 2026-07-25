@@ -35,6 +35,20 @@ const dbg = (...args: any[]) => { if (FAB_DEBUG && typeof console !== "undefined
 // for either. On iOS (and any browser missing SpeechRecognition) we swap in
 // server-side Whisper: MediaRecorder captures a clip, we POST it to
 // /api/assistant/voice/transcribe, Whisper returns the text.
+// Whisper silent-audio hallucinations. Trained on YouTube captions, the model
+// defaults to closing remarks when the input is silent, muffled, or under
+// ~1s. Boris hit "Thank you for watching" on his 2026-07-25 walk when the
+// mic opened but no speech arrived. Guard both transcript landings.
+const WHISPER_JUNK = new Set(["thank you for watching", "thanks for watching", "thanks for watching!", "thank you.", "thank you", "thank you very much", "you", "bye", "bye.", "bye bye", ".", "..", "...", "\u00a1gracias por ver!", "gracias por ver", "gracias"]);
+function scrubWhisper(raw: string): string {
+  const t = (raw || "").trim();
+  if (!t) return "";
+  const lc = t.toLowerCase().replace(/[!?.,]+
+, "").trim();
+  if (WHISPER_JUNK.has(lc)) return "";
+  return t;
+}
+
 type VoiceEngine = "web-speech" | "whisper" | "none";
 function detectIOS(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -427,9 +441,10 @@ export default function AssistantFab() {
       fd.append("route", pathname || "");
       const r = await fetch("/api/assistant/voice/transcribe", { method: "POST", body: fd });
       const d = await r.json();
-      if (d?.ok && typeof d?.text === "string" && d.text.trim()) {
-        if (!userEditedRef.current) {
-          setText(d.text); textRef.current = d.text; finalRef.current = d.text;
+      if (d?.ok && typeof d?.text === "string") {
+        const cleaned = scrubWhisper(d.text);
+        if (cleaned && !userEditedRef.current) {
+          setText(cleaned); textRef.current = cleaned; finalRef.current = cleaned;
         }
       }
     } catch (err) { dbg("interim whisper failed", err); }
@@ -517,8 +532,7 @@ export default function AssistantFab() {
             // fix it before the assistant sees it. FAB voice #3 — if
             // autoSendPendingRef fired (Stop & Send with editBeforeSend=off),
             // we forward straight to the orchestrator.
-            setText(d.text); textRef.current = d.text; finalRef.current = d.text;
-            userEditedRef.current = false;
+            setText(cleaned); textRef.current = cleaned; finalRef.current = cleaned;            userEditedRef.current = false;
             if (autoSendPendingRef.current) {
               autoSendPendingRef.current = false;
               setStatus(lang === "es" ? "Enviando…" : "Sending…");
