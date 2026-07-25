@@ -792,6 +792,18 @@ export default function AssistantFab() {
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "chef", text: reply, intent: d.intent, confidence: d.confidence, userText: t, turnId: d.user_turn_id, needsConfirm, memoryProposal: d.memory, orderDraft: d.order, feedback: d.feedback }; return n; });
       if (d.order) setOrderDraft(d.order);
       setLastPair({ you: t, chef: reply });
+      // Chef is a shell, not a room — dissolve after evidence lands
+      // (2026-07-25 walkthrough decision). If the turn produced nothing
+      // that needs the user's confirmation — no confirm chips, no memory
+      // proposal, no draft order, and not a capture (which shows a big
+      // CTA that must stay visible until tapped) — close the sheet after
+      // a short window so it doesn't cover the front page. The FAB
+      // remains, ready for the next turn.
+      if (!needsConfirm && !d.memory && !d.order && d.intent !== "capture") {
+        setTimeout(() => {
+          if (!textRef.current?.trim()) { setOpen(false); }
+        }, 4000);
+      }
     } catch (e: any) {
       setLog((l) => { const n = [...l]; n[n.length - 1] = { role: "sys", text: "⚠ " + (e?.message || "Chef offline") }; return n; });
       setLastPair({ you: t, chef: "⚠ " + (e?.message || (lang === "es" ? "Sin conexión" : "Chef offline")) });
