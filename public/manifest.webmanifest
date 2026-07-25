@@ -1,6 +1,6 @@
 {
-  "name": "Food Studios OS",
-  "short_name": "FS OS",
+  "name": "Food Studios",
+  "short_name": "Food Studios",
   "description": "The chef-built operating system — service, prep, deliveries, numbers.",
   "start_url": "/",
   "scope": "/",

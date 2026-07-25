@@ -21,10 +21,10 @@ export const metadata: Metadata = {
   title: "Food Studios",
   description: "The chef-built operating system.",
   manifest: "/manifest.webmanifest",
-  applicationName: "FS OS",
+  applicationName: "Food Studios",
   appleWebApp: {
     capable: true,
-    title: "FS OS",
+    title: "Food Studios",
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     // above covers modern iOS but these keep older devices honest.
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "FS OS",
+    "apple-mobile-web-app-title": "Food Studios",
     "mobile-web-app-capable": "yes",
     "format-detection": "telephone=no",
   },
