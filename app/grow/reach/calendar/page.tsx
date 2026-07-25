@@ -212,7 +212,7 @@ export default function CalendarPage() {
           <div className="mt-4 rounded-lg border border-dashed border-line bg-paper-deep p-6 text-center">
             <p className="font-sans text-[13px] italic text-ink-soft">No unscheduled drafts.</p>
             <p className="mt-2 font-sans text-[12px] text-ink-soft">
-              Try the <Link href="/grow/reach/generator" className="underline">AI generator</Link> or hit <em>Add post</em> above.
+              Ask Chef to draft one — <em>"draft a post about tonight"</em> — or hit <em>Add post</em> above.
             </p>
           </div>
         ) : (

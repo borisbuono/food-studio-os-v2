@@ -122,7 +122,7 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
       <nav className="mt-6 flex flex-wrap items-baseline gap-2 border-t border-line pt-6 font-mono text-[10px] uppercase tracking-wide">
         <span className="text-clay">social workstream ·</span>
         <Link href={`/grow/reach/calendar?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">calendar →</Link>
-        <Link href={`/grow/reach/generator?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">AI generator →</Link>
+        
         <Link href={`/grow/reach/ads?entity=${entity}`} className="rounded-full border border-line px-3 py-1 text-ink hover:border-ink-soft">Meta ads →</Link>
       </nav>
 
@@ -167,7 +167,7 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
               <div className="mt-5 border-t border-line pt-4">
                 <div className="flex items-baseline justify-between">
                   <p className="font-mono text-[10px] uppercase tracking-wide text-clay">recent campaigns</p>
-                  <Link href="/grow/reach/campaigns/new" className="rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper">
+                  <span className="rounded-full border border-line bg-paper-deep px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-clay">
                     new campaign →
                   </Link>
                 </div>
