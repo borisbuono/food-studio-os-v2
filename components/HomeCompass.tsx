@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import BrandMark from "@/components/BrandMark";
 import AssistantBriefPanel from "@/components/AssistantBriefPanel";
 import NewHiresStrip from "@/components/NewHiresStrip";
 import { ROLES, RoleKey } from "@/lib/roles";
@@ -305,8 +304,6 @@ export default function HomeCompass({ data }: { data: CompassData }) {
       <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>
         {greeting ? `Hello, ${greeting}` : "Home"}
       </p>
-      <div className="mt-2"><BrandMark entity={entity} variant="full" tone="light" /></div>
-
       <div className="mt-6 border-t border-b border-black/10 py-5">
         <Header label={ENTITY_LABEL[entity]} data={d} />
       </div>
