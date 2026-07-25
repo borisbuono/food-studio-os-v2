@@ -818,20 +818,24 @@ export default function AssistantFab() {
     setWineBusy(true); setWineDraft(null);
     setLog((l) => [...l, { role: "sys", text: lang === "es" ? "🍷 Leyendo etiqueta…" : "🍷 Reading label…" }]);
     try {
-      // Downscale in-browser (same recipe the old scan page used)
-      const bmp = await new Promise<{ data: string; media_type: string }>((resolve, reject) => {
+      // Downscale in-browser and stream as a Blob via multipart. iOS Safari
+      // kills large JSON base64 POSTs with "Load failed"; multipart survives.
+      const blob = await new Promise<Blob>((resolve, reject) => {
         const img = new Image(); const url = URL.createObjectURL(file);
         img.onload = () => {
-          const max = 1280; let { width, height } = img;
+          const max = 900; let { width, height } = img;
           if (width > max || height > max) { const sc = max / Math.max(width, height); width = Math.round(width * sc); height = Math.round(height * sc); }
           const c = document.createElement("canvas"); c.width = width; c.height = height;
           c.getContext("2d")!.drawImage(img, 0, 0, width, height); URL.revokeObjectURL(url);
-          resolve({ data: c.toDataURL("image/jpeg", 0.82).split(",")[1], media_type: "image/jpeg" });
+          c.toBlob((b) => b ? resolve(b) : reject(new Error("encode failed")), "image/jpeg", 0.75);
         };
-        img.onerror = reject; img.src = url;
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image load failed")); };
+        img.src = url;
       });
-      const r = await fetch("/api/wine-scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bmp) });
-      const d = await r.json();
+      const fd = new FormData();
+      fd.append("file", blob, "wine.jpg");
+      const r = await fetch("/api/wine-scan", { method: "POST", body: fd });
+      const d = await r.json().catch(() => ({ ok: false, error: "server returned no JSON" }));
       if (!d.ok) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (d.error || "scan failed") }]); setWineBusy(false); return; }
       const w = d.wine || {};
       setWineDraft(w);
@@ -1275,6 +1279,33 @@ export default function AssistantFab() {
                         </div>
                       </div>
                     ) : null}
+                    {m.role === "chef" && m.intent === "capture" && !m.needsConfirm ? (() => {
+                      // Auto-surface the right file picker when the user's turn
+                      // was classified as "capture" (e.g. "I'm uploading an
+                      // invoice from Hiba"). iOS Safari blocks programmatic
+                      // .click() on file inputs outside a user gesture, so we
+                      // render a prominent CTA the user taps once. Route the
+                      // tap to the wine picker when the text mentioned wine
+                      // (vino / label / bottle), otherwise to the general
+                      // document picker.
+                      const t = (m.userText || "").toLowerCase();
+                      const isWine = /\b(wine|vino|bottle|botella|label|etiqueta)\b/.test(t);
+                      const ref = isWine ? wineInputRef : captureInputRef;
+                      const label = isWine
+                        ? (lang === "es" ? "🍷 Tomar / elegir foto de la etiqueta" : "🍷 Take or choose the label photo")
+                        : (lang === "es" ? "📷 Tomar / elegir foto de la factura o albarán" : "📷 Take or choose the invoice / delivery note photo");
+                      return (
+                        <div className="mt-2 rounded-xl border-l-2 bg-paper-deep/50 p-3" style={{ borderLeftColor: "var(--accent)" }}>
+                          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "Adjunta la foto ahora" : "Attach the photo now"}</p>
+                          <button
+                            onClick={() => ref.current?.click()}
+                            className="mt-2 w-full rounded-full border border-ink bg-ink px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-paper"
+                          >
+                            {label}
+                          </button>
+                        </div>
+                      );
+                    })() : null}
                   </div>
                 ))}
               {text ? (
