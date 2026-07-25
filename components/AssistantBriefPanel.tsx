@@ -92,9 +92,13 @@ export default function AssistantBriefPanel({ entity }: { entity: string }) {
   const paragraphs = (brief?.body || "").split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
 
   return (
-    <section className="mt-6 border-t border-black/10 pt-4">
+    <section
+      className="mt-6 rounded-r-lg border-l-2 bg-paper-deep/40 px-4 py-4 sm:px-5"
+      style={{ borderLeftColor: "var(--accent)" }}
+      aria-label="Today's brief from Chef"
+    >
       <div className="flex items-baseline justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Today&apos;s brief</p>
+        <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Chef · Today&apos;s brief</p>
         <button
           onClick={regenerate}
           disabled={refreshing || loading}
