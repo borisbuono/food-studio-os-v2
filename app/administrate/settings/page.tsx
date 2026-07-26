@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
+import DensityToggle from "@/components/DensityToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,9 @@ export default async function Settings() {
           ))}
           {!skills.length ? <p className="py-3 font-sans text-[14px] text-clay">No skills configured.</p> : null}
         </ul>
+      </section>
+      <section className="mt-10 border-t border-line pt-6">
+        <DensityToggle />
       </section>
     </main>
   );

@@ -16,3 +16,11 @@ body { color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 3
   /* Chef FAB anchors above the iOS gesture bar */
   .fs-fab-safe { bottom: calc(env(safe-area-inset-bottom, 0px) + 20px) !important; }
 }
+
+
+/* Assistant FAB — on lg+ the bottom-sheet becomes a right-docked panel.
+ * The inline snap-height style wins the cascade; we force it back to 100vh
+ * via a data attribute so the Tailwind lg:h-full survives. */
+@media (min-width: 1024px) {
+  [data-fs-fab-sheet] { height: 100vh !important; }
+}

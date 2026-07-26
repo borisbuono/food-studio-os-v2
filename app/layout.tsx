@@ -6,6 +6,7 @@ import ChefSwitch from "@/components/ChefSwitch";
 import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
+import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import FlowStrip from "@/components/FlowStrip";
 import PwaOfflineBadge from "@/components/PwaOfflineBadge";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <FlowStrip />
         </div>
         <SessionMigrator />
+        <KeyboardShortcuts />
         <ChefSwitch />
         <NewHireAssistantNudge />
         <InstallPrompt />

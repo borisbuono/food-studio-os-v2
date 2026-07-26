@@ -700,6 +700,16 @@ export default function AssistantFab() {
 
   const send = async () => {
     const t = (textRef.current.trim() || text.trim()); if (!t) return;
+    // Desktop bridge — if the phrase looks like a nav intent, hand off to
+    // the Command-K palette so keyboard/voice both land on the target page
+    // instead of round-tripping through the orchestrator.
+    if (/^\s*(go to|open|navigate to|jump to|show me|take me to)\s+/i.test(t)) {
+      const q = t.replace(/^\s*(go to|open|navigate to|jump to|show me|take me to)\s+/i, "").trim();
+      try { window.dispatchEvent(new CustomEvent("fs:cmdk:open", { detail: { query: q } })); } catch {}
+      setText(""); textRef.current = ""; finalRef.current = "";
+      setOpen(false);
+      return;
+    }
     setText(""); textRef.current = ""; finalRef.current = ""; setStatus("");
     userEditedRef.current = false;
     setLog((l) => [...l, { role: "you", text: t }, { role: "chef", text: "···", userText: t }]);
@@ -1253,8 +1263,8 @@ export default function AssistantFab() {
 
       {open ? (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOpen(false)} />
-          <div ref={sheetRef} className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-2xl border-t border-black/10 bg-card shadow-2xl shadow-black/25" style={{ height: (SNAP_POINTS[snap] * 100) + "vh" }}>
+          <div className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={() => setOpen(false)} />
+          <div ref={sheetRef} data-fs-fab-sheet className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-2xl border-t border-black/10 bg-card shadow-2xl shadow-black/25 lg:inset-x-auto lg:right-0 lg:top-0 lg:bottom-0 lg:h-full lg:w-[420px] lg:rounded-none lg:border-t-0 lg:border-l lg:border-black/10 lg:shadow-none" style={{ height: (SNAP_POINTS[snap] * 100) + "vh" }}>
             <div className="flex items-center justify-between px-4 pt-2 pb-1" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp}>
               <span className="font-mono text-[10px] uppercase tracking-wide text-clay">Chef</span>
               <div className="mx-auto h-1 w-9 rounded-full bg-black/15" />
