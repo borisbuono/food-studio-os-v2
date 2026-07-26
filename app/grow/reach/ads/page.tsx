@@ -90,13 +90,13 @@ export default async function AdsPage({ searchParams }: { searchParams: { entity
   const disabledInfo = statusCode != null ? DISABLED_LABEL[statusCode] : null;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12" style={{ ["--accent" as any]: accent }}>
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12" style={{ ["--accent" as any]: accent }}>
       <Link href="/grow/reach" className="font-sans text-sm text-ink-soft">← Reach</Link>
       <div className="mt-6 flex items-baseline justify-between gap-6">
         <div>
           <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Grow · reach · ads</p>
           <h1 className="mt-2 font-serif text-3xl text-ink">Meta ads</h1>
-          <p className="mt-2 max-w-2xl font-sans text-[13px] leading-relaxed text-ink-soft">
+          <p className="mt-2 max-w-2xl lg:max-w-5xl font-sans text-[13px] leading-relaxed text-ink-soft">
             Read-only view of the {brand} ad account. When it's ready to reactivate, the checklist below marks it green.
           </p>
         </div>

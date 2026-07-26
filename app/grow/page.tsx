@@ -77,7 +77,7 @@ export default async function GrowHome() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Grow · outward-facing</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">The fourth pillar.</h1>

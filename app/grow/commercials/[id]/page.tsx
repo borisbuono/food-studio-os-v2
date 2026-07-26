@@ -148,16 +148,16 @@ export default function CommercialDetail({ params }: { params: { id: string } })
   const lbl = "font-mono text-[10px] uppercase tracking-wide text-clay";
   const inp = "w-full bg-transparent font-sans text-[14px] text-ink placeholder:text-clay outline-none";
 
-  if (!loaded) return <main className="mx-auto max-w-3xl px-6 py-12"><p className="font-mono text-[11px] text-clay">Loading…</p></main>;
+  if (!loaded) return <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12"><p className="font-mono text-[11px] text-clay">Loading…</p></main>;
   if (!c) return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow/commercials" className="font-sans text-sm text-ink-soft">← commercials</Link>
       <p className="mt-8 font-serif italic text-[16px] text-clay">Commercial not found.</p>
     </main>
   );
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow/commercials" className="font-sans text-sm text-ink-soft">← commercials</Link>
 
       <div className="mt-6 flex items-baseline justify-between gap-4">

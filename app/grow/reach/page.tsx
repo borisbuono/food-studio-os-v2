@@ -96,7 +96,7 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
   const currency = metaAds.state?.currency || "EUR";
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12">
       <Link href="/grow" className="font-sans text-sm text-ink-soft">← Grow</Link>
       <div className="mt-6 flex items-baseline justify-between gap-6">
         <div>

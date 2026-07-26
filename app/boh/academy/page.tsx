@@ -32,7 +32,7 @@ export default async function BohAcademyPage() {
   const rest = scoped.filter((l: any) => l.id !== todays?.id);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/boh" className="font-mono text-[10px] uppercase tracking-wide text-clay">← boh</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
         Academy · kitchen craft {schedule?.daily_academy_time ? `· daily at ${schedule.daily_academy_time}` : ""}

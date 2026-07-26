@@ -51,7 +51,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
   const stuckTotal = rows.filter((r) => !["approved","rejected","duplicate"].includes(r.match_status)).reduce((a, r) => a + Number(r.amount_eur || 0), 0);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <AssistantContext context={{ kind: "invoices", entity: ec, openInvoices: rows.slice(0, 20).map((r) => ({ id: r.id, supplier: r.supplier_name || r.provider?.name || null, amount_eur: r.amount_eur, flagged_reason: r.flagged_reason, match_status: r.match_status })), topId: rows[0]?.id || null }} />
       <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
       <span className="ml-3 inline-block font-mono text-sm text-clay">Hold Chef to snap a doc.</span>

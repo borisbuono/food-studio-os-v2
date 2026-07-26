@@ -14,7 +14,7 @@ export default async function HoldingsAssistantAdmin() {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -75,7 +75,7 @@ export default async function HoldingsAssistantAdmin() {
   }).sort((a: any, b: any) => a.entity_code.localeCompare(b.entity_code));
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12">
       <Link href="/administrate/holdings/console" className="font-mono text-[10px] uppercase tracking-wide text-clay">← Holdings</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Holdings · The Brain across the group</p>
       <h1 className="mt-2 font-serif text-[34px] leading-[1.05] text-ink">Assistant Layer, at a glance.</h1>

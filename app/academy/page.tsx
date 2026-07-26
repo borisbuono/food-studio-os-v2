@@ -86,9 +86,9 @@ export default function Academy() {
     })();
   }, []);
 
-  if (!ready) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening your academy…</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening your academy…</p></main>;
   if (!profile) return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">Academy</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to see your skills grow — every job you do is logged against its SOP and builds your ladder.</p>
@@ -102,7 +102,7 @@ export default function Academy() {
   const groupBy = view;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-10">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-5 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Academy · {profile.name} · {venueName}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Your skills</h1>

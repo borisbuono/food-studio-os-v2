@@ -49,7 +49,7 @@ export default async function AdministrateHome() {
   const openCharters = (chartersRes.data || []).filter((c: any) => !c.entity_code || c.entity_code === ec).length;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
         kicker={`Administrate · ${ec}`}
         title="The engine room."

@@ -74,7 +74,7 @@ export default function KitchenPass() {
   );
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Kitchen pass · leading indicators</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">Food that left the kitchen.</h1>

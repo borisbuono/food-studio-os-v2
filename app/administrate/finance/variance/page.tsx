@@ -69,7 +69,7 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
   const biggest = ingRows[0];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Variance · theoretical vs. actual</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">Where the stock went</h1>

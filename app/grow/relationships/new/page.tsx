@@ -58,7 +58,7 @@ export default function NewGuest() {
   const inp = "mt-1 w-full border-b border-line bg-transparent py-2 font-sans text-[15px] text-ink placeholder:text-clay outline-none focus:border-ink";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/grow/relationships" className="font-sans text-sm text-ink-soft">← guests</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Grow · relationships</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">Add a guest.</h1>

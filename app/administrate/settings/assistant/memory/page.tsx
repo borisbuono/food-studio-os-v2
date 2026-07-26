@@ -20,7 +20,7 @@ export default async function AssistantMemoryPage() {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -46,7 +46,7 @@ export default async function AssistantMemoryPage() {
     .limit(20);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/administrate/settings/assistant" className="font-mono text-[10px] uppercase tracking-wide text-clay">← Assistant</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Memory · {ec}</p>
       <h1 className="mt-2 font-serif text-[34px] leading-[1.05] text-ink">What the Assistant knows</h1>

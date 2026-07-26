@@ -61,7 +61,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
   }).filter((m) => m.pct !== null).sort((a, b) => Math.abs((b.pct as number)) - Math.abs((a.pct as number))).slice(0, 6);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Supplier · {p.category || "supplier"}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name)}</h1>

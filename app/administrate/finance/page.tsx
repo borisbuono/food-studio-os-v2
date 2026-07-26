@@ -37,7 +37,7 @@ export default async function Finance() {
     .slice(0, 5);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <nav aria-label="Finance sections" className="mt-4 mb-4 flex flex-wrap gap-x-5 gap-y-2 border-b border-line pb-3 font-mono text-[11px] uppercase tracking-wide"><a href="/administrate/finance/setup" className="text-ink hover:text-clay">⚙ Setup / Connect</a><a href="/administrate/finance/scans" className="text-ink-soft hover:text-clay">Invoices</a><a href="/administrate/finance/reconciliation" className="text-ink-soft hover:text-clay">Bank</a><a href="/administrate/finance/eod" className="text-ink-soft hover:text-clay">EOD</a><a href="/administrate/finance/pos-sync" className="text-ink-soft hover:text-clay">POS sync</a><a href="/administrate/finance/anomalies" className="text-ink-soft hover:text-clay">Anomalies</a><a href="/administrate/finance/integrations" className="text-ink-soft hover:text-clay">Substrate</a><a href="/administrate/chef-log" className="text-ink-soft hover:text-clay">Chef-log</a></nav>
       {/* FINANCE_NAV_INJECTED */}
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>

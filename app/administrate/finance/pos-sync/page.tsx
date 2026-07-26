@@ -67,7 +67,7 @@ export default async function PosSyncPage({ searchParams }: { searchParams: { en
   ];
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-10">
       <AssistantContext context={{ kind: "pos_sync", filter: filter || "ALL", rows_visible: rows.length, dry_run: FRESTO_DRY_RUN() }} />
       <Link href="/administrate/finance" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
       <h1 className="mt-3 font-serif text-[34px] leading-[1.05] text-ink">POS sync</h1>

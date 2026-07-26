@@ -13,7 +13,7 @@ export default async function FilePage({ params }: { params: { id: string } }) {
   const { data: doc } = await sb.from("files_documents").select("*").eq("id", params.id).maybeSingle();
   if (!doc) notFound();
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-10">
       <Link href="/files" className="font-mono text-[10px] uppercase tracking-wide text-clay">← files</Link>
       <FileDetailClient doc={doc as any} />
     </main>

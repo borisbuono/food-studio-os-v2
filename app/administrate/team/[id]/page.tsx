@@ -35,7 +35,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
   const lastClock = clock[0];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">← team</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: p.color || "var(--accent)" }}>Person · {p.role || "team"}</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{noEmoji(p.name)}</h1>

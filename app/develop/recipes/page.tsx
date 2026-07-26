@@ -13,7 +13,7 @@ export default async function DevelopRecipes() {
   const pending = ((await supabase.from("recipe_imports").select("id,external_ref,status,parsed_json,created_at").in("status", ["parsed","pending"]).order("created_at", { ascending: false }).limit(20)).data || []) as any[];
 
   return (
-    <main className="mx-auto max-w-3xl px-7 py-16 bg-paper">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-7 py-16 bg-paper">
       <div className="flex items-baseline justify-between">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-tomato">The corpus</p>
@@ -27,7 +27,7 @@ export default async function DevelopRecipes() {
         </Link>
       </div>
 
-      <p className="mt-4 max-w-xl font-serif text-[19px] font-light italic leading-snug text-ink-soft">
+      <p className="mt-4 max-w-xl lg:max-w-4xl font-serif text-[19px] font-light italic leading-snug text-ink-soft">
         Paste a recipe. Upload a PDF. Connect the Drive folder. Every dish
         becomes a first-class row — costed, scaled, and ready for the pass.
       </p>

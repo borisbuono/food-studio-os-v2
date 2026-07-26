@@ -15,7 +15,7 @@ export default function Onboard() {
   const [i, setI] = useState(0);
   const last = i === STEPS.length - 1;
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Onboarding · step {i + 1} of {STEPS.length}</p>
       <h1 className="mt-2 font-serif text-4xl text-ink">{STEPS[i].k}</h1>

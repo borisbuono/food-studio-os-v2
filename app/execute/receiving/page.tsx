@@ -140,7 +140,7 @@ export default function Receiving() {
   };
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Receiving · delivery in</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Log a delivery</h1>

@@ -55,7 +55,7 @@ export default function NewEvent() {
   const lbl = "font-mono text-[10px] uppercase tracking-wide text-clay";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/events" className="font-sans text-sm text-ink-soft">← events</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">New event</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Capture an enquiry</h1>

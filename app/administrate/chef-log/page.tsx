@@ -16,7 +16,7 @@ export default async function ChefLog() {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user?.id) return (
-    <main className="mx-auto max-w-3xl px-6 py-10"><p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p></main>
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10"><p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p></main>
   );
 
   const [{ data: turns }, { data: memory }, { data: actions }] = await Promise.all([
@@ -50,7 +50,7 @@ export default async function ChefLog() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/administrate" className="font-mono text-[10px] uppercase tracking-wide text-clay">← administrate</Link>
       <h1 className="mt-3 font-serif text-[34px] leading-[1.05] text-ink">Chef log</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Everything Chef said, remembered, and did on your behalf.</p>

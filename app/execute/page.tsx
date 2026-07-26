@@ -30,7 +30,7 @@ export default async function ExecuteHome() {
   const coversBooked = bookings.reduce((a: number, b: any) => a + Number(b.party_size || 0), 0);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
         kicker="Execute · today"
         title="The daily loop."

@@ -57,7 +57,7 @@ export default function Schedule() {
   const shiftsOn = (d: Date) => shifts.filter((s) => s.shift_date === iso(d)).sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Schedule · weekly rota</p>
       {/* Today's roster — who's in, who's late */}

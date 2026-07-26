@@ -56,7 +56,7 @@ export default async function GrowReputation() {
   for (const s of (status || []) as StatusRow[]) statusByPlatform[s.platform] = s;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
 
       <header className="mt-4 flex items-baseline justify-between gap-3">

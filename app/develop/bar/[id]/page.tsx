@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 export default async function CocktailHub({ params }: { params: { id: string } }) {
   
   const supabase = supabaseServer();const c: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
-  if (!c) return <main className="mx-auto max-w-xl px-6 py-12"><Link href="/develop/bar" className="font-sans text-sm text-ink-soft">← bar</Link><p className="mt-8 font-serif text-2xl text-ink">Cocktail not found.</p></main>;
+  if (!c) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><Link href="/develop/bar" className="font-sans text-sm text-ink-soft">← bar</Link><p className="mt-8 font-serif text-2xl text-ink">Cocktail not found.</p></main>;
   const build = (c.build || c.description || "").trim();
   return (
-    <main className="mx-auto max-w-xl px-7 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-7 py-12">
       <Link href="/develop/bar" className="font-sans text-sm text-ink-soft">← bar</Link>
       <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.28em] text-tomato">Cocktail</p>
       <h1 className="mt-2 font-serif text-4xl font-light leading-tight text-ink">{noEmoji(c.name)}</h1>

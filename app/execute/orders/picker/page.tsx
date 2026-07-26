@@ -45,7 +45,7 @@ export default function Picker() {
   const cheapest = matches[0];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Find a product · across all suppliers</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What are you looking for?</h1>

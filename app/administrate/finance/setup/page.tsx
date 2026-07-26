@@ -23,7 +23,7 @@ export default async function SetupIndex() {
   }));
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/administrate/finance/dashboard" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
       <h1 className="mt-3 font-serif text-[34px] leading-[1.05] text-ink">Onboard the three companies</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">One readiness page per entity. Open each to see what's wired, what's missing, and how to feed the backlog in.</p>

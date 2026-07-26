@@ -23,7 +23,7 @@ export default async function MenuPublishPage() {
   const publishedCount = items.filter((i) => i.published_to_m).length;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <Link href="/develop" className="font-sans text-sm text-ink-soft">← develop</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Publish · what guests see on the QR menu</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Menu publishing</h1>

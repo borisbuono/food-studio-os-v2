@@ -57,7 +57,7 @@ export default async function HoldingsConsole() {
   const daysToFiling = nextFiling ? Math.max(0, nextFiling.days_until) : null;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" /* olive — holdings */ }}>
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" /* olive — holdings */ }}>
       <AssistantContext
         context={{
           kind: "holdings_console",

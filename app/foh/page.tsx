@@ -36,7 +36,7 @@ export default async function FohHome() {
   const reviewsMonth = (reviewsRes.data || []).length;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
         kicker="FOH · front of house"
         title="Serve the room."

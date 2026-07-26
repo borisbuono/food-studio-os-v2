@@ -14,7 +14,7 @@ export default async function Wine() {
   const priced = (w: any) => [w.glass_price ? "€" + w.glass_price + " glass" : null, (w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) + " bottle" : null].filter(Boolean).join(" · ");
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · the wine list</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{wines.length} wines</h1>

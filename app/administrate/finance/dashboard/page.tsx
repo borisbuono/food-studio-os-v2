@@ -37,7 +37,7 @@ export default async function FinanceDashboard() {
   const paperStuckCount = stuckPaper.count ?? 0;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <AssistantContext context={{ kind: "finance_dashboard", entity: ec }} />
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Finance · {ec} · operational</p>

@@ -102,7 +102,7 @@ export default function NewCommercial() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow/commercials" className="font-sans text-sm text-ink-soft">← commercials</Link>
       <StepHeader />
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">Build an offer.</h1>

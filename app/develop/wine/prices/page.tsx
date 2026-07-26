@@ -73,7 +73,7 @@ export default function WinePrices() {
   const applicable = rows.filter((r) => r.wineId && r.unit_price != null).length;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · prices from the delivery note</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Update wine costs</h1>

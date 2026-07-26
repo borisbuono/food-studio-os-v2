@@ -29,7 +29,7 @@ export default async function MasterTodoPage() {
   const profiles = profilesRes.data || [];
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/administrate" className="font-mono text-[10px] uppercase tracking-wide text-clay">← administrate</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Master ToDo · {ec}</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">What&apos;s on your plate.</h1>

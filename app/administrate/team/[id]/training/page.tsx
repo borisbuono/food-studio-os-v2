@@ -40,7 +40,7 @@ export default async function ManagerTraining({ params }: { params: { id: string
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href={"/administrate/team/" + p.id} className="font-sans text-sm text-ink-soft">back to person</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Training · {ROLE_LABEL[role]}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name || p.email || "This person")}</h1>

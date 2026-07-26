@@ -53,11 +53,11 @@ export default async function MenuEngineeringMatrix() {
   const nameById = new Map(items.map((i) => [i.id, i.name] as const));
 
   return (
-    <main className="mx-auto max-w-4xl px-7 py-14 bg-paper">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-7 py-14 bg-paper">
       <Link href="/develop/recipes" className="font-sans text-[13px] text-ink-soft">← The corpus</Link>
       <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.28em] text-tomato">Menu engineering</p>
       <h1 className="mt-2 font-serif text-5xl font-light leading-tight text-ink">What earns its place</h1>
-      <p className="mt-3 max-w-xl font-serif text-[18px] font-light italic leading-snug text-ink-soft">
+      <p className="mt-3 max-w-xl lg:max-w-4xl font-serif text-[18px] font-light italic leading-snug text-ink-soft">
         Every dish placed by contribution margin against popularity. Stars carry the menu; plowhorses sell but barely pay; puzzles are worth promoting; dogs are candidates to rework or cut.
       </p>
 

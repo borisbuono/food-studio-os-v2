@@ -18,7 +18,7 @@ export default async function CalculationPage({ params }: { params: { id: string
   const r: any = (await supabase.from("recipes").select("*").eq("id", params.id).maybeSingle()).data;
   if (!r) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <Link href="/develop/menu" className="font-sans text-sm text-ink-soft">← the repertoire</Link>
         <p className="mt-8 font-serif text-2xl text-ink">Recipe not found.</p>
       </main>

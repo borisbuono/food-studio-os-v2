@@ -15,7 +15,7 @@ export default async function AdvisoryClientDashboard({ params }: { params: { cl
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -78,7 +78,7 @@ export default async function AdvisoryClientDashboard({ params }: { params: { cl
   };
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
       <AssistantContext
         context={{
           kind: "advisor_client_dashboard",

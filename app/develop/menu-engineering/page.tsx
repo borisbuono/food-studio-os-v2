@@ -32,7 +32,7 @@ export default async function MenuEngineering() {
   const totalContribution = rows.reduce((a, r) => a + r.contribution, 0);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/trial" className="font-sans text-sm text-ink-soft">← Restaurant Utopia</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Menu engineering</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">What earns its place</h1>

@@ -103,10 +103,10 @@ export default function TeamJoin() {
   }
 
   // ---------- Loading / error states ----------
-  if (status === "loading") return <main className="mx-auto max-w-xl px-6 py-16"><FabHidden /><p className="font-serif text-2xl text-ink">Checking your invitation...</p></main>;
+  if (status === "loading") return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-16"><FabHidden /><p className="font-serif text-2xl text-ink">Checking your invitation...</p></main>;
 
   if (status === "bad_token") return (
-    <main className="mx-auto max-w-xl px-6 py-16">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-16">
       <FabHidden />
       <p className="font-sans text-xs font-medium text-ink-soft">Invitation</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">This link is no longer live</h1>
@@ -116,7 +116,7 @@ export default function TeamJoin() {
   );
 
   if (status === "already") return (
-    <main className="mx-auto max-w-xl px-6 py-16">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-16">
       <FabHidden />
       <p className="font-sans text-xs font-medium text-ink-soft">Welcome back</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">You have already joined</h1>
@@ -126,7 +126,7 @@ export default function TeamJoin() {
   );
 
   if (status === "sent") return (
-    <main className="mx-auto max-w-xl px-6 py-16">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-16">
       <FabHidden />
       <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Check your email</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">One click away</h1>
@@ -139,7 +139,7 @@ export default function TeamJoin() {
   const first = (inv.invited_name || name).split(" ")[0] || "friend";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <FabHidden />
       <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Welcome</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">Hello, {first}</h1>

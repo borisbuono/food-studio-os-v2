@@ -25,15 +25,15 @@ export default function TrainWine() {
     })();
   }, []);
 
-  if (!ready) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Pouring…</p></main>;
-  if (!wines.length) return <main className="mx-auto max-w-xl px-6 py-12"><Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link><p className="mt-8 font-serif text-2xl text-ink">No wines to train on yet.</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Pouring…</p></main>;
+  if (!wines.length) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link><p className="mt-8 font-serif text-2xl text-ink">No wines to train on yet.</p></main>;
 
   const w = wines[i];
   const next = () => { setShow(false); setI((n) => (n + 1) % wines.length); };
   const prev = () => { setShow(false); setI((n) => (n - 1 + wines.length) % wines.length); };
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · sommelier training</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Know the list</h1>

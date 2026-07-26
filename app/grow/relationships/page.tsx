@@ -114,7 +114,7 @@ export default function GrowRelationships() {
   );
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow" className="font-sans text-sm text-ink-soft">← grow</Link>
       <div className="mt-6 flex items-baseline justify-between gap-4">
         <div>

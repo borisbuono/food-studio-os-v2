@@ -15,7 +15,7 @@ export default async function Forecast() {
 
   if (!eod.length) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
         <h1 className="mt-6 font-serif text-3xl text-ink">Forecast</h1>
         <p className="mt-3 font-sans text-[15px] text-clay">No end-of-day reports yet to forecast from.</p>
@@ -82,7 +82,7 @@ export default async function Forecast() {
   series.forEach((p, i) => { if (new Date(p.date).getUTCDay() === 1) mondayIdx.push(i); });
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Forecast · last 28d ↔ next 28d</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{venueName}</h1>

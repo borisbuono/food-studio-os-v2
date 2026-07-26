@@ -79,7 +79,7 @@ export default function Welcome() {
   }
 
   if (loading || !p)
-    return <main className="mx-auto max-w-xl px-6 py-12"><FabHidden /><p className="font-serif text-2xl text-ink">{t("welcome.loading", lang)}</p></main>;
+    return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><FabHidden /><p className="font-serif text-2xl text-ink">{t("welcome.loading", lang)}</p></main>;
 
   const world = ROLES[p.world];
   const firstTask = p.world === "office"
@@ -89,7 +89,7 @@ export default function Welcome() {
   const steps = [tr("welcome.step.you"), tr("welcome.step.rules"), tr("welcome.step.os")];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <div className="flex items-baseline justify-between">
         <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{tr("welcome.eyebrow", { i: step + 1, n: steps.length })}</p>
         <button onClick={() => applyLang(lang === "es" ? "en" : "es")} className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">

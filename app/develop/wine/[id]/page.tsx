@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function WineHub({ params }: { params: { id: string } }) {
   
   const supabase = supabaseServer();const w: any = (await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle()).data;
-  if (!w) return <main className="mx-auto max-w-xl px-6 py-12"><Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link><p className="mt-8 font-serif text-2xl text-ink">Wine not found.</p></main>;
+  if (!w) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link><p className="mt-8 font-serif text-2xl text-ink">Wine not found.</p></main>;
 
   const lex: any = (await supabase.from("lexicon_products").select("story,why_chosen,pairing_dishes,producer,region,vintage").ilike("name", w.name).maybeSingle()).data;
   const producer = w.producer || lex?.producer;
@@ -44,7 +44,7 @@ export default async function WineHub({ params }: { params: { id: string } }) {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-7 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-7 py-12">
       <Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link>
       <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.28em] text-tomato">{(w.wine_style || "wine").replace("_", " ")}</p>
       <h1 className="mt-2 font-serif text-4xl font-light leading-tight text-ink">{noEmoji(w.name)}</h1>

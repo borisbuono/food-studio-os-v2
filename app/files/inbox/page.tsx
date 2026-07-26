@@ -35,7 +35,7 @@ export default async function FilesInboxPage() {
   const rows: InboxRow[] = (data as any) || [];
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/files" className="font-mono text-[10px] uppercase tracking-wide text-clay">← files library</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Files · inbox</p>
       <div className="mt-2 flex items-baseline justify-between gap-4">

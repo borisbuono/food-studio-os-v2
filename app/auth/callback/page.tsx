@@ -32,7 +32,7 @@ export default function Callback() {
     })();
   }, [router]);
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <p className="font-serif text-2xl text-ink">{msg}</p>
     </main>
   );

@@ -29,7 +29,7 @@ function Cell({ binding, kind }: { binding: IntegrationBinding; kind: "pos" | "a
 export default function IntegrationsPage() {
   const bindings = getBindings();
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-10">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Finance · Integrations</p>
       <h1 className="mt-2 font-serif text-[34px] leading-[1.05] text-ink">Substrate</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Every system below is a swap. Set <code>FS_POS_IFL=square</code> or <code>FS_ACCOUNTING_BM=quickbooks</code> in Vercel env to flip a vendor for one entity. The contract above the adapter doesn't change.</p>

@@ -39,7 +39,7 @@ export default async function FirstWeek({ params }: { params: { id: string } }) 
   const pct = totalSteps ? Math.round((doneSteps / totalSteps) * 100) : 0;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/team/onboarding" className="font-sans text-sm text-ink-soft">back to pipeline</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>First week · {ROLE_LABEL[role]}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name || p.email || "New hire")}</h1>

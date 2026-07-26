@@ -82,7 +82,7 @@ export default function OnboardNew() {
   // ---------- Sent screen ----------
   if (sent) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <Link href="/administrate/team/onboarding" className="font-sans text-sm text-ink-soft">back to onboarding</Link>
         <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Invitation ready</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{name} is invited</h1>
@@ -112,7 +112,7 @@ export default function OnboardNew() {
 
   // ---------- Wizard steps ----------
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/team/onboarding" className="font-sans text-sm text-ink-soft">back to onboarding</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Onboarding a new hire · step {step + 1} of 3</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{step === 0 ? "The role" : step === 1 ? "Their details" : "Ready to send"}</h1>

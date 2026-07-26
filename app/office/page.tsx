@@ -39,7 +39,7 @@ export default async function OfficeHome() {
   const commercials = (commercialsRes.data || []).length;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
         kicker="Office · the ledger"
         title="Run the business."

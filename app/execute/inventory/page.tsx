@@ -13,7 +13,7 @@ export default async function Inventory() {
   const isLow = (i: any) => i.quantity_on_hand != null && i.reorder_threshold != null && Number(i.quantity_on_hand) <= Number(i.reorder_threshold);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-basil">Inventory</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{items.length.toLocaleString("en-GB")} items on file</h1>

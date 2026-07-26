@@ -72,7 +72,7 @@ export default async function SetupEntity({ params }: { params: { entity: string
   ]);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/administrate/finance/setup" className="font-mono text-[10px] uppercase tracking-wide text-clay">← all entities</Link>
       <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">{code}</p>
       <h1 className="mt-1 font-serif text-[34px] leading-[1.05] text-ink">{m.brand}</h1>

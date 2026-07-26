@@ -95,9 +95,9 @@ export default function Messages() {
     if (found && profile) { await loadChannels(profile, rid); const c = { id: found, kind: "dm", name: person.name, section: null, restaurant_id: rid } as Channel; open(c); }
   };
 
-  if (!ready) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening messages…</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening messages…</p></main>;
   if (!profile) return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">Messages</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to talk with the team — channels and direct messages, all in the OS.</p>
@@ -110,7 +110,7 @@ export default function Messages() {
 
   if (active) {
     return (
-      <main className="mx-auto flex h-[calc(100vh-64px)] max-w-xl flex-col px-6 py-4">
+      <main className="mx-auto flex h-[calc(100vh-64px)] max-w-xl lg:max-w-4xl flex-col px-6 py-4">
         <button onClick={() => setActive(null)} className="font-sans text-sm text-ink-soft">← channels</button>
         <p className="mt-2 font-serif text-2xl text-ink">{active.kind === "dm" ? noEmoji(active.name) : "#" + noEmoji(active.name)}</p>
         <div className="mt-3 flex-1 space-y-3 overflow-y-auto pb-4">
@@ -139,7 +139,7 @@ export default function Messages() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-10">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-5 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Messages · the team</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Channels</h1>

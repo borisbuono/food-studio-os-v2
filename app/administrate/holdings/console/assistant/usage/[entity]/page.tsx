@@ -13,7 +13,7 @@ export default async function AssistantUsageDetail(props: { params: { entity: st
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user?.id) return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -64,7 +64,7 @@ export default async function AssistantUsageDetail(props: { params: { entity: st
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <Link href="/administrate/holdings/console/assistant" className="font-mono text-[10px] uppercase tracking-wide text-clay">← Assistant overview</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Assistant usage · {tierName} tier</p>
       <h1 className="mt-2 font-serif text-[32px] leading-[1.05] text-ink">{displayName}</h1>

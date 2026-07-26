@@ -110,16 +110,16 @@ export default function GuestProfile({ params }: { params: { id: string } }) {
   const lbl = "font-mono text-[10px] uppercase tracking-wide text-clay";
   const inp = "w-full bg-transparent font-sans text-[14px] text-ink placeholder:text-clay outline-none";
 
-  if (!loaded) return <main className="mx-auto max-w-3xl px-6 py-12"><p className="font-mono text-[11px] text-clay">Loading…</p></main>;
+  if (!loaded) return <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12"><p className="font-mono text-[11px] text-clay">Loading…</p></main>;
   if (!g) return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow/relationships" className="font-sans text-sm text-ink-soft">← guests</Link>
       <p className="mt-8 font-serif italic text-[16px] text-clay">Guest not found.</p>
     </main>
   );
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <Link href="/grow/relationships" className="font-sans text-sm text-ink-soft">← guests</Link>
 
       <div className="mt-6 flex items-baseline justify-between gap-6 border-b border-line pb-6">

@@ -19,7 +19,7 @@ export default async function AssistantAuditPage() {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -60,7 +60,7 @@ export default async function AssistantAuditPage() {
   const totalCost    = daySeries.reduce((a, [, v]) => a + v.cost,    0);
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-12">
       <Link href="/administrate/settings/assistant" className="font-mono text-[10px] uppercase tracking-wide text-clay">← Assistant</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Audit · {ec}</p>
       <h1 className="mt-2 font-serif text-[34px] leading-[1.05] text-ink">What the Assistant did</h1>

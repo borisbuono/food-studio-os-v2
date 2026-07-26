@@ -15,7 +15,7 @@ export default async function ChecklistPage({ params }: { params: { client_id: s
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -53,7 +53,7 @@ export default async function ChecklistPage({ params }: { params: { client_id: s
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
       <Link href={"/administrate/advisor/" + client.id} className="font-mono text-[10px] uppercase tracking-wide text-clay">← {client.name}</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Advisory · activation checklist</p>
       <h1 className="mt-2 font-serif text-[34px] leading-[1.05] text-ink">Bring {client.name} live.</h1>

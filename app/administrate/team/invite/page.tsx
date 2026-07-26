@@ -63,7 +63,7 @@ export default function InviteToTeam() {
 
   if (done)
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">{tr("invite.back")}</Link>
         <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{tr("invite.saved")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{t("invite.saved.title", ui).replace("{name}", name)}</h1>
@@ -84,7 +84,7 @@ export default function InviteToTeam() {
     );
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">{tr("invite.back")}</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{tr("invite.eyebrow")}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{tr("invite.title")}</h1>

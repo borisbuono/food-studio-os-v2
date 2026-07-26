@@ -108,14 +108,14 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     router.push("/develop/menu/" + params.id);
   };
 
-  if (loading) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading…</p></main>;
+  if (loading) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading…</p></main>;
 
   const field = "w-full rounded-xl border border-black/15 bg-paper px-4 py-3 font-sans text-[15px] text-ink outline-none focus:border-tomato/50";
   const label = "mt-5 mb-1 font-mono text-[10.5px] uppercase tracking-[0.2em] text-clay";
   const mini = "w-16 rounded-xl border border-black/15 bg-paper px-2 py-3 text-center font-sans text-[15px] text-ink outline-none";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href={"/develop/menu/" + params.id} className="font-sans text-sm text-ink-soft">← cancel</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">Edit recipe</h1>
       {authed === false && <p className="mt-3 rounded-xl bg-paper-deep px-4 py-3 font-sans text-[13px] text-tomato">Sign in to save changes — you can still review the fields.</p>}

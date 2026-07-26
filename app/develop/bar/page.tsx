@@ -9,7 +9,7 @@ export default async function Bar() {
   
   const supabase = supabaseServer();const cocktails = (await supabase.from("menu_items").select("id,name,price,build").eq("is_active", true).eq("category", "drink").eq("section", "cocktail").eq("restaurant_id", serverRestaurantId()).order("name")).data || [];
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">Bar · the cocktails</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{cocktails.length} cocktails</h1>

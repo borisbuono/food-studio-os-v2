@@ -21,7 +21,7 @@ export default async function PatternsPage() {
   const rows = ((data as any[]) || []) as any[];
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <AssistantContext context={{ kind: "bank_patterns", entity: ec, patterns: rows.slice(0, 30).map((p) => ({ label: p.label, type: p.pattern_type, freq: p.expected_frequency, times: p.times_matched, disabled: !!p.disabled_at })) }} />
       <Link href="/administrate/finance/reconciliation" className="font-sans text-sm text-ink-soft">← reconciliation</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Bank · {ec} · learned patterns</p>

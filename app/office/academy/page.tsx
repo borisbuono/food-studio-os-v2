@@ -32,7 +32,7 @@ export default async function OfficeAcademyPage() {
   const rest = scoped.filter((l: any) => l.id !== todays?.id);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/office" className="font-mono text-[10px] uppercase tracking-wide text-clay">← office</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
         Academy · office craft {schedule?.daily_academy_time ? `· daily at ${schedule.daily_academy_time}` : ""}

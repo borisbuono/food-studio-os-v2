@@ -26,7 +26,7 @@ export default function AddProduct() {
   const lbl = "font-mono text-[10px] uppercase tracking-wide text-clay";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href={"/administrate/suppliers/" + params.id} className="font-sans text-sm text-ink-soft">← supplier</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Add product</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">A new line for this supplier</h1>

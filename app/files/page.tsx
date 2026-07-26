@@ -34,7 +34,7 @@ export default async function FilesHome({ searchParams }: { searchParams: { q?: 
   const rows: any[] = docs || [];
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Files · universal</p>
       <div className="mt-2 flex items-baseline justify-between gap-4">
         <h1 className="font-serif text-4xl leading-tight text-ink">The file room.</h1>

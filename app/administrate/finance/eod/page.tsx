@@ -11,7 +11,7 @@ export default async function EodList() {
   const eod = (await supabase.from("eod_accounting").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes").order("report_date", { ascending: false }).limit(60)).data || [];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">End-of-day reports</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{eod.length} reports</h1>

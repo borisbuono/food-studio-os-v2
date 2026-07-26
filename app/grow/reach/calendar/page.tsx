@@ -135,7 +135,7 @@ export default function CalendarPage() {
         <div>
           <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Grow · reach · calendar</p>
           <h1 className="mt-2 font-serif text-3xl text-ink">Content calendar</h1>
-          <p className="mt-2 max-w-2xl font-sans text-[13px] leading-relaxed text-ink-soft">
+          <p className="mt-2 max-w-2xl lg:max-w-5xl font-sans text-[13px] leading-relaxed text-ink-soft">
             Plan the week for {ENTITY_LABEL[entity]}. Drag drafts onto days, schedule through Buffer when the plan is set.
           </p>
         </div>
@@ -319,7 +319,7 @@ function Composer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 p-4 pt-16" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-2xl border border-line bg-paper p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-xl lg:max-w-4xl rounded-2xl border border-line bg-paper p-6" onClick={(e) => e.stopPropagation()}>
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">new post</p>
         <h2 className="mt-1 font-serif text-2xl text-ink">Compose</h2>
 

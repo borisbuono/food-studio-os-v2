@@ -44,7 +44,7 @@ export default function Login() {
   };
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <div className="flex justify-end px-6 py-2"><button onClick={hardResetSession} className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-tomato">↻ hard reset session</button></div><FabHidden />
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Sign in</p>

@@ -30,7 +30,7 @@ export default async function AcademyPage() {
   const rest = scoped.filter((l: any) => l.id !== todays?.id);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
       <Link href="/develop" className="font-mono text-[10px] uppercase tracking-wide text-clay">← develop</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
         Academy · daily {schedule?.daily_academy_time ? `at ${schedule.daily_academy_time}` : ""}

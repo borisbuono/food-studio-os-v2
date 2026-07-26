@@ -15,7 +15,7 @@ export default async function AssistantOnboardPage(props: {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to run the wizard</p>
     </main>
   );
@@ -31,7 +31,7 @@ export default async function AssistantOnboardPage(props: {
   const deepEntity = (props.searchParams?.entity || "").toUpperCase();
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <Link href="/administrate/settings/assistant" className="font-mono text-[10px] uppercase tracking-wide text-clay">
         ← back to Assistant settings
       </Link>

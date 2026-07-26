@@ -60,14 +60,14 @@ export default function Order() {
   };
   const sendVia = async (channel: "whatsapp" | "email", url: string) => { await logOrder(channel); setSentVia(channel); window.open(url, "_blank"); setStage("sent"); };
 
-  if (loading) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading suppliers…</p></main>;
+  if (loading) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading suppliers…</p></main>;
 
   if (stage === "send") {
     const message = orderMessage();
     const wa = provider?.whatsapp ? "https://wa.me/" + provider.whatsapp.replace(/[^0-9]/g, "") + "?text=" + encodeURIComponent(message) : null;
     const mail = provider?.email ? "mailto:" + provider.email + "?subject=" + encodeURIComponent("Order — Food Studios") + "&body=" + encodeURIComponent(message) : null;
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <button onClick={() => setStage("review")} className="font-sans text-sm text-ink-soft">← back</button>
         <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Send · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Send the order</h1>
@@ -85,7 +85,7 @@ export default function Order() {
 
   if (stage === "sent") {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <p className="font-sans text-xs font-medium text-ink-soft">Order</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">Order sent to {noEmoji(provider?.name || "")}</h1>
         <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">{lines.length} lines · {eur(total)} · opened in {sentVia === "email" ? "your email" : "WhatsApp"} for you to hit send. Logged here as sent — it’ll appear in Receiving and Invoices.</p>
@@ -96,7 +96,7 @@ export default function Order() {
 
   if (stage === "review") {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <button onClick={() => setStage("build")} className="font-sans text-sm text-ink-soft">← edit order</button>
         <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Review · {noEmoji(provider?.name || "")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{lines.length} lines · {eur(total)}</h1>
@@ -116,7 +116,7 @@ export default function Order() {
 
   // build stage
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">New order</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{provider ? noEmoji(provider.name) : "Choose a supplier"}</h1>

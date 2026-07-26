@@ -19,7 +19,7 @@ export default async function Command() {
   ];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Command center</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The control room</h1>

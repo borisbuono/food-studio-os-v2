@@ -103,10 +103,10 @@ export default function TraineeTraining({ params }: { params: { user_id: string 
     const next = new Map(progress); next.set(lessonId, row as any); setProgress(next);
   }
 
-  if (!ready) return <main className="mx-auto max-w-xl px-6 py-16"><FabHidden /><p className="font-serif text-2xl text-ink">Loading your training...</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-16"><FabHidden /><p className="font-serif text-2xl text-ink">Loading your training...</p></main>;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">back to home</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Training</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">Your first lessons</h1>

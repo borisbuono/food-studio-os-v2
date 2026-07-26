@@ -20,7 +20,7 @@ export default async function ReputationSettings() {
   const ec = ENTITY_CODE[entity] || "IFL";
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-10">
       <Link href="/grow/reputation" className="font-mono text-[10px] uppercase tracking-wide text-clay">← reputation</Link>
       <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-tomato">Grow · Reputation · settings</p>
       <h1 className="mt-1 font-serif text-[34px] leading-[1.05] text-ink">Connect review platforms</h1>

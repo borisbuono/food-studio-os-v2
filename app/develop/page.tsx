@@ -45,7 +45,7 @@ export default async function DevelopHome() {
   });
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
         kicker="Develop · the craft"
         title="Menu, recipes, calculation."

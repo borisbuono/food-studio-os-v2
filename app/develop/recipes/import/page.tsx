@@ -212,7 +212,7 @@ export default function ImportPage() {
   };
 
   return (
-    <main className="mx-auto max-w-4xl px-7 py-14 bg-paper">
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-7 py-14 bg-paper">
       <div className="flex items-baseline justify-between">
         <div>
           <Link href="/develop/recipes" className="font-sans text-[13px] text-ink-soft">← The corpus</Link>
@@ -220,7 +220,7 @@ export default function ImportPage() {
           <h1 className="mt-2 font-serif text-5xl font-light leading-tight text-ink">Bring a recipe in</h1>
         </div>
       </div>
-      <p className="mt-4 max-w-xl font-serif text-[19px] font-light italic leading-snug text-ink-soft">
+      <p className="mt-4 max-w-xl lg:max-w-4xl font-serif text-[19px] font-light italic leading-snug text-ink-soft">
         Paste it, drop a PDF, or connect the folder. The parser does the first pass; you finish the edit; the corpus grows.
       </p>
 
@@ -356,7 +356,7 @@ function PreviewDrawer({ raw, parsed, onChange, onCommit, saving, savedRecipeId,
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 max-h-[85vh] overflow-hidden rounded-t-3xl border-t border-line bg-paper shadow-2xl">
-      <div className="mx-auto max-w-5xl overflow-y-auto px-7 py-8" style={{ maxHeight: "80vh" }}>
+      <div className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl overflow-y-auto px-7 py-8" style={{ maxHeight: "80vh" }}>
         <div className="flex items-baseline justify-between">
           <div>
             <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-tomato">Preview · {parsed.parser} · {parsed.language}</p>

@@ -20,7 +20,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   const supabase = supabaseServer();const { data: item } = await supabase.from("menu_items").select("*").eq("id", params.id).maybeSingle();
   if (!item) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
         <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
         <p className="mt-8 font-serif text-2xl text-ink">Dish not found.</p>
       </main>
@@ -62,7 +62,7 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   const sec = (item.section || "").charAt(0).toUpperCase() + (item.section || "").slice(1);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/menu" className="font-sans text-sm text-ink-soft">← menu</Link>
       <p className="mt-6 font-sans text-xs font-medium text-tomato">{sec || "Dish"}</p>
       <h1 className="mt-1 font-serif text-4xl leading-tight text-ink">{noEmoji(item.name)}</h1>

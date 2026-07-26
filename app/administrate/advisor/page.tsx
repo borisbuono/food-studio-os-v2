@@ -16,7 +16,7 @@ export default async function AdvisorConsole() {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
   if (!uid) return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12">
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">sign in to view</p>
     </main>
   );
@@ -58,7 +58,7 @@ export default async function AdvisorConsole() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
+    <main className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl px-6 py-12" style={{ ["--accent" as any]: "#3F4C28" }}>
       <AssistantContext
         context={{
           kind: "advisor_console",

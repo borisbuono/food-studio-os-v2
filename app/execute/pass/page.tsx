@@ -178,9 +178,9 @@ export default function ThePass() {
   };
   const sendShoppingToOrdering = () => { localStorage.setItem("fs_order_draft", JSON.stringify(shopping.map((name) => ({ name, qty: 1, unit: "" })))); window.location.href = "/execute/orders"; };
 
-  if (!ready) return <main className="mx-auto max-w-xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening the pass…</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Opening the pass…</p></main>;
   if (!profile) return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">The Pass</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">Sign in to run the close-down — the pass records who closed and lands on tomorrow’s open.</p>
@@ -188,14 +188,14 @@ export default function ThePass() {
     </main>
   );
   if (!items.length) return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <h1 className="mt-6 font-serif text-3xl text-ink">The Pass</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">No prep or cleaning is set up for {venueName} yet.</p>
     </main>
   );
   if (passed) return (
-    <main className="mx-auto max-w-xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Passed</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The pass is signed</h1>
       <p className="mt-3 font-serif text-[17px] leading-relaxed text-ink-soft">{venueName} · closed by {profile.name}. {forecast ? `≈${forecast} covers forecast · ` : ""}{toDo.length} prep jobs and {shopping.length} shopping lines land on tomorrow’s open.</p>
@@ -210,7 +210,7 @@ export default function ThePass() {
   const busierWord = forecast != null && typical ? (forecast > typical * 1.08 ? `busier than a typical ${tmwWeekday}` : forecast < typical * 0.92 ? `quieter than usual` : `about normal for a ${tmwWeekday}`) : "";
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-10">
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-5 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>The Pass · close-down · {venueName}</p>
       <div className="mt-2 flex items-baseline justify-between">
