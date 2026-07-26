@@ -133,9 +133,7 @@ export default function FilesBrowser({
             <p className="font-serif italic text-[15px] text-ink-soft">
               No documents{cat ? ` under "${cat.replace("_", " ")}"` : ""} yet.
             </p>
-            <Link href="/files/upload" className="mt-4 inline-block rounded-full border border-ink px-4 py-2 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-ink hover:text-paper">
-              Upload the first document →
-            </Link>
+            <span className="mt-4 inline-block rounded-full border border-line px-4 py-2 font-mono text-[10px] uppercase tracking-wide text-clay">Ask Chef to file a photo — tap the Chef button and describe it</span>
           </div>
         ) : (
           <ul className="mt-3">
