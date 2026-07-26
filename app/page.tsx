@@ -1,4 +1,5 @@
-import HomeCompass, { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
+import HomeSwitch from "@/components/HomeSwitch";
+import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
 
@@ -335,5 +336,5 @@ export default async function Page() {
   };
 
   const data: CompassData = { holdings, bistro_mondo: bm, taller, utopia };
-  return <HomeCompass data={data} />;
+  return <HomeSwitch data={data} />;
 }
