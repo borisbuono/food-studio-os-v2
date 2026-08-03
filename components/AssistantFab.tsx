@@ -55,16 +55,25 @@ function detectIOS(): boolean {
   const ua = navigator.userAgent || "";
   return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && (navigator as any).maxTouchPoints > 1);
 }
+function detectSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  // Safari on any Apple platform. Chrome/Edge/Firefox on Mac all expose
+  // Chrome/CriOS/Edg/Firefox in their UA — Safari does not.
+  return /Safari/.test(ua) && !/Chrome|CriOS|Edg|Firefox|FxiOS/.test(ua);
+}
 function pickVoiceEngine(): VoiceEngine {
   if (typeof window === "undefined") return "none";
   const w = window as any;
   const hasWebSpeech = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
   const hasMediaRecorder = typeof w.MediaRecorder === "function" && !!navigator.mediaDevices?.getUserMedia;
   const ios = detectIOS();
-  // On iOS we always prefer Whisper — even if the browser exposes
-  // SpeechRecognition, the behavior is unusable. Elsewhere: Web Speech first,
-  // Whisper as a fallback, "none" if we can't do either.
-  if (ios && hasMediaRecorder) return "whisper";
+  const safari = detectSafari();
+  // On iOS AND on Safari desktop we always prefer Whisper — Safari exposes
+  // webkitSpeechRecognition but the behavior is unusable ("voice unavailable
+  // on this browser" was Boris's error on Safari desktop 2026-08-03).
+  // Elsewhere: Web Speech first, Whisper as fallback, "none" if neither.
+  if ((ios || safari) && hasMediaRecorder) return "whisper";
   if (hasWebSpeech) return "web-speech";
   if (hasMediaRecorder) return "whisper";
   return "none";
