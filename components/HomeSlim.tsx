@@ -92,21 +92,21 @@ export default function HomeSlim({ data }: { data: CompassData }) {
   const rest = d.alerts.length - alerts.length;
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-6 pb-24" style={{ ["--accent" as any]: accent }}>
+    <main className="mx-auto max-w-xl px-6 py-6 pb-24 lg:max-w-5xl lg:px-10 lg:py-10" style={{ ["--accent" as any]: accent }}>
       {/* LEAD — one big serif hero with an accent stripe. Everything else is quieter. */}
       <section
         className="rounded-r-lg border-l-2 bg-paper-deep/40 px-5 py-6"
         style={{ borderLeftColor: "var(--accent)" }}
       >
         <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>{leadContent.kicker}</p>
-        <h1 className="mt-3 font-serif text-[30px] leading-[1.1] text-ink">
+        <h1 className="mt-3 font-serif text-[30px] leading-[1.1] text-ink lg:text-[44px] lg:leading-[1.05]">
           {leadContent.headline}
         </h1>
         <p className="mt-3 font-serif italic text-[15px] text-ink-soft leading-snug">{leadContent.sub}</p>
       </section>
 
       {/* THIN NUMBERS STRIP — 3 quiet tiles, hairlines only */}
-      <div className="mt-6 grid grid-cols-3 divide-x divide-black/10 border-y border-black/10">
+      <div className="mt-6 grid grid-cols-3 divide-x divide-black/10 border-y border-black/10 lg:mt-8">
         <div className="px-3 py-3">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Cash · today</p>
           <p className="mt-1 font-serif text-[22px] text-ink tabular-nums">{d.cashToday != null ? eur(d.cashToday) : "—"}</p>
@@ -125,7 +125,7 @@ export default function HomeSlim({ data }: { data: CompassData }) {
       {alerts.length > 0 ? (
         <section className="mt-6" aria-label="Signals">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Signals for you</p>
-          <ul className="mt-3 flex flex-col gap-3">
+          <ul className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-4">
             {alerts.map((a) => (
               <li key={a.key}>
                 <Link href={a.href} className="block rounded-r-md border-l-2 border-basil/60 bg-paper px-4 py-3 hover:border-basil">
