@@ -53,11 +53,28 @@ export default function HomeSlim({ data }: { data: CompassData }) {
   const nowMins = Number(d.now.hhmm.split(":")[0]) * 60 + Number(d.now.hhmm.split(":")[1]);
   const phase = d.header.servicePhase; // 'before' | 'during' | 'after' | 'unknown'
 
-  // Assemble THE lead — one card, time-of-day driven
+  // Assemble THE lead — one card, time-of-day driven.
+  // 2026-08-07 wire fix -- uses real numbers from CompassData.yesterday /
+  // weather / upcoming30d / month instead of placeholder prose.
+  const yGross = d.yesterday ? eur(d.yesterday.grossEur) : null;
+  const yCovers = d.yesterday ? d.yesterday.covers : null;
+  const yAvg = d.yesterday && d.yesterday.covers > 0 ? `€${d.yesterday.avgSpendEur.toFixed(2)}` : null;
+  const weatherChip = d.weather
+    ? [d.weather.label, d.weather.tempMaxC != null ? `${Math.round(d.weather.tempMaxC)}°C` : null, (d.weather.rainMm || 0) > 1 ? "rain" : null].filter(Boolean).join(" · ")
+    : null;
+  const ylabel = ENTITY_LABEL[entity].split(" ")[0]; // "Bistro" / "Taller" / "Ibiza"
+  const monthDelta = d.month && d.month.deltaPct != null
+    ? `${d.month.deltaPct > 0 ? "+" : ""}${Math.round(d.month.deltaPct)}% vs last month`
+    : null;
+  const upcomingNext = d.upcoming30d?.next;
+  const upcomingCount = d.upcoming30d?.count || 0;
+  const upcomingCopy = upcomingNext
+    ? `next: ${upcomingNext.date}${upcomingNext.time ? " " + upcomingNext.time : ""} · ${upcomingNext.party} pax${upcomingNext.name ? " (" + upcomingNext.name + ")" : ""}`
+    : null;
+
   const leadContent = (() => {
     const covers = d.header.coversBooked;
     if (phase === "during") {
-      // In service — different focus
       return {
         kicker: `${d.now.dateLabel} · ${d.now.hhmm} · servicio en curso`,
         headline: covers > 0
@@ -69,21 +86,45 @@ export default function HomeSlim({ data }: { data: CompassData }) {
     if (phase === "after") {
       return {
         kicker: `${d.now.dateLabel} · ${d.now.hhmm} · cierre`,
-        headline: "Yesterday closed.",
-        sub: d.cashToday != null ? `Cash today: ${eur(d.cashToday)}. Review one thing before tomorrow.` : "Review one thing before tomorrow.",
+        headline: yGross && yCovers != null
+          ? `Yesterday: ${yGross} · ${yCovers} covers${yAvg ? " · avg " + yAvg : ""}.`
+          : "Yesterday closed.",
+        sub: [monthDelta, weatherChip].filter(Boolean).join(" · ") || "Review one thing before tomorrow.",
       };
     }
-    // pre-service (before) — the walk case
+    // pre-service (before) -- the walk case
     const minutesTo = d.header.minutesToService;
     const timeToServiceCopy = minutesTo != null && minutesTo > 0
       ? (minutesTo < 60 ? `service in ${minutesTo} min` : `service in ${Math.round(minutesTo / 60)}h`)
       : "service window ahead";
+
+    // Lead sentence: prefer today's covers; if none, surface upcoming next
+    // (Anna 27-Aug / Fincadelica 11-19 Aug shouldn't disappear because
+    // today's book is empty). Fall back to yesterday's real number.
+    let headline: string;
+    if (covers > 0) {
+      headline = `${covers} covers on the book. ${timeToServiceCopy}.`;
+    } else if (upcomingCopy) {
+      headline = `No covers today — ${timeToServiceCopy}. ${upcomingCount} covers on the book in the next 30 days.`;
+    } else if (yGross) {
+      headline = `Quiet book. ${timeToServiceCopy}.`;
+    } else {
+      headline = `No covers booked yet. ${timeToServiceCopy}.`;
+    }
+
+    // Sub: entity + yesterday's real number + weather.
+    // Boris asked for "BM · Yesterday €X gross · Y covers · avg €Z · weather".
+    const parts: string[] = [];
+    if (yGross && yCovers != null) parts.push(`${ylabel} · yesterday ${yGross} · ${yCovers} covers${yAvg ? " · avg " + yAvg : ""}`);
+    else parts.push(greetingFor(nowMins));
+    if (weatherChip) parts.push(weatherChip);
+    if (monthDelta) parts.push(monthDelta);
+    if (upcomingCopy && covers > 0) parts.push(upcomingCopy);
+
     return {
       kicker: `${d.now.dateLabel} · ${d.now.hhmm} · pre-service`,
-      headline: covers > 0
-        ? `${covers} covers on the book. ${timeToServiceCopy}.`
-        : `No covers booked yet. ${timeToServiceCopy}.`,
-      sub: greetingFor(nowMins) + " — Chef is ready. Say what needs doing.",
+      headline,
+      sub: parts.join(" · "),
     };
   })();
 
@@ -108,7 +149,9 @@ export default function HomeSlim({ data }: { data: CompassData }) {
       {/* THIN NUMBERS STRIP — 3 quiet tiles, hairlines only */}
       <div className="mt-6 grid grid-cols-3 divide-x divide-black/10 border-y border-black/10 lg:mt-8">
         <div className="px-3 py-3">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Cash · today</p>
+          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
+            {d.yesterday && (d.cashToday === d.yesterday.grossEur) ? "Cash · yesterday" : "Cash · today"}
+          </p>
           <p className="mt-1 font-serif text-[22px] text-ink tabular-nums">{d.cashToday != null ? eur(d.cashToday) : "—"}</p>
         </div>
         <div className="px-3 py-3">
