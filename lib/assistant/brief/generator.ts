@@ -109,8 +109,11 @@ async function assembleSignals(entity: EntityCode | string, userId: string | nul
     triageRes, waEventsRes, reviewsRes, memoryRes,
   ] = await Promise.all([
     rid ? sb.from("bookings").select("service_time,party_size,guest_name,status").eq("restaurant_id", rid).eq("service_date", today).order("service_time", { ascending: true }) : Promise.resolve({ data: [] } as any),
-    rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
-    rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", yesterday).maybeSingle() : Promise.resolve({ data: null } as any),
+    // 2026-08-07 wire fix -- eod_accounting is the manual-close journal (empty in prod);
+    // eod_pos is the daily POS import (439 real BM rows). Read the POS table so the LLM
+    // has yesterday's actual gross + covers instead of null.
+    rid ? sb.from("eod_pos").select("total_gross_eur,covers,date").eq("restaurant_id", rid).eq("date", today).maybeSingle() : Promise.resolve({ data: null } as any),
+    rid ? sb.from("eod_pos").select("total_gross_eur,covers,date,food_net_eur,wine_net_eur,tips_eur").eq("restaurant_id", rid).order("date", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null } as any),
     sb.from("invoice_inbox").select("amount_eur,match_status,flagged_reason").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
     sb.from("bank_movements").select("id").eq("entity_id", entity).eq("reconciled_to", "unmatched"),
     sb.from("platform_billing_status").select("platform,state").eq("entity_code", entity).in("state", ["failing","disabled","at_risk"]),
@@ -195,12 +198,13 @@ async function assembleSignals(entity: EntityCode | string, userId: string | nul
   if (invopen.length > 0) priorities.push({ label: `${invopen.length} invoice${invopen.length > 1 ? "s" : ""} waiting`, source: "money", count: invopen.length, amount_eur: Math.round(openEur) });
   if (lowRatingCount > 0) priorities.push({ label: `${lowRatingCount} low review${lowRatingCount > 1 ? "s" : ""} to answer`, source: "review", count: lowRatingCount });
   if (upcoming.length > 0 && priorities.length < 3) priorities.push({ label: `${covers} covers today, next at ${upcoming[0].time}`, source: "service", count: covers });
-  if (!eodY && rid && priorities.length < 3) priorities.push({ label: "Yesterday's EOD isn't posted yet", source: "money" });
+  if (!eodY && rid && priorities.length < 3) priorities.push({ label: "POS import is stale — no recent trading-day row", source: "money" });
+  else if (eodY && rid && priorities.length < 3) priorities.push({ label: `Last trading day: €${Math.round(Number((eodY as any).total_gross_eur || 0))} on ${(eodY as any).date}`, source: "eod", count: Number((eodY as any).covers || 0) });
   if (memRows.length && priorities.length < 3) priorities.push({ label: memRows[0].fact.slice(0, 100), source: "memory" });
 
   // Handled — everything the system already took care of.
   const handled: BriefHandled[] = [];
-  if (eodT) handled.push({ source: "eod", label: "today's EOD already posted", count: 1 });
+  if (eodT) handled.push({ source: "eod", label: `today's POS is in (€${Math.round(Number((eodT as any).total_gross_eur || 0))})`, count: 1 });
   if (emailTotal > 0) handled.push({ source: "email", label: `${emailTotal} email triage run${emailTotal > 1 ? "s" : ""} overnight`, count: emailTotal });
   // Approved / matched invoices in the last 24h — as "handled" hits.
   const handledInv = await sb.from("invoice_inbox").select("id").eq("entity_id", entity).in("match_status", ["approved","matched_albaran","matched_order"]).gte("triaged_at", now24);
@@ -216,9 +220,12 @@ async function assembleSignals(entity: EntityCode | string, userId: string | nul
       upcoming_bookings: upcoming,
     },
     yesterday: {
-      date: yesterday,
+      // note: eod_pos.date is the POS trading day (may be day-before yesterday
+      // when the sync lags). eod_posted / eod_revenue reflect the LATEST row
+      // -- what the operator would call "yesterday's number" in practice.
+      date: eodY ? String((eodY as any).date || yesterday) : yesterday,
       eod_posted: !!eodY,
-      eod_revenue: eodY ? Number(eodY.revenue || 0) : null,
+      eod_revenue: eodY ? Number((eodY as any).total_gross_eur || 0) : null,
       eod_deviation: null,
     },
     priorities: priorities.slice(0, 3),
