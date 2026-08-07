@@ -12,7 +12,7 @@ const UT = "a0000000-0000-4000-8000-000000000001";
 // Entity code used by the finance tables (invoice_inbox / bank_movements share BM / IFL / BBH).
 const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
 
-// Assumed service window per venue — used to compute the service step state
+// Assumed service window per venue -- used to compute the service step state
 // and the "service in Xh" copy. These match the current operating hours; if a
 // venue reshapes, edit here (Boris: this could later come from a venue settings row).
 const SERVICE_HOURS: Record<EntityKey, { open: string; close: string }> = {
@@ -22,7 +22,7 @@ const SERVICE_HOURS: Record<EntityKey, { open: string; close: string }> = {
   holdings: { open: "19:00", close: "23:30" }, // synthetic (holdings is not a venue but keep the shape)
 };
 
-// Madrid wall-clock helper — server runs UTC.
+// Madrid wall-clock helper -- server runs UTC.
 function madridClock() {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false,
@@ -45,18 +45,49 @@ function dateLabelMadrid() {
   }).format(new Date());
 }
 
+function madridToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+function firstOfMonth(iso: string): string { return iso.slice(0, 7) + "-01"; }
+function priorMonthFirst(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() - 1); d.setUTCDate(1);
+  return d.toISOString().slice(0, 10);
+}
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function Page() {
   const supabase = supabaseServer();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = madridToday();
+  const in30 = addDaysIso(today, 30);
+  const monthStart = firstOfMonth(today);
+  const priorStart = priorMonthFirst(today);
   const now = madridClock();
   const dateLabel = dateLabelMadrid();
 
   // -----------------------------------------------------------------------
   // Batch pull the tables we need for every venue in one call each. Cheap.
+  //
+  // 2026-08-07 wire fix -- previously this file queried eod_accounting (which
+  // is empty) instead of eod_pos (439 real BM rows + 94 real IFL rows), and
+  // bookings only for today (missing Anna 27-Aug + Fincadelica 11-19 Aug).
+  // Now we pull the tables Boris actually populated.
   // -----------------------------------------------------------------------
   const [
+    // OS state -- the loop still uses eod_accounting for today's manual EOD
+    // (a different journal from the POS import), but the numbers on Home
+    // read from eod_pos (real POS import).
     eodTodayRes,
-    bookingsRes,
+    eodPosRecentRes,           // last 14 days of POS data across both venues -- source of "yesterday's gross"
+    bookingsTodayRes,          // today's covers for the loop
+    bookings30dRes,            // future 30d bookings -- source of "on the book"
+    revenueMonthRes,           // month rollups for delta-vs-prior
+    weatherRes,                // last 7 days of Ibiza weather -- take today or most-recent
+    financeSnapshotsRes,       // latest weekly snapshot per entity -- cash position
     albaranesTodayRes,
     mepActiveRes,
     zonesRes,
@@ -70,29 +101,33 @@ export default async function Page() {
     filesInboxRes,
   ] = await Promise.all([
     supabase.from("eod_accounting").select("restaurant_id,revenue,actual_covers").eq("report_date", today),
-    supabase.from("bookings").select("restaurant_id,party_size,status,service_date").eq("service_date", today),
+    supabase.from("eod_pos").select("restaurant_id,date,covers,total_gross_eur,food_net_eur,wine_net_eur,tips_eur").gte("date", addDaysIso(today, -14)).lte("date", today).order("date", { ascending: false }),
+    supabase.from("bookings").select("restaurant_id,party_size,status,service_date,service_time,guest_name").eq("service_date", today),
+    supabase.from("bookings").select("restaurant_id,party_size,status,service_date,service_time,guest_name").gte("service_date", today).lte("service_date", in30).order("service_date", { ascending: true }),
+    supabase.from("revenue_monthly_history").select("restaurant_id,month,revenue_gross_eur,covers").gte("month", priorStart).lte("month", monthStart),
+    supabase.from("weather_daily").select("date,temp_max_c,precipitation_mm,rain_mm,label").gte("date", addDaysIso(today, -7)).lte("date", today).order("date", { ascending: false }),
+    supabase.from("finance_weekly_snapshots").select("entity_code,week_ending,revenue_gross_eur,cash_position_eur,ap_pendiente_eur,ap_over_90d_eur,food_cost_pct,prime_cost_pct").order("week_ending", { ascending: false }).limit(30),
     supabase.from("albarans").select("restaurant_id,received_at").gte("received_at", today + "T00:00:00").lt("received_at", today + "T23:59:59"),
     supabase.from("mep_dishes").select("zone_id,is_active,updated_at").eq("is_active", true),
     supabase.from("zones").select("id,restaurant_id"),
-    // Any chef conversation today between 07:00–11:00 = morning-brief signal.
     supabase.from("assistant_conversations").select("user_id,created_at").gte("created_at", today + "T07:00:00").lt("created_at", today + "T11:00:00"),
-    // Alerts sources — invoice_inbox big-ticket without match, bank_movements unmatched
-    // (age > 7d), platform_billing_status failing/disabled.
-    supabase.from("invoice_inbox").select("id,entity_id,amount_eur,sender:provider_id(name),arrived_at").gt("amount_eur", 500).not("match_status", "in", "(approved,rejected,duplicate)"),
+    supabase.from("invoice_inbox").select("id,entity_id,amount_eur,supplier_name,arrived_at").gt("amount_eur", 500).not("match_status", "in", "(approved,rejected,duplicate)"),
     supabase.from("bank_movements").select("id,entity_id,amount_eur,description,movement_date,reconciled_to").eq("reconciled_to", "unmatched"),
     supabase.from("platform_billing_status").select("entity_code,platform,state,notes,failure_count_30d,last_failure_at").in("state", ["failing", "disabled"]),
     supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
-    // Bank matches that have a proposed candidate waiting for the operator to accept / reject.
     supabase.from("v_bank_matches_open").select("movement_id,entity_code,top_confidence").not("top_candidate_id", "is", null),
-    // PA integration Sprint 1 — Master_ToDo highest-impact open rows for the strip.
     supabase.from("master_todos").select("id,title,impact_score,entity_code,due_at").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(30),
-    // Files inbox — needs_triage counter per entity for the compass alerts strip.
     supabase.from("files_inbox").select("suggested_entity,status").eq("status", "needs_triage").limit(500),
   ]);
 
   // Some of the newer tables may not exist yet in every environment; treat null as empty.
   const eodRows: any[] = eodTodayRes.data || [];
-  const bookings: any[] = bookingsRes.data || [];
+  const eodPosRows: any[] = eodPosRecentRes.data || [];
+  const bookingsToday: any[] = bookingsTodayRes.data || [];
+  const bookings30d: any[] = bookings30dRes.data || [];
+  const revMonthRows: any[] = revenueMonthRes.data || [];
+  const weatherRows: any[] = weatherRes.data || [];
+  const financeSnaps: any[] = financeSnapshotsRes.data || [];
   const albaranes: any[] = albaranesTodayRes.data || [];
   const mep: any[] = mepActiveRes.data || [];
   const zones: any[] = zonesRes.data || [];
@@ -106,7 +141,7 @@ export default async function Page() {
   const filesInboxRows: any[] = filesInboxRes.data || [];
 
   // Age > 7 days on bank movements
-  const sevenDaysAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const sevenDaysAgo = addDaysIso(today, -7);
   const bankOld = bankUnmatched.filter((r) => (r.movement_date || "") <= sevenDaysAgo);
 
   const zonesByRestaurant = new Map<string, string[]>();
@@ -116,14 +151,63 @@ export default async function Page() {
     zonesByRestaurant.set(z.restaurant_id, arr);
   }
 
+  // Latest weather row (today, or most-recent within 7d fallback).
+  const weatherLatest = weatherRows[0] || null;
+
   // -----------------------------------------------------------------------
   // Compute compass state for a single restaurant / entity.
   // -----------------------------------------------------------------------
   function compassFor(rid: string, entity: EntityKey) {
     const eod = eodRows.find((e) => e.restaurant_id === rid);
-    const covers = bookings
+    const coversToday = bookingsToday
       .filter((b) => b.restaurant_id === rid && !["cancelled", "no_show"].includes((b.status || "").toLowerCase()))
       .reduce((a, b) => a + Number(b.party_size || 0), 0);
+
+    // Future 30d bookings (excluding today already counted above)
+    const future = bookings30d
+      .filter((b) => b.restaurant_id === rid && !["cancelled", "no_show"].includes((b.status || "").toLowerCase()));
+    const futureCovers = future.reduce((a, b) => a + Number(b.party_size || 0), 0);
+    const nextBooking = future
+      .filter((b) => b.service_date > today)
+      .sort((a, b) => (a.service_date + (a.service_time || "")).localeCompare(b.service_date + (b.service_time || "")))[0] || null;
+
+    // Yesterday's POS (real POS import -- lags a day or two; take max(date) for restaurant).
+    const posForRid = eodPosRows.filter((r) => r.restaurant_id === rid);
+    const yestPos = posForRid[0] || null;
+    const yesterday = yestPos ? {
+      date: String(yestPos.date),
+      grossEur: Number(yestPos.total_gross_eur || 0),
+      covers: Number(yestPos.covers || 0),
+      avgSpendEur: Number(yestPos.covers || 0) > 0 ? Number(yestPos.total_gross_eur || 0) / Number(yestPos.covers) : 0,
+    } : null;
+
+    // Month-vs-prior from revenue_monthly_history (holded rollup, ex-VAT).
+    const thisMonth = revMonthRows.find((r) => r.restaurant_id === rid && String(r.month).startsWith(monthStart.slice(0, 7)));
+    const priorMonth = revMonthRows.find((r) => r.restaurant_id === rid && String(r.month).startsWith(priorStart.slice(0, 7)));
+    const month = thisMonth ? {
+      thisGrossEur: Number(thisMonth.revenue_gross_eur || 0),
+      priorGrossEur: priorMonth ? Number(priorMonth.revenue_gross_eur || 0) : null,
+      deltaPct: priorMonth && Number(priorMonth.revenue_gross_eur || 0) > 0
+        ? ((Number(thisMonth.revenue_gross_eur || 0) - Number(priorMonth.revenue_gross_eur || 0)) / Number(priorMonth.revenue_gross_eur)) * 100
+        : null,
+    } : null;
+
+    // Weather -- shared across venues (single lat/lon for Ibiza).
+    const weather = weatherLatest ? {
+      date: String(weatherLatest.date),
+      tempMaxC: weatherLatest.temp_max_c != null ? Number(weatherLatest.temp_max_c) : null,
+      label: weatherLatest.label || null,
+      rainMm: weatherLatest.rain_mm != null ? Number(weatherLatest.rain_mm) : (weatherLatest.precipitation_mm != null ? Number(weatherLatest.precipitation_mm) : null),
+    } : null;
+
+    // Latest cash position from finance_weekly_snapshots.
+    const snap = financeSnaps.find((s) => s.entity_code === ENTITY_CODE[entity]) || null;
+    const cashPosition = snap ? {
+      latestEur: snap.cash_position_eur != null ? Number(snap.cash_position_eur) : null,
+      weekEnding: String(snap.week_ending || ""),
+      apPendienteEur: snap.ap_pendiente_eur != null ? Number(snap.ap_pendiente_eur) : null,
+    } : null;
+
     const albarans = albaranes.filter((a) => a.restaurant_id === rid);
     const zIds = zonesByRestaurant.get(rid) || [];
     const openPrep = mep.filter((m) => zIds.includes(m.zone_id)).length;
@@ -169,7 +253,6 @@ export default async function Page() {
         detail: openPrep
           ? `${openPrep} dish${openPrep === 1 ? "" : "es"} on the list`
           : "prep list empty",
-        // Prep is "in progress" while there are dishes AND we're pre-service.
         status: openPrep > 0 && servicePhase === "before" ? "in_progress"
           : openPrep === 0 && servicePhase !== "before" ? "done"
           : servicePhase === "before" ? "upcoming"
@@ -184,8 +267,8 @@ export default async function Page() {
           ? "on the pass now"
           : servicePhase === "after"
           ? "closed"
-          : covers > 0
-          ? `${covers} covers booked`
+          : coversToday > 0
+          ? `${coversToday} covers booked`
           : "no bookings yet",
         status: servicePhase === "during" ? "in_progress"
           : servicePhase === "after" ? "done"
@@ -213,7 +296,7 @@ export default async function Page() {
 
     const myInvoices = invoiceInbox.filter((r) => r.entity_id === ec);
     for (const inv of myInvoices) {
-      const supplier = (inv.sender as any)?.name || "supplier";
+      const supplier = (inv as any).supplier_name || "supplier";
       alerts.push({
         key: `inv-${inv.id}`,
         kicker: `Invoice · ${supplier}`,
@@ -232,10 +315,6 @@ export default async function Page() {
       });
     }
 
-    // Bank matches proposed by the matcher waiting for the operator to accept.
-    // (Distinct from the "> 7d" alert above — this one fires the instant a
-    // candidate is produced so the operator can bulk-accept high-confidence
-    // rows without letting them age.)
     const myProposed = bankProposed.filter((r) => r.entity_code === ec);
     if (myProposed.length) {
       const highConf = myProposed.filter((r) => Number(r.top_confidence || 0) >= 0.9).length;
@@ -260,8 +339,6 @@ export default async function Page() {
       });
     }
 
-    // Finance anomalies — surface the count as a compass alert. The detail
-    // page /administrate/finance/anomalies has the full triage table + drawer.
     const myAnoms = financeAnomalies.filter((r) => r.entity_code === ec);
     if (myAnoms.length) {
       const sev4 = myAnoms.filter((r) => Number(r.severity || 0) >= 4).length;
@@ -274,10 +351,6 @@ export default async function Page() {
       });
     }
 
-    // Files inbox — attachments waiting for a manual category / entity /
-    // title confirmation before promotion to the library. Include rows
-    // suggested for this entity plus un-classified rows (which every
-    // operator can help route).
     const myInbox = filesInboxRows.filter((r) => !r.suggested_entity || r.suggested_entity === ec);
     if (myInbox.length) {
       alerts.push({
@@ -288,18 +361,36 @@ export default async function Page() {
       });
     }
 
+    // cashToday is the "one number on Home" -- prefer today's manual EOD
+    // revenue (if posted), fall back to yesterday's real POS gross.
+    const cashToday = eod ? Number(eod.revenue || 0) : (yesterday ? yesterday.grossEur : null);
+
     return {
       label: ENTITY_LABEL[entity],
       now: { hhmm: now.hhmm, dateLabel },
-      header: { coversBooked: covers, minutesToService, servicePhase },
+      header: { coversBooked: coversToday, minutesToService, servicePhase },
       loop,
       alerts,
       alertsTotal: alerts.length,
-      cashToday: eod ? Number(eod.revenue || 0) : null,
+      cashToday,
       highestImpact: masterTodos
         .filter((t) => !t.entity_code || t.entity_code === ec)
         .slice(0, 3)
         .map((t) => ({ id: t.id, title: String(t.title), impact_score: Number(t.impact_score || 3), due_at: t.due_at || null })),
+      // -- v2 wire additions (real data, populated 2026-08-07) --
+      yesterday,
+      weather,
+      month,
+      upcoming30d: {
+        count: futureCovers,
+        next: nextBooking ? {
+          date: String(nextBooking.service_date),
+          time: nextBooking.service_time ? String(nextBooking.service_time).slice(0, 5) : null,
+          party: Number(nextBooking.party_size || 0),
+          name: nextBooking.guest_name || null,
+        } : null,
+      },
+      cashPosition,
     };
   }
 
@@ -317,22 +408,47 @@ export default async function Page() {
       minutesToService: bm.header.minutesToService,
       servicePhase: bm.header.servicePhase,
     },
-    // Roll-up loop steps: done only if both venues done; in-progress if any.
     loop: bm.loop.map((s, i) => {
       const t = taller.loop[i];
       const both = s.status === "done" && t.status === "done";
       const any = s.status === "in_progress" || t.status === "in_progress";
       const status: LoopStep["status"] = both ? "done" : any ? "in_progress" : "upcoming";
-      return {
-        ...s,
-        status,
-        detail: `BM · ${s.detail}  ·  Taller · ${t.detail}`,
-      };
+      return { ...s, status, detail: `BM · ${s.detail}  ·  Taller · ${t.detail}` };
     }),
     alerts: holdingsAlerts,
     alertsTotal: holdingsAlerts.length,
     cashToday: (bm.cashToday || 0) + (taller.cashToday || 0),
     highestImpact: [...bm.highestImpact, ...taller.highestImpact].sort((a, b) => b.impact_score - a.impact_score).slice(0, 3),
+    // v2 wire additions -- holdings is a roll-up
+    yesterday: (bm.yesterday || taller.yesterday) ? {
+      date: (bm.yesterday?.date || taller.yesterday?.date) as string,
+      grossEur: (bm.yesterday?.grossEur || 0) + (taller.yesterday?.grossEur || 0),
+      covers: (bm.yesterday?.covers || 0) + (taller.yesterday?.covers || 0),
+      avgSpendEur: (() => {
+        const g = (bm.yesterday?.grossEur || 0) + (taller.yesterday?.grossEur || 0);
+        const c = (bm.yesterday?.covers || 0) + (taller.yesterday?.covers || 0);
+        return c > 0 ? g / c : 0;
+      })(),
+    } : null,
+    weather: bm.weather || taller.weather,
+    month: (bm.month || taller.month) ? {
+      thisGrossEur: (bm.month?.thisGrossEur || 0) + (taller.month?.thisGrossEur || 0),
+      priorGrossEur: (bm.month?.priorGrossEur || taller.month?.priorGrossEur) != null
+        ? (bm.month?.priorGrossEur || 0) + (taller.month?.priorGrossEur || 0)
+        : null,
+      deltaPct: null,
+    } : null,
+    upcoming30d: {
+      count: bm.upcoming30d.count + taller.upcoming30d.count,
+      next: [bm.upcoming30d.next, taller.upcoming30d.next]
+        .filter(Boolean)
+        .sort((a: any, b: any) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")))[0] || null,
+    },
+    cashPosition: bm.cashPosition && taller.cashPosition ? {
+      latestEur: (bm.cashPosition.latestEur || 0) + (taller.cashPosition.latestEur || 0),
+      weekEnding: bm.cashPosition.weekEnding,
+      apPendienteEur: (bm.cashPosition.apPendienteEur || 0) + (taller.cashPosition.apPendienteEur || 0),
+    } : (bm.cashPosition || taller.cashPosition),
   };
 
   const data: CompassData = { holdings, bistro_mondo: bm, taller, utopia };

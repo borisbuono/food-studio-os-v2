@@ -52,6 +52,12 @@ export type CompassData = Record<EntityKey, {
   cashToday: number | null;
   // PA integration Sprint 1 — top 3 highest-impact open Master_ToDo rows.
   highestImpact: MasterTodoLite[];
+  // -- v2 wire additions (2026-08-07) -- real data pulled by app/page.tsx
+  yesterday: { date: string; grossEur: number; covers: number; avgSpendEur: number } | null;
+  weather: { date: string; tempMaxC: number | null; label: string | null; rainMm: number | null } | null;
+  month: { thisGrossEur: number; priorGrossEur: number | null; deltaPct: number | null } | null;
+  upcoming30d: { count: number; next: { date: string; time: string | null; party: number; name: string | null } | null };
+  cashPosition: { latestEur: number | null; weekEnding: string | null; apPendienteEur: number | null } | null;
 }>;
 
 const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
