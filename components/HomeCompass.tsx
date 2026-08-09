@@ -13,6 +13,12 @@ import { pillarForRole, PILLAR_LANDING } from "@/lib/routing/pillar-map";
 // Architecture v2 — the Home compass.
 // This replaces the modular tile grid with a daily-loop timeline + alerts strip.
 // The OS holds the shape of the day; the operator does the work.
+//
+// DO NOT reintroduce <BrandMark/> or a "/" Link with a logo in this file.
+// The authoritative Home button + brand anchor is the top-left mark in
+// components/TopBar.tsx. Task #128 (commit 0154bdd) killed the duplicate;
+// Boris walk 2026-08-07 re-flagged it (prod stuck at 9d673e3, deploy needed).
+// A grep guard: `git grep -n BrandMark components/HomeCompass.tsx` must be empty.
 
 export type LoopStep = {
   key: "morning" | "deliveries" | "prep" | "service" | "eod";

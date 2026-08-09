@@ -20,6 +20,11 @@
 //
 // Killed vs HomeCompass: duplicate Home logo, pillar row, quick-action chips,
 // numbers-tiles-below-fold, new-hires strip, tri-role tabs (rely on TopBar).
+//
+// DO NOT reintroduce <BrandMark/> here. The authoritative brand anchor is
+// TopBar's top-left mark. Grep guard: `git grep -n BrandMark components/HomeSlim.tsx`
+// must be empty. Boris walk 2026-08-07 flagged the duplicate as still visible
+// (prod stuck at 9d673e3; commit 0154bdd killed it in HomeCompass already).
 
 import Link from "next/link";
 import type { CompassData } from "@/components/HomeCompass";

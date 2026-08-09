@@ -98,7 +98,7 @@ export default function TopBar() {
       style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
-        <Link href="/" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
+        <Link href="/" data-testid="top-brand-mark" aria-label="Home" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
 
         <div className="flex items-center gap-3">
           <CommandK />
