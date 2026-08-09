@@ -85,8 +85,19 @@ export default function TopBar() {
   const activeAccent = activePillar ? PILLAR_ACCENT[activePillar] : null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
+    // Safe-area belt-and-braces (Boris walk 2026-08-07): the earlier fix
+    // (10385b0) put paddingTop on the header, but on iOS PWA the inner row's
+    // fixed py-3 wasn't reserving enough vertical run, so the "Boris" chip on
+    // the right sometimes crept under the notch. Two extra guarantees now:
+    //  1) paddingTop = max(env(...), 8px) so there's always visible clearance
+    //     even in browser mode where env() resolves to 0.
+    //  2) the inner row gets min-h-[44px] (iOS tap-target min) so the flex
+    //     children can't collapse below what the notch demands.
+    <header
+      className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur"
+      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
+    >
+      <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
         <Link href="/" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
 
         <div className="flex items-center gap-3">
