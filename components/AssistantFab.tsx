@@ -43,8 +43,7 @@ const WHISPER_JUNK = new Set(["thank you for watching", "thanks for watching", "
 function scrubWhisper(raw: string): string {
   const t = (raw || "").trim();
   if (!t) return "";
-  const lc = t.toLowerCase().replace(/[!?.,]+
-, "").trim();
+  const lc = t.toLowerCase().replace(/[!?.,]+$/, "").trim();
   if (WHISPER_JUNK.has(lc)) return "";
   return t;
 }

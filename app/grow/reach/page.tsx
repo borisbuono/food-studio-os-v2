@@ -168,8 +168,8 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
                 <div className="flex items-baseline justify-between">
                   <p className="font-mono text-[10px] uppercase tracking-wide text-clay">recent campaigns</p>
                   <span className="rounded-full border border-line bg-paper-deep px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-                    new campaign →
-                  </Link>
+                    via chef
+                  </span>
                 </div>
                 {wix.campaigns.length === 0 ? (
                   <p className="mt-3 font-sans text-[13px] italic text-ink-soft">No campaigns yet.</p>
