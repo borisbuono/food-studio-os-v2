@@ -50,7 +50,10 @@ export default function HomeSlim({ data }: { data: CompassData }) {
   const [entity, setEntity] = useState<EntityKey>("bistro_mondo");
   useEffect(() => {
     setEntity((readEntityCookie() as EntityKey) || "bistro_mondo");
-    return onCtx((c) => { if (c.entity) setEntity(c.entity as EntityKey); });
+    return onCtx(() => {
+      const e = readEntityCookie() as EntityKey | null;
+      if (e) setEntity(e);
+    });
   }, []);
 
   const d = data[entity];
