@@ -68,13 +68,18 @@ function pickVoiceEngine(): VoiceEngine {
   const hasMediaRecorder = typeof w.MediaRecorder === "function" && !!navigator.mediaDevices?.getUserMedia;
   const ios = detectIOS();
   const safari = detectSafari();
-  // On iOS AND on Safari desktop we always prefer Whisper — Safari exposes
-  // webkitSpeechRecognition but the behavior is unusable ("voice unavailable
-  // on this browser" was Boris's error on Safari desktop 2026-08-03).
-  // Elsewhere: Web Speech first, Whisper as fallback, "none" if neither.
-  if ((ios || safari) && hasMediaRecorder) return "whisper";
-  if (hasWebSpeech) return "web-speech";
+  // Whisper first whenever MediaRecorder + getUserMedia exist — works
+  // reliably on every modern browser (Chrome, Safari, Firefox, PWA).
+  // History:
+  //   2026-08-03 — Safari desktop threw "voice unavailable" on Web Speech.
+  //   2026-08-12 — Chrome desktop threw the same on Web Speech (Chrome 128+
+  //                started rejecting new SpeechRecognition() on macOS).
+  // Rather than play whack-a-mole per browser, we route through Whisper
+  // (/api/assistant/voice/transcribe) whose behavior is under our control.
+  // Web Speech survives only as a last-ditch fallback for ancient browsers
+  // that lack MediaRecorder.
   if (hasMediaRecorder) return "whisper";
+  if (hasWebSpeech) return "web-speech";
   return "none";
 }
 function pickMediaMime(): string {
