@@ -1,38 +1,54 @@
-import { createBrowserClient } from "@supabase/ssr";
-import { AUTH_COOKIE_NAME, browserAuthCookieOptions } from "@/lib/authCookies";
+"use client";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 
-// THE single browser auth client.
+// Browser Supabase client.
 //
-// PKCE storage fix (Boris 2026-08-16 15:10):
-//   Debug pane showed the sb-fs-auth-code-verifier COOKIE was present on
-//   the callback page but exchangeCodeForSession reported "verifier not
-//   found in storage". Root cause: @supabase/ssr's storage adapter reads
-//   the verifier from localStorage under the hood, not from the mirrored
-//   cookie. When localStorage is empty (Incognito, or wiped by hardReset)
-//   the SDK sees no verifier even though the cookie exists.
+// We've moved off @supabase/ssr's createBrowserClient for auth because its
+// cookie-based PKCE storage adapter kept losing the code_verifier between
+// signInWithOAuth() and exchangeCodeForSession(). Debug proved the mirror
+// cookie was present but the SDK could not read the verifier back
+// ("PKCE code verifier not found in storage" even with a fresh Incognito).
 //
-// Fix: pass an explicit `auth.storage` pointing at window.localStorage +
-// a matching `storageKey`. Now signInWithOAuth writes the verifier to
-// localStorage and exchangeCodeForSession reads it back from the same
-// place. cookieOptions is still passed so session-cookie mirroring for
-// SSR reads continues to work.
+// Solution: use @supabase/supabase-js createClient with explicit
+// localStorage. The SDK writes the code_verifier to localStorage under
+// `sb-fs-auth-code-verifier`, and reads it from the same place. Session
+// tokens land in localStorage too under `sb-fs-auth-auth-token` — SSR
+// server components will no longer see the session (we accept that
+// trade-off for now; anon reads still work through RLS, and the UI has
+// been working as Guest for many surfaces already).
+//
+// Later refinement (post-launch): add a lightweight cookie mirror so
+// SSR can read the JWT for personalised server renders. For now, sign-in
+// working end-to-end is the goal.
 
-const memoryStorage: Record<string, string> = {};
-const isoStorage = {
-  getItem: (k: string) => memoryStorage[k] ?? null,
-  setItem: (k: string, v: string) => { memoryStorage[k] = v; },
-  removeItem: (k: string) => { delete memoryStorage[k]; },
-};
+let _client: SupabaseClient | null = null;
 
-export const supabaseBrowser = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    cookieOptions: browserAuthCookieOptions(),
-    auth: {
-      flowType: "pkce",
-      storage: typeof window !== "undefined" ? window.localStorage : isoStorage,
-      storageKey: AUTH_COOKIE_NAME,
-    },
-  }
-);
+export function getSupabaseBrowser(): SupabaseClient {
+  if (_client) return _client;
+  _client = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        flowType: "pkce",
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false, // we handle the exchange ourselves in /auth/callback
+        storage: typeof window !== "undefined" ? window.localStorage : undefined,
+        storageKey: AUTH_COOKIE_NAME,
+      },
+    }
+  );
+  return _client;
+}
+
+// Backward-compat export so every existing `import { supabaseBrowser } from ...`
+// keeps working without touching every callsite.
+export const supabaseBrowser = new Proxy({} as SupabaseClient, {
+  get(_t, prop, receiver) {
+    const c = getSupabaseBrowser();
+    const v = (c as any)[prop];
+    return typeof v === "function" ? v.bind(c) : v;
+  },
+});
