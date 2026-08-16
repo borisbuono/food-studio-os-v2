@@ -23,6 +23,16 @@ export default function Callback() {
         }
         const code = url.searchParams.get("code");
         log("host: " + window.location.host);
+        // Dump all cookies + localStorage keys so we can see whether the
+        // PKCE verifier is present under a name we did not expect.
+        try {
+          const cookieNames = document.cookie.split(";").map((c) => c.trim().split("=")[0]).filter(Boolean);
+          log("cookies (" + cookieNames.length + "): " + cookieNames.join(", "));
+        } catch (e: any) { log("cookie read err: " + e?.message); }
+        try {
+          const lsKeys = Object.keys(localStorage);
+          log("localStorage (" + lsKeys.length + "): " + lsKeys.filter((k) => k.includes("supabase") || k.includes("sb-") || k.includes("verifier") || k.includes("auth")).join(", "));
+        } catch (e: any) { log("ls read err: " + e?.message); }
         log("has code: " + (code ? "yes" : "no"));
         if (code) {
           const { error } = await supabaseBrowser.auth.exchangeCodeForSession(window.location.href);
