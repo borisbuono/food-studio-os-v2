@@ -3,17 +3,25 @@
 // stuck in a bad state (legacy localStorage session that servers can't see).
 function hardResetSession() {
   try {
-    // Wipe every localStorage key that looks Supabase-related
     Object.keys(localStorage).forEach((k) => {
       if (k.includes("supabase") || k.includes("sb-") || k.startsWith("fs-auth")) localStorage.removeItem(k);
     });
   } catch {}
   try {
-    // Wipe every sb-* cookie
+    // Cookies may have been written host-only OR with domain=.foodstudio.ai
+    // (see lib/authCookies.ts). Nuke every variant so nothing survives.
+    const host = window.location.hostname;
+    const domains: (string | undefined)[] = [undefined, host];
+    if (host === "foodstudio.ai" || host.endsWith(".foodstudio.ai")) {
+      domains.push(".foodstudio.ai");
+    }
     document.cookie.split(";").forEach((c) => {
       const [n] = c.trim().split("=");
       if (n.startsWith("sb-") || n.includes("supabase")) {
-        document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+        domains.forEach((d) => {
+          const domClause = d ? `; domain=${d}` : "";
+          document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domClause}`;
+        });
       }
     });
   } catch {}
