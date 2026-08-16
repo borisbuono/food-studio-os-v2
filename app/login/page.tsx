@@ -32,11 +32,24 @@ import { useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
+import { useEffect as _useEffect } from "react";
+function useEffectOnce(fn: () => void) { _useEffect(() => { fn(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []); }
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Surface the ?error= that the /auth/callback Route Handler
+  // redirects here with on any failure. Read once on mount.
+  useEffectOnce(() => {
+    try {
+      const u = new URL(window.location.href);
+      const e = u.searchParams.get("error");
+      if (e) setErr(e);
+    } catch {}
+  });
 
   const google = async () => {
     setErr("");
