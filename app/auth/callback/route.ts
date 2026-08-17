@@ -30,6 +30,17 @@ export async function GET(request: NextRequest) {
   const bounce = (msg: string) => {
     const u = new URL("/login", origin);
     u.searchParams.set("error", msg);
+    // Diagnostic: what cookies did the browser send to /auth/callback?
+    // Server-only view (client can't fake this). Truncated to keep URL short.
+    try {
+      const jar = cookies().getAll();
+      const names = jar.map((c) => c.name).join(",");
+      u.searchParams.set("dbg_cookies", names.slice(0, 300));
+      const verifier = jar.find((c) => c.name === "sb-fs-auth-code-verifier");
+      u.searchParams.set("dbg_verifier_len", verifier ? String(verifier.value.length) : "MISSING");
+      u.searchParams.set("dbg_verifier_prefix", verifier ? verifier.value.slice(0, 20) : "-");
+      u.searchParams.set("dbg_host", headers().get("host") ?? "-");
+    } catch {}
     return NextResponse.redirect(u);
   };
 
