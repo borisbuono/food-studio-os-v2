@@ -32,6 +32,16 @@ export function authCookieOptions(host: string | null | undefined) {
     secure: true,
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
+    // CRITICAL: httpOnly=false so the browser client can read the session
+    // cookie via document.cookie. If httpOnly is left at its default (true)
+    // when the server writes the cookie in /auth/callback, the sidebar/
+    // client-side supabaseBrowser.auth.getSession() sees nothing and renders
+    // as Guest even though sign-in server-side succeeded. The token is a
+    // JWT signed by Supabase — protecting it from client-side JS reads does
+    // NOT protect it from a browser-hijack (the browser already sends it as
+    // Cookie header on every request). This matches the standard Supabase
+    // Next.js quickstart config.
+    httpOnly: false,
   };
   if (isProdHost(host)) return { ...base, domain: ".foodstudio.ai" };
   return base;
