@@ -6,19 +6,13 @@ import { authCookieOptions } from "@/lib/authCookies";
 // Server-side OAuth / magic-link callback — standard Supabase Next.js
 // pattern (https://supabase.com/docs/guides/auth/server-side/nextjs).
 //
-// Why server-side, not the earlier client-side page:
-//   The client Page + @supabase/ssr storage adapter kept losing the
-//   PKCE code_verifier between signInWithOAuth() and
-//   exchangeCodeForSession() (three attempts, three different failure
-//   modes, all cookie-related). Doing the exchange in a Route Handler:
-//     - reads cookies via next/headers (server-authoritative)
-//     - writes session cookies via Set-Cookie response header before
-//       the redirect (guaranteed committed by the browser)
-//     - keeps the entire secret PKCE handshake off the client
-//
-// After success the handler redirects to '/' (or ?next= if provided).
-// After failure it redirects back to /login with ?error=<message> so
-// the login page can surface the real reason.
+// CRITICAL: session cookies MUST be written to the NextResponse we return,
+// not to the request-side `cookies()` store. Setting via next/headers
+// cookies().set() inside a Route Handler does NOT propagate to a
+// NextResponse.redirect() that we build separately — the Set-Cookie
+// headers get dropped and the browser never receives the session.
+// So we build the response object first, then have the SDK write cookies
+// directly on it via response.cookies.set().
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -27,19 +21,21 @@ export async function GET(request: NextRequest) {
   const errParam = searchParams.get("error");
   const errDesc = searchParams.get("error_description");
 
+  const host = headers().get("host");
+  const cookieOpts = authCookieOptions(host);
+  const { name: _n, ...cookieAttrs } = cookieOpts;
+
   const bounce = (msg: string) => {
     const u = new URL("/login", origin);
     u.searchParams.set("error", msg);
     // Diagnostic: what cookies did the browser send to /auth/callback?
-    // Server-only view (client can't fake this). Truncated to keep URL short.
     try {
       const jar = cookies().getAll();
-      const names = jar.map((c) => c.name).join(",");
-      u.searchParams.set("dbg_cookies", names.slice(0, 300));
+      u.searchParams.set("dbg_cookies", jar.map((c) => c.name).join(",").slice(0, 300));
       const verifier = jar.find((c) => c.name === "sb-fs-auth-code-verifier");
       u.searchParams.set("dbg_verifier_len", verifier ? String(verifier.value.length) : "MISSING");
       u.searchParams.set("dbg_verifier_prefix", verifier ? verifier.value.slice(0, 20) : "-");
-      u.searchParams.set("dbg_host", headers().get("host") ?? "-");
+      u.searchParams.set("dbg_host", host ?? "-");
     } catch {}
     return NextResponse.redirect(u);
   };
@@ -47,10 +43,9 @@ export async function GET(request: NextRequest) {
   if (errParam) return bounce(errDesc || errParam);
   if (!code) return bounce("Missing code parameter — did the provider cancel?");
 
-  const cookieStore = cookies();
-  const host = headers().get("host");
-  const cookieOpts = authCookieOptions(host);
-  const { name: _n, ...cookieAttrs } = cookieOpts;
+  // Build the response we intend to return FIRST — session cookies will be
+  // written directly on this object below by the SDK.
+  const response = NextResponse.redirect(new URL(next, origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,15 +53,14 @@ export async function GET(request: NextRequest) {
     {
       cookieOptions: cookieOpts,
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
+        // Read from the request-side cookies (what the browser sent).
+        get(name: string) { return request.cookies.get(name)?.value; },
+        // Write to the RESPONSE cookies (what the browser will receive).
         set(name: string, value: string, options: any) {
-          // MY attrs (httpOnly:false, domain, secure, sameSite) MUST win over
-          // whatever the SDK passes in `options` — otherwise SDK default
-          // httpOnly=true blocks client-side session reads.
-          try { cookieStore.set({ name, value, ...options, ...cookieAttrs }); } catch {}
+          response.cookies.set({ name, value, ...options, ...cookieAttrs });
         },
         remove(name: string, options: any) {
-          try { cookieStore.set({ name, value: "", ...options, ...cookieAttrs, maxAge: 0 }); } catch {}
+          response.cookies.set({ name, value: "", ...options, ...cookieAttrs, maxAge: 0 });
         },
       },
     }
@@ -78,16 +72,21 @@ export async function GET(request: NextRequest) {
   // Best-effort: sync profile from any pending team-member invite.
   try { await supabase.rpc("sync_my_profile_from_invite"); } catch {}
 
-  // First-run tour if the profile hasn't seen it yet.
-  let dest = next;
+  // First-run tour if the profile hasn't seen it yet — update the response
+  // redirect location if needed. Session cookies are already on `response`.
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data: prof } = await supabase
         .from("profiles").select("first_run_done_at").eq("id", user.id).maybeSingle();
-      if (prof && !prof.first_run_done_at) dest = "/welcome";
+      if (prof && !prof.first_run_done_at) {
+        // Rebuild redirect but carry over all cookies already set.
+        const welcome = NextResponse.redirect(new URL("/welcome", origin));
+        response.cookies.getAll().forEach((c) => welcome.cookies.set(c));
+        return welcome;
+      }
     }
   } catch {}
 
-  return NextResponse.redirect(new URL(dest, origin));
+  return response;
 }
