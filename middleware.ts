@@ -15,8 +15,11 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
+          // Cookie attributes we set (httpOnly:false, domain, secure) MUST
+          // win over SDK defaults so client-side JS can read the session.
+          const { name: _n, ...cookieAttrs } = cookieOpts;
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, { ...cookieOpts, ...options })
+            supabaseResponse.cookies.set(name, value, { ...options, ...cookieAttrs })
           );
         },
       },

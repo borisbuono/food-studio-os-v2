@@ -60,10 +60,13 @@ export async function GET(request: NextRequest) {
       cookies: {
         get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: any) {
-          try { cookieStore.set({ name, value, ...cookieAttrs, ...options }); } catch {}
+          // MY attrs (httpOnly:false, domain, secure, sameSite) MUST win over
+          // whatever the SDK passes in `options` — otherwise SDK default
+          // httpOnly=true blocks client-side session reads.
+          try { cookieStore.set({ name, value, ...options, ...cookieAttrs }); } catch {}
         },
         remove(name: string, options: any) {
-          try { cookieStore.set({ name, value: "", ...cookieAttrs, ...options, maxAge: 0 }); } catch {}
+          try { cookieStore.set({ name, value: "", ...options, ...cookieAttrs, maxAge: 0 }); } catch {}
         },
       },
     }
