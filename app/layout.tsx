@@ -1,7 +1,6 @@
 import "./globals.css";
+import AppChrome from "@/components/AppChrome";
 import type { Metadata, Viewport } from "next";
-import TopBar from "@/components/TopBar";
-import DesktopSidebar from "@/components/DesktopSidebar";
 import ChefSwitch from "@/components/ChefSwitch";
 import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
@@ -65,17 +64,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" style={{ ["--accent" as any]: accent } as any}>
       <body>
         <PwaOfflineBadge />
-        {/* Desktop rail — hidden on < lg */}
-        <DesktopSidebar />
-        {/* Mobile / tablet top nav — hidden on lg+ */}
-        <div className="lg:hidden">
-          <TopBar />
-        </div>
-        {/* Main content — shifted right on lg+ to clear the fixed rail */}
-        <div className="lg:pl-60">
+        {/* AppChrome hides the sidebar + topbar on public routes (/welcome,
+            /login, /auth/*, /m/*) so signed-out visitors get a marketing
+            surface, not the entity-scoped app shell. */}
+        <AppChrome>
           <RouteGuard>{children}</RouteGuard>
           <FlowStrip />
-        </div>
+        </AppChrome>
         <SessionMigrator />
         <KeyboardShortcuts />
         <ChefSwitch />
