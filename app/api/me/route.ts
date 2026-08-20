@@ -40,11 +40,30 @@ export async function GET() {
 
     try { await supabase.rpc("sync_my_profile_from_invite"); } catch {}
 
-    const { data: prof } = await supabase
+    // Diagnostic: try the profile lookup in multiple ways
+    const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("id,name,role,restaurant_id,color")
       .eq("id", user.id)
       .maybeSingle();
+    dbg.prof_err = profErr?.message ?? null;
+    dbg.prof_row_present = !!prof;
+
+    // Count all profiles rows visible to this JWT — if RLS is treating us as
+    // anon this will be 0 or fewer than the total (2)
+    const { count: profCount, error: profCountErr } = await supabase
+      .from("profiles").select("*", { count: "exact", head: true });
+    dbg.prof_count_visible = profCount;
+    dbg.prof_count_err = profCountErr?.message ?? null;
+
+    // Prove auth.uid() what the DB sees
+    try {
+      const { data: uidData } = await supabase.rpc("auth_uid_probe");
+      dbg.db_auth_uid = uidData ?? null;
+    } catch (e: any) {
+      dbg.db_auth_uid_err = e?.message ?? "rpc missing";
+    }
+
     if (!prof) return NextResponse.json({ profile: null, dbg, prof_lookup: "no_row" });
 
     const { world, isAdmin } = mapDbRole(prof.role);
