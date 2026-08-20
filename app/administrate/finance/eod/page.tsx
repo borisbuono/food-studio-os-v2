@@ -1,19 +1,28 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { serverRestaurantId, serverEntity } from "@/lib/serverVenue";
+import { ENTITY_LABEL } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 export default async function EodList() {
-  
-  const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
+  const supabase = supabaseServer();
+  const rid = serverRestaurantId();
+  const entity = serverEntity();
+  const venues = (await supabase.from("restaurants").select("id,name")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
-  const eod = (await supabase.from("eod_accounting").select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes").order("report_date", { ascending: false }).limit(60)).data || [];
+  const eod = (await supabase
+    .from("eod_accounting")
+    .select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes")
+    .eq("restaurant_id", rid)
+    .order("report_date", { ascending: false })
+    .limit(60)).data || [];
 
   return (
     <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
       <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">End-of-day reports</p>
+      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">End-of-day reports · {ENTITY_LABEL[entity]}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{eod.length} reports</h1>
       <Link href="/administrate/finance/eod/new" className="mt-4 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>+ Close today's service</Link>
 
@@ -29,7 +38,7 @@ export default async function EodList() {
             {r.eighty_six_notes ? <p className="mt-2 font-sans text-[13px] text-ink-soft">86: {r.eighty_six_notes}</p> : null}
           </div>
         ))}
-        {!eod.length ? <p className="font-sans text-[14px] text-clay">No reports yet.</p> : null}
+        {!eod.length ? <p className="font-sans text-[14px] text-clay">No reports yet for {ENTITY_LABEL[entity]}.</p> : null}
       </div>
     </main>
   );

@@ -5,7 +5,7 @@ import { getBindings } from "@/lib/integrations/registry";
 export const dynamic = "force-dynamic";
 
 const ENTITIES = [
-  { code: "IFL", brand: "Ibiza Food Studios", fiscal: "Ibiza Food Lab SL", restaurant_id: "a0000000-0000-4000-8000-000000000001" },
+  { code: "IFL", brand: "Ibiza Food Studios", fiscal: "Ibiza Food Lab SL", restaurant_id: "ca83e06f-a24d-43d7-bce4-57ac341d190f" },
   { code: "BM",  brand: "Bistro Mondo",       fiscal: "Bistrot Mondo SL",  restaurant_id: "fb4d008f-2d2a-4e0d-a525-6e0e36af0259" },
   { code: "BBH", brand: "Holdings",           fiscal: "Boris Buono Holdings SL", restaurant_id: null },
 ];

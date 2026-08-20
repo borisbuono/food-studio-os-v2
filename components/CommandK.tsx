@@ -332,7 +332,7 @@ export default function CommandK() {
                 className={"ml-2 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase " + (listening ? "border-ember text-ember" : "border-black/10 text-clay hover:text-ink")}
                 aria-label={listening ? "Stop voice" : "Start voice"}
               >
-                {listening ? "● listening" : "🎙 voice"}
+                {listening ? "● listening" : " voice"}
               </button>
               <span className="ml-2 rounded border border-black/15 bg-paper-deep px-1 font-mono text-[9px] uppercase text-clay">esc</span>
             </div>

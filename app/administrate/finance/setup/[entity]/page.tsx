@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const META: Record<string, { brand: string; fiscal: string; vat: string; restaurant_id?: string; gestoria: string; notes: string[] }> = {
   IFL: {
     brand: "Ibiza Food Studios", fiscal: "Ibiza Food Lab SL", vat: "Flat 10% on all sales (TPV + invoiced + events)",
-    restaurant_id: "a0000000-0000-4000-8000-000000000001",
+    restaurant_id: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
     gestoria: "Labritja (email-only from 2026-05-22)",
     notes: [
       "4× CaixaBank accounts in reality — Holded synced only 1. Use 'Import bank statement' below to load the other 3.",

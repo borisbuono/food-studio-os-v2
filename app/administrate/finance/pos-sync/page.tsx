@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const ENTITIES: EntityCode[] = ["IFL", "BM", "BBH"];
 const LABEL: Record<EntityCode, string> = { IFL: "Ibiza Food Studios", BM: "Bistro Mondo", BBH: "Boris Buono Holdings" };
 const RESTAURANT_ID_BY_ENTITY: Partial<Record<EntityCode, string>> = {
-  IFL: "a0000000-0000-4000-8000-000000000001",
+  IFL: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
   BM:  "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
 };
 

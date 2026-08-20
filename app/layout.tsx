@@ -6,6 +6,7 @@ import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+import CommandK from "@/components/CommandK";
 import FlowStrip from "@/components/FlowStrip";
 import PwaOfflineBadge from "@/components/PwaOfflineBadge";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -73,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </AppChrome>
         <SessionMigrator />
         <KeyboardShortcuts />
+        <CommandK />
         <ChefSwitch />
         <NewHireAssistantNudge />
         <InstallPrompt />

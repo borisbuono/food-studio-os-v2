@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AuthStatus from "@/components/AuthStatus";
 import LangChooser from "@/components/LangChooser";
-import CommandK from "@/components/CommandK";
 import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
@@ -101,7 +100,6 @@ export default function TopBar() {
         <Link href="/" data-testid="top-brand-mark" aria-label="Home" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
 
         <div className="flex items-center gap-3">
-          <CommandK />
 
           {/* entity context — top-right. Switcher for admins/preview, locked label for a scoped worker */}
           {loaded && canSwitch ? (

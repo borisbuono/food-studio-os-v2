@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 // Auth: requires an authenticated user (Vercel edge runtime enforces via supabaseServer).
 
 const RESTAURANT_ID_BY_ENTITY: Record<string, string> = {
-  IFL: "a0000000-0000-4000-8000-000000000001",
+  IFL: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
   BM:  "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
 };
 

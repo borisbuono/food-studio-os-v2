@@ -38,7 +38,6 @@ export const ROLE_BLURB: Record<OnboardingRole, string> = {
 // Mirrors ENTITY_TO_RESTAURANT in lib/entities.ts — kept as a plain map so it
 // can be used server-side without pulling the client-only entities module.
 export const RESTAURANT_TO_ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = {
-  "a0000000-0000-4000-8000-000000000001": "IFL",       // Utopia (launch sandbox — routes to IFL for finance)
   "fb4d008f-2d2a-4e0d-a525-6e0e36af0259": "BM",
   "ca83e06f-a24d-43d7-bce4-57ac341d190f": "IFL",
 };

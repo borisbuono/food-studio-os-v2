@@ -28,15 +28,6 @@ export async function GET(request: NextRequest) {
   const bounce = (msg: string) => {
     const u = new URL("/login", origin);
     u.searchParams.set("error", msg);
-    // Diagnostic: what cookies did the browser send to /auth/callback?
-    try {
-      const jar = cookies().getAll();
-      u.searchParams.set("dbg_cookies", jar.map((c) => c.name).join(",").slice(0, 300));
-      const verifier = jar.find((c) => c.name === "sb-fs-auth-code-verifier");
-      u.searchParams.set("dbg_verifier_len", verifier ? String(verifier.value.length) : "MISSING");
-      u.searchParams.set("dbg_verifier_prefix", verifier ? verifier.value.slice(0, 20) : "-");
-      u.searchParams.set("dbg_host", host ?? "-");
-    } catch {}
     return NextResponse.redirect(u);
   };
 
