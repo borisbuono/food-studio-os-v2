@@ -10,6 +10,7 @@ import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
+import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
 // The old Develop/Execute/Administrate/Grow labels are gone from the nav;
@@ -29,7 +30,7 @@ const PILLARS: { key: Pillar; href: string; label: string }[] = [
 export default function TopBar() {
   const [entity, setEntity] = useState<EntityKey>(() => {
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "utopia";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "bistro_mondo";
   });
   const [role, setRole] = useState<RoleKey>("office");
   const [profile, setProfile] = useState<MyProfile | null>(null);
@@ -37,6 +38,7 @@ export default function TopBar() {
   const pathname = usePathname() || "";
   const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
+  const switcher = useSwitcherEntities();
   const [inboxCount, setInboxCount] = useState<number>(0);
 
   // load profile once
@@ -63,7 +65,7 @@ export default function TopBar() {
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "utopia";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "bistro_mondo";
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
       setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
@@ -110,13 +112,56 @@ export default function TopBar() {
                 <span className="text-clay">▾</span>
               </button>
               {menu ? (
-                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-line bg-card shadow-xl shadow-black/15">
-                  {ENTITY_ORDER.map((k) => (
-                    <button key={k} onClick={() => pick(k)} className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition hover:bg-paper " + (k === entity ? "text-ink" : "text-ink-soft")}>
-                      <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[k] }} />
-                      {ENTITY_SHORT[k]}
+                <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-line bg-card shadow-xl shadow-black/15">
+                  {switcher.loading ? (
+                    <div className="px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-clay">Loading…</div>
+                  ) : null}
+                  {switcher.operating.length ? (
+                    <div className="px-3 pt-2 pb-1 font-mono text-[9px] uppercase tracking-wide text-clay">Venues</div>
+                  ) : null}
+                  {switcher.operating.map((ent) => (
+                    <button
+                      key={ent.id}
+                      disabled={!ent.entityKey}
+                      onClick={() => { if (ent.entityKey) { pick(ent.entityKey); } }}
+                      className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition " + (ent.entityKey ? "hover:bg-paper " : "cursor-not-allowed opacity-50 ") + (ent.entityKey === entity ? "text-ink" : "text-ink-soft")}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#7A7A75" }} />
+                      {ent.name}
                     </button>
                   ))}
+                  {switcher.holding.length ? (
+                    <div className="px-3 pt-2 pb-1 font-mono text-[9px] uppercase tracking-wide text-clay">Group</div>
+                  ) : null}
+                  {switcher.holding.map((ent) => (
+                    <button
+                      key={ent.id}
+                      disabled={!ent.entityKey}
+                      onClick={() => { if (ent.entityKey) { pick(ent.entityKey); } }}
+                      className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition " + (ent.entityKey ? "hover:bg-paper " : "cursor-not-allowed opacity-50 ") + (ent.entityKey === entity ? "text-ink" : "text-ink-soft")}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#7A7A75" }} />
+                      {ent.name}
+                    </button>
+                  ))}
+                  {switcher.portfolio.length ? (
+                    <div className="px-3 pt-2 pb-1 font-mono text-[9px] uppercase tracking-wide text-clay">Portfolio</div>
+                  ) : null}
+                  {switcher.portfolio.map((ent) => (
+                    <button
+                      key={ent.id}
+                      disabled
+                      title="Phase 3 — not yet routable"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition cursor-not-allowed opacity-50 text-ink-soft"
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: "#7A7A75" }} />
+                      <span className="flex-1 truncate">{ent.name}</span>
+                      <span className="font-mono text-[9px] uppercase text-clay">{ent.entity_type.replace("_", " ")}</span>
+                    </button>
+                  ))}
+                  {(!switcher.loading && !switcher.operating.length && !switcher.holding.length && !switcher.portfolio.length) ? (
+                    <div className="px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-clay">No entities</div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

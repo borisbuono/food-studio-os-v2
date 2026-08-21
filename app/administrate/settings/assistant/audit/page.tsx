@@ -7,7 +7,7 @@ import AuditClient from "./AuditClient";
 export const dynamic = "force-dynamic";
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL",
+  holdings: "BBH", bistro_mondo: "BM", taller: "IFL",
 };
 
 // Assistant Polish #3 — action audit surface.

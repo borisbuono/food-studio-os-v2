@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 const BM = "fb4d008f-2d2a-4e0d-a525-6e0e36af0259";
 const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
-const UT = "a0000000-0000-4000-8000-000000000001";
+// Utopia (a0000000-…-0001) intentionally dropped — trial archived 2026-08-22.
 
 // Entity code used by the finance tables (invoice_inbox / bank_movements share BM / IFL / BBH).
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 
 // Assumed service window per venue -- used to compute the service step state
 // and the "service in Xh" copy. These match the current operating hours; if a
@@ -18,7 +18,6 @@ const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: 
 const SERVICE_HOURS: Record<EntityKey, { open: string; close: string }> = {
   bistro_mondo: { open: "19:00", close: "23:30" },
   taller: { open: "19:00", close: "23:30" },
-  utopia: { open: "19:00", close: "23:00" },
   holdings: { open: "19:00", close: "23:30" }, // synthetic (holdings is not a venue but keep the shape)
 };
 
@@ -396,7 +395,6 @@ export default async function Page() {
 
   const bm = compassFor(BM, "bistro_mondo");
   const taller = compassFor(TALLER, "taller");
-  const utopia = compassFor(UT, "utopia");
 
   // Holdings = rolled-up. Loop is the merged view; alerts are combined.
   const holdingsAlerts = [...bm.alerts, ...taller.alerts];
@@ -451,6 +449,6 @@ export default async function Page() {
     } : (bm.cashPosition || taller.cashPosition),
   };
 
-  const data: CompassData = { holdings, bistro_mondo: bm, taller, utopia };
+  const data: CompassData = { holdings, bistro_mondo: bm, taller };
   return <HomeSwitch data={data} />;
 }

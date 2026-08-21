@@ -14,8 +14,8 @@ export async function POST(req: Request) {
   const message = String(body?.message || "").slice(0, 4000);
   const route = String(body?.route || "");
   const sessionId = String(body?.session_id || "") || null;
-  const entityRaw = String(body?.entity_id || "utopia");
-  // Map the FAB's entity_id (utopia/taller/bistro_mondo/holdings) to Assistant EntityCode.
+  const entityRaw = String(body?.entity_id || "bistro_mondo");
+  // Map the FAB's entity_id (taller/bistro_mondo/holdings) to Assistant EntityCode.
   const entity: EntityCode = entityRaw === "bistro_mondo" ? "BM" : entityRaw === "holdings" ? "BBH" : "IFL";
   const pageContext = body?.page_context || null;
   const language = (body?.language === "es" ? "es" : "en") as "en" | "es";

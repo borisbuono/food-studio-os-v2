@@ -53,8 +53,8 @@ export default function Order() {
   const logOrder = async (channel: string) => {
     try {
       const p = await getMyProfile();
-      const ent = (p && !p.isAdmin ? p.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "utopia";
-      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (p && !p.isAdmin ? p.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "bistro_mondo";
+      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       await supabaseBrowser.from("orders").insert({ restaurant_id: rid, provider_id: provider?.id || null, created_by: p?.id || null, status: "sent", channel, sent_at: new Date().toISOString(), order_date: new Date().toISOString().slice(0, 10), subtotal: total, total, notes: orderMessage() });
     } catch {}
   };

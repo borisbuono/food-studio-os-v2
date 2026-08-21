@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // per-entity accent stroke on the header + drop-target ring.
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH",
+  taller: "IFL", bistro_mondo: "BM", holdings: "BBH",
 };
 
 type Channel = "instagram" | "facebook" | "tiktok" | "threads";
@@ -50,7 +50,7 @@ function ymd(d: Date): string {
 function fmtDay(d: Date): string { return d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" }); }
 
 export default function CalendarPage() {
-  const [entity, setEntity] = useState<EntityKey>("utopia");
+  const [entity, setEntity] = useState<EntityKey>("bistro_mondo");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [posts, setPosts] = useState<Post[]>([]);
   const [drafts, setDrafts] = useState<Post[]>([]);

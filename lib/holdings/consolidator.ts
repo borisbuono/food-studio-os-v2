@@ -92,7 +92,7 @@ export async function getGroupRevenueMTD(): Promise<{ by_entity: ByEntity<number
   const RID_TO_EC: Record<string, EntityCode> = {};
   for (const [rid, ek] of Object.entries(RESTAURANT_TO_ENTITY)) {
     if (ek === "bistro_mondo") RID_TO_EC[rid] = "BM";
-    else if (ek === "taller" || ek === "utopia") RID_TO_EC[rid] = "IFL";
+    else if (ek === "taller") RID_TO_EC[rid] = "IFL";
     else if (ek === "holdings") RID_TO_EC[rid] = "BBH";
   }
 

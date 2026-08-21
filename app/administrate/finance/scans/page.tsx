@@ -6,7 +6,7 @@ import { SupplierChip } from "@/components/chips";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<string, string> = { utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
+const ENTITY_CODE: Record<string, string> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 const eur = (n: number | null | undefined) => n == null ? "—" : "€" + Number(n).toFixed(2);
 const SOURCE_LABEL: Record<string, string> = {
   holded_scan: "Holded scan",

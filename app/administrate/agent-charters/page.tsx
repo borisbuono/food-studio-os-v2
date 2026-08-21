@@ -6,7 +6,7 @@ import AgentCharterBoard from "@/components/AgentCharterBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 
 // /administrate/agent-charters — the OS-native Agent Task Charter surface.
 // Every agent spawned from the OS gets a charter row before it runs.

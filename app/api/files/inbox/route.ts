@@ -10,7 +10,7 @@ const ENTITY_CODE: Record<EntityKey, string> = {
   holdings: "BBH",
   bistro_mondo: "BM",
   taller: "IFL",
-  utopia: "IFL",
+  
 };
 
 // GET /api/files/inbox — list inbox rows for the current entity.

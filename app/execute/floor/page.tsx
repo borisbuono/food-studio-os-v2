@@ -30,8 +30,8 @@ export default function FloorPlan() {
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null);
 
   useEffect(() => {
-    const ent = (readEntityCookie() || "utopia") as EntityKey;
-    const r = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+    const ent = (readEntityCookie() || "bistro_mondo") as EntityKey;
+    const r = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
     setRid(r);
   }, []);
 

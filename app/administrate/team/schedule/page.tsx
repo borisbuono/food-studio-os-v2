@@ -27,8 +27,8 @@ export default function Schedule() {
       setLoading(true);
       const from = iso(days[0]), to = iso(days[6]);
       const prof = await getMyProfile();
-      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "utopia";
-      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "bistro_mondo";
+      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       const todayIso = new Date().toISOString().slice(0, 10);
       const dayStart = new Date(todayIso + "T00:00:00").toISOString();
       const [s, p, z, ce] = await Promise.all([

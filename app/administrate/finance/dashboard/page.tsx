@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 const ENTITY_CODE: Record<string, string> = {
-  utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH",
+  taller: "IFL", bistro_mondo: "BM", holdings: "BBH",
 };
 
 export default async function FinanceDashboard() {

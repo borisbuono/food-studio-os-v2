@@ -58,8 +58,8 @@ export default function Academy() {
     (async () => {
       const p = await getMyProfile(); setProfile(p);
       if (!p) { setReady(true); return; }
-      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-      const rid = p.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const rid = p.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       setVenueName((await supabaseBrowser.from("restaurants").select("name").eq("id", rid).maybeSingle()).data?.name || "Your venue");
       const { data: zs } = await supabaseBrowser.from("zones").select("id,name,area").eq("restaurant_id", rid);
       const zoneIds = (zs || []).map((z: any) => z.id);

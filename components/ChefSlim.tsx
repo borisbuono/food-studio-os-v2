@@ -31,7 +31,7 @@ import { pillarForRoute } from "@/lib/routing/pillar-map";
 
 type Mode = "idle" | "listening" | "thinking" | "replying";
 
-const ENTITY_CODE: Record<string, string> = { utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
+const ENTITY_CODE: Record<string, string> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 const AUTO_DISMISS_MS = 4000;
 const LONG_PRESS_MS = 500;
 const WHISPER_MAX_MS = 60_000;
@@ -105,7 +105,7 @@ export default function ChefSlim() {
     if (!text.trim()) { dismiss(); return; }
     setMode("thinking");
     try {
-      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
       const basePageCtx = (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null) || {};
       const activePillar = pillarForRoute(pathname || "");
       const pageContextWithPillar = { ...basePageCtx, active_pillar: activePillar };

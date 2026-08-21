@@ -10,7 +10,7 @@ const ENTITY_CODE: Record<EntityKey, string> = {
   holdings: "BBH",
   bistro_mondo: "BM",
   taller: "IFL",
-  utopia: "IFL",
+  
 };
 
 // /files/inbox — the triage front-end for auto-ingested attachments.

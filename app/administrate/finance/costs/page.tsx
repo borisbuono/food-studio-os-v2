@@ -29,8 +29,8 @@ export default function Costs() {
   useEffect(() => {
     (async () => {
       const p = await getMyProfile();
-      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       const { data } = await supabaseBrowser.from("price_history").select("name,item_kind,unit_price,captured_at,supplier").eq("restaurant_id", rid).order("captured_at", { ascending: true });
       setRows((data || []) as P[]); setReady(true);
     })();

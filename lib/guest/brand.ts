@@ -50,19 +50,6 @@ const BRANDS: Record<string, GuestBrand> = {
     displayClass: "font-serif font-light",
     supportLine: "Ibiza Food Studio · Sa Penya",
   },
-  "utopia": {
-    slug: "utopia",
-    restaurantName: "Restaurant Utopia",
-    kicker: "Editorial demo",
-    accent: "#0E7C86",
-    bg: "#EFEEEB",
-    ink: "#171511",
-    inkSoft: "#3A352D",
-    clay: "#7A7A75",
-    wordmarkClass: "font-serif italic font-light",
-    displayClass: "font-serif font-light",
-    supportLine: "Utopia · a Food Studios venue",
-  },
 };
 
 // Fallback used when a venue has a slug but no brand row yet — editorial-neutral.

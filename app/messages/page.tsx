@@ -42,8 +42,8 @@ export default function Messages() {
     (async () => {
       const p = await getMyProfile(); setProfile(p);
       if (!p) { setReady(true); return; }
-      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-      const r = p.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const r = p.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       setRid(r);
       await loadChannels(p, r);
       const { data: ppl } = await supabaseBrowser.from("profiles").select("id,name,role");

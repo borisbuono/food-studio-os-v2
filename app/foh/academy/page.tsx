@@ -6,7 +6,7 @@ import AcademyBoard from "@/components/AcademyBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 
 // Pillars #3 — the foh-scoped Academy surface. Same shared table
 // (academy_lessons), filtered by module_scope containing 'foh'.

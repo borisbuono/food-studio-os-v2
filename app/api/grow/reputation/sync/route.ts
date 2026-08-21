@@ -14,7 +14,6 @@ function entityKeyToCode(key: string): EntityCode {
   if (key === "taller") return "IFL";
   if (key === "bistro_mondo") return "BM";
   if (key === "holdings") return "BBH";
-  // utopia / demo → IFL substrate (matches finance setup)
   return "IFL";
 }
 

@@ -66,7 +66,7 @@ export type CompassData = Record<EntityKey, {
   cashPosition: { latestEur: number | null; weekEnding: string | null; apPendienteEur: number | null } | null;
 }>;
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
   { href: "/develop/menu-engineering", label: "Develop", blurb: "Menu, recipes, wine, lexicon" },
@@ -232,7 +232,7 @@ export default function HomeCompass({ data }: { data: CompassData }) {
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>(() => {
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? c : "utopia";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? c : "bistro_mondo";
   });
   const [userAccent, setUserAccent] = useState<string | null>(null);
 

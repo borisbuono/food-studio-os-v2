@@ -5,7 +5,7 @@ import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 // Office pillar — books, team, holdings, ads. The operator's back-office.

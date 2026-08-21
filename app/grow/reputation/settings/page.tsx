@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // entity via lib/integrations/registry.ts.
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL",
+  holdings: "BBH", bistro_mondo: "BM", taller: "IFL",
 };
 
 export default async function ReputationSettings() {

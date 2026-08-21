@@ -7,7 +7,6 @@ export const VENUE_LOGO: Record<EntityKey, string> = {
   holdings: "/brand/logos/ibiza-food-studios.svg",
   bistro_mondo: "/brand/logos/bistro-mondo.svg",
   taller: "/brand/logos/taller.svg",
-  utopia: "/brand/logos/utopia.svg",
 };
 export const FALLBACK_LOGO = "/brand/logos/food-studios-wordmark.svg";
 

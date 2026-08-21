@@ -49,8 +49,8 @@ export default function GrowRelationships() {
 
   useEffect(() => {
     (async () => {
-      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "utopia";
-      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "bistro_mondo";
+      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       const { data: gs } = await supabaseBrowser
         .from("guests")
         .select("id,name,email,phone,allergies,dietary,birthday,notes,first_visit_at,last_visit_at,lifetime_value_eur,source")

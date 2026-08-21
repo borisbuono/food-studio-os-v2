@@ -47,8 +47,8 @@ export default function GrowCommercials() {
 
   useEffect(() => {
     (async () => {
-      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "utopia";
-      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "bistro_mondo";
+      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       const { data: cs } = await supabaseBrowser
         .from("commercials")
         .select("id,type,title,description,starts_at,ends_at,active,created_at")

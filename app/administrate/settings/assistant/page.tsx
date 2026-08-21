@@ -7,7 +7,7 @@ import AssistantSettingsClient from "./AssistantSettingsClient";
 export const dynamic = "force-dynamic";
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL",
+  holdings: "BBH", bistro_mondo: "BM", taller: "IFL",
 };
 
 // Assistant Layer Sprint 5 — the config-as-data surface.

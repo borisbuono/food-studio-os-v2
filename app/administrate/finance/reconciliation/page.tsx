@@ -7,7 +7,7 @@ import ReconciliationSourcePreview from "./ReconciliationSourcePreview";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = { utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
+const ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 const eur = (n: number) => (n < 0 ? "-€" : "€") + Math.abs(n).toFixed(2);
 const CAT: Record<string, string> = {
   invoice: "Invoice",

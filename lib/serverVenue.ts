@@ -2,14 +2,13 @@ import { cookies } from "next/headers";
 import { EntityKey, ENTITY_TO_RESTAURANT, RESTAURANT_TO_ENTITY } from "./entities";
 import { supabaseServer } from "./supabaseServer";
 
-const KEYS: EntityKey[] = ["holdings", "bistro_mondo", "taller", "utopia"];
+const KEYS: EntityKey[] = ["holdings", "bistro_mondo", "taller"];
 
 // The venue the current view is scoped to. Priority:
 //  1. fs_entity cookie (explicit user choice, set by the switcher)
 //  2. signed-in user's profiles.restaurant_id (first-visit default)
-//  3. "bistro_mondo" (safe fallback — NEVER default to utopia in production;
-//     Utopia is a trial sandbox and defaulting to it shows fake data to the
-//     owner. Root-caused during the 2026-08-20 audit.)
+//  3. "bistro_mondo" (safe fallback — Utopia trial is archived,
+//     see 2026-08-22 Phase 1 entity migration.)
 export function serverEntity(): EntityKey {
   const c = cookies().get("fs_entity")?.value as EntityKey | undefined;
   if (c && KEYS.includes(c)) return c;

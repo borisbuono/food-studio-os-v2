@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import type { MenuItem } from "@/types/db";
+import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function MenuPage() {
   const supabase = supabaseServer();const { data } = await supabase
     .from("menu_items")
     .select("id,restaurant_id,recipe_id,name,section,price,cost,description,is_active,is_eighty_six,is_special,beverage_type,category,course,wine_style")
-    .eq("is_active", true).neq("restaurant_id", "a0000000-0000-4000-8000-000000000001");
+    .eq("is_active", true).in("restaurant_id", Object.keys(RESTAURANT_TO_ENTITY)); // exclude archived venues (Utopia)
   const items = (data ?? []) as MenuItem[];
   // Library: recipes with no linked menu item (sub-recipes, prep)
   const linkedRecipeIds = new Set(items.map((i) => i.recipe_id).filter(Boolean));

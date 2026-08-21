@@ -6,7 +6,7 @@ import AssistantContext from "@/components/AssistantContext";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = { utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
+const ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 
 export default async function PatternsPage() {
   const sb = supabaseServer();

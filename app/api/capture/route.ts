@@ -4,7 +4,7 @@ import { serverEntity } from "@/lib/serverVenue";
 
 export const runtime = "nodejs";
 
-const ENTITY_CODE: Record<string, string> = { utopia: "IFL", taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
+const ENTITY_CODE: Record<string, string> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 
 type Detected = { type: "invoice" | "albaran" | "eod" | "other"; supplier_name?: string | null; total_eur?: number | null; vat_eur?: number | null; document_date?: string | null; confidence?: number; reasoning?: string };
 

@@ -90,8 +90,8 @@ export default function TempLog() {
     (async () => {
       const p = await getMyProfile();
       setProfile(p);
-      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "utopia")) || "utopia";
-      const restaurant = p?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.utopia!;
+      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const restaurant = p?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
       setRid(restaurant);
       await loadLogs(restaurant);
       setReady(true);

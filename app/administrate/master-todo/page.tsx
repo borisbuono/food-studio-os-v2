@@ -6,7 +6,7 @@ import MasterTodoBoard from "@/components/MasterTodoBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL", utopia: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
 
 // /administrate/master-todo — the OS-native Master_ToDo surface.
 // Mirrors Boris's Cowork-side PA orchestrator list. Ranks by impact_score

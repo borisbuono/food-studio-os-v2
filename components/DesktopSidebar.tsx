@@ -9,115 +9,64 @@ import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routi
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
+import { sidebarForScope, entityTypeFor, EntityType } from "@/lib/scope";
+import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px). On
 // smaller viewports the sidebar hides (see md:hidden below) and the existing
 // TopBar pill row remains authoritative — nothing regresses on mobile.
 //
-// Structure: entity switcher on top, three collapsible pillar sections
-// (FOH · BOH · Office) with the aliased routes from pillar-map, then a
-// Files jump, then user avatar + settings + sign-out. Each pillar section
-// carries its own accent stripe on the active row so the eye can locate
-// context without reading the label.
-
-type Item = { href: string; label: string; badge?: string };
-type Section = { pillar: Pillar; items: Item[] };
-
-const SECTIONS: Section[] = [
-  {
-    pillar: "foh",
-    items: [
-      { href: "/foh",                    label: "Front dashboard" },
-      { href: "/foh/bookings",           label: "Bookings" },
-      { href: "/foh/pass",                label: "The Pass" },
-      { href: "/foh/menu",                label: "Menu (consumer)" },
-      { href: "/foh/guests",              label: "Guest arc" },
-      { href: "/foh/reviews",             label: "Reviews" },
-      { href: "/foh/academy",             label: "Service academy" },
-      { href: "/grow/relationships",      label: "Relationships" },
-      { href: "/grow/reputation",         label: "Reputation" },
-      { href: "/grow/inbox",              label: "Guest inbox" },
-      { href: "/m",                       label: "Guest surface" },
-    ],
-  },
-  {
-    pillar: "boh",
-    items: [
-      { href: "/boh",                     label: "Kitchen dashboard" },
-      { href: "/boh/cook",                label: "Cook mode" },
-      { href: "/boh/mep",                 label: "MEP" },
-      { href: "/boh/recipes",             label: "Recipes" },
-      { href: "/boh/menu",                label: "Menu (BOH)" },
-      { href: "/boh/receiving",           label: "Receiving" },
-      { href: "/boh/wine",                label: "Wine" },
-      { href: "/boh/bar",                 label: "Bar" },
-      { href: "/boh/academy",             label: "Kitchen academy" },
-      { href: "/develop/menu",            label: "Menu develop" },
-      { href: "/develop/lexicon",         label: "Lexicon" },
-      { href: "/develop/repricing",       label: "Repricing" },
-      { href: "/develop/menu-engineering",label: "Menu engineering" },
-      { href: "/execute/orders",          label: "Place an order" },
-      { href: "/execute/inventory",       label: "Inventory" },
-      { href: "/execute/temp",            label: "Temps" },
-      { href: "/execute/handover",        label: "Handover" },
-    ],
-  },
-  {
-    pillar: "office",
-    items: [
-      { href: "/office",                          label: "Office dashboard" },
-      { href: "/administrate/finance",            label: "Finance" },
-      { href: "/administrate/finance/reconciliation", label: "Reconciliation" },
-      { href: "/administrate/finance/anomalies",  label: "Anomalies" },
-      { href: "/administrate/finance/scans",      label: "Scan queue" },
-      { href: "/administrate/finance/eod",        label: "EOD reports" },
-      { href: "/administrate/invoices",           label: "Missing invoices" },
-      { href: "/administrate/suppliers",          label: "Suppliers" },
-      { href: "/administrate/team",               label: "Team" },
-      { href: "/administrate/team/schedule",      label: "Schedule" },
-      { href: "/administrate/events",             label: "Events" },
-      { href: "/administrate/decisions",          label: "Decisions" },
-      { href: "/administrate/holdings",           label: "Holdings" },
-      { href: "/grow/reach",                      label: "Reach" },
-      { href: "/grow/reach/calendar",             label: "Reach calendar" },
-      { href: "/grow/commercials",                label: "Commercials" },
-      { href: "/administrate/settings",           label: "Settings" },
-    ],
-  },
-];
+// Phase 2 (2026-08-22) — TWO changes vs the pre-rewrite shell:
+//   1. The entity switcher no longer renders a hardcoded ENTITY_ORDER list.
+//      It calls useSwitcherEntities() which reads Supabase memberships and
+//      returns operating / holding / portfolio groups. Utopia is gone.
+//   2. The sidebar body is scope-aware. Bistro Mondo (operating_venue) shows
+//      FOH/BOH/OFFICE; BBH (holding_company) shows Group/Portfolio/Growth;
+//      an advisory client sees a 3-item Advisory tree only. See lib/scope.ts.
 
 export default function DesktopSidebar() {
   const pathname = usePathname() || "";
   const activePillar = pillarForRoute(pathname);
 
   const [entity, setEntity] = useState<EntityKey>(() => {
-    if (typeof window === "undefined") return "utopia";
+    if (typeof window === "undefined") return "bistro_mondo";
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "utopia";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "bistro_mondo";
   });
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [entMenu, setEntMenu] = useState(false);
-  const [open, setOpen] = useState<Record<Pillar, boolean>>(() => ({
-    foh: activePillar === "foh",
-    boh: activePillar === "boh",
-    office: activePillar === "office" || activePillar === null,
-  }));
+
+  const switcher = useSwitcherEntities();
+  const scopeType: EntityType = entityTypeFor(entity);
+  const sections = useMemo(() => sidebarForScope(scopeType), [scopeType]);
+
+  // Sections open state is section-key-keyed (not pillar-keyed) because the
+  // new tree includes group/portfolio/growth/etc. Default: current-route
+  // section open when that section matches a pillar; otherwise all open.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setOpen((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const s of sections) {
+        // Preserve any previously-toggled state; default to open.
+        next[s.key] = prev[s.key] ?? true;
+      }
+      // If the current route matches a pillar in this scope, ensure it's open.
+      if (activePillar) next[activePillar] = true;
+      return next;
+    });
+  }, [sections, activePillar]);
 
   useEffect(() => { getMyProfile().then(setProfile); }, []);
 
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "utopia";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "bistro_mondo";
       setEntity(e); writeCookie(e);
     };
     read();
     return onCtx(read);
   }, []);
-
-  useEffect(() => {
-    // If the route moves into a new pillar, auto-open its section.
-    if (activePillar) setOpen((s) => ({ ...s, [activePillar]: true }));
-  }, [activePillar]);
 
   const isAdmin = !!profile?.isAdmin;
   const canSwitch = isAdmin || !profile;
@@ -133,6 +82,13 @@ export default function DesktopSidebar() {
     try { await sbBrowser.auth.signOut(); } catch {}
     if (typeof window !== "undefined") window.location.href = "/login";
   }
+
+  // Accent for a section header — pillars keep their existing accent, the new
+  // group/portfolio/etc. keys inherit the operator olive so they don't scream.
+  const sectionAccent = (key: string): string => {
+    if (key === "foh" || key === "boh" || key === "office") return PILLAR_ACCENT[key as Pillar];
+    return "#3F4C28"; // olive (operator ledger) for group/portfolio/growth/settings/etc.
+  };
 
   return (
     <aside
@@ -159,18 +115,70 @@ export default function DesktopSidebar() {
             </button>
             {entMenu ? (
               <div className="absolute left-0 right-0 mt-1 z-10 overflow-hidden rounded-md border border-line bg-card shadow-xl" role="listbox">
-                {ENTITY_ORDER.map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => { setEntityCtx(k); setEntity(k); setEntMenu(false); }}
-                    className={"flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-sans text-[12px] transition hover:bg-paper " + (k === entity ? "text-ink" : "text-ink-soft")}
-                    role="option"
-                    aria-selected={k === entity}
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[k] }} />
-                    {ENTITY_SHORT[k]}
-                  </button>
+                {switcher.loading ? (
+                  <div className="px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">Loading…</div>
+                ) : null}
+
+                {/* Operating venues — the default work-in group */}
+                {switcher.operating.length ? (
+                  <SwitcherGroupHeader label="Venues" />
+                ) : null}
+                {switcher.operating.map((ent) => (
+                  <SwitcherRow
+                    key={ent.id}
+                    label={ent.name}
+                    accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
+                    selected={ent.entityKey === entity}
+                    disabled={!ent.entityKey}
+                    onClick={() => {
+                      if (!ent.entityKey) return;
+                      setEntityCtx(ent.entityKey);
+                      setEntity(ent.entityKey);
+                      setEntMenu(false);
+                    }}
+                  />
                 ))}
+
+                {/* Holding company — "Group" section */}
+                {switcher.holding.length ? (
+                  <SwitcherGroupHeader label="Group" />
+                ) : null}
+                {switcher.holding.map((ent) => (
+                  <SwitcherRow
+                    key={ent.id}
+                    label={ent.name}
+                    accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
+                    selected={ent.entityKey === entity}
+                    disabled={!ent.entityKey}
+                    onClick={() => {
+                      if (!ent.entityKey) return;
+                      setEntityCtx(ent.entityKey);
+                      setEntity(ent.entityKey);
+                      setEntMenu(false);
+                    }}
+                  />
+                ))}
+
+                {/* Portfolio (advisory + partners + landlords) */}
+                {switcher.portfolio.length ? (
+                  <SwitcherGroupHeader label="Portfolio" />
+                ) : null}
+                {switcher.portfolio.map((ent) => (
+                  <SwitcherRow
+                    key={ent.id}
+                    label={ent.name}
+                    accent="#7A7A75"
+                    selected={false}
+                    disabled={true}
+                    hint={ent.entity_type.replace("_", " ")}
+                    onClick={() => { /* Phase 3 — no EntityKey yet */ }}
+                  />
+                ))}
+
+                {/* Empty state — nothing loaded, nothing membered. */}
+                {!switcher.loading && !switcher.operating.length && !switcher.holding.length && !switcher.portfolio.length ? (
+                  <div className="px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">No entities</div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -199,21 +207,22 @@ export default function DesktopSidebar() {
         </button>
       </div>
 
-      {/* Pillar sections */}
+      {/* Scope-aware sections — different tree for operating_venue vs
+          holding_company vs advisory / partner / landlord. See lib/scope.ts. */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {SECTIONS.map((section) => {
-          const opened = open[section.pillar];
-          const accent = PILLAR_ACCENT[section.pillar];
+        {sections.map((section) => {
+          const opened = open[section.key] ?? true;
+          const accent = sectionAccent(section.key);
           return (
-            <div key={section.pillar} className="mb-3">
+            <div key={section.key} className="mb-3">
               <button
-                onClick={() => setOpen((s) => ({ ...s, [section.pillar]: !s[section.pillar] }))}
+                onClick={() => setOpen((s) => ({ ...s, [section.key]: !(s[section.key] ?? true) }))}
                 className="flex w-full items-center justify-between rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
                 aria-expanded={opened}
               >
                 <span className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
-                  {PILLAR_LABEL[section.pillar]}
+                  {section.label}
                 </span>
                 <span aria-hidden>{opened ? "−" : "+"}</span>
               </button>
@@ -245,7 +254,10 @@ export default function DesktopSidebar() {
           );
         })}
 
-        {/* Files — universal escape hatch, distinct from pillars */}
+        {/* Files — universal escape hatch, distinct from pillars. Rendered in
+            every scope because HACCP, contracts, brand assets and gestoría
+            paperwork are cross-scope by nature (a landlord invoice lives in
+            the same Files store as a supplier's HACCP sheet). */}
         <div className="mt-3 border-t border-black/10 pt-3">
           <Link
             href="/files"
@@ -315,5 +327,42 @@ export default function DesktopSidebar() {
         </div>
       </div>
     </aside>
+  );
+}
+
+// --- Switcher subcomponents -----------------------------------------------
+
+function SwitcherGroupHeader({ label }: { label: string }) {
+  return (
+    <div className="px-2.5 pt-2 pb-1 font-mono text-[9px] uppercase tracking-wide text-clay">
+      {label}
+    </div>
+  );
+}
+
+function SwitcherRow({
+  label, accent, selected, disabled, hint, onClick,
+}: {
+  label: string; accent: string; selected: boolean; disabled?: boolean;
+  hint?: string; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        "flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-sans text-[12px] transition " +
+        (disabled ? "cursor-not-allowed opacity-50" : "hover:bg-paper ") +
+        (selected ? " text-ink" : " text-ink-soft")
+      }
+      role="option"
+      aria-selected={selected}
+      aria-disabled={disabled || undefined}
+      title={disabled ? "Phase 3 — not yet routable" : undefined}
+    >
+      <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
+      <span className="flex-1 truncate">{label}</span>
+      {hint ? <span className="font-mono text-[9px] uppercase text-clay">{hint}</span> : null}
+    </button>
   );
 }
