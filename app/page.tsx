@@ -2,6 +2,7 @@ import HomeSwitch from "@/components/HomeSwitch";
 import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,10 @@ function addDaysIso(iso: string, days: number): string {
 }
 
 export default async function Page() {
+  const _authSb = supabaseServer();
+  const { data: { user: _anonCheck } } = await _authSb.auth.getUser();
+  if (!_anonCheck) redirect("/welcome");
+
   const supabase = supabaseServer();
   const today = madridToday();
   const in30 = addDaysIso(today, 30);
