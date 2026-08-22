@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   }
 
   const [context, memory, config, history] = await Promise.all([
-    orchestrator.getContext(entity, uid, pageContext),
+    orchestrator.getContext(entity, uid, pageContext, route),
     orchestrator.getMemory(entity, uid),
     orchestrator.getConfig(entity),
     mode === "chat" ? orchestrator.getHistory(sessionId, uid) : Promise.resolve([]),

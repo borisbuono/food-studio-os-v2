@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const uid = u.user?.id || null;
 
   const [context, memory, config, history] = await Promise.all([
-    orchestrator.getContext(entity, uid, pageContext),
+    orchestrator.getContext(entity, uid, pageContext, route),
     orchestrator.getMemory(entity, uid),
     orchestrator.getConfig(entity),
     orchestrator.getHistory(sessionId, uid),

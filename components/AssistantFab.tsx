@@ -804,7 +804,25 @@ export default function AssistantFab() {
       // the existing page_context so any page-set intent is preserved.
       const basePageCtx = (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null) || {};
       const activePillar = pillarForRoute(pathname || "");
-      const pageContextWithPillar = { ...basePageCtx, active_pillar: activePillar };
+      // Chef context grounding (2026-08-22): pass the page's URL, title,
+      // and any URL params so the orchestrator's route context lookup can
+      // scope reads to what the user is actually looking at. Falls back
+      // gracefully in SSR / test environments where window is undefined.
+      let pageMeta: Record<string, any> = {};
+      try {
+        if (typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          const params: Record<string, string> = {};
+          url.searchParams.forEach((v, k) => { params[k] = v; });
+          pageMeta = {
+            route: pathname || url.pathname,
+            pathname: url.pathname,
+            url_params: params,
+            title: (typeof document !== "undefined" ? document.title : null) || null,
+          };
+        }
+      } catch {}
+      const pageContextWithPillar = { ...basePageCtx, ...pageMeta, active_pillar: activePillar };
       const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         message: t, route: pathname || "", session_id: sessionRef.current, entity_id: ent, language: lang,
         page_context: pageContextWithPillar,

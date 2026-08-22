@@ -16,6 +16,7 @@ export async function POST(req: Request) {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
 
-  const context = await orchestrator.getContext(entity, uid, pageContext);
+  const route = (pageContext && (pageContext.route || pageContext.pathname)) || null;
+  const context = await orchestrator.getContext(entity, uid, pageContext, route);
   return Response.json({ ok: true, context });
 }

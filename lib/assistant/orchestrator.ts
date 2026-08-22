@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { getRouteContext, formatRouteContextBlock, routeContextTokens, RouteContext } from "@/lib/assistant/routeContext";
 
 // The Brain — the Assistant Layer orchestrator.
 //
@@ -62,6 +63,13 @@ export type AssistantContext = {
     next_lesson_title: string | null;
   } | null;
   page_context: any | null;
+  // Chef context grounding (2026-08-22): the page the operator is
+  // standing on right now, plus the ground-truth row counts for the
+  // tables that page reads. When set, this OUTWEIGHS the entity-wide
+  // state block — otherwise Chef answers aspirationally about ledgers
+  // the user isn't looking at.
+  route: string | null;
+  route_context: RouteContext | null;
 };
 
 export type AssistantMemoryFact = { fact: string; scope?: string };
@@ -166,12 +174,17 @@ export class AssistantOrchestrator {
     return data || null;
   }
 
-  async getContext(entity: EntityCode, userId: string | null, pageContext: any | null): Promise<AssistantContext> {
+  async getContext(entity: EntityCode, userId: string | null, pageContext: any | null, route?: string | null): Promise<AssistantContext> {
     const sb = supabaseServer();
     const today = madridToday();
     const rid = ENTITY_TO_RID[entity] || null;
 
-    const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    // Chef grounding: the page the user is on takes priority over
+    // entity-wide state. Read route from the explicit arg or from
+    // page_context (the FAB sets it there since 2026-08-22).
+    const resolvedRoute: string | null = (route ?? (pageContext && (pageContext.route || pageContext.pathname))) || null;
+    const routeContextPromise = getRouteContext(entity, resolvedRoute).catch(() => null);
+        const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
     const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos, paSchedule, academyModuleLessons, academyProgress] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
@@ -199,6 +212,8 @@ export class AssistantOrchestrator {
         : Promise.resolve({ data: [] } as any),
       userId ? sb.from("academy_lesson_progress").select("lesson_id,status").eq("user_id", userId) : Promise.resolve({ data: [] } as any),
     ]);
+
+    const routeCtx = await routeContextPromise;
 
     // Resolve per-hire step counts so "What is Alberto's onboarding status?"
     // has a real answer for the assistant to summarise.
@@ -313,6 +328,8 @@ export class AssistantOrchestrator {
         };
       })(),
       page_context: pageContext,
+      route: resolvedRoute,
+      route_context: routeCtx,
     };
   }
 
@@ -385,7 +402,36 @@ export class AssistantOrchestrator {
       ? "\n\nMemory (treat as true unless the user updates them):\n" + input.memory.map((m, i) => (i + 1) + ". " + m.fact + (m.scope && m.scope !== "global" ? " [" + m.scope + "]" : "")).join("\n")
       : "";
     const ctx = input.context;
-    const ctxBlock = ctx
+
+    // 2026-08-22: context grounding rewrite. The rules:
+    //  1. If the page has a route context, that block goes FIRST and gets
+    //     the strongest wording. Entity-wide state is demoted to a short
+    //     "background" line.
+    //  2. Mid-service urgency framing (service_phase, covers, EOD posted)
+    //     only makes sense on service routes (/execute/pass, /execute/floor,
+    //     /execute/bookings). On /develop/* and /administrate/* it made
+    //     Chef sound frantic about the wrong things.
+    //  3. Every proper noun in the output must trace back to context.
+    //     We tell the model that explicitly. A post-check enforces it.
+    const rc = ctx?.route_context || null;
+    const routeBlock = rc ? "\n\n" + formatRouteContextBlock(rc, ctx!.entity) : "";
+    const routeIsService = rc?.is_service_route === true;
+    // Suppress mid-service framing when we're on a page that isn't service.
+    // We still let the model see today's date and the entity, just not the
+    // "during service, covers booked, EOD posted" narrative that made Chef
+    // reply as if it was 8pm on the pass.
+    const suppressServiceFraming = !!ctx?.route && !routeIsService;
+
+    const shortStateLine = ctx
+      ? "\n\nBackground OS state (do not lead with this — the page above is the primary context):\n"
+        + "- entity: " + ctx.entity + " · date: " + ctx.today + " " + ctx.now_hhmm + " Ibiza\n"
+        + "- highest-impact open plate items across the OS: " + (ctx.top_master_todos?.length ?? 0)
+        + (ctx.top_master_todos && ctx.top_master_todos.length
+            ? "\n" + ctx.top_master_todos.slice(0, 3).map((t) => "    · " + t.title + " (impact " + t.impact_score + ")").join("\n")
+            : "")
+      : "";
+
+    const fullStateBlock = ctx
       ? "\n\nOS state right now (" + ctx.entity + "):\n"
         + "- date: " + ctx.today + " " + ctx.now_hhmm + " Ibiza\n"
         + "- service: " + ctx.service_phase + "\n"
@@ -419,6 +465,24 @@ export class AssistantOrchestrator {
         + (ctx.academy_progress_current_module ? "\n- academy (" + ctx.academy_progress_current_module.module_scope + "): " + ctx.academy_progress_current_module.done + "/" + ctx.academy_progress_current_module.total + " done" + (ctx.academy_progress_current_module.next_lesson_title ? " · next: " + ctx.academy_progress_current_module.next_lesson_title : "") : "")
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
+
+    // Grounding rules — always included when we have real context.
+    // These are the anti-hallucination guardrails.
+    const groundingRules = ctx
+      ? "\n\nGrounding rules (STRICT):\n"
+        + "- Only reference numbers, venues, tables, or account balances that appear in the context above. Do not invent totals.\n"
+        + "- The only valid venue names are: Bistro Mondo (BM), Taller Sa Penya / Taller (IFL), Ibiza Food Studio (BBH). Never use any other venue name.\n"
+        + "- If the page has a route context, ANSWER ABOUT THAT PAGE. Do not pivot to unrelated finance/ops state unless the user explicitly asks about it.\n"
+        + "- If a page-level query returns 0 rows and a filter looks buggy, say so plainly and name the buggy filter. Do not fabricate a business explanation.\n"
+        + "- If you don't have data to answer, say 'I don't have that in the current context' rather than guessing.\n"
+      : "";
+
+    const ctxBlock = rc
+      ? routeBlock + shortStateLine + groundingRules
+      : (suppressServiceFraming
+          ? shortStateLine + groundingRules
+          : fullStateBlock + groundingRules);
+
     const extra = input.system_extra ? "\n\n" + input.system_extra : "";
     // PA Sprint 2 — the charter binds a sub-agent to its scope.
     const ch = input.charter;
@@ -434,7 +498,10 @@ export class AssistantOrchestrator {
             : "")
       : "";
 
-    if (mode === "chat")    return CHAT_BASE    + voice + dials + memBlock + ctxBlock + charterBlock + extra;
+    // Pick the base prompt. For chat mode on non-service routes, use the
+    // page-focused base which drops the "run the day" framing.
+    const chatBase = (mode === "chat" && suppressServiceFraming) ? CHAT_BASE_PAGE_FOCUSED : CHAT_BASE;
+    if (mode === "chat")    return chatBase     + voice + dials + memBlock + ctxBlock + charterBlock + extra;
     if (mode === "brief")   return BRIEF_BASE   + voice + dials + memBlock + ctxBlock + charterBlock + extra;
     if (mode === "extract") return EXTRACT_BASE + extra;
     return DRAFT_BASE + voice + dials + memBlock + ctxBlock + charterBlock + extra;
@@ -503,6 +570,8 @@ export class AssistantOrchestrator {
       cost    = (inTok / 1_000_000) * PRICE_IN_PER_MTOK     + (outTok / 1_000_000) * PRICE_OUT_PER_MTOK;
       costEur = (inTok / 1_000_000) * PRICE_IN_PER_MTOK_EUR + (outTok / 1_000_000) * PRICE_OUT_PER_MTOK_EUR;
     }
+
+    text = this.verifyResponseTokens(text, input);
 
     return {
       ok: true, text, intent, confidence, actions, raw_json: rawJson,
@@ -606,7 +675,75 @@ export class AssistantOrchestrator {
       reversible: false,
     });
   }
+  // Anti-hallucination post-check (2026-08-22). Cheap heuristic: if the
+  // model output contains a capitalised name-like token that doesn't map
+  // to any known venue or token from the context, prepend a warning.
+  // v1 keeps it lightweight — we're catching the "Pistumonto" class of
+  // failure, not proofreading the whole reply.
+  private verifyResponseTokens(text: string, input: GenerateInput): string {
+    if (!text) return text;
+    const ctx = input.context;
+    const knownVenues = new Set([
+      "Bistro Mondo", "Bistro-Mondo", "BM",
+      "Taller Sa Penya", "Taller",
+      "Ibiza Food Studio", "IFS", "IFL", "BBH",
+      "Ibiza", "Sa Penya", "Sa Cala", "Santa Gertrudis",
+      "Boris", "Food Studio", "Food Studios",
+    ]);
+    // Build a positive vocabulary from context: entity name, memory facts,
+    // route context tokens, page context blob.
+    const vocab = new Set<string>();
+    for (const v of knownVenues) vocab.add(v.toLowerCase());
+    if (ctx) {
+      vocab.add(ctx.entity.toLowerCase());
+      for (const m of input.memory || []) vocab.add((m.fact || "").toLowerCase());
+      for (const t of ctx.top_master_todos || []) vocab.add((t.title || "").toLowerCase());
+      for (const a of ctx.top_anomalies || []) vocab.add((a.description || "").toLowerCase());
+      if (ctx.page_context) vocab.add(JSON.stringify(ctx.page_context).toLowerCase());
+      for (const t of routeContextTokens(ctx.route_context || null)) vocab.add(String(t).toLowerCase());
+    }
+    // Extract candidate proper nouns from the reply: capitalised tokens of
+    // 4+ letters that aren't sentence starters we already know.
+    const props = text.match(/\b[A-Z][a-zA-Z]{3,}(?:\s+[A-Z][a-zA-Z]{2,}){0,3}\b/g) || [];
+    const suspicious: string[] = [];
+    const stop = new Set([
+      "I","Ibiza","OK","API","EOD","MEP","VAT","PDF","Chef","Food","Studios","Studio","Bistro","Mondo","Taller",
+      "Yes","No","But","And","The","This","That","These","Those","Would","Could","Should","Please","Sorry","Look",
+      "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday",
+      "January","February","March","April","May","June","July","August","September","October","November","December",
+      "Supabase","Holded","Fresto","Wix","Amex","Pleo","Amazon","Google","WhatsApp","Gmail","CaixaBank",
+    ]);
+    for (const p of props) {
+      const key = p.toLowerCase();
+      if (stop.has(p)) continue;
+      // Allow if any word inside is already in vocab-substring.
+      let found = false;
+      for (const v of vocab) { if (v.includes(key)) { found = true; break; } }
+      if (!found) suspicious.push(p);
+    }
+    if (suspicious.length > 0) {
+      // Deduplicate.
+      const uniq = Array.from(new Set(suspicious)).slice(0, 5);
+      const warning = "[Chef flag: the reply mentioned " + uniq.map((x) => "\"" + x + "\"").join(", ") + " which do not appear in the page or context I was given. Treat as uncertain.]\n\n";
+      return warning + text;
+    }
+    return text;
+  }
+
 }
+
+const CHAT_BASE_PAGE_FOCUSED = `You are the Food Studios Assistant — the operator's second brain inside a restaurant OS. Right now the operator is looking at a specific page in the app (see PAGE THE OPERATOR IS ON below). Your job on this turn:
+
+- Answer about the page the operator is looking at. The route context block is your primary source of truth — the row counts came from re-running the page's own query moments ago.
+- Do NOT bring up mid-service urgency, tonight's covers, EOD posting, or the invoice inbox unless the user explicitly asks. This is a build/back-office view, not the pass.
+- If the page shows zero rows and the filter looks buggy, name the bug and point at the real data. Don't invent a business reason for the empty state.
+- Suggested next steps must be concrete and about THIS page — not generic sales/ops advice.
+- Match the user's language (English or Spanish).
+- Never send/purchase/post anything yourself — you draft, a human confirms.
+- Speak in the entity's voice (see Voice below). Respect the dials.
+
+End every reply with EXACTLY this tail on its own line:
+<assistant>{"intent":"ask|order|feedback|capture|memory","confidence":0.0-1.0,"order":[{"name":"...","qty":1,"unit":"kg"}]|null,"feedback":{"kind":"love|idea|bug|confusing","body":"..."}|null,"memory":{"fact":"...","scope":"global|entity:IFL|topic:finance"}|null,"did_action":null}</assistant>`;
 
 const CHAT_BASE = `You are the Food Studios Assistant — the operator's second brain inside a restaurant OS. People talk to you like Siri; you reply like a seasoned head chef who also knows the numbers and the calendar. You can:
 - answer recipe / cooking / pairing / cost questions;
