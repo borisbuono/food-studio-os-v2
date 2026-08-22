@@ -7,6 +7,7 @@ import { getGuestBrand } from "@/lib/guest/brand";
 import { copy, type GuestLang } from "@/lib/guest/allergens";
 import { noEmoji } from "@/lib/text";
 import GuestMenuBoard from "./GuestMenuBoard";
+import { isFood, isDrink } from "@/lib/menuClassify";
 
 export const dynamic = "force-dynamic";
 
@@ -72,9 +73,9 @@ export default async function PublicVenueMenu({ params }: { params: { slug: stri
   const langsAvailable: GuestLang[] = ["en", ...(hasES ? ["es" as GuestLang] : []), ...(hasDE ? ["de" as GuestLang] : [])];
 
   const specials = items.filter((i) => i.is_special || (i.section || "").toLowerCase() === "specials");
-  const food = items.filter((i) => i.category === "food" && !(i.is_special || (i.section || "").toLowerCase() === "specials"));
-  const wine = items.filter((i) => i.category === "drink" && (i.section === "wine" || i.wine_style));
-  const bar = items.filter((i) => i.category === "drink" && !(i.section === "wine" || i.wine_style));
+  const food = items.filter((i) => isFood(i.section) && !(i.is_special || (i.section || "").toLowerCase() === "specials"));
+  const wine = items.filter((i) => isDrink(i.section) && (i.section === "wine" || i.wine_style));
+  const bar = items.filter((i) => isDrink(i.section) && !(i.section === "wine" || i.wine_style));
   const empty = items.length === 0;
 
   return (

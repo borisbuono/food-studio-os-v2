@@ -2,13 +2,14 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
+import { FOOD_SECTION_LIST } from "@/lib/menuClassify";
 
 export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + n.toFixed(2);
 
 export default async function Repricing() {
   
-  const supabase = supabaseServer();const items = (await supabase.from("menu_items").select("name,price,cost,target_margin_pct,computed_price,category").eq("is_active", true).eq("category", "food").eq("restaurant_id", serverRestaurantId())).data || [];
+  const supabase = supabaseServer();const items = (await supabase.from("menu_items").select("name,price,cost,target_margin_pct,computed_price,category").eq("is_active", true).in("section", FOOD_SECTION_LIST).eq("restaurant_id", serverRestaurantId())).data || [];
   const rows = items.map((i: any) => {
     const price = Number(i.price || 0);
     const cost = Number(i.cost || 0);

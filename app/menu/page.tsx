@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import type { MenuItem } from "@/types/db";
 import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { isFood, isDrink } from "@/lib/menuClassify";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +41,8 @@ export default async function MenuPage() {
   const linkedRecipeIds = new Set(items.map((i) => i.recipe_id).filter(Boolean));
   const recRes = await supabase.from("recipes").select("id,name,section").order("name");
   const library = ((recRes.data || []) as any[]).filter((r) => !linkedRecipeIds.has(r.id));
-  const food = items.filter((i) => i.category === "food");
-  const drink = items.filter((i) => i.category === "drink");
+  const food = items.filter((i) => isFood(i.section));
+  const drink = items.filter((i) => isDrink(i.section));
   const inSection = (arr: MenuItem[], s: string) => arr.filter((i) => (i.section || "") === s);
 
   return (

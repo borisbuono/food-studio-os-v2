@@ -9,7 +9,7 @@ const LABEL: Record<string, string> = { sparkling: "Sparkling", petnat: "Pét-Na
 
 export default async function Wine() {
   
-  const supabase = supabaseServer();const wines = (await supabase.from("menu_items").select("id,name,price,glass_price,bottle_price,wine_style,producer,region,vintage,is_eighty_six").eq("is_active", true).eq("category", "drink").eq("section", "wine").eq("restaurant_id", serverRestaurantId())).data || [];
+  const supabase = supabaseServer();const wines = (await supabase.from("menu_items").select("id,name,price,glass_price,bottle_price,wine_style,producer,region,vintage,is_eighty_six").eq("is_active", true).eq("section", "wine").eq("restaurant_id", serverRestaurantId())).data || [];
   const styled = (s: string) => wines.filter((w: any) => (w.wine_style || "to_classify") === s);
   const priced = (w: any) => [w.glass_price ? "€" + w.glass_price + " glass" : null, (w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) + " bottle" : null].filter(Boolean).join(" · ");
 

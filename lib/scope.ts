@@ -50,22 +50,26 @@ const OPERATING_VENUE: SidebarSection[] = [
   {
     key: "boh",
     label: "BOH",
+    // Consolidated 2026-08-23 (Boris walkthrough): dropped Cook mode (dead
+    // link — /execute/cook is per-recipe only, no landing), collapsed the
+    // Menu (BOH) / Menu develop duplicate into a single Menu entry, dropped
+    // the Place-an-order / Receiving duplicate (both target /execute/orders,
+    // Receiving is the operator-familiar label), and moved Kitchen academy
+    // off the sidebar (low-frequency, still reachable from the dashboard).
+    // Order: dashboard → daily flow (MEP) → develop (Recipes, Menu, Wine,
+    // Bar, Lexicon) → ops (Receiving, Inventory, Temps, Repricing, Handover).
     items: [
       { href: "/boh",                    label: "Kitchen dashboard" },
-      { href: "/boh/cook",               label: "Cook mode" },
       { href: "/boh/mep",                label: "MEP" },
-      { href: "/boh/recipes",            label: "Recipes" },
-      { href: "/boh/menu",               label: "Menu (BOH)" },
-      { href: "/boh/receiving",          label: "Receiving" },
-      { href: "/boh/wine",               label: "Wine" },
-      { href: "/boh/bar",                label: "Bar" },
-      { href: "/boh/academy",            label: "Kitchen academy" },
-      { href: "/develop/menu",           label: "Menu develop" },
+      { href: "/develop/recipes",        label: "Recipes" },
+      { href: "/develop/menu",           label: "Menu" },
+      { href: "/develop/wine",           label: "Wine" },
+      { href: "/develop/bar",            label: "Bar" },
       { href: "/develop/lexicon",        label: "Lexicon" },
-      { href: "/develop/repricing",      label: "Repricing" },
-      { href: "/execute/orders",         label: "Place an order" },
+      { href: "/execute/orders",         label: "Receiving" },
       { href: "/execute/inventory",      label: "Inventory" },
       { href: "/execute/temp",           label: "Temps" },
+      { href: "/develop/repricing",      label: "Repricing" },
       { href: "/execute/handover",       label: "Handover" },
     ],
   },

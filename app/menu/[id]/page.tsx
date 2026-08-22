@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import EightySixToggle from "@/components/EightySixToggle";
 import SoftRecipeCost from "@/components/SoftRecipeCost";
+import { isFood, FOOD_SECTION_LIST } from "@/lib/menuClassify";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +37,8 @@ export default async function DishHub({ params }: { params: { id: string } }) {
   }
   // menu-engineering position, folded onto the dish itself (no separate engineering screen)
   let mePos: { label: string; nudge: string; color: string } | null = null;
-  if (item.category === "food") {
-    const sibs = (await supabase.from("menu_items").select("units_sold").eq("restaurant_id", item.restaurant_id).eq("category", "food").eq("is_active", true)).data || [];
+  if (isFood(item.section)) {
+    const sibs = (await supabase.from("menu_items").select("units_sold").eq("restaurant_id", item.restaurant_id).in("section", FOOD_SECTION_LIST).eq("is_active", true)).data || [];
     const sold = sibs.map((x: any) => Number(x.units_sold || 0)).sort((a: number, b: number) => a - b);
     const med = sold.length ? sold[Math.floor(sold.length / 2)] : 0;
     const popular = Number(item.units_sold || 0) >= med && med > 0;
