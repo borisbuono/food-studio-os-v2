@@ -92,7 +92,7 @@ export default async function StudioPage() {
     .eq("is_active", true)
     .order("entity_type")
     .order("name");
-  const ents = (allEnts || []).filter((e: any) => (e.status ?? "active") !== "ended");
+  const ents = (allEnts || []).filter((e: any) => (e.status ?? "active") === "active");
 
   // Membership-scope filter.
   const memberEntityIds = new Set(ctx.memberships.map((m) => m.entity_id));
