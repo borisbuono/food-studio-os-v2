@@ -3,7 +3,6 @@ import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompa
 import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
 import { redirect } from "next/navigation";
-import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
 
 export const dynamic = "force-dynamic";
 
@@ -65,24 +64,6 @@ export default async function Page() {
   const _authSb = supabaseServer();
   const { data: { user: _anonCheck } } = await _authSb.auth.getUser();
   if (!_anonCheck) redirect("/welcome");
-
-  // Push 1 (2026-08-23) — role-based landing. `/` is now a router: resolve
-  // the signed-in user's memberships → primary room → redirect. Owners and
-  // multi-role users land on /studio; single-role users on their room.
-  // If a user has no memberships (edge case — profile row without team_members
-  // link), fall through to the legacy compass so they see SOMETHING.
-  //
-  // NB: `redirect()` throws NEXT_REDIRECT which must NOT be swallowed by the
-  // outer try/catch. We resolve the context first, then redirect outside.
-  let _landing: string | null = null;
-  try {
-    const ctx = await getMyMembershipContext();
-    if (ctx.memberships.length) {
-      const target = ROOM_TO_PATH[ctx.primaryRoom];
-      if (target && target !== "/") _landing = target;
-    }
-  } catch { /* fall through to compass */ }
-  if (_landing) redirect(_landing);
 
   const supabase = supabaseServer();
   const today = madridToday();

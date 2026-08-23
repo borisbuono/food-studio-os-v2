@@ -32,7 +32,7 @@ export default async function BohHome() {
   return (
     <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
-        kicker="Kitchen · back of house"
+        kicker="BOH · back of house"
         title="The kitchen."
         blurb="Menu, recipes, prep, deliveries, cook mode. The craft under the pass."
       />

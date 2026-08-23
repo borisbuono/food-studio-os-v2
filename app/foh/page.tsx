@@ -38,7 +38,7 @@ export default async function FohHome() {
   return (
     <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
-        kicker="Dining Room · front of house"
+        kicker="FOH · front of house"
         title="Serve the room."
         blurb="Bookings, the pass, the menu, guests, reviews. Everything on the service floor."
       />

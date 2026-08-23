@@ -32,9 +32,9 @@ export type SidebarSection = {
 const OPERATING_VENUE: SidebarSection[] = [
   {
     key: "foh",
-    label: "Dining Room",
+    label: "FOH",
     items: [
-      { href: "/foh",                    label: "Dining Room" },
+      { href: "/foh",                    label: "Front dashboard" },
       { href: "/foh/bookings",           label: "Bookings" },
       { href: "/foh/pass",               label: "The Pass" },
       { href: "/foh/menu",               label: "Menu (consumer)" },
@@ -49,7 +49,7 @@ const OPERATING_VENUE: SidebarSection[] = [
   },
   {
     key: "boh",
-    label: "Kitchen",
+    label: "BOH",
     // Consolidated 2026-08-23 (Boris walkthrough): dropped Cook mode (dead
     // link — /execute/cook is per-recipe only, no landing), collapsed the
     // Menu (BOH) / Menu develop duplicate into a single Menu entry, dropped
@@ -59,7 +59,7 @@ const OPERATING_VENUE: SidebarSection[] = [
     // Order: dashboard → daily flow (MEP) → develop (Recipes, Menu, Wine,
     // Bar, Lexicon) → ops (Receiving, Inventory, Temps, Repricing, Handover).
     items: [
-      { href: "/boh",                    label: "Kitchen" },
+      { href: "/boh",                    label: "Kitchen dashboard" },
       { href: "/boh/mep",                label: "MEP" },
       { href: "/develop/recipes",        label: "Recipes" },
       { href: "/develop/menu",           label: "Menu" },
@@ -77,7 +77,7 @@ const OPERATING_VENUE: SidebarSection[] = [
     key: "office",
     label: "Office",
     items: [
-      { href: "/office",                              label: "Office" },
+      { href: "/office",                              label: "Office dashboard" },
       { href: "/administrate/finance",                label: "Finance" },
       { href: "/administrate/finance/reconciliation", label: "Reconciliation" },
       { href: "/administrate/finance/anomalies",      label: "Anomalies" },
