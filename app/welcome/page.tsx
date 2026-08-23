@@ -1,19 +1,27 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 export const metadata: Metadata = {
   title: "Food Studios",
   description: "The chef-built operating system for restaurants.",
 };
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 // Public FS OS landing. Rendered without the operational sidebar/topbar
 // so signed-out visitors see the product, not the entity-scoped app shell.
-// Sidebar hiding is done in app/layout.tsx via a client wrapper that
-// checks pathname against the PUBLIC_PATHS list.
-export default function Welcome() {
+// If the visitor IS signed in (e.g. they landed here via the callback's
+// first-run redirect), forward them to the app — do not show the sign-in
+// button; that class of bug caused a sign-in loop for Boris 2026-08-23.
+export default async function Welcome() {
+  const sb = supabaseServer();
+  const { data: { user } } = await sb.auth.getUser();
+  if (user) redirect("/");
+
   return (
+
     <main className="mx-auto max-w-3xl px-6 py-16 lg:py-24">
       <header className="mb-12 lg:mb-16">
         <img src="/brand/ifs-mark-black.png" alt="Food Studios" className="h-10 w-auto" />

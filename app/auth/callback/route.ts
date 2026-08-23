@@ -63,21 +63,11 @@ export async function GET(request: NextRequest) {
   // Best-effort: sync profile from any pending team-member invite.
   try { await supabase.rpc("sync_my_profile_from_invite"); } catch {}
 
-  // First-run tour if the profile hasn't seen it yet — update the response
-  // redirect location if needed. Session cookies are already on `response`.
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: prof } = await supabase
-        .from("profiles").select("first_run_done_at").eq("id", user.id).maybeSingle();
-      if (prof && !prof.first_run_done_at) {
-        // Rebuild redirect but carry over all cookies already set.
-        const welcome = NextResponse.redirect(new URL("/welcome", origin));
-        response.cookies.getAll().forEach((c) => welcome.cookies.set(c));
-        return welcome;
-      }
-    }
-  } catch {}
+  // First-run tour concept was removed 2026-08-23 — the redirect to /welcome
+  // caused a sign-in loop because /welcome doesn't detect signed-in state and
+  // profiles.first_run_done_at was NULL for every user (nothing sets it). If a
+  // first-run tour is added later, do it as a client-side modal on / rather
+  // than a server redirect, so an unset value can't loop the login flow.
 
   return response;
 }
