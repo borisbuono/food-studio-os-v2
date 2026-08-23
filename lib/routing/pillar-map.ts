@@ -18,8 +18,11 @@ export type Pillar = "foh" | "boh" | "office";
 export type Flow = "develop" | "execute" | "admin" | "grow";
 
 export const PILLAR_LABEL: Record<Pillar, string> = {
-  foh: "FOH",
-  boh: "BOH",
+  // Push 1 (2026-08-23) — room vocabulary lands here. The pillar KEYS stay
+  // (foh/boh/office) so the rest of the app can keep addressing them, but
+  // the visible label is the ROOM name the operator recognises.
+  foh: "Dining Room",
+  boh: "Kitchen",
   office: "Office",
 };
 
