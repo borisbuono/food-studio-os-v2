@@ -62,31 +62,20 @@ function addDaysIso(iso: string, days: number): string {
 }
 
 export default async function Page() {
-<<<<<<< HEAD
-=======
-  const _authSb = supabaseServer();
-  const { data: { user: _anonCheck } } = await _authSb.auth.getUser();
-  if (!_anonCheck) redirect("/welcome");
-
-  // Push 1 (2026-08-23) — role-based landing. `/` is now a router: resolve
-  // the signed-in user's memberships → primary room → redirect. Owners and
-  // multi-role users land on /studio; single-role users on their room.
-  // If a user has no memberships (edge case — profile row without team_members
-  // link), fall through to the legacy compass so they see SOMETHING.
-  //
-  // NB: `redirect()` throws NEXT_REDIRECT which must NOT be swallowed by the
-  // outer try/catch. We resolve the context first, then redirect outside.
+  // Push 1 role-based landing. Resolve memberships → primary room → redirect.
+  // Owners + multi-role → /studio. Single-role → their room. Anon or no
+  // memberships → fall through to the legacy compass render (no forced
+  // /welcome redirect — that combo caused the 2026-08-23 sign-in loop).
   let _landing: string | null = null;
   try {
     const ctx = await getMyMembershipContext();
-    if (ctx.memberships.length) {
+    if (ctx.signedIn && ctx.memberships.length) {
       const target = ROOM_TO_PATH[ctx.primaryRoom];
       if (target && target !== "/") _landing = target;
     }
   } catch { /* fall through to compass */ }
   if (_landing) redirect(_landing);
 
->>>>>>> 3703c2f (Push 1: Studio / House / Room / Station vocabulary + role-based landing)
   const supabase = supabaseServer();
   const today = madridToday();
   const in30 = addDaysIso(today, 30);
