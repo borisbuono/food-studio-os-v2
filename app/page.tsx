@@ -2,11 +2,8 @@ import HomeSwitch from "@/components/HomeSwitch";
 import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
-<<<<<<< HEAD
-=======
 import { redirect } from "next/navigation";
 import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
->>>>>>> 3703c2f (Push 1: Studio / House / Room / Station vocabulary + role-based landing)
 
 export const dynamic = "force-dynamic";
 
