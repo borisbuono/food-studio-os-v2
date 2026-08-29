@@ -340,6 +340,23 @@ export default function HomeCompass({ data }: { data: CompassData }) {
         </div>
       ) : null}
 
+      {/* Capture shortcut — Boris ask 2026-08-24: no paper doc buried
+          behind a long-press on the FAB. Sits above the plate. */}
+      <div className="mt-6 border-t border-black/10 pt-4 flex flex-wrap gap-2">
+        <Link
+          href="/capture?type=invoice"
+          className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
+        >
+          + Capture invoice
+        </Link>
+        <Link
+          href="/capture?type=albaran"
+          className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
+        >
+          + Capture delivery note
+        </Link>
+      </div>
+
       {/* Highest-impact strip — Master_ToDo top 3 */}
       <HighestImpactStrip todos={d.highestImpact} />
 

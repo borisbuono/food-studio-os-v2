@@ -190,6 +190,22 @@ export default async function StudioPage() {
             <p className="font-mono text-[11px] text-clay">Madrid · {clock}</p>
           </div>
         </div>
+        {/* Capture Station shortcut — Boris asked for a visible +Capture button
+            on every top-level surface so paper docs never wait (2026-08-24). */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/capture?type=invoice"
+            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
+          >
+            + Capture invoice
+          </Link>
+          <Link
+            href="/capture?type=albaran"
+            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
+          >
+            + Capture delivery note
+          </Link>
+        </div>
         {/* Cross-house handover placeholder — Push 2 lights this up. */}
         <p className="mt-4 font-mono text-[10px] uppercase tracking-wide text-clay">
           Handover · no active handover across houses
