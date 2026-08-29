@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
       extraction_model: "claude-sonnet-4-5-20250929",
       extraction_at: new Date().toISOString(),
       ocr_extracted: extracted as any,
-      match_status: "needs_triage",
+      match_status: "unmatched",
       notes: extractionError
         ? `captured via /capture — extraction failed: ${extractionError}`
         : `captured via /capture · sonnet-4.5 · ${(extracted.lines || []).length} lines`,
