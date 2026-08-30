@@ -1,48 +1,56 @@
 "use client";
 
-// ChefSlim — the "Chef is the shell, not a room" implementation.
+// ChefSlim — text-first Chef drawer.
 //
-// Fable design critic + builder converged 2026-07-25 on:
-//   - ONE 56pt circle. No engine chip, no language dropdown, no wine chip,
-//     no camera chip, no snap handle, no close X, no "stop" button.
-//   - Chef is the layer under every page; the sheet is transient and
-//     dissolves when its evidence lands (typically 4s after reply).
-//   - Contextual chip inline: max ONE chip appears below the reply when
-//     the intent needs a physical follow-up (📷 capture, 🍷 wine label,
-//     ✓ save memory).
-//   - Long-press FAB = camera direct (no voice necessary).
-//   - Sheet attaches to FAB visually (no orphan window bug on portrait).
+// Boris walk (2026-08-30): the old AssistantFab tried to do everything
+// (voice → tool chips → screenshot preview → intent classifier → capture
+// → sheet) and read as "way way too many things going on... way more than
+// even the native Claude interface." The bar for this rebuild is: **less
+// than native Claude.**
 //
-// Feature-flagged via `?slim=1` URL param OR `localStorage.fs_chef_slim=1`.
-// Ships alongside the legacy AssistantFab. Zero risk to daily ops — old
-// Chef stays default; slim activates on demand for Boris's walk.
+// Design (locked with Boris same day):
+//   - Single-circle FAB, bottom-right. One glyph (chat bubble). No badge,
+//     no long-press, no "capture" branch. Capture has its own button now
+//     (commit e16db28 unified it under /capture) — Chef is chat only.
+//   - Tap FAB → drawer opens. Tap again / Escape / swipe-down on mobile
+//     closes.
+//   - Drawer = right-anchored 420px panel on desktop (full height),
+//     bottom sheet ~85vh on mobile. **No dim backdrop.** Boris wants
+//     Chef alongside the page, not in place of it.
+//   - Inside: message stream on top, one text input at the bottom, one
+//     mic button next to it. That's it. No tool chips, no suggestions,
+//     no screenshot preview.
 //
-// Voice: server-side Whisper via /api/assistant/voice/transcribe (with the
-// scrubWhisper hallucination guard mirrored from the legacy component).
-// Chat: /api/ask (unchanged — same contract).
-// Camera intake: /api/capture (invoices / albarán / EOD) or /api/wine-scan
-// (wine labels), auto-selected by heuristic on the user's transcript.
+// Preserved from AssistantFab (this is the working plumbing):
+//   - /api/ask contract (unchanged) with page_context piped SILENTLY.
+//   - Route context via window.__fsAssistantContext + pillarForRoute().
+//   - Voice via Whisper: POST audio to /api/assistant/voice/transcribe,
+//     scrub silent-audio hallucinations.
+//   - body[data-fab="hidden"] override so pages can hide the FAB.
+//
+// Deliberately NOT ported from AssistantFab (~1400 → ~350 lines):
+//   - Long-press → camera. (Capture is its own button now.)
+//   - Wine-scan branch. (Same reason.)
+//   - Tool-suggestion chips. (Boris: "way too many things going on.")
+//   - Screenshot-preview thumbnails.
+//   - Intent-classifier confidence chips + "did you mean" ladder.
+//   - Web Speech API fallback (Whisper is the only path — reliable
+//     everywhere).
+//   - Language selector chip (still passes fs_lang cookie).
+//   - Snap-point drag handle (single fixed size per breakpoint).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { EntityKey, ENTITY_ACCENT } from "@/lib/entities";
+import { EntityKey } from "@/lib/entities";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
 
-type Mode = "idle" | "listening" | "thinking" | "replying";
+type Msg = { role: "you" | "chef" | "sys"; text: string };
 
-const ENTITY_CODE: Record<string, string> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
-const AUTO_DISMISS_MS = 4000;
-const LONG_PRESS_MS = 500;
-const WHISPER_MAX_MS = 60_000;
-
-// Whisper silent-audio hallucinations — mirrored from AssistantFab. Trained
-// on YouTube captions, the model defaults to closing remarks when input is
-// silent or under ~1s.
 const WHISPER_JUNK = new Set([
-  "thank you for watching", "thanks for watching", "thank you", "thank you.",
-  "thank you very much", "you", "bye", "bye bye", ".", "..", "...",
-  "gracias por ver", "gracias", "¡gracias por ver!",
+  "thank you for watching", "thanks for watching", "thanks for watching!",
+  "thank you.", "thank you", "thank you very much", "you", "bye", "bye.",
+  "bye bye", ".", "..", "...", "¡gracias por ver!", "gracias por ver", "gracias",
 ]);
 function scrubWhisper(raw: string): string {
   const t = (raw || "").trim();
@@ -52,36 +60,71 @@ function scrubWhisper(raw: string): string {
   return t;
 }
 
-function detectIOS(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && (navigator as any).maxTouchPoints > 1);
+const WHISPER_MAX_MS = 60_000;
+
+function readLang(): "en" | "es" | "da" {
+  if (typeof document === "undefined") return "en";
+  const m = document.cookie.match(/(?:^|;\s*)fs_lang=(en|es|da)/);
+  if (m?.[1]) return m[1] as "en" | "es" | "da";
+  return "en";
 }
 
 export default function ChefSlim() {
   const pathname = usePathname();
   const [profile, setProfile] = useState<MyProfile | null>(null);
-  const [mode, setMode] = useState<Mode>("idle");
-  const [transcript, setTranscript] = useState("");
-  const [reply, setReply] = useState<{ text: string; intent?: string; confidence?: number; needsConfirm?: boolean; memoryProposal?: any } | null>(null);
-  const [errorPulse, setErrorPulse] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceErr, setVoiceErr] = useState<string | null>(null);
 
-  // Refs for streaming voice
+  // Refs
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const startedAtRef = useRef<number>(0);
-  const captureInputRef = useRef<HTMLInputElement>(null);
-  const wineInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const dismissTimer = useRef<NodeJS.Timeout | null>(null);
-  const sessionRef = useRef<string>(crypto.randomUUID?.() || String(Date.now()));
+  const sessionRef = useRef<string>("");
+  const streamListRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const dragStartYRef = useRef<number | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { getMyProfile().then(setProfile).catch(() => setProfile(null)); }, []);
+  useEffect(() => {
+    getMyProfile().then(setProfile).catch(() => setProfile(null));
+    try { sessionRef.current = (crypto as any).randomUUID?.() || String(Date.now()); } catch { sessionRef.current = String(Date.now()); }
+  }, []);
 
-  const clearDismiss = () => { if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null; } };
+  // Hide-on-route via body[data-fab="hidden"] (mirrored from AssistantFab)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const check = () => setHidden(document.body.getAttribute("data-fab") === "hidden");
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { attributes: true, attributeFilter: ["data-fab"] });
+    return () => mo.disconnect();
+  }, [pathname]);
 
-  const stopAndCleanup = useCallback(() => {
+  // Escape closes on desktop
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    const el = streamListRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs, sending]);
+
+  // Focus textarea when opened
+  useEffect(() => {
+    if (open) setTimeout(() => textareaRef.current?.focus(), 60);
+  }, [open]);
+
+  const stopMic = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       try { recorderRef.current.stop(); } catch {}
     }
@@ -92,65 +135,65 @@ export default function ChefSlim() {
     recorderRef.current = null;
   }, []);
 
-  const dismiss = useCallback(() => {
-    clearDismiss();
-    stopAndCleanup();
-    setMode("idle");
-    setTranscript("");
-    setReply(null);
-  }, [stopAndCleanup]);
-
-  // Send to Chef API
-  const sendToChef = useCallback(async (text: string) => {
-    if (!text.trim()) { dismiss(); return; }
-    setMode("thinking");
+  const sendMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+    setMsgs((m) => [...m, { role: "you", text: trimmed }]);
+    setInput("");
+    setSending(true);
     try {
-      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const ent = (!profile?.isAdmin
+        ? profile?.entity
+        : (typeof window !== "undefined" ? ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo") : "bistro_mondo")
+      ) || "bistro_mondo";
+
       const basePageCtx = (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null) || {};
       const activePillar = pillarForRoute(pathname || "");
       const pageContextWithPillar = { ...basePageCtx, active_pillar: activePillar };
+
       const r = await fetch("/api/ask", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          message: text, route: pathname || "", session_id: sessionRef.current,
-          entity_id: ent, language: "auto",
+          message: trimmed,
+          route: pathname || "",
+          session_id: sessionRef.current,
+          entity_id: ent,
+          language: readLang(),
           page_context: pageContextWithPillar,
         }),
       });
-      const d = await r.json();
-      const needsConfirm = d.intent && typeof d.confidence === "number" && d.confidence < 0.6;
-      setReply({ text: d.reply || "…", intent: d.intent, confidence: d.confidence, needsConfirm, memoryProposal: d.memory });
-      setMode("replying");
-      // Auto-dismiss on evidence unless the reply has pending obligations
-      if (!needsConfirm && !d.memory && d.intent !== "capture") {
-        dismissTimer.current = setTimeout(() => { dismiss(); }, AUTO_DISMISS_MS);
-      }
+      const d = await r.json().catch(() => ({}));
+      const reply = (d?.reply || d?.text || "…").toString();
+      setMsgs((m) => [...m, { role: "chef", text: reply }]);
     } catch (e: any) {
-      setReply({ text: "⚠ Chef offline — " + (e?.message || "network") });
-      setMode("replying");
-      setErrorPulse(true); setTimeout(() => setErrorPulse(false), 3000);
+      setMsgs((m) => [...m, { role: "sys", text: "Chef offline — " + (e?.message || "network") }]);
+    } finally {
+      setSending(false);
     }
-  }, [dismiss, pathname, profile]);
+  }, [pathname, profile, sending]);
 
-  // Whisper stop-and-send pipeline
+  // Voice — press-and-hold mic (Whisper stop-and-send)
   const startListening = useCallback(async () => {
-    if (mode === "listening") return;
+    if (listening || sending) return;
+    setVoiceErr(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setReply({ text: "Voice not supported in this browser." }); setMode("replying"); return;
+      setVoiceErr("Voice not supported in this browser."); return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
-      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+      const mime = (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm"))
+        ? "audio/webm"
+        : (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       recorderRef.current = rec;
-      startedAtRef.current = Date.now();
       rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = async () => {
-        stopAndCleanup();
-        if (chunksRef.current.length === 0) { setMode("idle"); return; }
-        setMode("thinking");
+        stopMic();
+        setListening(false);
+        if (chunksRef.current.length === 0) return;
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
         chunksRef.current = [];
         try {
@@ -158,32 +201,24 @@ export default function ChefSlim() {
           fd.append("audio", blob, "voice.webm");
           fd.append("route", pathname || "");
           const r = await fetch("/api/assistant/voice/transcribe", { method: "POST", body: fd });
-          const d = await r.json();
+          const d = await r.json().catch(() => ({}));
           if (!d?.ok || !d?.text) {
-            setReply({ text: d?.error || "Couldn't transcribe — try again." });
-            setMode("replying"); setErrorPulse(true); setTimeout(() => setErrorPulse(false), 3000);
-            return;
+            setVoiceErr(d?.error || "Couldn't transcribe — try again."); return;
           }
           const cleaned = scrubWhisper(d.text);
-          if (!cleaned) { dismiss(); return; }
-          setTranscript(cleaned);
-          void sendToChef(cleaned);
+          if (!cleaned) return;
+          void sendMessage(cleaned);
         } catch (err: any) {
-          setReply({ text: "Voice error: " + (err?.message || "unknown") });
-          setMode("replying");
+          setVoiceErr("Voice error: " + (err?.message || "unknown"));
         }
       };
       rec.start();
-      setMode("listening");
-      setTranscript("");
-      setReply(null);
-      // Safety cap
+      setListening(true);
       setTimeout(() => { if (rec.state === "recording") { try { rec.stop(); } catch {} } }, WHISPER_MAX_MS);
     } catch (e: any) {
-      setReply({ text: "Mic permission needed." });
-      setMode("replying"); setErrorPulse(true); setTimeout(() => setErrorPulse(false), 3000);
+      setVoiceErr("Mic permission needed.");
     }
-  }, [mode, pathname, sendToChef, dismiss, stopAndCleanup]);
+  }, [listening, pathname, sending, sendMessage, stopMic]);
 
   const stopListening = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state === "recording") {
@@ -191,174 +226,206 @@ export default function ChefSlim() {
     }
   }, []);
 
-  // FAB press handlers — tap = voice, long-press = camera direct
-  const onPressDown = () => {
-    clearDismiss();
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      captureInputRef.current?.click(); // long-press = camera
-    }, LONG_PRESS_MS);
+  // Mobile swipe-down to close
+  const onTouchStart = (e: React.TouchEvent) => {
+    dragStartYRef.current = e.touches[0].clientY;
   };
-  const onPressUp = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-      // It was a tap
-      if (mode === "idle") { void startListening(); }
-      else if (mode === "listening") { stopListening(); }
-      else { dismiss(); }
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (dragStartYRef.current == null) return;
+    const dy = e.touches[0].clientY - dragStartYRef.current;
+    if (dy > 0 && sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dy}px)`;
     }
   };
-  const onPressCancel = () => {
-    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (dragStartYRef.current == null) return;
+    const dy = (e.changedTouches[0]?.clientY ?? dragStartYRef.current) - dragStartYRef.current;
+    dragStartYRef.current = null;
+    if (sheetRef.current) sheetRef.current.style.transform = "";
+    if (dy > 90) setOpen(false);
   };
 
-  // Camera capture handler
-  const onCapture = async (file?: File | null) => {
-    if (!file) return;
-    setMode("thinking");
-    setReply({ text: "Reading the photo…" });
-    try {
-      const fd = new FormData();
-      fd.append("file", file); fd.append("type", "auto");
-      const r = await fetch("/api/capture", { method: "POST", body: fd });
-      const d = await r.json();
-      if (!d.ok) {
-        setReply({ text: "Couldn't file this — " + (d.error || "unknown") });
-        setMode("replying"); return;
-      }
-      const summary = d.detected
-        ? `${d.type}${d.detected.supplier_name ? " · " + d.detected.supplier_name : ""}${d.detected.total_eur != null ? " · €" + Number(d.detected.total_eur).toFixed(2) : ""}`
-        : d.type;
-      setReply({ text: `Filed: ${summary}. It'll appear on ${d.where === "invoice_inbox" ? "Finance" : d.where}.` });
-      setMode("replying");
-      dismissTimer.current = setTimeout(() => { dismiss(); }, AUTO_DISMISS_MS);
-    } catch (e: any) {
-      setReply({ text: "Upload error: " + (e?.message || "unknown") });
-      setMode("replying");
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) void sendMessage(input);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends, Shift+Enter for newline (native Claude convention Boris knows)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (input.trim()) void sendMessage(input);
     }
   };
 
-  const onWineCapture = async (file?: File | null) => {
-    if (!file) return;
-    setMode("thinking");
-    setReply({ text: "Reading the label…" });
-    try {
-      // downscale
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        const img = new Image(); const url = URL.createObjectURL(file);
-        img.onload = () => {
-          const max = 900; let { width, height } = img;
-          if (width > max || height > max) { const sc = max / Math.max(width, height); width = Math.round(width * sc); height = Math.round(height * sc); }
-          const c = document.createElement("canvas"); c.width = width; c.height = height;
-          c.getContext("2d")!.drawImage(img, 0, 0, width, height); URL.revokeObjectURL(url);
-          c.toBlob((b) => b ? resolve(b) : reject(new Error("encode failed")), "image/jpeg", 0.75);
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image load failed")); };
-        img.src = url;
-      });
-      const fd = new FormData();
-      fd.append("file", blob, "wine.jpg");
-      const r = await fetch("/api/wine-scan", { method: "POST", body: fd });
-      const d = await r.json();
-      if (!d.ok) {
-        setReply({ text: "Couldn't read the label — " + (d.error || "unknown") });
-        setMode("replying"); return;
-      }
-      const w = d.wine || {};
-      const summary = [w.producer, w.name, w.vintage].filter(Boolean).join(" · ") || "wine";
-      setReply({ text: `Label read: ${summary}. I've saved it to the cellar as a draft.` });
-      setMode("replying");
-      dismissTimer.current = setTimeout(() => { dismiss(); }, AUTO_DISMISS_MS);
-    } catch (e: any) {
-      setReply({ text: "Scan error: " + (e?.message || "unknown") });
-      setMode("replying");
-    }
-  };
+  const empty = useMemo(() => msgs.length === 0, [msgs]);
 
-  // Intent-driven contextual chip
-  const chipForReply = () => {
-    if (!reply || mode !== "replying") return null;
-    const uText = (transcript || "").toLowerCase();
-    if (reply.intent === "capture") {
-      const isWine = /\b(wine|vino|bottle|botella|label|etiqueta)\b/.test(uText);
-      const ref = isWine ? wineInputRef : captureInputRef;
-      return (
-        <button
-          onClick={() => ref.current?.click()}
-          className="mt-3 w-full rounded-full border border-ink bg-ink px-4 py-3 font-mono text-[11px] uppercase tracking-wide text-paper"
-        >
-          {isWine ? "🍷 Take or choose the label photo" : "📷 Take or choose the photo"}
-        </button>
-      );
-    }
-    return null;
-  };
-
-  // Render — always render the FAB and file inputs; sheet only when active
-  const active = mode !== "idle";
-  const showTranscript = mode === "listening" || (mode === "thinking" && transcript);
-  const showReply = (mode === "replying" || mode === "thinking") && (reply || transcript);
+  if (hidden) return null;
 
   return (
     <>
-      {/* Hidden file inputs — click triggered by long-press or by contextual chip */}
-      <input ref={captureInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
-      <input ref={wineInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onWineCapture(e.target.files?.[0])} />
-
-      {/* Dim backdrop — tap to dismiss. Sheet & FAB sit above it. */}
-      {active ? (
+      {/* Drawer — right-anchored on desktop, bottom sheet on mobile. No backdrop. */}
+      {open ? (
         <div
-          className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
-          onClick={dismiss}
-          aria-hidden
-        />
-      ) : null}
-
-      {/* Attached-to-FAB sheet — anchors bottom-right so it visually flows out of the FAB */}
-      {active ? (
-        <div
-          className="fs-fab-safe fixed right-4 z-50 max-w-[min(94vw,420px)] rounded-3xl bg-paper p-4 shadow-2xl shadow-black/30"
-          style={{
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 92px)", // sits above the 56pt FAB with 16px gap
-            border: "1px solid var(--line, rgba(0,0,0,.1))",
-          }}
+          ref={sheetRef}
           role="dialog"
           aria-label="Chef"
+          className={
+            "fixed z-50 flex flex-col bg-paper shadow-2xl shadow-black/20 " +
+            "inset-x-0 bottom-0 h-[85vh] rounded-t-2xl border-t border-black/10 " +
+            "lg:inset-x-auto lg:top-0 lg:bottom-0 lg:right-0 lg:h-full lg:w-[420px] " +
+            "lg:rounded-none lg:border-t-0 lg:border-l lg:border-black/10 lg:shadow-xl"
+          }
+          style={{ transition: "transform 200ms ease" }}
         >
-          {/* Transcript (live while listening or thinking) */}
-          {showTranscript && transcript ? (
-            <p className="font-serif italic text-[15px] leading-snug text-ink-soft">{transcript}</p>
-          ) : null}
-          {mode === "listening" && !transcript ? (
-            <p className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Listening…</p>
-          ) : null}
-          {mode === "thinking" ? (
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">…</p>
-          ) : null}
+          {/* Header */}
+          <div
+            className="flex items-center justify-between border-b border-black/10 px-4 py-3 lg:px-5 lg:py-4"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {/* Drag handle (mobile only visual) */}
+            <div className="lg:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-black/20" />
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-mono text-[#F7F7F4]"
+                style={{ background: "var(--accent)" }}
+              >
+                C
+              </span>
+              <span className="font-serif text-[15px] text-ink">Chef</span>
+            </div>
+            <button
+              type="button"
+              aria-label="Close Chef"
+              className="rounded-full p-2 text-ink-soft transition hover:bg-black/5 hover:text-ink"
+              onClick={() => setOpen(false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
 
-          {/* Reply */}
-          {showReply && reply ? (
-            <>
-              <p className="mt-2 whitespace-pre-line font-serif text-[17px] leading-relaxed text-ink">{reply.text}</p>
-              {chipForReply()}
-            </>
-          ) : null}
+          {/* Message stream */}
+          <div
+            ref={streamListRef}
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5"
+          >
+            {empty ? (
+              <p className="font-serif italic text-[14px] leading-relaxed text-ink-soft">
+                Ask Chef anything about what's on this screen.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {msgs.map((m, i) => (
+                  <li key={i}>
+                    {m.role === "you" ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2 font-sans text-[14px] leading-snug text-[#F7F7F4]">
+                          {m.text}
+                        </div>
+                      </div>
+                    ) : m.role === "chef" ? (
+                      <div className="flex justify-start">
+                        <div className="max-w-[92%] whitespace-pre-line font-serif text-[15px] leading-relaxed text-ink">
+                          {m.text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="font-mono text-[10px] uppercase tracking-wide text-clay">{m.text}</div>
+                    )}
+                  </li>
+                ))}
+                {sending ? (
+                  <li>
+                    <div className="font-mono text-[10px] uppercase tracking-wide text-ink-soft">…</div>
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </div>
+
+          {/* Composer */}
+          <form
+            onSubmit={onSubmit}
+            className="border-t border-black/10 bg-paper px-3 py-3 lg:px-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+          >
+            {voiceErr ? (
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-wide" style={{ color: "#9A3122" }}>{voiceErr}</p>
+            ) : null}
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={listening ? "Listening…" : "Message Chef"}
+                rows={1}
+                disabled={listening}
+                className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-2xl border border-black/10 bg-paper px-3 py-2 font-sans text-[14px] leading-snug text-ink outline-none focus:border-ink/40"
+              />
+              {/* Mic — press-and-hold */}
+              <button
+                type="button"
+                aria-label={listening ? "Stop recording" : "Hold to speak"}
+                onPointerDown={(e) => { e.preventDefault(); void startListening(); }}
+                onPointerUp={() => { if (listening) stopListening(); }}
+                onPointerLeave={() => { if (listening) stopListening(); }}
+                onPointerCancel={() => { if (listening) stopListening(); }}
+                className={
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition " +
+                  (listening
+                    ? "border-transparent text-[#F7F7F4] animate-pulse"
+                    : "border-black/10 text-ink hover:bg-black/5")
+                }
+                style={listening ? { background: "var(--accent)" } : undefined}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="9" y="3" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              {/* Send */}
+              <button
+                type="submit"
+                aria-label="Send"
+                disabled={!input.trim() || sending || listening}
+                className={
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#F7F7F4] transition disabled:opacity-40 " +
+                  (sending ? "" : "")
+                }
+                style={{ background: "var(--accent)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path d="M2 8l12-6-6 12-1.5-5L2 8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 
-      {/* THE FAB — one 56pt circle. Tap = voice; long-press = camera; tap-in-sheet-state = dismiss. */}
+      {/* FAB — single circle, one glyph, no long-press, no badge. */}
       <button
-        aria-label="Chef"
-        className={"fs-fab-safe fixed right-5 z-[60] h-14 w-14 select-none rounded-full font-serif text-[14px] text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95"}
-        style={{ background: errorPulse ? "#9A3122" : "var(--accent)", touchAction: "manipulation" }}
-        onPointerDown={onPressDown}
-        onPointerUp={onPressUp}
-        onPointerCancel={onPressCancel}
-        onPointerLeave={onPressCancel}
-        onContextMenu={(e) => e.preventDefault()}
+        type="button"
+        aria-label={open ? "Close Chef" : "Open Chef"}
+        onClick={() => setOpen((v) => !v)}
+        className="fs-fab-safe fixed right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95"
+        style={{ background: "var(--accent)", touchAction: "manipulation" }}
       >
-        {mode === "listening" ? <span className="inline-block h-2 w-2 rounded-full bg-white animate-pulse" /> : "Chef"}
+        {open ? (
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        ) : (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9A2.5 2.5 0 0 1 17.5 17H9.8l-4 3.4A.75.75 0 0 1 4.6 20V5.5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          </svg>
+        )}
       </button>
     </>
   );

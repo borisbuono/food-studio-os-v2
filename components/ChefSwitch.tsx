@@ -1,32 +1,44 @@
 "use client";
 
-// Chef switch — reads ?slim=1 or localStorage.fs_chef_slim=1 and renders
-// the slim rebuild, otherwise the legacy AssistantFab. Ships zero-risk:
-// production stays on the legacy component until Boris flips the flag.
+// Chef switch — ChefSlim is now the DEFAULT (2026-08-30). The legacy
+// AssistantFab still ships in the tree in case Boris wants to A/B a
+// specific behaviour that got dropped in the rebuild.
 //
-// Flag persistence: once ?slim=1 is seen in the URL, we save to
-// localStorage so the flag survives navigation and PWA reopen. Set
-// ?slim=0 to opt back out (also cleared from localStorage).
+// Flag semantics (URL wins over localStorage, both persist):
+//   ?slim=0   → legacy AssistantFab (also writes fs_chef_slim=0)
+//   ?slim=1   → slim (also clears the opt-out flag)
+//   (default) → slim, unless fs_chef_slim=0 was set previously
+//
+// Ships zero-risk: navigate to any page with ?slim=0 to revert. Same file
+// path as the original switch so the layout.tsx import doesn't change.
 
 import { useEffect, useState } from "react";
 import AssistantFab from "@/components/AssistantFab";
 import ChefSlim from "@/components/ChefSlim";
 
 export default function ChefSwitch() {
-  const [slim, setSlim] = useState(false);
+  const [useLegacy, setUseLegacy] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlFlag = params.get("slim");
-      if (urlFlag === "1") { localStorage.setItem("fs_chef_slim", "1"); setSlim(true); }
-      else if (urlFlag === "0") { localStorage.removeItem("fs_chef_slim"); setSlim(false); }
-      else { setSlim(localStorage.getItem("fs_chef_slim") === "1"); }
-    } catch { setSlim(false); }
+      if (urlFlag === "0") {
+        localStorage.setItem("fs_chef_slim", "0");
+        setUseLegacy(true);
+      } else if (urlFlag === "1") {
+        localStorage.removeItem("fs_chef_slim");
+        setUseLegacy(false);
+      } else {
+        setUseLegacy(localStorage.getItem("fs_chef_slim") === "0");
+      }
+    } catch {
+      setUseLegacy(false);
+    }
     setReady(true);
   }, []);
 
   if (!ready) return null; // avoid double-mount flash
-  return slim ? <ChefSlim /> : <AssistantFab />;
+  return useLegacy ? <AssistantFab /> : <ChefSlim />;
 }
