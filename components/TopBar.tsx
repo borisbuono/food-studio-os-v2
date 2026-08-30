@@ -39,6 +39,11 @@ export default function TopBar() {
   const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
   const switcher = useSwitcherEntities();
+  // Switcher visibility (2026-08-30): hide the entity switcher entirely for
+  // users with only one accessible entity. Single-house operators shouldn't
+  // even know the concept exists.
+  const totalEntities = switcher.operating.length + switcher.holding.length + switcher.portfolio.length;
+  const hasMultipleEntities = !switcher.loading && totalEntities > 1;
   const [inboxCount, setInboxCount] = useState<number>(0);
 
   // load profile once
@@ -104,7 +109,7 @@ export default function TopBar() {
         <div className="flex items-center gap-3">
 
           {/* entity context — top-right. Switcher for admins/preview, locked label for a scoped worker */}
-          {loaded && canSwitch ? (
+          {loaded && hasMultipleEntities && canSwitch ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="flex items-center gap-1.5 rounded-full border border-black/15 px-3 py-1.5 font-sans text-[12px] text-ink-soft transition hover:border-ink/40">
                 <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[entity] }} />
@@ -166,7 +171,7 @@ export default function TopBar() {
               ) : null}
             </div>
           ) : null}
-          {loaded && scoped ? (
+          {loaded && scoped && hasMultipleEntities ? (
             <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-[12px] text-[#EFEEEB]" style={{ background: ENTITY_ACCENT[entity] }}>
               <span className="h-2 w-2 rounded-full bg-white/70" />
               {ENTITY_SHORT[entity]}

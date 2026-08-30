@@ -13,7 +13,15 @@ export type EntityType =
   | "holding_company"
   | "advisory_client"
   | "partner"
-  | "landlord";
+  | "landlord"
+  // 2026-08-30 — URL-scoped shells. AppChrome / DesktopSidebar overrides the
+  // entity-derived scope when the user is inside a room route (/studio, /office,
+  // /boh, /foh) so the sidebar reflects the ROOM the user is looking at, not
+  // the entity they last picked from the switcher.
+  | "studio"
+  | "office_room"
+  | "boh_room"
+  | "foh_room";
 
 export type SidebarItem = { href: string; label: string; badge?: string };
 export type SidebarSection = {
@@ -175,6 +183,33 @@ const LANDLORD: SidebarSection[] = [
   },
 ];
 
+
+// Studio (portfolio / executive scope). When Boris — or any owner-tier user —
+// is on /studio/*, the sidebar is deliberately not an operating tree: no MEP,
+// no Menu, no Recipes, no Kitchen or Dining links. Those live INSIDE a house.
+// Studio is oversight: pick a house, look at the people, look at the money,
+// tune the system.
+const STUDIO: SidebarSection[] = [
+  {
+    key: "group",
+    label: "Studio",
+    items: [
+      { href: "/studio",                              label: "Overview" },
+      { href: "/administrate/holdings",               label: "Houses" },
+      { href: "/administrate/team",                   label: "People" },
+      { href: "/administrate/finance",                label: "Money" },
+      { href: "/command",                             label: "Command" },
+    ],
+  },
+];
+
+// Office-room scope — when the user is on /office/*, show only the Office
+// section from the operating tree. Extracted from OPERATING_VENUE so we don't
+// duplicate the item list.
+const OFFICE_ROOM: SidebarSection[] = [OPERATING_VENUE[2]];
+const BOH_ROOM:    SidebarSection[] = [OPERATING_VENUE[1]];
+const FOH_ROOM:    SidebarSection[] = [OPERATING_VENUE[0]];
+
 // The public function the sidebar renders. Missing scope → operating venue
 // (safest for an unauthenticated preview, matches the current default cookie).
 export function sidebarForScope(scope: EntityType | null | undefined): SidebarSection[] {
@@ -183,9 +218,28 @@ export function sidebarForScope(scope: EntityType | null | undefined): SidebarSe
     case "advisory_client":  return ADVISORY_CLIENT;
     case "partner":          return PARTNER;
     case "landlord":         return LANDLORD;
+    case "studio":           return STUDIO;
+    case "office_room":      return OFFICE_ROOM;
+    case "boh_room":         return BOH_ROOM;
+    case "foh_room":         return FOH_ROOM;
     case "operating_venue":
     default:                 return OPERATING_VENUE;
   }
+}
+
+// URL-based scope override. When the user is deep in a room route, the sidebar
+// should reflect the ROOM they're in, not the entity they last selected.
+// Returns null when no URL-scope applies (fall through to the entity-derived
+// scope).
+export function scopeForUrl(pathname: string): EntityType | null {
+  if (!pathname) return null;
+  if (pathname === "/studio" || pathname.startsWith("/studio/")) return "studio";
+  // /office is BOTH a canonical route and part of the operating tree; when the
+  // user is inside /office/*, we still want the FULL operating tree open so
+  // they can jump to Finance / Team / Suppliers under it. So we return null and
+  // let the entity-derived scope take over (operating_venue for BM/Taller).
+  // The /boh and /foh cases are the same story — they live inside a venue.
+  return null;
 }
 
 // EntityKey → EntityType. Utopia is intentionally absent (archived 2026-08-22).

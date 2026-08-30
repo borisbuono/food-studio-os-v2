@@ -9,7 +9,7 @@ import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routi
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
-import { sidebarForScope, entityTypeFor, EntityType } from "@/lib/scope";
+import { sidebarForScope, entityTypeFor, scopeForUrl, EntityType } from "@/lib/scope";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px). On
@@ -37,7 +37,16 @@ export default function DesktopSidebar() {
   const [entMenu, setEntMenu] = useState(false);
 
   const switcher = useSwitcherEntities();
-  const scopeType: EntityType = entityTypeFor(entity);
+  // Switcher visibility (2026-08-30): hide the entity switcher entirely for
+  // users with only one accessible entity. Single-house operators shouldn't
+  // even know the concept exists — Boris's rule for the switcher chrome.
+  const totalEntities = switcher.operating.length + switcher.holding.length + switcher.portfolio.length;
+  const hasMultipleEntities = !switcher.loading && totalEntities > 1;
+  // URL-scope override: /studio/* forces the Studio (portfolio) sidebar
+  // regardless of which entity is selected in the switcher. Task #49
+  // (2026-08-30) — Boris was seeing the operating-venue tree at /studio.
+  const urlScope = scopeForUrl(pathname);
+  const scopeType: EntityType = urlScope ?? entityTypeFor(entity);
   const sections = useMemo(() => sidebarForScope(scopeType), [scopeType]);
 
   // Sections open state is section-key-keyed (not pillar-keyed) because the
@@ -101,7 +110,7 @@ export default function DesktopSidebar() {
         <Link href="/" className="flex items-center" aria-label="Home">
           <BrandMark entity={entity} variant="mark" tone="light" />
         </Link>
-        {canSwitch ? (
+        {hasMultipleEntities && canSwitch ? (
           <div className="relative">
             <button
               onClick={() => setEntMenu((m) => !m)}
@@ -182,7 +191,7 @@ export default function DesktopSidebar() {
               </div>
             ) : null}
           </div>
-        ) : (
+        ) : hasMultipleEntities ? (
           <span
             className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-[12px] text-[#EFEEEB]"
             style={{ background: ENTITY_ACCENT[entity] }}
@@ -190,7 +199,7 @@ export default function DesktopSidebar() {
             <span className="h-2 w-2 rounded-full bg-white/70" />
             {ENTITY_SHORT[entity]}
           </span>
-        )}
+        ) : null}
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("fs:cmdk:open"))}
           className="flex items-center justify-between rounded-md border border-black/10 px-2.5 py-1.5 font-sans text-[12px] text-ink-soft hover:border-ink/40"

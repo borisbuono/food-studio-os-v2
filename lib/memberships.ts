@@ -173,3 +173,42 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
     availableRooms,
   };
 }
+
+// countActiveMemberships — cheap wrapper for "does this person have more than
+// one active membership?" checks. Added 2026-08-30 for the switcher-visibility
+// gate: single-membership users never see entity/room switchers.
+//
+// Fetches directly from the memberships table without hydrating entities.
+export async function countActiveMemberships(personId: string): Promise<number> {
+  if (!personId) return 0;
+  const sb = supabaseServer();
+  const { count } = await sb
+    .from("memberships")
+    .select("*", { count: "exact", head: true })
+    .eq("person_id", personId)
+    .eq("status", "active");
+  return count || 0;
+}
+
+// countActiveMembershipsForAuthUser — same shape but for the auth.uid → team_members
+// → memberships join. Sums across ALL team_members rows for the same auth user
+// (a single auth user can be an operator at multiple venues, each with its own
+// team_members row).
+export async function countActiveMembershipsForAuthUser(authUserId: string): Promise<number> {
+  if (!authUserId) return 0;
+  const sb = supabaseServer();
+  const { data: tmRows } = await sb
+    .from("team_members")
+    .select("id, status")
+    .eq("auth_user_id", authUserId);
+  const personIds = (tmRows || [])
+    .filter((r: any) => r.status !== "archived")
+    .map((r: any) => r.id as string);
+  if (!personIds.length) return 0;
+  const { count } = await sb
+    .from("memberships")
+    .select("*", { count: "exact", head: true })
+    .in("person_id", personIds)
+    .eq("status", "active");
+  return count || 0;
+}
