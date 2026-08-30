@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 // The Capture Station.
 //
@@ -103,6 +104,12 @@ export default function CaptureStation({
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [snapLock, setSnapLock] = useState(false);
+  // Auth guard — the /capture page has a server-side gate, but sessions
+  // can expire while Boris is holding the phone. If the JWT dies mid-shoot
+  // we freeze the camera and show a banner (see Boris 2026-08-30: 6 shots
+  // landed in storage but 0 in invoice_inbox because he wasn't signed in).
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const returnHref = "/capture?type=" + (type || "auto");
 
   // Start camera
   useEffect(() => {
@@ -136,12 +143,41 @@ export default function CaptureStation({
     };
   }, []);
 
+  // Watch the auth session. Supabase fires TOKEN_REFRESHED on rotation and
+  // SIGNED_OUT on expiry / manual sign-out. If we lose the session we stop
+  // the camera and prompt for re-auth. The queue (in-memory + already-
+  // uploaded blobs) is untouched so nothing is lost.
+  useEffect(() => {
+    let cancelled = false;
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      if (!cancelled && !data.session) setSessionExpired(true);
+    });
+    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        setSessionExpired(true);
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    });
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+  }, []);
+
   const captured = cards.length;
   const processing = cards.filter((c) => c.state === "processing").length;
   const filed = cards.filter((c) => c.state === "done").length;
 
   const snap = useCallback(async () => {
     if (snapLock) return;
+    // Verify JWT is still live before we take a shot. If it's gone the
+    // rich endpoint will 401-under-RLS and the storage bucket (anon-ok)
+    // will silently accept the blob without a matching DB row.
+    const { data } = await supabaseBrowser.auth.getSession();
+    if (!data.session) {
+      setSessionExpired(true);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      return;
+    }
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
     setSnapLock(true);
@@ -238,6 +274,23 @@ export default function CaptureStation({
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col">
+      {sessionExpired ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur">
+          <div className="max-w-sm rounded-2xl border border-white/15 bg-neutral-900 p-6 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-white/60">Session expired</p>
+            <p className="mt-3 font-serif text-xl text-white">Sign back in to keep filing</p>
+            <p className="mt-2 font-sans text-sm text-white/70">
+              Your queue is preserved. New shots need a live session — RLS blocks anonymous writes.
+            </p>
+            <a
+              href={"/login?next=" + encodeURIComponent(returnHref)}
+              className="mt-5 inline-block rounded-full bg-white px-5 py-2 font-sans text-sm font-medium text-black"
+            >
+              Sign in
+            </a>
+          </div>
+        </div>
+      ) : null}
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div>

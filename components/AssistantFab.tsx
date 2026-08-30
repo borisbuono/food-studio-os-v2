@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
@@ -139,7 +139,7 @@ export default function AssistantFab() {
   const silenceTimer = useRef<any>(null);
   const pressTimer = useRef<any>(null);
   const longPressFired = useRef(false);
-  const captureInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const wineInputRef = useRef<HTMLInputElement>(null);
   const [wineDraft, setWineDraft] = useState<any | null>(null);
   const [wineBusy, setWineBusy] = useState(false);
@@ -695,14 +695,19 @@ export default function AssistantFab() {
     startListen();
   };
 
-  // Long-press → open sheet with camera actions strip (Collapse #2 redo)
+  // Long-press → jump to the full Capture Station (server-side auth-gated).
+  // Boris 2026-08-30: the old long-press opened the sheet with an inline
+  // file picker that POSTed to /api/capture with type=auto — when Claude
+  // Haiku's classifier was uncertain the type defaulted to "other" and
+  // the shot landed at BM/other/… instead of BM/invoice/…. Unifying to a
+  // single capture path (with auth guard + rich extraction) retires that
+  // parallel route.
   const fabPressDown = () => {
     longPressFired.current = false;
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
-      // Haptic
       if (navigator.vibrate) navigator.vibrate(15);
-      setOpen(true);
+      router.push("/capture?type=invoice");
     }, 500);
   };
   const fabPressUp = () => {
@@ -868,20 +873,8 @@ export default function AssistantFab() {
     setLog((l) => [...l, { role: "sys", text: d.ok ? (lang === "es" ? "✓ Recordado" : "✓ Saved to memory") : ("⚠ " + (d.error || "save failed")) }]);
   };
 
-  // Photo capture from long-press
-  const onCapture = async (file?: File | null) => {
-    if (!file) return;
-    setLog((l) => [...l, { role: "sys", text: lang === "es" ? "📷 Subiendo…" : "📷 Uploading…" }]);
-    try {
-      const fd = new FormData(); fd.append("file", file); fd.append("type", "auto");
-      const r = await fetch("/api/capture", { method: "POST", body: fd });
-      const d = await r.json();
-      if (!d.ok) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (d.error || "upload failed") }]); return; }
-      const det = d.detected;
-      const summary = det ? `${d.type}${det.supplier_name ? " · " + det.supplier_name : ""}${det.total_eur != null ? " · €" + Number(det.total_eur).toFixed(2) : ""}` : d.type;
-      setLog((l) => [...l, { role: "sys", text: `📷 ${lang === "es" ? "Archivado" : "Filed"}: ${summary} → ${d.where}` }]);
-    } catch (e: any) { setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "upload failed") }]); }
-  };
+  // onCapture removed 2026-08-30 — long-press + capture intent both route
+  // to /capture (auth-gated, rich OCR via Sonnet). See CaptureStation.tsx.
 
   // Wine label scan — Collapse #2 second intent. Uses the same /api/wine-scan
   // endpoint the (now-deleted) /develop/wine/scan page used. Shows the extracted
@@ -1030,7 +1023,6 @@ export default function AssistantFab() {
 
   return (
     <>
-      <input ref={captureInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onCapture(e.target.files?.[0])} />
       <input ref={wineInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onWineCapture(e.target.files?.[0])} />
 
       <button
@@ -1313,7 +1305,7 @@ export default function AssistantFab() {
               ) : null}
               {/* Camera actions strip (Collapse #2 wiring) — always visible when sheet is open */}
               <div className="mb-4 flex flex-wrap gap-2 border-b border-line pb-3">
-                <button onClick={() => captureInputRef.current?.click()} className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft">📷 {lang === "es" ? "Capturar factura / EOD" : "Capture doc / EOD"}</button>
+                <button onClick={() => { setOpen(false); router.push("/capture?type=invoice"); }} className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft">📷 {lang === "es" ? "Capturar factura / EOD" : "Capture doc / EOD"}</button>
                 <button onClick={() => wineInputRef.current?.click()} disabled={wineBusy} className="rounded-full border border-line bg-paper px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft disabled:opacity-50">🍷 {wineBusy ? (lang === "es" ? "leyendo…" : "reading…") : (lang === "es" ? "Escanear vino" : "Scan wine")}</button>
               </div>
               {wineDraft ? (
@@ -1353,25 +1345,24 @@ export default function AssistantFab() {
                       </div>
                     ) : null}
                     {m.role === "chef" && m.intent === "capture" && !m.needsConfirm ? (() => {
-                      // Auto-surface the right file picker when the user's turn
-                      // was classified as "capture" (e.g. "I'm uploading an
-                      // invoice from Hiba"). iOS Safari blocks programmatic
-                      // .click() on file inputs outside a user gesture, so we
-                      // render a prominent CTA the user taps once. Route the
-                      // tap to the wine picker when the text mentioned wine
-                      // (vino / label / bottle), otherwise to the general
-                      // document picker.
+                      // "I'm uploading an invoice" style turns. Wine still uses
+                      // the inline picker (wine-scan endpoint hasn't moved to
+                      // the Capture Station yet). Non-wine hands off to the
+                      // Capture Station, which is auth-gated + does rich OCR.
                       const t = (m.userText || "").toLowerCase();
                       const isWine = /\b(wine|vino|bottle|botella|label|etiqueta)\b/.test(t);
-                      const ref = isWine ? wineInputRef : captureInputRef;
                       const label = isWine
                         ? (lang === "es" ? "🍷 Tomar / elegir foto de la etiqueta" : "🍷 Take or choose the label photo")
-                        : (lang === "es" ? "📷 Tomar / elegir foto de la factura o albarán" : "📷 Take or choose the invoice / delivery note photo");
+                        : (lang === "es" ? "📷 Abrir Capture Station" : "📷 Open Capture Station");
                       return (
                         <div className="mt-2 rounded-xl border-l-2 bg-paper-deep/50 p-3" style={{ borderLeftColor: "var(--accent)" }}>
                           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "Adjunta la foto ahora" : "Attach the photo now"}</p>
                           <button
-                            onClick={() => ref.current?.click()}
+                            onClick={() => {
+                              if (isWine) { wineInputRef.current?.click(); return; }
+                              setOpen(false);
+                              router.push("/capture?type=invoice");
+                            }}
                             className="mt-2 w-full rounded-full border border-ink bg-ink px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-paper"
                           >
                             {label}
