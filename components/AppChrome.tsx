@@ -95,14 +95,58 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         <TopBar />
       </div>
       <div className="lg:pl-60">
+        {/* Persistent identity chip so Boris never has to wonder whether he
+            is signed in — the 2026-08-30 capture-while-signed-out incident
+            is why this row is here. Desktop only; mobile users see the chip
+            inside <TopBar/> above. */}
+        <div className="hidden lg:flex items-center justify-end gap-3 px-6 pt-3">
+          {shell.availableRooms.length >= 2 ? (
+            <RoomSwitcher rooms={shell.availableRooms} compact />
+          ) : null}
+          <IdentityChip />
+        </div>
         {shell.availableRooms.length >= 2 ? (
-          <div className="flex justify-end px-6 pt-3">
+          <div className="flex lg:hidden justify-end px-6 pt-3">
             <RoomSwitcher rooms={shell.availableRooms} compact />
           </div>
         ) : null}
         {children}
       </div>
     </>
+  );
+}
+
+// Small top-right identity affordance for the desktop full shell.
+// Shows initials + display name/email and links to /account (which also
+// hosts the sign-out control). We keep the actual sign-out inside /account
+// so the header stays a single-click affordance and doesn't need a popover.
+function IdentityChip() {
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  useEffect(() => { getMyProfile().then(setProfile); }, []);
+  if (!profile) return null;
+  const displayName = profile.name || profile.email || "";
+  const initials = (() => {
+    const n = (displayName || "?").trim();
+    const parts = n.split(/\s+/).slice(0, 2).map((x) => x[0] || "").join("");
+    return (parts || n.slice(0, 2)).toUpperCase();
+  })();
+  return (
+    <Link
+      href="/account"
+      className="flex items-center gap-2 rounded-full border border-black/10 bg-paper/70 pl-1 pr-3 py-1 transition hover:border-ink/30"
+      title="Account · sign out"
+    >
+      <span
+        className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[10px] text-[#EFEEEB]"
+        style={{ background: "var(--accent)" }}
+        aria-hidden
+      >
+        {initials}
+      </span>
+      <span className="font-sans text-[12px] text-ink-soft truncate max-w-[12rem]">
+        {displayName}
+      </span>
+    </Link>
   );
 }
 

@@ -40,26 +40,39 @@ export default function Login() {
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [next, setNext] = useState("/");
 
   // Surface the ?error= that the /auth/callback Route Handler
-  // redirects here with on any failure. Read once on mount.
+  // redirects here with on any failure. Also grab ?next= from the middleware
+  // redirect so we can bounce back to where the user was after sign-in.
   useEffectOnce(() => {
     try {
       const u = new URL(window.location.href);
       const e = u.searchParams.get("error");
       if (e) setErr(e);
+      const n = u.searchParams.get("next");
+      if (n && n.startsWith("/") && !n.startsWith("//")) setNext(n);
     } catch {}
   });
 
+  // Build the callback URL with a preserved `next` so /auth/callback can
+  // redirect the browser back to the originally-requested path after the
+  // session cookie is written.
+  const callbackUrl = () => {
+    const u = new URL("/auth/callback", window.location.origin);
+    if (next && next !== "/") u.searchParams.set("next", next);
+    return u.toString();
+  };
+
   const google = async () => {
     setErr("");
-    const { error } = await supabaseBrowser.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + "/auth/callback" } });
+    const { error } = await supabaseBrowser.auth.signInWithOAuth({ provider: "google", options: { redirectTo: callbackUrl() } });
     if (error) setErr(error.message);
   };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setErr("");
-    const { error } = await supabaseBrowser.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/auth/callback" } });
+    const { error } = await supabaseBrowser.auth.signInWithOtp({ email, options: { emailRedirectTo: callbackUrl() } });
     setBusy(false);
     if (error) setErr(error.message); else setSent(true);
   };
