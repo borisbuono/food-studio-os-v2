@@ -266,6 +266,14 @@ function extractText(payload: any): string {
   return "";
 }
 
+// Exposed for feature-specific scanners (e.g. Fresto closing-report email
+// guest parser) that need to hit arbitrary Gmail endpoints without
+// duplicating the OAuth / refresh plumbing. Internal callers still use
+// the un-exported alias.
+export async function gmailApiFetch(channel: AssistantChannelRow, path: string, init?: RequestInit): Promise<any> {
+  return gmailFetch(channel, path, init);
+}
+
 async function gmailFetch(channel: AssistantChannelRow, path: string, init?: RequestInit): Promise<any> {
   const token = await accessToken(channel);
   const r = await fetch(GMAIL_API + path, {

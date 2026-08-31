@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
 import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { GuestChip } from "../GuestChip";
 
 export const dynamic = "force-dynamic";
 
@@ -74,11 +75,12 @@ export default async function StudioHousesPage() {
   const today = madridToday();
   const rids = houses.map((e: any) => ENTITY_TO_RID[e.name]).filter(Boolean);
 
-  let posByRid = new Map<string, { date: string; gross: number; covers: number }>();
+  type PosSnap = { date: string; gross: number; tickets: number | null; guests: number | null; guests_source: string | null; z_spans_days: boolean };
+  let posByRid = new Map<string, PosSnap>();
   if (rids.length) {
     const { data: posRows } = await sb
       .from("eod_pos")
-      .select("restaurant_id,date,total_gross_eur,covers")
+      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_source,z_spans_days")
       .in("restaurant_id", rids)
       .order("date", { ascending: false })
       .limit(60);
@@ -88,7 +90,10 @@ export default async function StudioHousesPage() {
         posByRid.set(rid, {
           date: String(r.date),
           gross: Number(r.total_gross_eur || 0),
-          covers: Number(r.covers || 0),
+          tickets: r.tickets == null ? null : Number(r.tickets),
+          guests: r.guests == null ? null : Number(r.guests),
+          guests_source: (r.guests_source as string | null) || null,
+          z_spans_days: !!r.z_spans_days,
         });
       }
     }
@@ -126,9 +131,31 @@ export default async function StudioHousesPage() {
                   <p className="font-serif text-[20px] text-ink leading-tight">{e.name}</p>
                   {pos ? (
                     <>
-                      <p className="mt-3 font-sans text-[13px] text-ink-soft">{eur(pos.gross)} · {pos.covers} covers</p>
-                      <p className="mt-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                      <p className="mt-3 font-sans text-[13px] text-ink-soft">
+                        {eur(pos.gross)}
+                        {pos.tickets != null ? <span> · {pos.tickets} tickets</span> : null}
+                      </p>
+                      <div className="mt-2">
+                        {rid ? (
+                          <GuestChip
+                            restaurant_id={rid}
+                            date={pos.date}
+                            initialGuests={pos.guests ?? null}
+                            initialSource={pos.guests_source ?? null}
+                          />
+                        ) : null}
+                      </div>
+                      <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
                         <span>{pos.date === today ? "Today" : `Last close ${humanDate(pos.date, today)}`}</span>
+                        {pos.z_spans_days ? (
+                          <span
+                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
+                            title="Z-report spans multiple days; cash figures on this row are aggregated"
+                          >
+                            Span
+                          </span>
+                        ) : null}
                         {stale ? (
                           <span
                             className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"

@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
 import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { GuestChip } from "./GuestChip";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +66,18 @@ type Tile = {
   type: string;
   href: string;
   status: string;               // fallback for non-operating houses
-  primary?: string;             // "€170 · 0 covers"
-  secondary?: string;           // "Last close 21 Aug"
-  stale?: boolean;              // orange pill
+  // Boris rule 2026-08-31 18:15 CET — tickets and guests are two
+  // separate signals. tickets = item count (Fresto z.quantity), guests
+  // = physical people. Never conflate.
+  gross_eur?: number;
+  tickets?: number | null;
+  guests?: number | null;
+  guests_source?: string | null; // 'manual' | 'email' | null
+  restaurant_id?: string;        // needed for the inline guest-key input
+  date?: string;                 // POS row date (for the guest-key POST)
+  z_spans_days?: boolean;        // SPAN pill trigger
+  secondary?: string;            // "Last close 21 Aug"
+  stale?: boolean;               // orange pill
 };
 
 // Human date — "21 Aug" or "3 Sep". If the date is today, say "today"; if
@@ -139,11 +149,12 @@ export default async function StudioPage() {
     .map((e: any) => ENTITY_TO_RID[e.name])
     .filter(Boolean);
 
-  let posByRid = new Map<string, { date: string; gross: number; covers: number }>();
+  type PosSnap = { date: string; gross: number; tickets: number | null; guests: number | null; guests_source: string | null; z_spans_days: boolean };
+  let posByRid = new Map<string, PosSnap>();
   if (opRids.length) {
     const { data: posRows } = await sb
       .from("eod_pos")
-      .select("restaurant_id,date,total_gross_eur,covers")
+      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_source,z_spans_days")
       .in("restaurant_id", opRids)
       .order("date", { ascending: false })
       .limit(60);
@@ -153,7 +164,10 @@ export default async function StudioPage() {
         posByRid.set(rid, {
           date: String(r.date),
           gross: Number(r.total_gross_eur || 0),
-          covers: Number(r.covers || 0),
+          tickets: r.tickets == null ? null : Number(r.tickets),
+          guests: r.guests == null ? null : Number(r.guests),
+          guests_source: (r.guests_source as string | null) || null,
+          z_spans_days: !!r.z_spans_days,
         });
       }
     }
@@ -172,11 +186,21 @@ export default async function StudioPage() {
       href = slug ? `/h/${slug}` : OPERATING_DEFAULT_ROOM;
       const pos = rid ? posByRid.get(rid) : null;
       if (pos) {
-        const primary = `${eur(pos.gross)} · ${pos.covers} covers`;
         const dateWord = humanDate(pos.date, today);
         const secondary = pos.date === today ? "Today" : `Last close ${dateWord}`;
         const stale = isStale(pos.date, today);
-        return { id: e.id, name: e.name, type: e.entity_type, href, status: primary, primary, secondary, stale };
+        return {
+          id: e.id, name: e.name, type: e.entity_type, href,
+          status: `${eur(pos.gross)}`, // fallback text
+          gross_eur: pos.gross,
+          tickets: pos.tickets,
+          guests: pos.guests,
+          guests_source: pos.guests_source,
+          restaurant_id: rid,
+          date: pos.date,
+          z_spans_days: pos.z_spans_days,
+          secondary, stale,
+        };
       } else {
         status = "No closes yet";
       }
@@ -265,11 +289,37 @@ export default async function StudioPage() {
                       {t.type.replace("_", " ")}
                     </span>
                   </div>
-                  {t.primary ? (
+                  {t.gross_eur != null ? (
                     <>
-                      <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.primary}</p>
-                      <p className="mt-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                      {/* Line 1: money + tickets. tickets is Fresto item
+                          count (each dish = 1); NOT people. */}
+                      <p className="mt-3 font-sans text-[13px] text-ink-soft">
+                        {eur(t.gross_eur)}
+                        {t.tickets != null ? <span> · {t.tickets} tickets</span> : null}
+                      </p>
+                      {/* Line 2: guests chip — separate signal, physical
+                          people count. Manual key or email parse. */}
+                      <div className="mt-2">
+                        {t.restaurant_id && t.date ? (
+                          <GuestChip
+                            restaurant_id={t.restaurant_id}
+                            date={t.date}
+                            initialGuests={t.guests ?? null}
+                            initialSource={t.guests_source ?? null}
+                          />
+                        ) : null}
+                      </div>
+                      <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
                         <span>{t.secondary}</span>
+                        {t.z_spans_days ? (
+                          <span
+                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
+                            title="Z-report spans multiple days; cash figures on this row are aggregated and unreliable"
+                          >
+                            Span
+                          </span>
+                        ) : null}
                         {t.stale ? (
                           <span
                             className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"

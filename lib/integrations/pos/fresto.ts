@@ -15,6 +15,25 @@ import type { PosAdapter, PosDailySale, PosSaleLine, EntityCode } from "@/lib/in
 //
 // The XLSX shape has one row per day: date | food | wine | bar | softdrinks | tips | total.
 // Headers are normalised for resilience across Spanish/English exports.
+//
+// ------------------------------------------------------------------------
+// Boris walk 2026-08-31 18:15 CET — tickets vs guests split
+// ------------------------------------------------------------------------
+// The Fresto API has NO guest field anywhere. What we USED to write into
+// eod_pos.covers was z.quantity — the count of items on the ticket, not
+// people. A pair of guests ordering two mains, two glasses of wine and a
+// coffee is 5 "tickets" on Fresto, 2 guests in the dining room.
+//
+// This writer now emits both signals separately:
+//   • tickets       = SUM(quantity) from /sales/orderlines
+//   • orders_count  = COUNT(DISTINCT orderID) from /sales/orderlines
+//   • tables_count  = COUNT(DISTINCT tableID) from /sales/orders (best-effort)
+//   • guests        = NOT WRITTEN HERE. Manual entry or email parse only.
+//
+// It also flags multi-day z-reports (a z whose fromDate.date != toDate.date
+// aggregates cash across the span onto a single business day). When that
+// happens we null cash/card/tips and set z_spans_days=true so the Studio
+// card can render a SPAN pill rather than lie about the day's cash.
 
 // ---------- 1) XLSX fallback (unchanged public shape) ----------
 
@@ -73,8 +92,11 @@ export function parseFrestoXlsx(buf: ArrayBuffer): { date: string; covers: numbe
   return out;
 }
 
-// Persist a parsed Fresto row to eod_pos (immutable POS snapshot). Idempotent per
-// (restaurant_id, date, source). Used by both the XLSX upload path and the live API pull.
+// Persist a parsed Fresto XLSX row to eod_pos. Idempotent per (restaurant_id,
+// date, source). The XLSX export's "cubiertos" column in the Spanish
+// operator dashboard IS a physical guest count, so we write it to
+// guests (source='import'), NOT to tickets — tickets is only populated
+// by the API pull path where z.quantity is item count.
 export async function persistFrestoRowToPos(params: {
   restaurant_id: string;
   row: ReturnType<typeof parseFrestoXlsx>[number];
@@ -98,7 +120,12 @@ export async function persistFrestoRowToPos(params: {
     date: row.date,
     source: "fresto",
     source_ref: params.source_ref || null,
-    covers: row.covers || 0,
+    covers: null,
+    guests: row.covers && row.covers > 0 ? row.covers : null,
+    guests_source: row.covers && row.covers > 0 ? "import" : null,
+    tickets: null,
+    orders_count: null,
+    tables_count: null,
     food_net_eur: row.food || 0,
     wine_net_eur: row.wine || 0,
     bar_net_eur: row.bar || 0,
@@ -248,6 +275,17 @@ export interface FrestoOrderline {
   productAccountingCode?: string;
 }
 
+export interface FrestoOrder {
+  id?: string;
+  slug?: string;
+  businessDate?: string;
+  tableID?: string;
+  tableName?: string;
+  quantity?: number;
+  revenue?: number;
+  cancelled?: 0 | 1;
+}
+
 export interface FrestoZReport {
   id?: string;
   slug?: string;
@@ -302,14 +340,54 @@ export interface FrestoSalesDay {
 
 // ---------- Public API methods ----------
 
-// Pull all orderlines for a date and aggregate into a canonical PosDailySale.
-// Group buckets are inferred from the productGroupID (best-effort) since Fresto does
-// not tag "food/wine/bar/softdrinks" natively — we use vatPct + accounting code hints
-// and fall back to "other". Downstream (eod_pos) accepts the split; anything unmatched
-// lands under food so total_gross_eur reconciles.
+// Extract "YYYY-MM-DD" from an ISO-ish string. Fresto returns things like
+// "2026-08-30T03:14:22Z" for z.fromDate/toDate. If the string is missing
+// or malformed we return null.
+function isoDatePart(s: string | undefined | null): string | null {
+  if (!s || typeof s !== "string") return null;
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+// Pull all orderlines for a businessDate. Fresto's per-day filter is
+// `?businessDate=D` which is authoritative — it pins each line to the
+// business day the operator chose at close time (handles the 03:00-next-
+// morning case correctly).
+export async function pullOrderlinesForDay(entity: EntityCode, date: string): Promise<FrestoOrderline[]> {
+  if (FRESTO_DRY_RUN()) return [];
+  const creds = getFrestoCredentials(entity);
+  if (!creds) return [];
+  // We still pass startDate/endDate for the historic behaviour and
+  // businessDate for the exact per-day pin. The Fresto API tolerates
+  // both being present; the narrowest predicate wins.
+  const resp = await frestoGet<{ data: FrestoOrderline[] }>(entity, "/sales/orderlines", {
+    startDate: date, endDate: date, businessDate: date, pagesize: 5000,
+  });
+  return (resp?.data || []).filter((l) => (l.isRevenue ?? 1) === 1 && (l.cancelled ?? 0) === 0);
+}
+
+// Pull orders for the day — used only for tables_count. Best-effort; if
+// the endpoint isn't available for a tenant we return an empty list and
+// tables_count stays null.
+export async function pullOrdersForDay(entity: EntityCode, date: string): Promise<FrestoOrder[]> {
+  if (FRESTO_DRY_RUN()) return [];
+  const creds = getFrestoCredentials(entity);
+  if (!creds) return [];
+  try {
+    const resp = await frestoGet<{ data: FrestoOrder[] }>(entity, "/sales/orders", {
+      businessDate: date, pagesize: 5000,
+    });
+    return (resp?.data || []).filter((o) => (o.cancelled ?? 0) === 0);
+  } catch {
+    return [];
+  }
+}
+
+// Kept for surface compatibility. Emits the canonical PosDailySale shape
+// used by the older adapter surface — the writer path (persistPullToPos)
+// no longer calls this; it goes direct to orderlines + z's for exactness.
 export async function pullDay(entity: EntityCode, restaurant_id: string, date: string): Promise<PosDailySale | null> {
   if (FRESTO_DRY_RUN()) {
-    // Dry-run: emit an empty shell so the surface can still render "0 pulled" without hitting the API.
     return {
       date, restaurant_id, covers: 0, lines: [], total_eur: 0,
       source: { adapter: "fresto", raw_ref: "dry-run" },
@@ -318,29 +396,16 @@ export async function pullDay(entity: EntityCode, restaurant_id: string, date: s
   const creds = getFrestoCredentials(entity);
   if (!creds) return null;
 
-  // Fresto uses startDate/endDate (inclusive). One day = same value.
-  const resp = await frestoGet<{ data: FrestoOrderline[] }>(entity, "/sales/orderlines", { startDate: date, endDate: date, pagesize: 5000 });
-  const lines = (resp?.data || []).filter((l) => (l.isRevenue ?? 1) === 1 && (l.cancelled ?? 0) === 0);
-
-  // Bucket orderlines. Fresto's group naming is per-tenant so we infer:
-  //  - group name from menu/product-groups if the title is available in the line's slug
-  //  - fall back to bar/food from isBarProduct / vatPct heuristics
-  // Since /sales/orderlines does not embed product-group titles, we key by productGroupID
-  // and treat unknown groups as food. Wine/softdrinks discovery lives in a follow-up
-  // migration that seeds a productGroupID → bucket map per venue.
+  const lines = await pullOrderlinesForDay(entity, date);
   const bucket = { food: 0, wine: 0, bar: 0, softdrinks: 0, tips: 0 };
   let total = 0;
   for (const ol of lines) {
     const price = Number(ol.price || 0);
     total += price;
-    // Very rough heuristic. VAT 21% in Spain is usually alcohol; 10% is food. Real
-    // classification happens in a future productGroupID map; today Boris still
-    // trusts the ZReport for the split (see pullZReport below).
     const vat = Number(ol.vatPct || 0);
     if (vat >= 20) bucket.bar += price;
     else bucket.food += price;
   }
-
   const posLines: PosSaleLine[] = [
     { group: "food",       net_eur: bucket.food,       vat_rate: 10, vat_eur: bucket.food * 0.10 },
     { group: "wine",       net_eur: bucket.wine,       vat_rate: 10, vat_eur: bucket.wine * 0.10 },
@@ -348,15 +413,16 @@ export async function pullDay(entity: EntityCode, restaurant_id: string, date: s
     { group: "softdrinks", net_eur: bucket.softdrinks, vat_rate: 10, vat_eur: bucket.softdrinks * 0.10 },
     { group: "tips",       net_eur: bucket.tips,       vat_rate: 0,  vat_eur: 0 },
   ];
-
   return {
     date, restaurant_id, covers: 0, lines: posLines, total_eur: total,
     source: { adapter: "fresto", raw_ref: `orderlines:${date}` },
   };
 }
 
-// Pull the closing (Z) report for a date. Fresto Z reports are the authoritative
-// end-of-day figures — cash / cards / tips / discounts — and are what Boris books.
+// Pull the z-report(s) for a date. If any is multi-day (fromDate.date !=
+// toDate.date) the cash/card figures cover multiple business days and
+// can't be trusted for the single day — we surface that so the writer
+// can flag z_spans_days and null cash/card.
 export async function pullZReport(entity: EntityCode, date: string): Promise<FrestoZReport | null> {
   if (FRESTO_DRY_RUN()) return null;
   const creds = getFrestoCredentials(entity);
@@ -364,8 +430,7 @@ export async function pullZReport(entity: EntityCode, date: string): Promise<Fre
   const resp = await frestoGet<{ data: FrestoZReport[] }>(entity, "/sales/z-reports", { startDate: date, endDate: date });
   const arr = resp?.data || [];
   if (!arr.length) return null;
-  // Multiple Z-reports possible if there were multiple closings — aggregate them.
-  const agg: FrestoZReport = { fromDate: date, toDate: date, revenue: 0, cashRevenue: 0, cardsTotal: 0, tips: 0, vatAmount: 0, discountTotal: 0, refundTotal: 0 };
+  const agg: FrestoZReport = { fromDate: date, toDate: date, revenue: 0, cashRevenue: 0, cardsTotal: 0, tips: 0, vatAmount: 0, discountTotal: 0, refundTotal: 0, quantity: 0 };
   for (const z of arr) {
     agg.revenue = (agg.revenue || 0) + (z.revenue || 0);
     agg.cashRevenue = (agg.cashRevenue || 0) + (z.cashRevenue || 0);
@@ -374,14 +439,12 @@ export async function pullZReport(entity: EntityCode, date: string): Promise<Fre
     agg.vatAmount = (agg.vatAmount || 0) + (z.vatAmount || 0);
     agg.discountTotal = (agg.discountTotal || 0) + (z.discountTotal || 0);
     agg.refundTotal = (agg.refundTotal || 0) + (z.refundTotal || 0);
-    // preserve id of the first for reference
+    agg.quantity = (agg.quantity || 0) + (z.quantity || 0);
     if (!agg.id) agg.id = z.id;
   }
   return agg;
 }
 
-// List Z reports for backfill / catchup — used by /sync and by the closing-report webhook
-// receiver when the payload contains an ID but not the full body.
 export async function listRecentClosingReports(entity: EntityCode, sinceDate: string, untilDate?: string): Promise<FrestoZReport[]> {
   if (FRESTO_DRY_RUN()) return [];
   const creds = getFrestoCredentials(entity);
@@ -393,9 +456,7 @@ export async function listRecentClosingReports(entity: EntityCode, sinceDate: st
   return resp?.data || [];
 }
 
-// Combine an orderlines pull + Z Report into the canonical PosDailySale shape we persist
-// to eod_pos. Z Report wins for cash/card/tips totals — orderlines contribute the
-// product-group split. If the Z Report is missing we surface orderlines only.
+// Kept for surface compatibility.
 export async function pullDayCombined(entity: EntityCode, restaurant_id: string, date: string): Promise<PosDailySale | null> {
   const [day, z] = await Promise.all([pullDay(entity, restaurant_id, date), pullZReport(entity, date)]);
   if (!day && !z) return null;
@@ -406,48 +467,184 @@ export async function pullDayCombined(entity: EntityCode, restaurant_id: string,
     { group: "softdrinks", net_eur: 0, vat_rate: 10, vat_eur: 0 },
     { group: "tips",       net_eur: Number(z?.tips || 0), vat_rate: 0, vat_eur: 0 },
   ];
-  // Prefer Z Report revenue as the authoritative daily total.
   const total = Number(z?.revenue ?? day?.total_eur ?? 0);
   return {
-    date,
-    restaurant_id,
-    covers: day?.covers || 0,
-    lines,
-    total_eur: total,
+    date, restaurant_id, covers: 0, lines, total_eur: total,
     source: { adapter: "fresto", raw_ref: z?.id ? `zreport:${z.id}` : `orderlines:${date}` },
   };
 }
 
-// Persist a live pull to eod_pos. Handles the ZReport → cash/card split so downstream
-// house-rule (deduct cash from food) still fires.
+// Regex used by both the closing-report email parser and any operator
+// dashboard pastes. Fresto's email body has a "Guests: N" line — a stray
+// "guest:" or "guests :" is also accepted. Exports the regex so tests
+// can lock the shape.
+export const FRESTO_GUESTS_REGEX = /\bguests?\s*:\s*(\d+)\b/i;
+
+export function parseGuestsFromEmailBody(body: string | null | undefined): number | null {
+  if (!body) return null;
+  const m = String(body).match(FRESTO_GUESTS_REGEX);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// ---------- The writer ----------
+//
+// Idempotent upsert on (restaurant_id, date, source='fresto'). If the row
+// already exists we UPDATE all POS-derived fields but preserve any
+// guests / guests_source / guests_keyed_* that Boris keyed manually — the
+// audit rule is that manual key trumps API pull.
+
 export async function persistPullToPos(params: {
   entity: EntityCode;
   restaurant_id: string;
   date: string;
   imported_by?: string | null;
 }): Promise<{ id: string; existed: boolean } | null> {
-  const combined = await pullDayCombined(params.entity, params.restaurant_id, params.date);
-  if (!combined) return null;
-  const z = await pullZReport(params.entity, params.date);
-  const row = {
-    date: params.date,
-    covers: combined.covers || 0,
-    food: combined.lines.find((l) => l.group === "food")?.net_eur || 0,
-    wine: combined.lines.find((l) => l.group === "wine")?.net_eur || 0,
-    bar:  combined.lines.find((l) => l.group === "bar")?.net_eur  || 0,
-    softdrinks: combined.lines.find((l) => l.group === "softdrinks")?.net_eur || 0,
-    tips: Number(z?.tips || combined.lines.find((l) => l.group === "tips")?.net_eur || 0),
-    total: combined.total_eur || 0,
-    cash: Number(z?.cashRevenue || 0),
-    card: Number((z?.cardsTotal || 0) + (z?.onlineCardsTotal || 0)),
+  const { supabaseServer } = await import("@/lib/supabaseServer");
+  const sb = supabaseServer();
+
+  const [orderlines, orders, zRaw] = await Promise.all([
+    pullOrderlinesForDay(params.entity, params.date),
+    pullOrdersForDay(params.entity, params.date),
+    // Raw z-report list (not aggregated) — we need per-z fromDate/toDate
+    // to detect multi-day z's.
+    (async (): Promise<FrestoZReport[]> => {
+      if (FRESTO_DRY_RUN()) return [];
+      if (!getFrestoCredentials(params.entity)) return [];
+      try {
+        const resp = await frestoGet<{ data: FrestoZReport[] }>(params.entity, "/sales/z-reports", { startDate: params.date, endDate: params.date });
+        return resp?.data || [];
+      } catch {
+        return [];
+      }
+    })(),
+  ]);
+
+  if (!orderlines.length && !zRaw.length) return null;
+
+  // --- Tickets / orders_count / tables_count from orderlines + orders. --
+  // Orderlines are already filtered (isRevenue=1, cancelled=0) so quantity
+  // sums are the item count you'd see on the ticket. Fresto tolerates
+  // fractional quantity for weight-based items (charcuterie, cheese) but
+  // rounding to whole items matches operator instinct.
+  const tickets = Math.round(orderlines.reduce((s, l) => s + Number(l.quantity || 0), 0));
+  const orderIds = new Set<string>();
+  for (const l of orderlines) if (l.orderID) orderIds.add(l.orderID);
+  const orders_count = orderIds.size || null;
+  const tableIds = new Set<string>();
+  for (const o of orders) if (o.tableID) tableIds.add(o.tableID);
+  const tables_count = tableIds.size || null;
+
+  // --- Revenue split from orderlines. VAT heuristic (>=20 → bar, else
+  // food) is deliberately conservative — the product-group map lives in a
+  // follow-up migration; today the aggregate total_gross_eur is what
+  // Boris trusts. See notes at top of file. ---
+  const bucket = { food: 0, wine: 0, bar: 0, softdrinks: 0 };
+  for (const ol of orderlines) {
+    const price = Number(ol.price || 0);
+    const vat = Number(ol.vatPct || 0);
+    if (vat >= 20) bucket.bar += price;
+    else bucket.food += price;
+  }
+
+  // --- Z-report aggregation + multi-day detection. ---------------------
+  // z_spans_days is true if ANY z touching this date has fromDate.date
+  // != toDate.date. When that happens cash/card/tips reflect the SPAN,
+  // not the day — we null them so downstream doesn't book fake cash.
+  let z_spans_days = false;
+  let cashRevenue = 0, cardsTotal = 0, onlineCardsTotal = 0, tips = 0, zRevenue = 0;
+  const zIds: string[] = [];
+  for (const z of zRaw) {
+    if (z.id) zIds.push(z.id);
+    const from = isoDatePart(z.fromDate);
+    const to = isoDatePart(z.toDate);
+    if (from && to && from !== to) z_spans_days = true;
+    cashRevenue += Number(z.cashRevenue || 0);
+    cardsTotal += Number(z.cardsTotal || 0);
+    onlineCardsTotal += Number(z.onlineCardsTotal || 0);
+    tips += Number(z.tips || 0);
+    zRevenue += Number(z.revenue || 0);
+  }
+
+  // total_gross_eur — prefer the sum of z.revenue as the authoritative
+  // daily total, fall back to orderlines aggregate if z's are missing.
+  const orderlinesTotal = orderlines.reduce((s, l) => s + Number(l.price || 0), 0);
+  const total_gross = zRevenue || orderlinesTotal;
+
+  // Cash/card/tips: null when the z that dropped on this day covered a
+  // multi-day span (unsafe to attribute).
+  const cash_declared_eur = z_spans_days ? null : (cashRevenue || 0);
+  const card_declared_eur = z_spans_days ? null : ((cardsTotal || 0) + (onlineCardsTotal || 0));
+  const tips_eur = z_spans_days ? null : (tips || 0);
+
+  // --- Upsert -----------------------------------------------------------
+  const source_ref = zIds.length ? `zreport:${zIds.join(",")}` : `orderlines:${params.date}`;
+  const raw_payload = {
+    version: "tickets_guests_v1",
+    orderlines_count: orderlines.length,
+    orders_count,
+    tables_count,
+    tickets,
+    z_spans_days,
+    z_ids: zIds,
+    // Keep the aggregated z summary for auditability without dumping the
+    // full body (a busy day can have 20 z-reports).
+    zreport_summary: {
+      revenue: zRevenue, cashRevenue, cardsTotal, onlineCardsTotal, tips,
+      count: zRaw.length,
+    },
   };
-  return await persistFrestoRowToPos({
+
+  // Insert or update in one round-trip. We select first to preserve the
+  // manual guests key if present (never overwrite guests_source='manual').
+  const found = await sb.from("eod_pos")
+    .select("id, guests, guests_source, guests_keyed_by, guests_keyed_at")
+    .eq("restaurant_id", params.restaurant_id)
+    .eq("date", params.date)
+    .eq("source", "fresto")
+    .maybeSingle();
+
+  const patch: any = {
     restaurant_id: params.restaurant_id,
-    row,
-    source_ref: combined.source.raw_ref || `fresto-api:${params.date}`,
+    date: params.date,
+    source: "fresto",
+    source_ref,
+    covers: null, // deprecated for fresto rows
+    tickets,
+    orders_count,
+    tables_count,
+    z_spans_days,
+    food_net_eur: bucket.food,
+    wine_net_eur: bucket.wine,
+    bar_net_eur: bucket.bar,
+    softdrinks_net_eur: bucket.softdrinks,
+    tips_eur: tips_eur == null ? null : tips_eur,
+    service_charge_eur: 0,
+    cash_declared_eur,
+    card_declared_eur,
+    total_gross_eur: total_gross,
     imported_by: params.imported_by || null,
-    raw_payload: { orderlines_summary: combined, zreport: z },
-  });
+    raw_payload,
+  };
+
+  // Preserve manual guests key (audit rule). If email or import already
+  // set guests we still keep them — the writer never touches guests.
+  if (found.data?.id) {
+    const upd = await sb.from("eod_pos").update(patch).eq("id", found.data.id).select("id").single();
+    if (upd.error) throw new Error("eod_pos update failed: " + upd.error.message);
+    return { id: upd.data.id, existed: true };
+  }
+
+  const ins = await sb.from("eod_pos").insert({
+    ...patch,
+    guests: null,
+    guests_source: null,
+    guests_keyed_by: null,
+    guests_keyed_at: null,
+  }).select("id").single();
+  if (ins.error) throw new Error("eod_pos insert failed: " + ins.error.message);
+  return { id: ins.data.id, existed: false };
 }
 
 // ---------- Adapter surface (kept API-compatible with the existing registry) ----------
@@ -473,12 +670,10 @@ export const frestoAdapter: PosAdapter = {
     }));
   },
   async pullDay(restaurant_id: string, date: string): Promise<PosDailySale | null> {
-    // Legacy read path — read the immutable snapshot for the day. Live pulls happen via
-    // the /api/integrations/fresto/sync route (which uses pullDayCombined + persistPullToPos).
     const { supabaseServer } = await import("@/lib/supabaseServer");
     const sb = supabaseServer();
     const { data } = await sb.from("eod_pos")
-      .select("food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur,covers")
+      .select("food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur,covers,guests,tickets")
       .eq("restaurant_id", restaurant_id)
       .eq("date", date)
       .eq("source", "fresto")
@@ -491,10 +686,13 @@ export const frestoAdapter: PosAdapter = {
       { group: "softdrinks", net_eur: Number(data.softdrinks_net_eur || 0), vat_rate: 10, vat_eur: Number(data.softdrinks_net_eur || 0) * 0.10 },
       { group: "tips",       net_eur: Number(data.tips_eur           || 0), vat_rate: 0,  vat_eur: 0 },
     ];
+    // covers on the PosDailySale surface is now guest-count, falling back
+    // to null (rendered as 0 by legacy consumers). tickets is not part of
+    // the PosDailySale shape — a follow-up will thread it through.
     return {
       date,
       restaurant_id,
-      covers: Number(data.covers || 0),
+      covers: Number(data.guests ?? data.covers ?? 0),
       lines,
       total_eur: Number(data.total_gross_eur || 0),
       source: { adapter: "fresto", raw_ref: "eod_pos" },

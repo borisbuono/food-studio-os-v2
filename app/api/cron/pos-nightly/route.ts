@@ -26,8 +26,14 @@ export const maxDuration = 300;
 //   • Auth: Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
 //     Also allowed: an authenticated Studio user (Boris) hitting the
 //     route directly from the browser.
-//   • Idempotent: persistPullToPos already checks (restaurant_id, date,
-//     source=fresto) and returns { existed: true } if the row is there.
+//   • Idempotent update: persistPullToPos upserts on (restaurant_id, date,
+//     source=fresto). Existing rows are refreshed with the current API
+//     response (tickets, orders_count, tables_count, revenue split, z-span
+//     flag). Manually keyed guests are preserved by the writer, never
+//     overwritten.
+//   • ?force=1 — ignore the "newest row" optimisation and re-pull the
+//     whole MAX_LOOKBACK_DAYS window. Used for backfills after a schema
+//     change (Boris walk 2026-08-31 tickets/guests split).
 
 const VENUES: Array<{ entity: EntityCode; restaurant_id: string; label: string }> = [
   { entity: "BM",  restaurant_id: "fb4d008f-2d2a-4e0d-a525-6e0e36af0259", label: "Bistro Mondo" },
@@ -80,6 +86,8 @@ export async function GET(req: NextRequest) {
   // yesterday's Z is settled.
   const yesterday = isoDaysAgo(today, 1);
   const lookback_floor = isoDaysAgo(today, MAX_LOOKBACK_DAYS);
+  const url = new URL(req.url);
+  const force = url.searchParams.get("force") === "1";
 
   const perVenue: any[] = [];
 
@@ -103,10 +111,11 @@ export async function GET(req: NextRequest) {
     }
 
     const newestDate = newest?.[0]?.date as string | undefined;
-    // Start = day AFTER the newest row we have. If we've never pulled,
-    // start = MAX_LOOKBACK_DAYS ago so we don't chew through months of
-    // history on first run.
-    const gapStart = newestDate ? isoDaysAgo(newestDate, -1) : lookback_floor;
+    // Start = day AFTER the newest row we have (self-heal). With ?force=1
+    // we ignore this and always pull the whole MAX_LOOKBACK_DAYS window
+    // so a schema change (like the tickets/guests split) can be
+    // back-propagated in one shot.
+    const gapStart = newestDate && !force ? isoDaysAgo(newestDate, -1) : lookback_floor;
     const start = gapStart < lookback_floor ? lookback_floor : gapStart;
 
     if (start > yesterday) {
@@ -116,7 +125,7 @@ export async function GET(req: NextRequest) {
 
     const dates = eachDate(start, yesterday);
     const summary: Array<{ date: string; ok: boolean; existed?: boolean; error?: string; eod_pos_id?: string }> = [];
-    let pulled = 0, skipped = 0, failed = 0, empty = 0;
+    let inserted = 0, updated = 0, failed = 0, empty = 0;
 
     for (const date of dates) {
       try {
@@ -125,7 +134,7 @@ export async function GET(req: NextRequest) {
         });
         if (!res) { summary.push({ date, ok: false, error: "no data for date" }); empty++; continue; }
         summary.push({ date, ok: true, existed: res.existed, eod_pos_id: res.id });
-        if (res.existed) skipped++; else pulled++;
+        if (res.existed) updated++; else inserted++;
       } catch (e: any) {
         summary.push({ date, ok: false, error: e?.message || String(e) });
         failed++;
@@ -135,8 +144,26 @@ export async function GET(req: NextRequest) {
     perVenue.push({
       entity: v.entity, label: v.label, newest_before: newestDate,
       backfilled_from: start, backfilled_through: yesterday,
-      days: dates.length, pulled, skipped, empty, failed, summary,
+      days: dates.length, inserted, updated, empty, failed, summary,
     });
+  }
+
+  // Piggyback: also sweep Gmail for Fresto closing-report emails and
+  // parse `Guests: N` into eod_pos.guests where guests_source != 'manual'.
+  // We don't add a separate Vercel cron for this (Hobby plan is capped at
+  // 3 crons — see the memory note). The scan is a no-op if no Gmail
+  // channel is connected.
+  let email_scan_ok = false;
+  let email_scan_error: string | null = null;
+  try {
+    const origin = new URL(req.url).origin;
+    const r = await fetch(origin + "/api/cron/fresto-email-guests", {
+      headers: { ...(process.env.CRON_SECRET ? { authorization: "Bearer " + process.env.CRON_SECRET } : {}) },
+    });
+    email_scan_ok = r.ok;
+    if (!r.ok) email_scan_error = "http " + r.status;
+  } catch (e: any) {
+    email_scan_error = e?.message || String(e);
   }
 
   // Audit trail so we can see when the cron ran and what it moved.
@@ -151,9 +178,10 @@ export async function GET(req: NextRequest) {
         at_madrid: today,
         yesterday,
         dry_run: FRESTO_DRY_RUN(),
+        force,
         per_venue: perVenue.map((p) => ({
-          entity: p.entity, days: p.days, pulled: p.pulled, skipped: p.skipped,
-          empty: p.empty, failed: p.failed, error: p.error, skipped_reason: p.skipped,
+          entity: p.entity, days: p.days, inserted: p.inserted, updated: p.updated,
+          empty: p.empty, failed: p.failed, error: p.error,
           newest_before: p.newest_before, backfilled_through: p.backfilled_through,
         })),
       },
@@ -169,6 +197,9 @@ export async function GET(req: NextRequest) {
     today_madrid: today,
     yesterday,
     dry_run: FRESTO_DRY_RUN(),
+    force,
+    email_scan_ok,
+    email_scan_error,
     per_venue: perVenue,
   });
 }
