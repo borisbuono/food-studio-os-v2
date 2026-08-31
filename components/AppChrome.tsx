@@ -14,12 +14,20 @@ import { getMyProfile, MyProfile } from "@/lib/profile";
 // Boris asked (2026-08-19): "logging in on top of Bistro Mondo... it needs
 // a front page for Food Studio OS."
 //
-// Push 1 (2026-08-23) — three shell modes now:
+// Push 1 (2026-08-23) — three shell modes:
 //   • public   → children only (welcome, login, /m/*, /auth/*)
 //   • slim     → single-role user: hide sidebar entirely, slim top bar
 //                  (entity + user chip). Room switcher NOT shown (there's
 //                  only one room for this user).
 //   • full     → owner or multi-role user: sidebar + topbar + room switcher.
+//
+// Push (2026-08-31, Boris walk 09:50 CET) — the redundant top-right identity
+// chip is GONE. The bottom-left chip in DesktopSidebar carries the sign-out
+// menu and is the useful one. Having two chips reading "Boris Buono" on the
+// same page was noise. The RoomSwitcher renders itself scope-aware now
+// (studio → hidden, house/room → rooms of THIS house), so AppChrome no
+// longer needs to pass a rooms array.
+
 const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms"];
 
 function isPublic(path: string): boolean {
@@ -31,13 +39,12 @@ type ShellState = {
   isOwner: boolean;
   isMulti: boolean;
   hasMemberships: boolean;
-  availableRooms: Array<"studio" | "kitchen" | "dining" | "office">;
 };
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const path = usePathname() || "/";
   const [shell, setShell] = useState<ShellState>({
-    loaded: false, isOwner: false, isMulti: false, hasMemberships: false, availableRooms: [],
+    loaded: false, isOwner: false, isMulti: false, hasMemberships: false,
   });
 
   useEffect(() => {
@@ -48,21 +55,11 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         if (!r.ok) throw new Error("bad status");
         const j = await r.json();
         if (cancelled) return;
-        // Owner always sees the studio room in the switcher; other rooms come
-        // from availableRooms directly.
-        const rooms: Array<"studio" | "kitchen" | "dining" | "office"> = [];
-        if (j.isOwner || j.isMulti) rooms.push("studio");
-        for (const r of (j.availableRooms || []) as string[]) {
-          if (r === "kitchen" || r === "dining" || r === "office") {
-            if (!rooms.includes(r)) rooms.push(r);
-          }
-        }
         setShell({
           loaded: true,
           isOwner: !!j.isOwner,
           isMulti: !!j.isMulti,
           hasMemberships: Array.isArray(j.memberships) && j.memberships.length > 0,
-          availableRooms: rooms,
         });
       } catch {
         if (!cancelled) setShell((s) => ({ ...s, loaded: true }));
@@ -87,7 +84,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Owner / multi-role / unresolved → full shell + room switcher.
+  // Owner / multi-role / unresolved → full shell. RoomSwitcher decides
+  // itself whether to render (hidden on /studio, visible on /h/* + legacy
+  // house-scoped paths).
   return (
     <>
       <DesktopSidebar />
@@ -95,58 +94,18 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         <TopBar />
       </div>
       <div className="lg:pl-60">
-        {/* Persistent identity chip so Boris never has to wonder whether he
-            is signed in — the 2026-08-30 capture-while-signed-out incident
-            is why this row is here. Desktop only; mobile users see the chip
-            inside <TopBar/> above. */}
+        {/* Desktop-only room switcher row. The identity chip that used to
+            live here was removed 2026-08-31 — the bottom-left chip in the
+            sidebar is the canonical identity affordance. */}
         <div className="hidden lg:flex items-center justify-end gap-3 px-6 pt-3">
-          {shell.availableRooms.length >= 2 ? (
-            <RoomSwitcher rooms={shell.availableRooms} compact />
-          ) : null}
-          <IdentityChip />
+          <RoomSwitcher compact />
         </div>
-        {shell.availableRooms.length >= 2 ? (
-          <div className="flex lg:hidden justify-end px-6 pt-3">
-            <RoomSwitcher rooms={shell.availableRooms} compact />
-          </div>
-        ) : null}
+        <div className="flex lg:hidden justify-end px-6 pt-3">
+          <RoomSwitcher compact />
+        </div>
         {children}
       </div>
     </>
-  );
-}
-
-// Small top-right identity affordance for the desktop full shell.
-// Shows initials + display name/email and links to /account (which also
-// hosts the sign-out control). We keep the actual sign-out inside /account
-// so the header stays a single-click affordance and doesn't need a popover.
-function IdentityChip() {
-  const [profile, setProfile] = useState<MyProfile | null>(null);
-  useEffect(() => { getMyProfile().then(setProfile); }, []);
-  if (!profile) return null;
-  const displayName = profile.name || profile.email || "";
-  const initials = (() => {
-    const n = (displayName || "?").trim();
-    const parts = n.split(/\s+/).slice(0, 2).map((x) => x[0] || "").join("");
-    return (parts || n.slice(0, 2)).toUpperCase();
-  })();
-  return (
-    <Link
-      href="/account"
-      className="flex items-center gap-2 rounded-full border border-black/10 bg-paper/70 pl-1 pr-3 py-1 transition hover:border-ink/30"
-      title="Account · sign out"
-    >
-      <span
-        className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[10px] text-[#EFEEEB]"
-        style={{ background: "var(--accent)" }}
-        aria-hidden
-      >
-        {initials}
-      </span>
-      <span className="font-sans text-[12px] text-ink-soft truncate max-w-[12rem]">
-        {displayName}
-      </span>
-    </Link>
   );
 }
 

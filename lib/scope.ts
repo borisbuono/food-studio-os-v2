@@ -5,8 +5,16 @@
 // from Bistro Mondo (operating_venue) to BBH (holding_company), the sidebar
 // re-renders with Group / Portfolio sections instead of FOH / BOH / OFFICE.
 // See os_consolidation_plan_2026-08-22 memory + audit doc for the rationale.
+//
+// Push (2026-08-31, Boris walk 09:50 CET): scope is now three levels —
+// Studio (portfolio), House (an operating venue), Room (a functional area
+// inside a house). URLs adopt /studio, /h/<slug>, /h/<slug>/<room>; legacy
+// paths (/office, /boh, /foh, /administrate/*) still resolve to the right
+// scope via the user's fs_entity cookie. See lib/houses.ts.
 
 import type { Pillar } from "@/lib/routing/pillar-map";
+import type { HouseSlug, HouseRoom } from "@/lib/houses";
+import { entityForHouseSlug, isHouseRoom } from "@/lib/houses";
 
 export type EntityType =
   | "operating_venue"
@@ -32,6 +40,18 @@ export type SidebarSection = {
   label: string;
   items: SidebarItem[];
 };
+
+// -----------------------------------------------------------------------------
+// Scope object — the new three-level model.
+//
+// scopeForUrl() returns null for legacy paths so the caller can fall back to
+// the fs_entity-derived scope. resolveScope() bakes that fallback in.
+// -----------------------------------------------------------------------------
+
+export type Scope =
+  | { level: "studio" }
+  | { level: "house"; houseSlug: HouseSlug }
+  | { level: "room"; houseSlug: HouseSlug; room: HouseRoom };
 
 // Operating venue (BM, Taller) — the operator's day-to-day surface.
 // REMOVED vs the old universal tree: Holdings link, Reach, Commercials,
@@ -227,19 +247,73 @@ export function sidebarForScope(scope: EntityType | null | undefined): SidebarSe
   }
 }
 
-// URL-based scope override. When the user is deep in a room route, the sidebar
-// should reflect the ROOM they're in, not the entity they last selected.
-// Returns null when no URL-scope applies (fall through to the entity-derived
-// scope).
-export function scopeForUrl(pathname: string): EntityType | null {
+// -----------------------------------------------------------------------------
+// URL → Scope resolver (three-level).
+//
+// Returns:
+//   • { level: "studio" }                                — /studio, /studio/*
+//   • { level: "house", houseSlug }                      — /h/<slug>
+//   • { level: "room", houseSlug, room }                 — /h/<slug>/<room>
+//   • null                                                — legacy path;
+//     caller falls back to the user's default entity via resolveScope().
+//
+// Kept as a pure function of pathname so it's callable from client + server.
+// Legacy paths (/office, /boh, /foh, /administrate/*, etc.) intentionally
+// don't return anything here — they're scope-less on their own; the caller
+// resolves them against the fs_entity cookie.
+// -----------------------------------------------------------------------------
+export function scopeForUrl(pathname: string): Scope | null {
   if (!pathname) return null;
-  if (pathname === "/studio" || pathname.startsWith("/studio/")) return "studio";
-  // /office is BOTH a canonical route and part of the operating tree; when the
-  // user is inside /office/*, we still want the FULL operating tree open so
-  // they can jump to Finance / Team / Suppliers under it. So we return null and
-  // let the entity-derived scope take over (operating_venue for BM/Taller).
-  // The /boh and /foh cases are the same story — they live inside a venue.
+
+  // Studio level
+  if (pathname === "/studio" || pathname.startsWith("/studio/")) {
+    return { level: "studio" };
+  }
+
+  // House / room levels — /h/<slug> or /h/<slug>/<room>
+  if (pathname === "/h" || pathname.startsWith("/h/")) {
+    const parts = pathname.split("/").filter(Boolean); // ["h","<slug>",...]
+    const slug = parts[1];
+    if (slug && entityForHouseSlug(slug)) {
+      const houseSlug = slug.toLowerCase() as HouseSlug;
+      const roomPart = parts[2];
+      if (roomPart && isHouseRoom(roomPart)) {
+        return { level: "room", houseSlug, room: roomPart };
+      }
+      return { level: "house", houseSlug };
+    }
+  }
+
   return null;
+}
+
+// resolveScope — combine URL grammar with the user's fs_entity fallback.
+// The Sidebar uses this to figure out the RIGHT scope for the chrome:
+//   • /studio          → studio, no matter the cookie
+//   • /h/bm            → house(bm)
+//   • /h/bm/kitchen    → room(bm, kitchen)
+//   • /office (BM ck)  → house(bm)  (legacy path bound to BM via cookie)
+//   • /boh   (BM ck)   → room(bm, kitchen)
+// When the fallback entity isn't a house (e.g. BBH), we return null and the
+// caller (DesktopSidebar) falls back to the entityType-driven sidebar.
+export function resolveScope(pathname: string, fallbackHouseSlug: HouseSlug | null): Scope | null {
+  const s = scopeForUrl(pathname);
+  if (s) return s;
+  // Legacy path bindings — if the user is inside /office|/boh|/foh|/administrate/*
+  // and their cookie points at a house, lift that into a room/house scope so
+  // the room switcher + sidebar label say "Bistro Mondo · Kitchen" instead of
+  // just "Kitchen".
+  if (!fallbackHouseSlug) return null;
+  if (!pathname) return { level: "house", houseSlug: fallbackHouseSlug };
+  if (pathname.startsWith("/boh")) return { level: "room", houseSlug: fallbackHouseSlug, room: "kitchen" };
+  if (pathname.startsWith("/foh")) return { level: "room", houseSlug: fallbackHouseSlug, room: "dining" };
+  if (pathname.startsWith("/office") || pathname.startsWith("/administrate")) {
+    return { level: "room", houseSlug: fallbackHouseSlug, room: "office" };
+  }
+  // Any other legacy path (/develop/*, /execute/*, /grow/*, /command, /files,
+  // /academy, /schedule, /team, /messages, /order, /recipes, /menu, etc.) —
+  // still house-bound; land on the house dashboard.
+  return { level: "house", houseSlug: fallbackHouseSlug };
 }
 
 // EntityKey → EntityType. Utopia is intentionally absent (archived 2026-08-22).
@@ -255,4 +329,24 @@ export const ENTITY_KEY_TO_TYPE: Record<EntityKey, EntityType> = {
 export function entityTypeFor(k: EntityKey | null | undefined): EntityType {
   if (!k) return "operating_venue";
   return ENTITY_KEY_TO_TYPE[k];
+}
+
+// -----------------------------------------------------------------------------
+// Legacy shim — some callers (DesktopSidebar) still expect scopeForUrl to
+// return an EntityType (or null). We deprecate the old signature but keep
+// this helper alive as a compatibility export so incremental refactors don't
+// have to change every call site in one push.
+// -----------------------------------------------------------------------------
+export function entityTypeForUrl(pathname: string): EntityType | null {
+  const s = scopeForUrl(pathname);
+  if (!s) return null;
+  if (s.level === "studio") return "studio";
+  // House / room both map back onto the operating tree in the entity-type
+  // vocabulary — a house IS an operating_venue for sidebar-tree purposes.
+  if (s.level === "room") {
+    if (s.room === "office") return "office_room";
+    if (s.room === "kitchen") return "boh_room";
+    if (s.room === "dining") return "foh_room";
+  }
+  return "operating_venue";
 }

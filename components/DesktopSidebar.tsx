@@ -3,26 +3,36 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
+import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL } from "@/lib/entities";
 import { setEntity as setEntityCtx, onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
 import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routing/pillar-map";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
-import { sidebarForScope, entityTypeFor, scopeForUrl, EntityType } from "@/lib/scope";
+import {
+  sidebarForScope, entityTypeFor, entityTypeForUrl, scopeForUrl, resolveScope,
+  EntityType, type Scope,
+} from "@/lib/scope";
+import {
+  houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity,
+} from "@/lib/houses";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
-// Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px). On
-// smaller viewports the sidebar hides (see md:hidden below) and the existing
-// TopBar pill row remains authoritative — nothing regresses on mobile.
+// Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px).
 //
-// Phase 2 (2026-08-22) — TWO changes vs the pre-rewrite shell:
-//   1. The entity switcher no longer renders a hardcoded ENTITY_ORDER list.
-//      It calls useSwitcherEntities() which reads Supabase memberships and
-//      returns operating / holding / portfolio groups. Utopia is gone.
-//   2. The sidebar body is scope-aware. Bistro Mondo (operating_venue) shows
-//      FOH/BOH/OFFICE; BBH (holding_company) shows Group/Portfolio/Growth;
-//      an advisory client sees a 3-item Advisory tree only. See lib/scope.ts.
+// Push (2026-08-31, Boris walk 09:50 CET) — three-level scope model:
+//   • Studio scope → static "Food Studios" label at top (no venue picker),
+//     STUDIO sidebar tree (Overview / Houses / People / Money / Command).
+//   • House scope  → static house name ("Bistro Mondo") at top, full
+//     operating tree grouped by room. Switcher shows only when the user
+//     has multiple houses AND is on a house/room (single-house users
+//     never see it — keeps the switcher-gating from a695dda alive).
+//   • Room scope   → breadcrumb "Bistro Mondo · Kitchen" at top, only
+//     that room's tree.
+//
+// The venue chip / dropdown that used to render for signed-in users on
+// /studio is GONE — leaving it there made the user think they were inside
+// BM when they were at portfolio level (the actual bug Boris named).
 
 export default function DesktopSidebar() {
   const pathname = usePathname() || "";
@@ -37,30 +47,35 @@ export default function DesktopSidebar() {
   const [entMenu, setEntMenu] = useState(false);
 
   const switcher = useSwitcherEntities();
-  // Switcher visibility (2026-08-30): hide the entity switcher entirely for
-  // users with only one accessible entity. Single-house operators shouldn't
-  // even know the concept exists — Boris's rule for the switcher chrome.
   const totalEntities = switcher.operating.length + switcher.holding.length + switcher.portfolio.length;
   const hasMultipleEntities = !switcher.loading && totalEntities > 1;
-  // URL-scope override: /studio/* forces the Studio (portfolio) sidebar
-  // regardless of which entity is selected in the switcher. Task #49
-  // (2026-08-30) — Boris was seeing the operating-venue tree at /studio.
-  const urlScope = scopeForUrl(pathname);
-  const scopeType: EntityType = urlScope ?? entityTypeFor(entity);
+
+  // Resolve the current three-level scope. resolveScope combines the URL
+  // grammar (/studio, /h/<slug>, /h/<slug>/<room>) with the fs_entity
+  // cookie fallback so /office bound to BM lifts into room(bm, office).
+  const scope: Scope | null = useMemo(() => {
+    const s = scopeForUrl(pathname);
+    if (s) return s;
+    return resolveScope(pathname, houseSlugForEntity(entity));
+  }, [pathname, entity]);
+
+  // Sidebar tree still keyed by entityType — a house shows the full
+  // operating tree, a room shows just that room's section, studio shows
+  // STUDIO. entityTypeForUrl handles the URL-first cases; the fallback is
+  // the cookie-derived entityType (used when scope is a house/room derived
+  // from a legacy path).
+  const urlScopeType = entityTypeForUrl(pathname);
+  const scopeType: EntityType = urlScopeType ?? entityTypeFor(entity);
   const sections = useMemo(() => sidebarForScope(scopeType), [scopeType]);
 
-  // Sections open state is section-key-keyed (not pillar-keyed) because the
-  // new tree includes group/portfolio/growth/etc. Default: current-route
-  // section open when that section matches a pillar; otherwise all open.
+  // Sections open state.
   const [open, setOpen] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setOpen((prev) => {
       const next: Record<string, boolean> = {};
       for (const s of sections) {
-        // Preserve any previously-toggled state; default to open.
         next[s.key] = prev[s.key] ?? true;
       }
-      // If the current route matches a pillar in this scope, ensure it's open.
       if (activePillar) next[activePillar] = true;
       return next;
     });
@@ -92,12 +107,28 @@ export default function DesktopSidebar() {
     if (typeof window !== "undefined") window.location.href = "/login";
   }
 
-  // Accent for a section header — pillars keep their existing accent, the new
-  // group/portfolio/etc. keys inherit the operator olive so they don't scream.
   const sectionAccent = (key: string): string => {
     if (key === "foh" || key === "boh" || key === "office") return PILLAR_ACCENT[key as Pillar];
-    return "#3F4C28"; // olive (operator ledger) for group/portfolio/growth/settings/etc.
+    return "#3F4C28";
   };
+
+  // "You are here" label — what the top of the sidebar reads. Studio scope
+  // uses the studio brand as a static label; house scope names the house;
+  // room scope names the house AND the room (breadcrumb). None of these
+  // are dropdowns — house switching happens either via the switcher (when
+  // the user has multiple houses) or via Studio → click another house tile.
+  const hereLabel = useMemo(() => {
+    if (!scope) return null;
+    if (scope.level === "studio") return "Food Studios";
+    if (scope.level === "house") return houseNameForSlug(scope.houseSlug);
+    return `${houseNameForSlug(scope.houseSlug)} · ${HOUSE_ROOM_LABEL[scope.room]}`;
+  }, [scope]);
+
+  // Show the switcher dropdown only when the user is inside a house or a
+  // room AND has multiple houses. On Studio scope we never show it (users
+  // move between houses by clicking a tile on the Studio page).
+  const showHouseSwitcher =
+    !!scope && scope.level !== "studio" && hasMultipleEntities && canSwitch;
 
   return (
     <aside
@@ -105,101 +136,72 @@ export default function DesktopSidebar() {
       className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-60 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
       aria-label="Desktop navigation"
     >
-      {/* Wordmark + entity switcher */}
+      {/* Wordmark + "you are here" label. Static text on Studio scope,
+          dropdown on House/Room scope when the user has multiple houses. */}
       <div className="flex flex-col gap-3 border-b border-black/10 px-4 py-4">
         <Link href="/" className="flex items-center" aria-label="Home">
           <BrandMark entity={entity} variant="mark" tone="light" />
         </Link>
-        {hasMultipleEntities && canSwitch ? (
-          <div className="relative">
-            <button
-              onClick={() => setEntMenu((m) => !m)}
-              className="flex w-full items-center gap-2 rounded-md border border-black/10 px-2.5 py-1.5 font-sans text-[12px] text-ink-soft hover:border-ink/40"
-              aria-haspopup="listbox"
-              aria-expanded={entMenu}
+
+        {hereLabel ? (
+          showHouseSwitcher ? (
+            <div className="relative">
+              <button
+                onClick={() => setEntMenu((m) => !m)}
+                className="flex w-full items-center gap-2 rounded-md border border-black/10 px-2.5 py-1.5 font-sans text-[12px] text-ink hover:border-ink/40"
+                aria-haspopup="listbox"
+                aria-expanded={entMenu}
+                title="Switch house"
+              >
+                <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[entity] }} />
+                <span className="flex-1 text-left truncate">{hereLabel}</span>
+                <span className="text-clay">▾</span>
+              </button>
+              {entMenu ? (
+                <div className="absolute left-0 right-0 mt-1 z-10 overflow-hidden rounded-md border border-line bg-card shadow-xl" role="listbox">
+                  {switcher.loading ? (
+                    <div className="px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">Loading…</div>
+                  ) : null}
+                  {switcher.operating.length ? <SwitcherGroupHeader label="Houses" /> : null}
+                  {switcher.operating.map((ent) => (
+                    <SwitcherRow
+                      key={ent.id}
+                      label={ent.name}
+                      accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
+                      selected={ent.entityKey === entity}
+                      disabled={!ent.entityKey}
+                      onClick={() => {
+                        if (!ent.entityKey) return;
+                        setEntityCtx(ent.entityKey);
+                        setEntity(ent.entityKey);
+                        setEntMenu(false);
+                      }}
+                    />
+                  ))}
+                  <SwitcherGroupHeader label="Studio" />
+                  <a
+                    href="/studio"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-sans text-[12px] text-ink-soft hover:bg-paper transition"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: "#3F4C28" }} />
+                    <span className="flex-1 truncate">Back to Food Studios</span>
+                  </a>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <span
+              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-[12px] text-ink"
+              title={hereLabel}
             >
-              <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[entity] }} />
-              <span className="flex-1 text-left truncate">{ENTITY_SHORT[entity]}</span>
-              <span className="text-clay">▾</span>
-            </button>
-            {entMenu ? (
-              <div className="absolute left-0 right-0 mt-1 z-10 overflow-hidden rounded-md border border-line bg-card shadow-xl" role="listbox">
-                {switcher.loading ? (
-                  <div className="px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">Loading…</div>
-                ) : null}
-
-                {/* Operating venues — the default work-in group */}
-                {switcher.operating.length ? (
-                  <SwitcherGroupHeader label="Venues" />
-                ) : null}
-                {switcher.operating.map((ent) => (
-                  <SwitcherRow
-                    key={ent.id}
-                    label={ent.name}
-                    accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
-                    selected={ent.entityKey === entity}
-                    disabled={!ent.entityKey}
-                    onClick={() => {
-                      if (!ent.entityKey) return;
-                      setEntityCtx(ent.entityKey);
-                      setEntity(ent.entityKey);
-                      setEntMenu(false);
-                    }}
-                  />
-                ))}
-
-                {/* Holding company — "Group" section */}
-                {switcher.holding.length ? (
-                  <SwitcherGroupHeader label="Group" />
-                ) : null}
-                {switcher.holding.map((ent) => (
-                  <SwitcherRow
-                    key={ent.id}
-                    label={ent.name}
-                    accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
-                    selected={ent.entityKey === entity}
-                    disabled={!ent.entityKey}
-                    onClick={() => {
-                      if (!ent.entityKey) return;
-                      setEntityCtx(ent.entityKey);
-                      setEntity(ent.entityKey);
-                      setEntMenu(false);
-                    }}
-                  />
-                ))}
-
-                {/* Portfolio (advisory + partners + landlords) */}
-                {switcher.portfolio.length ? (
-                  <SwitcherGroupHeader label="Portfolio" />
-                ) : null}
-                {switcher.portfolio.map((ent) => (
-                  <SwitcherRow
-                    key={ent.id}
-                    label={ent.name}
-                    accent="#7A7A75"
-                    selected={false}
-                    disabled={true}
-                    hint={ent.entity_type.replace("_", " ")}
-                    onClick={() => { /* Phase 3 — no EntityKey yet */ }}
-                  />
-                ))}
-
-                {/* Empty state — nothing loaded, nothing membered. */}
-                {!switcher.loading && !switcher.operating.length && !switcher.holding.length && !switcher.portfolio.length ? (
-                  <div className="px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">No entities</div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : hasMultipleEntities ? (
-          <span
-            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-[12px] text-[#EFEEEB]"
-            style={{ background: ENTITY_ACCENT[entity] }}
-          >
-            <span className="h-2 w-2 rounded-full bg-white/70" />
-            {ENTITY_SHORT[entity]}
-          </span>
+              <span className="h-2 w-2 rounded-full" style={{
+                background: scope && scope.level !== "studio" ? ENTITY_ACCENT[entity] : "#3F4C28",
+              }} />
+              <span className="flex-1 text-left truncate">{hereLabel}</span>
+            </span>
+          )
         ) : null}
+
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("fs:cmdk:open"))}
           className="flex items-center justify-between rounded-md border border-black/10 px-2.5 py-1.5 font-sans text-[12px] text-ink-soft hover:border-ink/40"
@@ -216,8 +218,7 @@ export default function DesktopSidebar() {
         </button>
       </div>
 
-      {/* Scope-aware sections — different tree for operating_venue vs
-          holding_company vs advisory / partner / landlord. See lib/scope.ts. */}
+      {/* Scope-aware sections. */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         {sections.map((section) => {
           const opened = open[section.key] ?? true;
@@ -263,10 +264,7 @@ export default function DesktopSidebar() {
           );
         })}
 
-        {/* Files — universal escape hatch, distinct from pillars. Rendered in
-            every scope because HACCP, contracts, brand assets and gestoría
-            paperwork are cross-scope by nature (a landlord invoice lives in
-            the same Files store as a supplier's HACCP sheet). */}
+        {/* Files — universal escape hatch. */}
         <div className="mt-3 border-t border-black/10 pt-3">
           <Link
             href="/files"
@@ -295,7 +293,8 @@ export default function DesktopSidebar() {
         </div>
       </nav>
 
-      {/* Bottom: avatar / settings / sign-out */}
+      {/* Bottom: avatar / settings / sign-out. This is the canonical identity
+          affordance — the top-right chip in AppChrome was removed 2026-08-31. */}
       <div className="border-t border-black/10 px-2 py-3">
         <div className="flex items-center gap-2 px-1 py-1">
           <span

@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
+import StudioCaptureButtons from "@/components/StudioCaptureButtons";
+import { houseSlugForEntity } from "@/lib/houses";
+import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -133,8 +136,13 @@ export default async function StudioPage() {
     let href = OPERATING_DEFAULT_ROOM;
     let status = "—";
     if (e.entity_type === "operating_venue") {
-      href = OPERATING_DEFAULT_ROOM;
+      // 2026-08-31: operating tiles use /h/<slug> so the URL grammar
+      // reflects the three-level model. The house page sets fs_entity
+      // and drops the user on /office (the operator's canonical entry).
       const rid = ENTITY_TO_RID[e.name];
+      const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;
+      const slug = houseSlugForEntity(ent);
+      href = slug ? `/h/${slug}` : OPERATING_DEFAULT_ROOM;
       const pos = rid ? posByRid.get(rid) : null;
       if (pos) {
         const dateNote = pos.date === today ? "today" : "last close";
@@ -179,33 +187,24 @@ export default async function StudioPage() {
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">The Studio</p>
             <h1 className="mt-1 font-serif text-4xl text-ink">{studioName}</h1>
-            {bbh ? (
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-                {bbh.name} · holding
-              </p>
-            ) : null}
+            {/* Boris walk 2026-08-31: the old "BBH · HOLDING" tag read as a
+                type badge and confused the relationship. Spell it out
+                instead — Food Studios (the trading name) is legally BBH,
+                owned by Boris. */}
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
+              Legal entity · {bbh?.name || "Boris Buono Holdings SL"} · Owner · Boris Buono
+            </p>
           </div>
           <div className="text-right">
             <p className="font-serif text-[17px] text-ink-soft">{dateLabel}</p>
             <p className="font-mono text-[11px] text-clay">Madrid · {clock}</p>
           </div>
         </div>
-        {/* Capture Station shortcut — Boris asked for a visible +Capture button
-            on every top-level surface so paper docs never wait (2026-08-24). */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href="/capture?type=invoice"
-            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
-          >
-            + Capture invoice
-          </Link>
-          <Link
-            href="/capture?type=albaran"
-            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
-          >
-            + Capture delivery note
-          </Link>
-        </div>
+        {/* Capture Station shortcut — 2026-08-31 (Boris walk): the Studio
+            doesn't receive invoices. Capture is a house-level action, so
+            the buttons open a house picker modal here rather than jump
+            straight into the camera with an ambiguous entity. */}
+        <StudioCaptureButtons />
         {/* Cross-house handover placeholder — Push 2 lights this up. */}
         <p className="mt-4 font-mono text-[10px] uppercase tracking-wide text-clay">
           Handover · no active handover across houses
