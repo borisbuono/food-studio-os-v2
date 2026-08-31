@@ -215,7 +215,12 @@ const STUDIO: SidebarSection[] = [
     label: "Studio",
     items: [
       { href: "/studio",                              label: "Overview" },
-      { href: "/administrate/holdings",               label: "Houses" },
+      // Boris re-walk 2026-08-31 17:40 CET: the Houses link used to point
+      // at /administrate/holdings, which is a HOUSE-scoped page (drops the
+      // user into BM's sidebar + logo). A Studio-sidebar link must not
+      // leave Studio scope. /studio/houses is the portfolio list that
+      // stays in Studio scope; clicking a tile there is the boundary.
+      { href: "/studio/houses",                       label: "Houses" },
       { href: "/administrate/team",                   label: "People" },
       { href: "/administrate/finance",                label: "Money" },
       { href: "/command",                             label: "Command" },

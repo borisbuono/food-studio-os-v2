@@ -40,10 +40,12 @@
 //   - Snap-point drag handle (single fixed size per breakpoint).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { EntityKey } from "@/lib/entities";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
+import { scopeForUrl } from "@/lib/scope";
+import { listHouses, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
 
 type Msg = { role: "you" | "chef" | "sys"; text: string };
 
@@ -71,6 +73,7 @@ function readLang(): "en" | "es" | "da" {
 
 export default function ChefSlim() {
   const pathname = usePathname();
+  const router = useRouter();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -79,6 +82,9 @@ export default function ChefSlim() {
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceErr, setVoiceErr] = useState<string | null>(null);
+  // Capture house-picker (only shown when we're on Studio scope and Chef is
+  // asked to capture — otherwise Chef routes directly into the current house).
+  const [captureOpen, setCaptureOpen] = useState(false);
 
   // Refs
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -226,6 +232,51 @@ export default function ChefSlim() {
     }
   }, []);
 
+  // Capture — Boris re-walk 2026-08-31 17:40 CET. The old capture pill
+  // lived on the Studio landing (StudioCaptureButtons); Boris asked for
+  // ONE capture affordance, inside Chef. Scope-aware routing:
+  //   • Studio scope → open house picker (Chef doesn't know which house).
+  //   • House / Room scope → jump straight into /capture with the current
+  //     house's entity key.
+  // type=auto lets the OCR classify invoice vs. delivery note vs. statement
+  // itself; Boris didn't want two buttons here.
+  const houses = useMemo(() => listHouses(), []);
+  const currentHouseEntity: EntityKey | null = useMemo(() => {
+    const s = scopeForUrl(pathname || "");
+    if (s && (s.level === "house" || s.level === "room")) {
+      return HOUSE_SLUG_TO_ENTITY[s.houseSlug];
+    }
+    // Legacy paths (/office, /boh, /foh, /administrate/*): fall back to
+    // the fs_entity cookie so Chef still knows the house context.
+    if (typeof document !== "undefined") {
+      const m = document.cookie.match(/(?:^|;\s*)fs_entity=([^;]+)/);
+      const c = m?.[1] as EntityKey | undefined;
+      if (c && houseSlugForEntity(c)) return c;
+    }
+    return null;
+  }, [pathname]);
+
+  const startCapture = useCallback(() => {
+    if (currentHouseEntity) {
+      setOpen(false);
+      router.push(`/capture?type=auto&entity=${encodeURIComponent(currentHouseEntity)}`);
+      return;
+    }
+    // Studio scope — pick which house first.
+    if (houses.length === 1) {
+      setOpen(false);
+      router.push(`/capture?type=auto&entity=${encodeURIComponent(houses[0].entity)}`);
+      return;
+    }
+    setCaptureOpen(true);
+  }, [currentHouseEntity, houses, router]);
+
+  const pickCaptureHouse = useCallback((entity: EntityKey) => {
+    setCaptureOpen(false);
+    setOpen(false);
+    router.push(`/capture?type=auto&entity=${encodeURIComponent(entity)}`);
+  }, [router]);
+
   // Mobile swipe-down to close
   const onTouchStart = (e: React.TouchEvent) => {
     dragStartYRef.current = e.touches[0].clientY;
@@ -358,6 +409,22 @@ export default function ChefSlim() {
               <p className="mb-2 font-mono text-[10px] uppercase tracking-wide" style={{ color: "#9A3122" }}>{voiceErr}</p>
             ) : null}
             <div className="flex items-end gap-2">
+              {/* Capture — the ONE capture affordance in the shell (Boris
+                  re-walk 2026-08-31 17:40 CET). Small icon button next to
+                  the mic; type=auto because OCR classifies. */}
+              <button
+                type="button"
+                aria-label="Capture a document"
+                title="Capture invoice / delivery note / statement"
+                onClick={startCapture}
+                disabled={listening || sending}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 text-ink transition hover:bg-black/5 disabled:opacity-40"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h2.2l1.5-2h5.6l1.5 2h2.2A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <circle cx="12" cy="13" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+              </button>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -406,6 +473,50 @@ export default function ChefSlim() {
               </button>
             </div>
           </form>
+        </div>
+      ) : null}
+
+      {/* House picker — only shown when Chef is on Studio scope and the
+          user hits +Capture without a house context. Renders above the
+          FAB and drawer (z-[70]) so it's reachable even with Chef open. */}
+      {captureOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Capture for which house"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/40 p-4"
+          onClick={() => setCaptureOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-black/10 bg-paper shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-black/10 px-5 py-3">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Capture</p>
+              <h2 className="mt-1 font-serif text-[20px] text-ink">Capture for which house?</h2>
+            </div>
+            <ul className="p-2">
+              {houses.map((h) => (
+                <li key={h.slug}>
+                  <button
+                    onClick={() => pickCaptureHouse(h.entity)}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-sans text-[14px] text-ink hover:bg-paper-deep"
+                  >
+                    <span>{h.name}</span>
+                    <span className="font-mono text-[10px] uppercase text-clay">/{h.slug}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end border-t border-black/10 px-3 py-2">
+              <button
+                onClick={() => setCaptureOpen(false)}
+                className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 

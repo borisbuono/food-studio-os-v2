@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
-import StudioCaptureButtons from "@/components/StudioCaptureButtons";
 import { houseSlugForEntity } from "@/lib/houses";
 import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
 
@@ -55,13 +54,41 @@ function eur(n: number): string {
   return "€" + Math.round(n).toLocaleString("en-GB");
 }
 
+// Boris walk 2026-08-31 17:40 CET: the old single-string status ("€170 · 0
+// covers · last close") had no date, so a tile that hadn't updated in 10
+// days read like it was fresh. Tiles now carry a structured status —
+// primary (money+covers), secondary (date), and an optional stale badge
+// when the newest eod_pos row is > 48h old.
 type Tile = {
   id: string;
   name: string;
   type: string;
   href: string;
-  status: string;
+  status: string;               // fallback for non-operating houses
+  primary?: string;             // "€170 · 0 covers"
+  secondary?: string;           // "Last close 21 Aug"
+  stale?: boolean;              // orange pill
 };
+
+// Human date — "21 Aug" or "3 Sep". If the date is today, say "today"; if
+// yesterday, say "yesterday". Boris reads dates faster than ISO strings.
+function humanDate(iso: string, today: string): string {
+  if (iso === today) return "today";
+  const yest = new Date(today + "T12:00:00Z");
+  yest.setUTCDate(yest.getUTCDate() - 1);
+  if (iso === yest.toISOString().slice(0, 10)) return "yesterday";
+  const d = new Date(iso + "T12:00:00Z");
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
+}
+// "Stale" = > 48h old vs the Madrid business day. Boris runs the day-plus-1
+// check on the tile because that's when he starts to worry. A 2026-08-30
+// tile is not stale on 2026-08-31; only 2026-08-29 and older are.
+function isStale(iso: string, today: string): boolean {
+  const now = new Date(today + "T12:00:00Z").getTime();
+  const rowT = new Date(iso + "T12:00:00Z").getTime();
+  const diffH = (now - rowT) / 36e5;
+  return diffH > 48;
+}
 
 const TYPE_BADGE_ACCENT: Record<string, string> = {
   operating_venue: "#3F4C28", // olive
@@ -145,10 +172,13 @@ export default async function StudioPage() {
       href = slug ? `/h/${slug}` : OPERATING_DEFAULT_ROOM;
       const pos = rid ? posByRid.get(rid) : null;
       if (pos) {
-        const dateNote = pos.date === today ? "today" : "last close";
-        status = `${eur(pos.gross)} · ${pos.covers} covers · ${dateNote}`;
+        const primary = `${eur(pos.gross)} · ${pos.covers} covers`;
+        const dateWord = humanDate(pos.date, today);
+        const secondary = pos.date === today ? "Today" : `Last close ${dateWord}`;
+        const stale = isStale(pos.date, today);
+        return { id: e.id, name: e.name, type: e.entity_type, href, status: primary, primary, secondary, stale };
       } else {
-        status = "no POS data yet";
+        status = "No closes yet";
       }
     } else if (e.entity_type === "advisory_client") {
       href = ADVISORY_DEFAULT_ROOM;
@@ -200,11 +230,12 @@ export default async function StudioPage() {
             <p className="font-mono text-[11px] text-clay">Madrid · {clock}</p>
           </div>
         </div>
-        {/* Capture Station shortcut — 2026-08-31 (Boris walk): the Studio
-            doesn't receive invoices. Capture is a house-level action, so
-            the buttons open a house picker modal here rather than jump
-            straight into the camera with an ambiguous entity. */}
-        <StudioCaptureButtons />
+        {/* Capture on the Studio landing was removed 2026-08-31 (Boris
+            re-walk 17:40 CET). The Studio is not a receiving surface;
+            a floating +Capture on this page contradicted the "no
+            operating actions at the Studio level" rule. Capture now
+            lives inside Chef (composer row → +Capture icon), which
+            can route by scope (Studio → house picker, House → direct). */}
         {/* Cross-house handover placeholder — Push 2 lights this up. */}
         <p className="mt-4 font-mono text-[10px] uppercase tracking-wide text-clay">
           Handover · no active handover across houses
@@ -234,7 +265,25 @@ export default async function StudioPage() {
                       {t.type.replace("_", " ")}
                     </span>
                   </div>
-                  <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.status}</p>
+                  {t.primary ? (
+                    <>
+                      <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.primary}</p>
+                      <p className="mt-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                        <span>{t.secondary}</span>
+                        {t.stale ? (
+                          <span
+                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
+                            title="Newest POS row is more than 48h old"
+                          >
+                            Stale
+                          </span>
+                        ) : null}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.status}</p>
+                  )}
                 </Link>
               </li>
             ))}

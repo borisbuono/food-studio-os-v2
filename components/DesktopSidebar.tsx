@@ -14,7 +14,7 @@ import {
   EntityType, type Scope,
 } from "@/lib/scope";
 import {
-  houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity,
+  houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY,
 } from "@/lib/houses";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
@@ -139,8 +139,23 @@ export default function DesktopSidebar() {
       {/* Wordmark + "you are here" label. Static text on Studio scope,
           dropdown on House/Room scope when the user has multiple houses. */}
       <div className="flex flex-col gap-3 border-b border-black/10 px-4 py-4">
+        {/* Logo binds to the current SCOPE, not the fs_entity cookie. Boris
+            re-walk 2026-08-31 17:40 CET: the logo was reading the cookie,
+            so navigating to /studio while the cookie still said BM left
+            the Bistro Mondo mark visible at the top of a Studio-scoped
+            page. Scope wins: Studio → Food Studios; house/room → house. */}
         <Link href="/" className="flex items-center" aria-label="Home">
-          <BrandMark entity={entity} variant="mark" tone="light" />
+          <BrandMark
+            entity={
+              scope?.level === "studio"
+                ? "holdings"
+                : scope && (scope.level === "house" || scope.level === "room")
+                  ? HOUSE_SLUG_TO_ENTITY[scope.houseSlug]
+                  : entity
+            }
+            variant="mark"
+            tone="light"
+          />
         </Link>
 
         {hereLabel ? (

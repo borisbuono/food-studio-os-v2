@@ -8,7 +8,10 @@ export const runtime = "nodejs";
 // POST { entity, date_from, date_to?, dry_run? } → backfill Fresto orderlines + Z Reports
 // into eod_pos for every date in the range (inclusive). Returns per-day summary.
 //
-// Auth: requires an authenticated user (Vercel edge runtime enforces via supabaseServer).
+// Auth: either an authenticated Supabase user OR a Bearer CRON_SECRET header
+// (so the nightly cron and manual `curl -H "Authorization: Bearer $CRON_SECRET"`
+// backfills work without a browser session).
+export const maxDuration = 300;
 
 const RESTAURANT_ID_BY_ENTITY: Record<string, string> = {
   IFL: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
@@ -45,6 +48,14 @@ export async function POST(req: NextRequest) {
     const sb = supabaseServer();
     const { data: userRes } = await sb.auth.getUser();
     const uid = userRes?.user?.id || null;
+
+    // Auth: user session OR CRON_SECRET bearer. If neither, reject.
+    const secret = process.env.CRON_SECRET;
+    const auth = req.headers.get("authorization") || "";
+    const cronAuthed = !!secret && auth === `Bearer ${secret}`;
+    if (!uid && !cronAuthed) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
 
     const dates = eachDate(date_from, date_to);
     if (!dates.length) return NextResponse.json({ ok: false, error: "empty date range" }, { status: 400 });
