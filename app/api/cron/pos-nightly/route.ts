@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN } from "@/lib/integrations/pos/fresto";
+import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN, refreshFrestoMasters } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
 
 export const runtime = "nodejs";
@@ -141,10 +141,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Refresh masters (tables/staff/menu products/menu groups) once per
+    // venue per run. Best-effort — a 404 on any endpoint returns [] and
+    // just leaves the master table unchanged.
+    let masters: any = null;
+    try {
+      masters = await refreshFrestoMasters(v.entity);
+    } catch (e: any) {
+      masters = { error: e?.message || String(e) };
+    }
+
     perVenue.push({
       entity: v.entity, label: v.label, newest_before: newestDate,
       backfilled_from: start, backfilled_through: yesterday,
       days: dates.length, inserted, updated, empty, failed, summary,
+      masters,
     });
   }
 

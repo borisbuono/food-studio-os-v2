@@ -5,6 +5,7 @@ import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
 import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
 import { GuestChip } from "./GuestChip";
+import { HourlySpark } from "./HourlySpark";
 
 export const dynamic = "force-dynamic";
 
@@ -72,12 +73,16 @@ type Tile = {
   gross_eur?: number;
   tickets?: number | null;
   guests?: number | null;
+  guests_daily?: number | null;  // preferred over guests when set (bookings/daily.guests)
   guests_source?: string | null; // 'manual' | 'email' | null
   restaurant_id?: string;        // needed for the inline guest-key input
   date?: string;                 // POS row date (for the guest-key POST)
   z_spans_days?: boolean;        // SPAN pill trigger
   secondary?: string;            // "Last close 21 Aug"
   stale?: boolean;               // orange pill
+  peak_hour?: string | null;
+  peak_hour_revenue?: number | null;
+  hourly_revenue?: Record<string, number> | null;
 };
 
 // Human date — "21 Aug" or "3 Sep". If the date is today, say "today"; if
@@ -149,12 +154,22 @@ export default async function StudioPage() {
     .map((e: any) => ENTITY_TO_RID[e.name])
     .filter(Boolean);
 
-  type PosSnap = { date: string; gross: number; tickets: number | null; guests: number | null; guests_source: string | null; z_spans_days: boolean };
+  type PosSnap = {
+    date: string; gross: number;
+    tickets: number | null;
+    guests: number | null;
+    guests_daily: number | null;
+    guests_source: string | null;
+    z_spans_days: boolean;
+    peak_hour: string | null;
+    peak_hour_revenue: number | null;
+    hourly_revenue: Record<string, number> | null;
+  };
   let posByRid = new Map<string, PosSnap>();
   if (opRids.length) {
     const { data: posRows } = await sb
       .from("eod_pos")
-      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_source,z_spans_days")
+      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_daily,guests_source,z_spans_days,peak_hour,peak_hour_revenue,hourly_revenue")
       .in("restaurant_id", opRids)
       .order("date", { ascending: false })
       .limit(60);
@@ -166,8 +181,12 @@ export default async function StudioPage() {
           gross: Number(r.total_gross_eur || 0),
           tickets: r.tickets == null ? null : Number(r.tickets),
           guests: r.guests == null ? null : Number(r.guests),
+          guests_daily: (r as any).guests_daily == null ? null : Number((r as any).guests_daily),
           guests_source: (r.guests_source as string | null) || null,
           z_spans_days: !!r.z_spans_days,
+          peak_hour: ((r as any).peak_hour as string | null) || null,
+          peak_hour_revenue: (r as any).peak_hour_revenue == null ? null : Number((r as any).peak_hour_revenue),
+          hourly_revenue: ((r as any).hourly_revenue as Record<string, number> | null) || null,
         });
       }
     }
@@ -195,10 +214,14 @@ export default async function StudioPage() {
           gross_eur: pos.gross,
           tickets: pos.tickets,
           guests: pos.guests,
+          guests_daily: pos.guests_daily,
           guests_source: pos.guests_source,
           restaurant_id: rid,
           date: pos.date,
           z_spans_days: pos.z_spans_days,
+          peak_hour: pos.peak_hour,
+          peak_hour_revenue: pos.peak_hour_revenue,
+          hourly_revenue: pos.hourly_revenue,
           secondary, stale,
         };
       } else {
@@ -291,26 +314,43 @@ export default async function StudioPage() {
                   </div>
                   {t.gross_eur != null ? (
                     <>
-                      {/* Line 1: money + tickets. tickets is Fresto item
-                          count (each dish = 1); NOT people. */}
+                      {/* Line 1: money · tickets · guests.
+                          - tickets  = Fresto z.quantity (dishes/wines/coffees), NOT people.
+                          - guests   = physical people count. Prefer guests_daily
+                                       (bookings/daily walk-ins included) over the
+                                       manual `guests` field when available. If both
+                                       null, we fall through to the GuestChip below
+                                       for the [key guests] input. */}
                       <p className="mt-3 font-sans text-[13px] text-ink-soft">
                         {eur(t.gross_eur)}
                         {t.tickets != null ? <span> · {t.tickets} tickets</span> : null}
+                        {(() => {
+                          const g = t.guests_daily ?? t.guests ?? null;
+                          return g != null ? <span> · {g} guests</span> : null;
+                        })()}
                       </p>
-                      {/* Line 2: guests chip — separate signal, physical
-                          people count. Manual key or email parse. */}
-                      <div className="mt-2">
-                        {t.restaurant_id && t.date ? (
-                          <GuestChip
-                            restaurant_id={t.restaurant_id}
-                            date={t.date}
-                            initialGuests={t.guests ?? null}
-                            initialSource={t.guests_source ?? null}
-                          />
-                        ) : null}
-                      </div>
+                      {/* GuestChip only rendered when no bookings/daily.guests
+                          landed — otherwise the number lives inline above. */}
+                      {t.guests_daily == null ? (
+                        <div className="mt-2">
+                          {t.restaurant_id && t.date ? (
+                            <GuestChip
+                              restaurant_id={t.restaurant_id}
+                              date={t.date}
+                              initialGuests={t.guests ?? null}
+                              initialSource={t.guests_source ?? null}
+                            />
+                          ) : null}
+                        </div>
+                      ) : null}
                       <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
                         <span>{t.secondary}</span>
+                        {t.peak_hour ? (
+                          <span title="Peak revenue hour (Madrid)">
+                            · peak {t.peak_hour}:00
+                            {t.peak_hour_revenue ? ` (${eur(t.peak_hour_revenue)})` : null}
+                          </span>
+                        ) : null}
                         {t.z_spans_days ? (
                           <span
                             className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
@@ -330,6 +370,11 @@ export default async function StudioPage() {
                           </span>
                         ) : null}
                       </p>
+                      {t.hourly_revenue ? (
+                        <div className="mt-2 hidden sm:block" aria-hidden="true" title="Hourly revenue — 07..22, peak hour in ink">
+                          <HourlySpark hourly={t.hourly_revenue} peakHour={t.peak_hour} />
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.status}</p>
