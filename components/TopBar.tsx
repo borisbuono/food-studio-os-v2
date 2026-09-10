@@ -2,8 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import AuthStatus from "@/components/AuthStatus";
-import LangChooser from "@/components/LangChooser";
 import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
@@ -11,6 +9,7 @@ import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
+import { scopeForUrl } from "@/lib/scope";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
@@ -188,15 +187,27 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
             </span>
           ) : null}
 
-          <LangChooser />
-          <AuthStatus />
+          {/* LangChooser removed 2026-09-10 — language is a one-time choice
+              made in onboarding / Settings, not a chip in the app chrome. */}
+          {/* AuthStatus (top-right "boris" identity chip) removed 2026-09-10
+              (Boris walk). The canonical identity affordance is the
+              bottom-left chip in DesktopSidebar (avatar · account · settings
+              · sign out). Two chips reading the same name was noise. */}
         </div>
       </div>
 
       {/* Pillars — the THREE pillars of the OS. Files icon sits far-left as a
          universal escape hatch. The active pillar is underlined with its
-         accent colour. */}
-      {loaded ? (
+         accent colour.
+         Boris walk 2026-09-10: the room switcher (see AppChrome) already
+         covers the three rooms (Overview · Kitchen · Dining Room · Office)
+         for every scoped URL — /studio, /h/<slug>, /h/<slug>/<room>, plus
+         legacy /foh /boh /office. Rendering the pillar row on those paths
+         gave Boris TWO nav rows saying the same thing. Gate the pillar row
+         to LEGACY routes only (scopeForUrl returns null), which today means
+         /administrate/*, /develop/*, /execute/*, /grow/*, /account, etc.
+         When those legacy trees are dismantled this row goes with them. */}
+      {loaded && scopeForUrl(pathname) === null ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
           <Link
             href={inboxCount > 0 ? "/files/inbox" : "/files"}

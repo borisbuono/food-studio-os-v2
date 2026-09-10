@@ -205,7 +205,7 @@ export default function OnboardWizardClient(props: {
                   className="font-serif text-[16px] bg-transparent border-b border-black/20 py-1">
                   <option value="IFL">Taller Sa Penya (IFL)</option>
                   <option value="BM">Bistro Mondo (BM)</option>
-                  <option value="BBH">Boris Buono Holdings (BBH)</option>
+                  <option value="BBH">Ibiza Food Studio S.L. (BBH)</option>
                   {props.advClients.map((a) => (
                     <option key={a.entity_code} value={a.entity_code}>{a.name} ({a.entity_code})</option>
                   ))}

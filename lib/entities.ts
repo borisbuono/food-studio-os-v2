@@ -9,6 +9,20 @@ export const ENTITY_ORDER: EntityKey[] = ["holdings", "bistro_mondo", "taller"];
 export const ENTITY_SHORT: Record<EntityKey, string> = { holdings: "Holdings", bistro_mondo: "Bistro Mondo", taller: "Taller" };
 // full brand names
 export const ENTITY_LABEL: Record<EntityKey, string> = { holdings: "Ibiza Food Studio", bistro_mondo: "Bistro Mondo", taller: "Taller Sa Penya" };
+
+// Public trading name — used at ANY customer-facing render surface.
+// The DB `entities.name` field is the internal shorthand (BBH, Bistro Mondo,
+// Taller Sa Penya / "IFL" etc.); this helper maps it to the name we show
+// externally. Boris walk 2026-09-10: BBH is never spelled out to guests or
+// partners; the S.L. legal form is the trading name for the holding.
+export function publicNameForEntity(entity: EntityKey | string | null | undefined): string {
+  const e = (entity || "").toString().toLowerCase();
+  if (e === "holdings" || e === "bbh" || e === "boris buono holdings" || e === "boris buono holdings sl") return "Ibiza Food Studio S.L.";
+  if (e === "bistro_mondo" || e === "bm" || e === "bistro mondo" || e === "bistrot mondo") return "Bistro Mondo";
+  if (e === "taller" || e === "ifl" || e === "taller sa penya" || e === "ibiza food lab" || e === "ibiza food studios") return "Taller Sa Penya";
+  // Unknown entity — return the input verbatim so we don't paper over new houses.
+  return String(entity ?? "");
+}
 // per-venue typographic voice — masthead
 export const ENTITY_WORDMARK: Record<EntityKey, string> = {
   holdings: "font-serif text-[17px] tracking-tight text-ink",

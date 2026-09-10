@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
 import DensityToggle from "@/components/DensityToggle";
+import LangChooser from "@/components/LangChooser";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,17 @@ export default async function Settings() {
       </section>
       <section className="mt-10 border-t border-line pt-6">
         <DensityToggle />
+      </section>
+
+      {/* Language — moved out of the header 2026-09-10 (Boris walk). This is a
+          one-time choice, not a running affordance. The default is English;
+          the toggle persists via lib/i18n and is per-profile. */}
+      <section className="mt-10 border-t border-line pt-6">
+        <p className="font-sans text-xs font-medium text-clay">Language · Idioma</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">The OS speaks English by default. Switch once — the choice sticks.</p>
+        <div className="mt-3">
+          <LangChooser />
+        </div>
       </section>
     </main>
   );

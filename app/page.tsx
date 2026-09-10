@@ -3,6 +3,7 @@ import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompa
 import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,23 @@ export default async function Page() {
     if (ctx.signedIn && ctx.memberships.length) {
       const target = ROOM_TO_PATH[ctx.primaryRoom];
       if (target && target !== "/") _landing = target;
+      // Boris walk 2026-09-10 — reset the sticky fs_entity cookie to
+      // `holdings` for owner-multi users on every visit to /. Without
+      // this, DesktopSidebar and TopBar seed from the LAST venue the
+      // owner touched (BM), so /studio flashed the Bistro Mondo wordmark
+      // before scope resolved. Only rewritten when we are actively
+      // routing them to /studio — leaves single-role users untouched.
+      if ((ctx.isOwner || ctx.isMulti) && target === "/studio") {
+        try {
+          cookies().set({
+            name: "fs_entity",
+            value: "holdings",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: "lax",
+          });
+        } catch { /* cookies() is read-only outside RSC action contexts on some routes */ }
+      }
     }
   } catch { /* fall through to compass */ }
   if (_landing) redirect(_landing);

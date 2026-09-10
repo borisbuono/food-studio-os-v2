@@ -69,5 +69,60 @@ export async function GET(request: NextRequest) {
   // first-run tour is added later, do it as a client-side modal on / rather
   // than a server redirect, so an unset value can't loop the login flow.
 
+  // Owner-multi landing (Boris walk 2026-09-10). If the signed-in user is an
+  // owner OR carries multiple active memberships, we land them on /studio
+  // regardless of the `next` param or the sticky fs_entity cookie. Sticky
+  // "last venue" for owners was the root cause of the "sign in and land on
+  // Bistro Mondo" report — Boris's entity is the STUDIO, not one of the
+  // houses. We also rewrite fs_entity to `holdings` so DesktopSidebar,
+  // TopBar and BrandMark render the Studio brand on the first paint
+  // instead of flashing the last-visited venue's mark.
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes?.user?.id;
+    if (uid) {
+      // Cheap join: auth.uid → team_members.id → memberships. Same shape as
+      // lib/memberships.ts, inlined here so we don't spin the whole context
+      // builder in a callback that is on the hot login path.
+      const { data: tmRows } = await supabase
+        .from("team_members")
+        .select("id, status")
+        .eq("auth_user_id", uid);
+      const personIds = (tmRows || [])
+        .filter((r: any) => r.status !== "archived")
+        .map((r: any) => r.id as string);
+      if (personIds.length) {
+        const { data: mRows } = await supabase
+          .from("memberships")
+          .select("role, status")
+          .in("person_id", personIds)
+          .eq("status", "active");
+        const raw = mRows || [];
+        const isOwner = raw.some((m: any) => String(m.role || "").toLowerCase() === "owner");
+        const isMulti = raw.length > 1;
+        if (isOwner || isMulti) {
+          // Rewrite the response as a redirect to /studio and set fs_entity=holdings.
+          const studio = NextResponse.redirect(new URL("/studio", origin));
+          // Copy every cookie the auth SDK wrote onto our original response.
+          for (const c of response.cookies.getAll()) {
+            studio.cookies.set(c);
+          }
+          // cookieAttrs already carries domain/secure/sameSite from
+          // authCookieOptions(host) — we spread it first, then set the
+          // fs_entity specifics (path root, 1yr max-age) on top.
+          studio.cookies.set({
+            ...cookieAttrs,
+            name: "fs_entity",
+            value: "holdings",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: "lax",
+          });
+          return studio;
+        }
+      }
+    }
+  } catch { /* fall through to the default `next` redirect */ }
+
   return response;
 }

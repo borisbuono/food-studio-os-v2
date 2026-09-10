@@ -268,8 +268,13 @@ export default async function StudioPage() {
                 type badge and confused the relationship. Spell it out
                 instead — Food Studios (the trading name) is legally BBH,
                 owned by Boris. */}
+            {/* Boris walk 2026-09-10 — public trading name only. The DB
+                still stores "BBH" / "Boris Buono Holdings SL" as the
+                internal shorthand; publicNameForEntity() maps it at the
+                render surface so we never leak the holding company name
+                to guests, partners or team members. */}
             <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-              Legal entity · {bbh?.name || "Boris Buono Holdings SL"} · Owner · Boris Buono
+              Legal entity · Ibiza Food Studio S.L. · Owner · Boris Buono
             </p>
           </div>
           <div className="text-right">
