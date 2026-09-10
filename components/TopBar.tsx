@@ -129,7 +129,6 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
               if (s && (s.level === "house" || s.level === "room")) return HOUSE_SLUG_TO_ENTITY[s.houseSlug];
               return entity;
             })()}
-            variant="mark"
             tone="light"
           />
         </Link>

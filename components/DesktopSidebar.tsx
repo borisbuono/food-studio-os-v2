@@ -163,7 +163,6 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
                   ? HOUSE_SLUG_TO_ENTITY[scope.houseSlug]
                   : entity
             }
-            variant="mark"
             tone="light"
           />
         </Link>

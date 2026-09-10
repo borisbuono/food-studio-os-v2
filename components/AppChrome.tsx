@@ -144,7 +144,7 @@ function SlimTopBar({ initialProfile }: { initialProfile?: ServerProfile | null 
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
         <Link href="/" aria-label="Home" className="flex items-center">
-          <BrandMark entity="holdings" variant="mark" tone="light" />
+          <BrandMark entity="holdings" tone="light" />
         </Link>
         <div className="flex items-center gap-2">
           <span
