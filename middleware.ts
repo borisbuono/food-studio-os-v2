@@ -41,12 +41,16 @@ const PUBLIC_PAGE_PREFIXES = [
   "/auth/",
   "/m/",
   "/booking-terms",
+  // Public lead-capture form — placeholder shipped overnight 2026-09-11.
+  // The comm/design agent replaces the component; the path stays public.
+  "/leads/capture",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([
   "/welcome",
   "/login",
   "/booking-terms",
+  "/leads/capture",
 ]);
 
 const PUBLIC_API_PREFIXES = [
@@ -64,6 +68,8 @@ const PUBLIC_API_PREFIXES = [
   "/api/assistant/channels/whatsapp/webhook",
   // Fresto push webhooks — Fresto signs the payload.
   "/api/integrations/fresto/webhook/",
+  // Public lead capture — rate-limited + honeypot-guarded in the route.
+  "/api/leads/capture",
 ];
 
 const PUBLIC_STATIC_EXACT = new Set<string>([
