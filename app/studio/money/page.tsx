@@ -256,6 +256,24 @@ export default async function StudioMoneyPage() {
         </p>
       </section>
 
+      {/* ─── Menu margin (per-dish, live) ─────────────────────────── */}
+      <section className="mt-10">
+        <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Menu margin</p>
+        <Link
+          href="/studio/money/menu-margin"
+          className="mt-3 block rounded-lg border border-black/10 bg-paper/50 p-5 transition hover:border-ink/40 hover:bg-paper"
+        >
+          <p className="font-serif text-[16px] text-ink">Menu-to-recipe cost matching</p>
+          <p className="mt-1 font-serif italic text-[13px] text-ink-soft">
+            Every dish on the current cards, matched to a recipe, priced against
+            food cost. Flags dishes with missing recipe links or margin under 60%.
+          </p>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+            Open the margin table →
+          </p>
+        </Link>
+      </section>
+
       {/* ─── Cash across entities ──────────────────────────────────── */}
       <section className="mt-10">
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Cash across entities</p>
