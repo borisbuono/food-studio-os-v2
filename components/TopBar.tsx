@@ -10,6 +10,7 @@ import type { ServerProfile } from "@/lib/serverProfile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
 import { scopeForUrl } from "@/lib/scope";
+import { HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
@@ -113,7 +114,25 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
       style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
-        <Link href="/" data-testid="top-brand-mark" aria-label="Home" className="flex items-center"><BrandMark entity={entity} variant="mark" tone="light" /></Link>
+        {/* Logo binds to the current SCOPE, not the fs_entity cookie. Boris walk
+            2026-09-11: on /studio the mobile top bar still showed the BM mark
+            (cookie-bound) even though the page header read "Food Studios". The
+            desktop sidebar was already scope-bound (2026-08-31); this brings
+            the mobile chrome in line so both surfaces resolve the same way.
+            Studio → holdings; house/room → the house mark; fallback → cookie
+            (only reachable when scope is null on legacy paths). */}
+        <Link href="/" data-testid="top-brand-mark" aria-label="Home" className="flex items-center">
+          <BrandMark
+            entity={(() => {
+              const s = scopeForUrl(pathname);
+              if (s?.level === "studio") return "holdings";
+              if (s && (s.level === "house" || s.level === "room")) return HOUSE_SLUG_TO_ENTITY[s.houseSlug];
+              return entity;
+            })()}
+            variant="mark"
+            tone="light"
+          />
+        </Link>
 
         <div className="flex items-center gap-3">
 
