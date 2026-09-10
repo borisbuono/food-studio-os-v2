@@ -35,31 +35,48 @@ import type { FrestoOrderline, FrestoOrder, FrestoZReport } from "./fresto";
 // need +1 day applied to reach the true trading night.
 export const FRESTO_BDATE_FIX_TS = new Date("2026-09-07T00:00:00Z");
 
-// Given the time a raw row was pulled from Fresto AND the businessDate
-// label on the row, return the true trading date as YYYY-MM-DD.
+// Given the businessDate label on a raw row (and, optionally, the row's own
+// close/event timestamp), return the true trading date as YYYY-MM-DD.
 //
-// - post-fix pulls: label passes through unchanged
-// - pre-fix pulls: add +1 day
-// - null / missing label: null
+// Correction (2026-09-10): `pulledAt` is NOT the right pivot. The server
+// mutation was applied to closings going forward at 2026-09-07 — but
+// historical rows stored BEFORE that moment keep their original day-early
+// labels no matter when we fetch them. Using pulledAt made a 09-09 backfill
+// of a July z return the day-early label as-is (see memory
+// `os_fresto_z_raw_trading_date_one_day_early_09-10`, seed only,
+// re-key needed). The correct pivot is when the ROW itself was sealed:
+// prefer an explicit event timestamp (z.toDate is ideal — that's when the
+// close hit the server); fall back to the businessDate label as the best
+// day-precision proxy.
 //
-// Rules deliberately live here — never re-derive inline. This is the
-// hedge against the derived_date_computed_once class of bug.
+// - if the record's event happened before FRESTO_BDATE_FIX_TS → label was
+//   assigned pre-fix (day-early) → add +1 day
+// - if the record's event happened at/after FRESTO_BDATE_FIX_TS → label is
+//   the true trading day → pass through unchanged
+// - null / missing label → null
+//
+// `pulledAt` kept for signature backward-compat with earlier call sites,
+// but is ignored. Callers with a per-row event-timestamp (z.toDate,
+// order/orderline creation ts) should pass it as `eventTs`.
 export function resolveTradingDate(
   pulledAt: Date | string | null | undefined,
   businessDateLabel: string | null | undefined,
+  eventTs?: Date | string | null | undefined,
 ): string | null {
+  void pulledAt; // intentionally unused — see comment above.
   if (!businessDateLabel) return null;
   const label = String(businessDateLabel).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(label)) return null;
 
-  const pulled = pulledAt ? (typeof pulledAt === "string" ? new Date(pulledAt) : pulledAt) : null;
-  // No pulledAt available (e.g. a legacy dump with no metadata) → assume
-  // pre-fix. Better to shift a modern label by a day (caller can re-run
-  // the writer with force=1) than to leave a real day-early label in place.
-  const isPostFix = pulled ? pulled >= FRESTO_BDATE_FIX_TS : false;
+  // Resolve the pivot moment for this ROW: prefer an explicit event
+  // timestamp (z.toDate is ideal). Fall back to noon-UTC of the label
+  // (a stable day-precision proxy for when the label was assigned).
+  const evt = eventTs ? (typeof eventTs === "string" ? new Date(eventTs) : eventTs) : null;
+  const pivot = evt && !isNaN(evt.getTime()) ? evt : new Date(label + "T12:00:00Z");
+  const isPostFix = pivot >= FRESTO_BDATE_FIX_TS;
   if (isPostFix) return label;
 
-  // Add +1 day.
+  // Pre-fix label — add +1 day to reach the true trading night.
   const d = new Date(label + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);

@@ -796,17 +796,23 @@ async function writeOrdersRaw(sb: any, entity: EntityCode, businessDate: string,
 
 async function writeZReportsRaw(sb: any, entity: EntityCode, businessDate: string, rows: FrestoZReport[], pulledAt: Date) {
   if (!rows.length) return;
-  const trading = resolveTradingDate(pulledAt, businessDate);
+  // Trading date is resolved PER ROW using the row's own fromDate as the label
+  // and toDate as the event-timestamp pivot. A single API call can return
+  // z-reports from several trading dates (multi-day span, backfill windows) —
+  // applying one batch-level trading date to all of them mis-attributed
+  // revenue (see memory `os_fresto_z_raw_trading_date_one_day_early_09-10`).
   const payload = rows.map((r) => {
     const from = _isoDatePart((r as any).fromDate);
     const to = _isoDatePart((r as any).toDate);
+    const rowBd = from || businessDate;
+    const rowTrading = resolveTradingDate(pulledAt, rowBd, (r as any).toDate);
     return {
       entity_code: entity,
       fresto_id: String(r.id || ""),
       from_date: (r as any).fromDate || null,
       to_date: (r as any).toDate || null,
-      business_date: from || businessDate,
-      trading_date: trading,
+      business_date: rowBd,
+      trading_date: rowTrading,
       spans_days: !!(from && to && from !== to),
       revenue_eur: Number((r as any).revenue || 0),
       cash_revenue_eur: Number((r as any).cashRevenue || 0),

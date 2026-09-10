@@ -8,6 +8,7 @@ import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/enti
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
+import type { ServerProfile } from "@/lib/serverProfile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
@@ -27,13 +28,22 @@ const PILLARS: { key: Pillar; href: string; label: string }[] = [
   { key: "office", href: "/office", label: PILLAR_LABEL.office },
 ];
 
-export default function TopBar() {
+export default function TopBar({ initialEntity, initialProfile }: { initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const [entity, setEntity] = useState<EntityKey>(() => {
+    // Seed from the SERVER-resolved entity (threaded from layout.tsx) so the
+    // first client render matches the server HTML. readEntityCookie() reads
+    // document.cookie, which is unavailable during SSR — seeding from it made
+    // the server emit bistro_mondo and the client flip on hydration.
+    if (initialEntity) return initialEntity;
     const c = readEntityCookie() as EntityKey | null;
     return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "bistro_mondo";
   });
   const [role, setRole] = useState<RoleKey>("office");
-  const [profile, setProfile] = useState<MyProfile | null>(null);
+  // Seed from the server-resolved profile so the top bar chip paints
+  // the operator on first render instead of flashing "Guest".
+  const [profile, setProfile] = useState<MyProfile | null>(
+    (initialProfile as unknown as MyProfile | null) ?? null,
+  );
   const [loaded, setLoaded] = useState(false);
   const pathname = usePathname() || "";
   const activePillar = pillarForRoute(pathname);
@@ -47,7 +57,7 @@ export default function TopBar() {
   const [inboxCount, setInboxCount] = useState<number>(0);
 
   // load profile once
-  useEffect(() => { getMyProfile().then((p) => { setProfile(p); setLoaded(true); }); }, []);
+  useEffect(() => { getMyProfile().then((p) => { if (p) setProfile(p); setLoaded(true); }); }, []);
 
   // Poll the Files inbox needs-triage counter. Cheap: one indexed count, and
   // only when the user is signed in. Refreshes when the entity changes.

@@ -11,6 +11,7 @@ import FlowStrip from "@/components/FlowStrip";
 import PwaOfflineBadge from "@/components/PwaOfflineBadge";
 import InstallPrompt from "@/components/InstallPrompt";
 import { serverEntity } from "@/lib/serverVenue";
+import { serverProfile } from "@/lib/serverProfile";
 import { ENTITY_ACCENT } from "@/lib/entities";
 
 // PWA #1 (2026-07-28) — manifest + Apple meta so iOS Safari treats FS OS as an
@@ -58,9 +59,14 @@ export const viewport: Viewport = {
 };
 
 // Render with the right accent on FIRST PAINT (no flicker waiting for client hydration).
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const entity = serverEntity();
   const accent = ENTITY_ACCENT[entity];
+  // Seed profile server-side too (2026-09-10). Without it every SSR paint
+  // rendered "Guest" and the client flipped on hydration — the same class
+  // of hydration mismatch as initialEntity, but for the identity chip.
+  // Regression of #418/#423 (memory: os_functions_check_2026-09-10_guest_flicker).
+  const initialProfile = await serverProfile();
   return (
     <html lang="en" style={{ ["--accent" as any]: accent } as any}>
       <body>
@@ -68,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* AppChrome hides the sidebar + topbar on public routes (/welcome,
             /login, /auth/*, /m/*) so signed-out visitors get a marketing
             surface, not the entity-scoped app shell. */}
-        <AppChrome>
+        <AppChrome initialEntity={entity} initialProfile={initialProfile}>
           <RouteGuard>{children}</RouteGuard>
           <FlowStrip />
         </AppChrome>

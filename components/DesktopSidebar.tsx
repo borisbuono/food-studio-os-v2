@@ -7,6 +7,7 @@ import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL } fr
 import { setEntity as setEntityCtx, onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
 import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routing/pillar-map";
 import { getMyProfile, MyProfile } from "@/lib/profile";
+import type { ServerProfile } from "@/lib/serverProfile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
 import {
@@ -34,16 +35,25 @@ import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 // /studio is GONE — leaving it there made the user think they were inside
 // BM when they were at portfolio level (the actual bug Boris named).
 
-export default function DesktopSidebar() {
+export default function DesktopSidebar({ initialEntity, initialProfile }: { initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const pathname = usePathname() || "";
   const activePillar = pillarForRoute(pathname);
 
   const [entity, setEntity] = useState<EntityKey>(() => {
+    // Seed from the SERVER-resolved entity (threaded from layout.tsx) so the
+    // first client render matches the server HTML. readEntityCookie() reads
+    // document.cookie, which is unavailable during SSR — seeding from it made
+    // the server emit bistro_mondo and the client flip on hydration.
+    if (initialEntity) return initialEntity;
     if (typeof window === "undefined") return "bistro_mondo";
     const c = readEntityCookie() as EntityKey | null;
     return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "bistro_mondo";
   });
-  const [profile, setProfile] = useState<MyProfile | null>(null);
+  // Seed from the server-resolved profile so the sidebar identity chip
+  // paints Boris on first render instead of flashing "Guest" and flipping.
+  const [profile, setProfile] = useState<MyProfile | null>(
+    (initialProfile as unknown as MyProfile | null) ?? null,
+  );
   const [entMenu, setEntMenu] = useState(false);
 
   const switcher = useSwitcherEntities();
@@ -81,7 +91,7 @@ export default function DesktopSidebar() {
     });
   }, [sections, activePillar]);
 
-  useEffect(() => { getMyProfile().then(setProfile); }, []);
+  useEffect(() => { getMyProfile().then((p) => { if (p) setProfile(p); }); }, []);
 
   useEffect(() => {
     const read = () => {

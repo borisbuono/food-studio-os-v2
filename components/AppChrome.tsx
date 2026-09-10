@@ -8,6 +8,8 @@ import BrandMark from "@/components/BrandMark";
 import RoomSwitcher from "@/components/RoomSwitcher";
 import AuthStatus from "@/components/AuthStatus";
 import { getMyProfile, MyProfile } from "@/lib/profile";
+import type { ServerProfile } from "@/lib/serverProfile";
+import { EntityKey } from "@/lib/entities";
 
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
@@ -41,7 +43,13 @@ type ShellState = {
   hasMemberships: boolean;
 };
 
-export default function AppChrome({ children }: { children: React.ReactNode }) {
+// initialEntity (2026-08-27) — resolved SERVER-SIDE in app/layout.tsx via
+// serverEntity() and threaded down so TopBar/DesktopSidebar can seed their
+// entity state on first paint. Without it both components called
+// readEntityCookie(), which reads document.cookie and returns null during
+// SSR, so the server always painted bistro_mondo and the client flipped on
+// hydration — the "profile swaps when switching apps" report.
+export default function AppChrome({ children, initialEntity, initialProfile }: { children: React.ReactNode; initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const path = usePathname() || "/";
   const [shell, setShell] = useState<ShellState>({
     loaded: false, isOwner: false, isMulti: false, hasMemberships: false,
@@ -78,7 +86,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   if (slim) {
     return (
       <>
-        <SlimTopBar />
+        <SlimTopBar initialProfile={initialProfile ?? null} />
         <div>{children}</div>
       </>
     );
@@ -89,9 +97,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   // house-scoped paths).
   return (
     <>
-      <DesktopSidebar />
+      <DesktopSidebar initialEntity={initialEntity} initialProfile={initialProfile ?? null} />
       <div className="lg:hidden">
-        <TopBar />
+        <TopBar initialEntity={initialEntity} initialProfile={initialProfile ?? null} />
       </div>
       <div className="lg:pl-60">
         {/* Desktop-only room switcher row. The identity chip that used to
@@ -114,9 +122,14 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 // Just the brand mark on the left, the user's name/avatar on the right. No
 // pillar row, no sidebar, no room switcher — this user has ONE room and
 // they're already in it.
-function SlimTopBar() {
-  const [profile, setProfile] = useState<MyProfile | null>(null);
-  useEffect(() => { getMyProfile().then(setProfile); }, []);
+function SlimTopBar({ initialProfile }: { initialProfile?: ServerProfile | null }) {
+  // Seed with the server-resolved profile (2026-09-10) so the first paint
+  // shows the operator's name / initials, not the "Guest" fallback that
+  // used to flash on every SSR paint and hydrate to Boris.
+  const [profile, setProfile] = useState<MyProfile | null>(
+    (initialProfile as unknown as MyProfile | null) ?? null,
+  );
+  useEffect(() => { getMyProfile().then((p) => { if (p) setProfile(p); }); }, []);
   const displayName = profile?.name || profile?.email || "Guest";
   const initials = (() => {
     const n = displayName.trim();

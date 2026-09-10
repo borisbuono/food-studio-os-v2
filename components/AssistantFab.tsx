@@ -845,7 +845,9 @@ export default function AssistantFab() {
       // CTA that must stay visible until tapped) — close the sheet after
       // a short window so it doesn't cover the front page. The FAB
       // remains, ready for the next turn.
-      if (!needsConfirm && !d.memory && !d.order && d.intent !== "capture") {
+      // NOTE (2026-08-27): !d.feedback added — the feedback card is a CTA that
+      // must stay visible until the user taps send/dismiss, same as memory/order.
+      if (!needsConfirm && !d.memory && !d.order && !d.feedback && d.intent !== "capture") {
         setTimeout(() => {
           if (!textRef.current?.trim()) { setOpen(false); }
         }, 4000);
@@ -875,6 +877,30 @@ export default function AssistantFab() {
 
   // onCapture removed 2026-08-30 — long-press + capture intent both route
   // to /capture (auth-gated, rich OCR via Sonnet). See CaptureStation.tsx.
+
+  // Persist an Assistant-proposed feedback item to the feedback board.
+  //
+  // Until 2026-08-27 this had no counterpart: /api/ask returned d.feedback,
+  // we stored it on the message, and nothing ever wrote it anywhere — the
+  // board took zero rows for 85 days. Mirrors saveMemory above.
+  const saveFeedback = async (msgIdx: number) => {
+    const m = log[msgIdx]; if (!m?.feedback?.body) return;
+    setLog((l) => l.map((x, i) => i === msgIdx ? { ...x, feedback: null } : x));
+    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+    try {
+      const r = await fetch("/api/chef/save-feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        kind: m.feedback.kind || "idea",
+        body: m.feedback.body,
+        route: pathname || "",
+        entity: ent,
+        session_id: sessionRef.current,
+      })});
+      const d = await r.json();
+      setLog((l) => [...l, { role: "sys", text: d.ok ? (lang === "es" ? "✓ Enviado al tablero" : "✓ Sent to the board") : ("⚠ " + (d.error || "save failed")) }]);
+    } catch (e: any) {
+      setLog((l) => [...l, { role: "sys", text: "⚠ " + (e?.message || "save failed") }]);
+    }
+  };
 
   // Wine label scan — Collapse #2 second intent. Uses the same /api/wine-scan
   // endpoint the (now-deleted) /develop/wine/scan page used. Shows the extracted
@@ -1331,6 +1357,17 @@ export default function AssistantFab() {
                           {["ask","order","feedback","memory","capture"].map((opt) => (
                             <button key={opt} onClick={() => confirmIntent(i, opt)} className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide ${m.intent === opt ? "border-ink bg-paper-deep" : "border-line bg-paper hover:border-ink-soft"}`}>{opt}</button>
                           ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {m.feedback?.body ? (
+                      <div className="mt-2 rounded-xl border border-line bg-paper-deep/40 p-3">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{lang === "es" ? "¿Enviar al tablero?" : "Send to the board?"}</p>
+                        <p className="mt-1 font-serif italic text-[14px] text-ink">{m.feedback.body}</p>
+                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-clay">{m.feedback.kind || "idea"}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button onClick={() => saveFeedback(i)} className="rounded-full border border-ink bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper">{lang === "es" ? "✓ enviar" : "✓ send"}</button>
+                          <button onClick={() => setLog((l) => l.map((x, j) => j === i ? { ...x, feedback: null } : x))} className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink">{lang === "es" ? "× descartar" : "× dismiss"}</button>
                         </div>
                       </div>
                     ) : null}

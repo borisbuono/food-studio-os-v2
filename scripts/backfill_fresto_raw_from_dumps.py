@@ -30,17 +30,31 @@ from urllib.error import HTTPError
 
 FRESTO_BDATE_FIX = dt.date(2026, 9, 7)  # server-side shift
 
-def resolve_trading_date(pulled_at: dt.date, business_date_label: str | None) -> str | None:
-    """The single date derivation — mirrors lib/integrations/pos/fresto-derive.ts.
-    Pre-fix pulls → label + 1 day. Post-fix pulls → label unchanged.
+def resolve_trading_date(pulled_at: dt.date, business_date_label: str | None,
+                          event_ts: str | None = None) -> str | None:
+    """Mirror of lib/integrations/pos/fresto-derive.ts::resolveTradingDate.
+
+    Pivot is the ROW's event moment (z.toDate for closings) — falling back to
+    the businessDate label — NOT the pulled_at date. A backfill run on 09-09
+    of a July z is still resolving a pre-fix row: its label is day-early and
+    needs +1. Using pulled_at made every historical z pass through unchanged
+    (memory: os_fresto_z_raw_trading_date_one_day_early_09-10).
     """
+    _ = pulled_at  # intentionally unused — see comment above.
     if not business_date_label:
         return None
     m = re.match(r"^(\d{4}-\d{2}-\d{2})", str(business_date_label))
     if not m:
         return None
     d = dt.date.fromisoformat(m.group(1))
-    if pulled_at >= FRESTO_BDATE_FIX:
+    pivot = None
+    if event_ts:
+        em = re.match(r"^(\d{4}-\d{2}-\d{2})", str(event_ts))
+        if em:
+            pivot = dt.date.fromisoformat(em.group(1))
+    if pivot is None:
+        pivot = d
+    if pivot >= FRESTO_BDATE_FIX:
         return d.isoformat()
     return (d + dt.timedelta(days=1)).isoformat()
 
@@ -110,7 +124,8 @@ def main():
                     "from_date": from_ts,
                     "to_date": to_ts,
                     "business_date": bd_label,
-                    "trading_date": resolve_trading_date(pull_date, bd_label) if pull_date else bd_label,
+                    # Route per-row: pivot on the z's toDate (close), not the pull date.
+                    "trading_date": resolve_trading_date(pull_date, bd_label, to_ts) if bd_label else None,
                     "spans_days": spans,
                     "revenue_eur": z.get("revenue") or 0,
                     "cash_revenue_eur": z.get("cashRevenue") or 0,
