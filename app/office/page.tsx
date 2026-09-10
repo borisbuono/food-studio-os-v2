@@ -117,15 +117,12 @@ export default async function OfficeHome() {
           action="Open suppliers →"
           flowChip="admin"
         />
-        <PillarTile
-          href="/administrate/holdings/console"
-          kicker="Holdings · group view"
-          title="Holdings"
-          value="—"
-          status="The rolled-up group view — every entity in one console."
-          action="Open holdings →"
-          flowChip="admin"
-        />
+        {/* Holdings tile removed 2026-09-11 (Boris walk): Holdings is a
+            Studio-level concept (portfolio of houses), not a house-scope
+            one. It belongs on /studio, not on the Office landing of an
+            operating venue. The /administrate/holdings/* route stays alive
+            for the Group console — this just stops advertising it from
+            inside a house. */}
         <PillarTile
           href="/grow/reach"
           kicker="Reach · campaigns + ads"

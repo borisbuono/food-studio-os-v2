@@ -9,8 +9,8 @@ import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
 import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
-import { scopeForUrl } from "@/lib/scope";
-import { HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
+import { scopeForUrl, resolveScope } from "@/lib/scope";
+import { HOUSE_SLUG_TO_ENTITY, houseSlugForEntity } from "@/lib/houses";
 import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
@@ -217,15 +217,18 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
       {/* Pillars — the THREE pillars of the OS. Files icon sits far-left as a
          universal escape hatch. The active pillar is underlined with its
          accent colour.
-         Boris walk 2026-09-10: the room switcher (see AppChrome) already
-         covers the three rooms (Overview · Kitchen · Dining Room · Office)
-         for every scoped URL — /studio, /h/<slug>, /h/<slug>/<room>, plus
-         legacy /foh /boh /office. Rendering the pillar row on those paths
-         gave Boris TWO nav rows saying the same thing. Gate the pillar row
-         to LEGACY routes only (scopeForUrl returns null), which today means
-         /administrate/*, /develop/*, /execute/*, /grow/*, /account, etc.
-         When those legacy trees are dismantled this row goes with them. */}
-      {loaded && scopeForUrl(pathname) === null ? (
+         Boris walk 2026-09-11: the gate flipped from `scopeForUrl === null`
+         to `resolveScope === null`. The old gate was URL-only, so legacy
+         paths (/office, /boh, /foh) always rendered the pillar row even
+         though the RoomSwitcher was ALSO rendering there (via the
+         resolveScope fallback that lifts an fs_entity=bistro_mondo cookie
+         into a house/room scope). That stacked THREE nav systems on /office
+         — pillars, "View as" role toggle, and RoomSwitcher. Now: whenever
+         RoomSwitcher renders (any resolved scope), suppress the pillars.
+         The row is still useful on truly-portfolio paths where no scope
+         resolves at all (unauthenticated, /account without a house cookie,
+         etc.). */}
+      {loaded && resolveScope(pathname, houseSlugForEntity(entity)) === null ? (
         <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
           <Link
             href={inboxCount > 0 ? "/files/inbox" : "/files"}
@@ -264,8 +267,13 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
         </nav>
       ) : null}
 
-      {/* admin "view as" role line — admins preview each world; workers don't see this */}
-      {loaded && isAdmin ? (
+      {/* admin "view as" role line — admins preview each world; workers don't see this.
+         Boris walk 2026-09-11: also suppressed on any resolved scope, same
+         reason as the pillar row above — the RoomSwitcher is the canonical
+         inter-room nav and this legacy toggle stacked on top of it on
+         /office and every other legacy-path-with-house-cookie. Kept on
+         truly-legacy portfolio paths so admin preview still works there. */}
+      {loaded && isAdmin && resolveScope(pathname, houseSlugForEntity(entity)) === null ? (
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-6 pb-2">
           <span className="font-mono text-[10px] uppercase tracking-wide text-clay">View as</span>
           {(Object.keys(ROLES) as RoleKey[]).map((k) => (
