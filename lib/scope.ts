@@ -215,6 +215,7 @@ const STUDIO: SidebarSection[] = [
     label: "Studio",
     items: [
       { href: "/studio",                              label: "Overview" },
+      { href: "/studio/overview",                     label: "3-Company" },
       // Boris re-walk 2026-08-31 17:45 CET: EVERY Studio sidebar link must
       // stay in Studio scope. The old wiring teleported into a house — the
       // Houses tile pointed at /administrate/holdings (BM chrome), People
