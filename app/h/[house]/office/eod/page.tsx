@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
-import { ENTITY_LABEL, EntityKey } from "@/lib/entities";
+import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
+import { ENTITY_LABEL, type EntityKey } from "@/lib/entities";
 import ManualEodClient from "./ManualEodClient";
 
 // /h/[house]/office/eod — manual EOD entry surface.
@@ -19,8 +19,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ManualEodPage({ params }: { params: { house: string } }) {
   const slug = params.house;
-  const entity = entityForHouseSlug(slug);
-  if (!entity) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
+  const entity = house.id;
   try {
     cookies().set("fs_entity", entity, {
       path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30,
@@ -38,11 +39,12 @@ export default async function ManualEodPage({ params }: { params: { house: strin
     vendor = (data?.vendor as string | null) ?? null;
   } catch { vendor = null; }
 
-  // Timezone for the "today" default — Madrid for BM/Taller/Holdings, but
-  // any future entity should carry its own tz. For d2 we hardcode Madrid;
-  // when the Amsterdam entity lands we swap in entities.timezone.
+  // Timezone for the "today" default — read from the entity row (P0 fix
+  // 2026-09-20 rehearsal). Amsterdam venue lands on the Amsterdam wall-clock
+  // date; Ibiza houses still land on Madrid. Falling back to Madrid keeps
+  // the pre-refactor default when a legacy row has no timezone set.
   const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
+    timeZone: house.timezone || "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
   return (
@@ -61,7 +63,7 @@ export default async function ManualEodPage({ params }: { params: { house: strin
         </div>
         <div className="text-right">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Entity</p>
-          <p className="mt-1 font-serif text-[15px] text-ink">{ENTITY_LABEL[entity as EntityKey] || entity}</p>
+          <p className="mt-1 font-serif text-[15px] text-ink">{ENTITY_LABEL[entity as EntityKey] || house.name}</p>
         </div>
       </div>
 

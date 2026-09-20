@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
 import IngredientAliasesAdmin from "@/components/IngredientAliasesAdmin";
 
 // /h/<slug>/kitchen/ingredients — manage ingredient_aliases. Boris links
@@ -8,11 +8,11 @@ import IngredientAliasesAdmin from "@/components/IngredientAliasesAdmin";
 
 export const dynamic = "force-dynamic";
 
-export default function KitchenIngredientsPage({ params, searchParams }: { params: { house: string; room: string }; searchParams?: { prefill?: string } }) {
-  const entity = entityForHouseSlug(params.house);
-  if (!entity) redirect("/studio");
+export default async function KitchenIngredientsPage({ params, searchParams }: { params: { house: string; room: string }; searchParams?: { prefill?: string } }) {
+  const house = await getHouseBySlug(params.house);
+  if (!house) redirect("/studio");
   if (params.room !== "kitchen") redirect(`/h/${params.house}`);
-  return <IngredientAliasesAdmin entityId={entity} houseSlug={params.house} prefill={searchParams?.prefill ?? null} />;
+  return <IngredientAliasesAdmin entityId={house.id} houseSlug={params.house} prefill={searchParams?.prefill ?? null} />;
 }
 
 export function generateMetadata({ params }: { params: { house: string; room: string } }) {

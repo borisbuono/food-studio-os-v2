@@ -14,7 +14,7 @@
 
 import type { Pillar } from "@/lib/routing/pillar-map";
 import type { HouseSlug, HouseRoom } from "@/lib/houses";
-import { entityForHouseSlug, isHouseRoom } from "@/lib/houses";
+import { slugLooksLikeHouse, isHouseRoom } from "@/lib/houses";
 
 export type EntityType =
   | "operating_venue"
@@ -285,8 +285,12 @@ export function scopeForUrl(pathname: string): Scope | null {
   if (pathname === "/h" || pathname.startsWith("/h/")) {
     const parts = pathname.split("/").filter(Boolean); // ["h","<slug>",...]
     const slug = parts[1];
-    if (slug && entityForHouseSlug(slug)) {
-      const houseSlug = slug.toLowerCase() as HouseSlug;
+    if (slug && slugLooksLikeHouse(slug)) {
+      // scopeForUrl is a pure sync function used from client + server, so
+      // we can't await the DB here. A slug that LOOKS like a house is treated
+      // as one for chrome / sidebar purposes; the actual page render calls
+      // getHouseBySlug and redirects on miss.
+      const houseSlug: HouseSlug = slug.toLowerCase();
       const roomPart = parts[2];
       if (roomPart && isHouseRoom(roomPart)) {
         return { level: "room", houseSlug, room: roomPart };

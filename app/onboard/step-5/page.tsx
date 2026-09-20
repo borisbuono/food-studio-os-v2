@@ -21,6 +21,25 @@ export default async function OnboardStep5() {
 
   const invitedCount = (state.invited || []).length;
 
+  // Currency + timezone fallback — read the entity row so the summary chip
+  // reflects what actually landed in the DB, not a hardcoded ES default.
+  // P0 fix 2026-09-20 (rehearsal punchlist): the "Europe/Madrid" fallback
+  // would mask an Amsterdam onboarder losing their tz between step-3 and
+  // step-5. The entity row is the source of truth.
+  let entityTz: string | null = null;
+  let entityCurrency: string | null = null;
+  try {
+    const { data: ent } = await sb
+      .from("entities")
+      .select("timezone, currency_code")
+      .eq("id", state.entity_id)
+      .maybeSingle();
+    entityTz = (ent as any)?.timezone ?? null;
+    entityCurrency = (ent as any)?.currency_code ?? null;
+  } catch { /* non-fatal — chip falls back to state / defaults */ }
+  const shownCurrency = state.fiscal?.currency_code || entityCurrency || "EUR";
+  const shownTimezone = state.fiscal?.timezone || entityTz || "Europe/Madrid";
+
   return (
     <OnboardShell
       step={5}
@@ -42,7 +61,7 @@ export default async function OnboardStep5() {
         <div className="flex items-center justify-between">
           <dt className={labelCls}>Currency · timezone</dt>
           <dd className="font-sans text-[14px] text-ink">
-            {state.fiscal?.currency_code || "EUR"} · {state.fiscal?.timezone || "Europe/Madrid"}
+            {shownCurrency} · {shownTimezone}
           </dd>
         </div>
         <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
 import { supabaseServer } from "@/lib/supabaseServer";
 import NewOpeningForm from "./NewOpeningForm";
 
@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 export default async function NewOpeningPage({ params }: { params: { house: string } }) {
   const slug = params.house;
-  const entity_id = entityForHouseSlug(slug);
-  if (!entity_id) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
+  const entity_id = house.id;
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/hiring/new`);

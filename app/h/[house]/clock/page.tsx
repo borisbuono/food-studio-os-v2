@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
 import { supabaseServer } from "@/lib/supabaseServer";
 import ClockKiosk from "./ClockKiosk";
 
@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ClockPage({ params }: { params: { house: string } }) {
   const slug = params.house;
-  const entity_id = entityForHouseSlug(slug);
-  if (!entity_id) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
+  const entity_id = house.id;
 
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();

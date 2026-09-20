@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
 import { supabaseServer } from "@/lib/supabaseServer";
 import OpeningEditor from "./OpeningEditor";
 
@@ -16,8 +16,9 @@ export default async function OpeningDetailPage({
 }) {
   const slug = params.house;
   const openingId = params.opening;
-  const entity_id = entityForHouseSlug(slug);
-  if (!entity_id) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
+  const entity_id = house.id;
 
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();

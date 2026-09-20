@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { entityForHouseSlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses";
 
 // /h/<slug>/office — mirror of the [room] catchall for the "office" room.
 //
@@ -12,12 +12,12 @@ import { entityForHouseSlug } from "@/lib/houses";
 
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { house: string } }) {
+export default async function Page({ params }: { params: { house: string } }) {
   const slug = params.house;
-  const entity = entityForHouseSlug(slug);
-  if (!entity) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
   try {
-    cookies().set("fs_entity", entity, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
+    cookies().set("fs_entity", house.id, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
   } catch { /* read-only in some render paths — non-fatal */ }
   redirect("/office");
 }

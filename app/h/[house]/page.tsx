@@ -3,10 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import {
-  entityForHouseSlug, houseNameForSlug,
+  getHouseBySlug, houseNameForSlug,
   HOUSE_ROOMS, HOUSE_ROOM_LABEL,
 } from "@/lib/houses";
-import { ENTITY_TO_RESTAURANT, ENTITY_H1, publicNameForEntity, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { ENTITY_H1, publicNameForEntity, type EntityKey } from "@/lib/entities";
 import { HourlySpark } from "@/app/studio/HourlySpark";
 
 // /h/<slug> — the house landing page.
@@ -23,35 +23,25 @@ import { HourlySpark } from "@/app/studio/HourlySpark";
 
 export const dynamic = "force-dynamic";
 
-// Map house entity → restaurant_id for eod_pos lookups. Mirrors
-// ENTITY_TO_RESTAURANT but the values are already there — we just alias here
-// so a house-slug caller doesn't need to hop through EntityKey.
-const HOUSE_SLUG_TO_RESTAURANT_ID: Record<string, string | undefined> = {
-  bm: ENTITY_TO_RESTAURANT[E_BM],        // fb4d008f-2d2a-4e0d-a525-6e0e36af0259
-  taller: ENTITY_TO_RESTAURANT[E_TALLER],          // ca83e06f-a24d-43d7-bce4-57ac341d190f
-};
-
-// House-specific subtitle. Legal entity + address anchor the mark so the
-// visitor can tell BM (Sant Joan) from Taller (Sa Penya) at a glance.
-// TODO (2026-09-20 runway d1): read legal_name + city from `entities`
-// instead of hardcoding — this only works for Boris's two houses today
-// and any new tenant's house slug will fall through to the blank string.
-const HOUSE_SUBTITLE: Record<string, string> = {
-  bm:     "Legal entity · Bistro Mondo · Sant Joan de Labritja, Ibiza",
-  taller: "Legal entity · Ibiza Food Studio S.L. · Plaza Sa Penya, Ibiza",
-};
+// P0 fix 2026-09-20 (Amsterdam rehearsal): the two hardcoded maps used to
+// live here (HOUSE_SLUG_TO_RESTAURANT_ID, HOUSE_SUBTITLE) — both keyed on
+// "bm" / "taller" and both returned empty for any other tenant. They are
+// gone. restaurant_id now comes from the entity's linked restaurants row
+// (getHouseBySlug()), the subtitle is derived from legal_name + city on
+// the entities row, and every formatter takes an explicit `tz` string
+// resolved once from house.timezone at the top of the render.
 
 function eur(n: number): string {
   return "€" + Math.round(n).toLocaleString("en-GB");
 }
-function madridDateLabel(): string {
+function tzDateLabel(tz: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
+    timeZone: tz, weekday: "long", day: "numeric", month: "long",
   }).format(new Date());
 }
-function madridClock(): string {
+function tzClock(tz: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(new Date());
 }
 // Human-readable close date — "3 Sep", "yesterday", "today". Same helper as
@@ -64,10 +54,17 @@ function humanDate(iso: string, today: string): string {
   const d = new Date(iso + "T12:00:00Z");
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
 }
-function madridToday(): string {
+function tzToday(tz: string): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
+}
+// "Madrid" / "Amsterdam" — used in the top-strip clock caption. The zone
+// database format is "Continent/City", so the tail after the slash is a
+// serviceable human label.
+function tzShortLabel(tz: string): string {
+  const tail = tz.split("/").pop() || tz;
+  return tail.replace(/_/g, " ");
 }
 
 type EodRow = {
@@ -83,8 +80,9 @@ type EodRow = {
 
 export default async function HouseLandingPage({ params }: { params: { house: string } }) {
   const slug = params.house;
-  const entity = entityForHouseSlug(slug);
-  if (!entity) redirect("/studio");
+  const house = await getHouseBySlug(slug);
+  if (!house) redirect("/studio");
+  const entity = house.id;
 
   // Bind the cookie so subsequent nav (legacy /office / /boh / /foh) still
   // reads THIS house. The redirect to /office is gone — this page IS the
@@ -95,13 +93,24 @@ export default async function HouseLandingPage({ params }: { params: { house: st
     });
   } catch { /* read-only in some render paths — non-fatal */ }
 
-  const rid = HOUSE_SLUG_TO_RESTAURANT_ID[slug];
-  const houseName = publicNameForEntity(entity);
-  const subtitle = HOUSE_SUBTITLE[slug] ?? "";
-  const dateLabel = madridDateLabel();
-  const clock = madridClock();
-  const today = madridToday();
-  const h1Class = ENTITY_H1[entity];
+  const rid = house.restaurant_id ?? undefined;
+  // Pinned entities (BM/Taller) still resolve to their pretty trading name
+  // via publicNameForEntity; new tenants get the DB name. legal_name + city
+  // together drive the subtitle — the old hardcoded "Bistro Mondo · Sant Joan
+  // de Labritja" strings are gone.
+  const houseName = publicNameForEntity(entity) || house.name;
+  const subtitleParts = [
+    "Legal entity",
+    house.legal_name || house.name,
+    house.city || null,
+  ].filter(Boolean) as string[];
+  const subtitle = subtitleParts.length >= 2 ? subtitleParts.join(" · ") : "";
+  const tz = house.timezone;
+  const dateLabel = tzDateLabel(tz);
+  const clock = tzClock(tz);
+  const today = tzToday(tz);
+  const tzLabel = tzShortLabel(tz);
+  const h1Class = ENTITY_H1[entity as EntityKey] || "font-serif text-3xl text-ink";
 
   // Yesterday's close from eod_pos. We ask for the most recent row (which
   // in practice is yesterday for a night-close operation, but might be
@@ -148,7 +157,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      {/* Top strip — house identity + date + Madrid clock. Room switcher
+      {/* Top strip — house identity + date + venue-local clock. Room switcher
           lives in the chrome (top-right) — RoomSwitcher renders on
           house/room scope automatically. */}
       <section className="border-b border-black/10 pb-6">
@@ -162,7 +171,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
           </div>
           <div className="text-right">
             <p className="font-serif text-[17px] text-ink-soft">{dateLabel}</p>
-            <p className="font-mono text-[11px] text-clay">Madrid · {clock}</p>
+            <p className="font-mono text-[11px] text-clay">{tzLabel} · {clock}</p>
           </div>
         </div>
       </section>
@@ -232,7 +241,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
             <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
               <span>Last close {humanDate(latest.date, today)}</span>
               {latest.peak_hour ? (
-                <span title="Peak revenue hour (Madrid)">
+                <span title={`Peak revenue hour (${tzLabel})`}>
                   · peak {latest.peak_hour}:00
                   {latest.peak_hour_revenue ? ` (${eur(latest.peak_hour_revenue)})` : null}
                 </span>
