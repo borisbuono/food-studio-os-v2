@@ -80,7 +80,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </AppChrome>
         <SessionMigrator />
         <KeyboardShortcuts />
-        <CommandK />
+        {/* CommandK is gated on `initialProfile` — on public routes (/welcome,
+            /login, /auth/*) or for unauth visitors it renders nothing, so
+            Amsterdam's owner never sees Boris's internal route list before
+            signing in (p0 leak fixed 2026-09-21). */}
+        <CommandK initialProfile={initialProfile} />
         <ChefSwitch />
         <NewHireAssistantNudge />
         <InstallPrompt />

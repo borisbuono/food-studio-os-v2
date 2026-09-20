@@ -1,10 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
 import { setEntity as setEntityCtx } from "@/lib/ctx";
 import { PILLAR_LABEL, PILLAR_ACCENT, Pillar } from "@/lib/routing/pillar-map";
+import type { ServerProfile } from "@/lib/serverProfile";
+
+// P0 fix (2026-09-21) — Boris caught the palette rendering for anonymous
+// visitors on /welcome, exposing every internal route (FOH, dashboard,
+// bookings, guests, etc.) before the visitor had signed in. Two gates:
+//   1. Route gate — never mount on public routes (/welcome, /login, /auth/*,
+//      /m/*, /booking-terms, /onboard/*). Same list AppChrome uses to hide
+//      the sidebar + topbar.
+//   2. Session gate — even on a private route, refuse to render (and skip
+//      registering the ⌘K keyboard listener) unless the SSR profile is
+//      present. `initialProfile` is threaded from app/layout.tsx via
+//      serverProfile() so this decision holds on FIRST PAINT (per the SSR
+//      guest flicker precedent — #418/#423).
+// Membership-scoped filtering of the ROUTES list (per-tenant surfaces,
+// FOH_enabled flag) is logged as a follow-up — see
+// 06_PA/_INBOX/TO_BORIS_command_palette_leak_fix_2026-09-21.md.
+const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard"];
+function isPublic(path: string): boolean {
+  return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
+}
 
 // Command palette — ⌘K / Ctrl+K on any breakpoint. Extended for desktop:
 // slash commands, fuzzy search, keyboard navigation, recent history,
@@ -148,8 +168,15 @@ function pushRecent(href: string) {
   } catch {}
 }
 
-export default function CommandK() {
+export default function CommandK({ initialProfile }: { initialProfile?: ServerProfile | null }) {
   const router = useRouter();
+  const path = usePathname() || "/";
+  // Gate: only mount the palette (chip + modal + ⌘K listener) when the SSR
+  // profile resolved AND we're on a private route. On /welcome, /login, etc.
+  // the palette must NEVER render — an anonymous visitor should not see the
+  // internal route list.
+  const enabled = initialProfile != null && !isPublic(path);
+
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -160,7 +187,10 @@ export default function CommandK() {
   const mode = useMemo(() => parseMode(q), [q]);
 
   // Keyboard opener + external dispatch. Voice / FAB integration invokes this.
+  // The listener is only attached when `enabled` — an anonymous visitor
+  // pressing ⌘K on /welcome hits nothing.
   useEffect(() => {
+    if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault(); setOpen((o) => !o);
@@ -178,7 +208,7 @@ export default function CommandK() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("fs:cmdk:open", onOpen as any);
     };
-  }, [open]);
+  }, [enabled, open]);
 
   useEffect(() => {
     if (open) {
@@ -285,6 +315,11 @@ export default function CommandK() {
     recRef.current = null;
     setListening(false);
   }
+
+  // Nothing renders — no chip, no ⌘K label, no modal — for unauth visitors
+  // or public routes. Keeps the internal route inventory off the marketing
+  // shell entirely (both DOM and initial HTML).
+  if (!enabled) return null;
 
   return (
     <>
