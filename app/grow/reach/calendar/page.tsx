@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { ENTITY_ACCENT, ENTITY_LABEL, type EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { ENTITY_ACCENT, ENTITY_LABEL, type EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 export const dynamic = "force-dynamic";
 
 // Grow · Reach · posting calendar (Meta stack).
@@ -16,11 +16,11 @@ export const dynamic = "force-dynamic";
 // Ibiza time throughout the UI — scheduled_at is timestamptz (UTC at rest),
 // displayed in Europe/Madrid on every render. Approval is one click, 5s undo.
 
-const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  [E_TALLER]: "IFL", [E_BM]: "BM", [E_HOLDINGS]: "BBH",
+const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH" | "UTOPIA"> = {
+  [E_TALLER]: "IFL", [E_BM]: "BM", [E_HOLDINGS]: "BBH", [E_UTOPIA]: "UTOPIA",
 };
-const ENTITY_SHORT_CODE: Record<EntityKey, "IFS" | "BM" | "BBH"> = {
-  [E_TALLER]: "IFS", [E_BM]: "BM", [E_HOLDINGS]: "BBH",
+const ENTITY_SHORT_CODE: Record<EntityKey, "IFS" | "BM" | "BBH" | "UTOPIA"> = {
+  [E_TALLER]: "IFS", [E_BM]: "BM", [E_HOLDINGS]: "BBH", [E_UTOPIA]: "UTOPIA",
 };
 
 type Channel = "instagram" | "facebook" | "tiktok" | "threads";
@@ -591,7 +591,7 @@ function Drawer({
 // --- Composer ------------------------------------------------------------
 function Composer({
   entity, day, onClose, onSaved,
-}: { entity: "IFL" | "BM" | "BBH"; day?: string; onClose: () => void; onSaved: () => void }) {
+}: { entity: "IFL" | "BM" | "BBH" | "UTOPIA"; day?: string; onClose: () => void; onSaved: () => void }) {
   const [channels, setChannels] = useState<Channel[]>(["instagram"]);
   const [mediaType, setMediaType] = useState<MediaType>("IMAGE");
   const [title, setTitle] = useState("");

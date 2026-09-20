@@ -1,15 +1,26 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { noEmoji } from "@/lib/text";
+import { serverEntity } from "@/lib/serverVenue";
 
 export const dynamic = "force-dynamic";
 
 // Recipe corpus — the operator's own library of every dish, prep, sub-recipe,
 // and imported worksheet. Editorial face on purpose (Fraunces, whitespace),
 // no numeric chrome in the cover; the Calculation view carries precision.
+//
+// P0 fix 2026-09-21 (audit RED-1): this used to pull EVERY recipe with no
+// scope, so any operator on any house saw all 162 rows across BM / Taller /
+// Utopia. Scoped by entity_id now, backed by the fs_entity cookie. Legacy
+// rows still on entity_id=NULL are backfilled by the 09-21 migration.
 export default async function DevelopRecipes() {
   const supabase = supabaseServer();
-  const recipes = ((await supabase.from("recipes").select("id,name,section,servings,cost_per_serving_eur,source_import_id").order("name")).data || []) as any[];
+  const entity = serverEntity();
+  const recipes = ((await supabase
+    .from("recipes")
+    .select("id,name,section,servings,cost_per_serving_eur,source_import_id")
+    .eq("entity_id", entity)
+    .order("name")).data || []) as any[];
   const pending = ((await supabase.from("recipe_imports").select("id,external_ref,status,parsed_json,created_at").in("status", ["parsed","pending"]).order("created_at", { ascending: false }).limit(20)).data || []) as any[];
 
   return (

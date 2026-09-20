@@ -1,7 +1,7 @@
 import HomeSwitch from "@/components/HomeSwitch";
 import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { EntityKey, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, ENTITY_LABEL, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
@@ -13,13 +13,14 @@ const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
 // Utopia (a0000000-…-0001) intentionally dropped — trial archived 2026-08-22.
 
 // Entity code used by the finance tables (invoice_inbox / bank_movements share BM / IFL / BBH).
-const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 // Assumed service window per venue -- used to compute the service step state
 // and the "service in Xh" copy. These match the current operating hours; if a
 // venue reshapes, edit here (Boris: this could later come from a venue settings row).
 const SERVICE_HOURS: Record<EntityKey, { open: string; close: string }> = {
   [E_BM]: { open: "19:00", close: "23:30" },  [E_TALLER]: { open: "19:00", close: "23:30" },  [E_HOLDINGS]: { open: "19:00", close: "23:30" }, // synthetic (holdings is not a venue but keep the shape)
+  [E_UTOPIA]: { open: "18:00", close: "23:00" },
 };
 
 // Madrid wall-clock helper -- server runs UTC.
@@ -481,6 +482,10 @@ export default async function Page() {
     } : (bm.cashPosition || taller.cashPosition),
   };
 
-  const data: CompassData = { [E_HOLDINGS]: holdings, [E_BM]: bm, [E_TALLER]: taller };
+  // Utopia (2026-09-21 P0 unblock): pass a copy of Holdings for now so the
+  // CompassData shape is complete. Utopia numbers surface through /studio and
+  // /h/utopia; this root compass is legacy and Utopia's own dashboard is the
+  // canonical entry.
+  const data: CompassData = { [E_HOLDINGS]: holdings, [E_BM]: bm, [E_TALLER]: taller, [E_UTOPIA]: holdings };
   return <HomeSwitch data={data} />;
 }

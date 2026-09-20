@@ -334,11 +334,12 @@ export function resolveScope(pathname: string, fallbackHouseSlug: HouseSlug | nu
 // EntityKey (entities.id UUID) → EntityType. Utopia is intentionally absent
 // (archived 2026-08-22). Refactor 2026-09-20: keys are the E_* UUID constants;
 // legacy string keys ("holdings", "bistro_mondo", "taller") are gone.
-import { E_HOLDINGS, E_BM, E_TALLER, type EntityKey } from "@/lib/entities";
+import { E_HOLDINGS, E_BM, E_TALLER, E_UTOPIA, type EntityKey } from "@/lib/entities";
 export const ENTITY_KEY_TO_TYPE: Record<EntityKey, EntityType> = {
   [E_HOLDINGS]: "holding_company",
   [E_BM]:       "operating_venue",
   [E_TALLER]:   "operating_venue",
+  [E_UTOPIA]:   "operating_venue",
 };
 
 export function entityTypeFor(k: EntityKey | null | undefined): EntityType {

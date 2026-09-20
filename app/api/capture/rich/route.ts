@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 // keeps working; this endpoint lives alongside it.
 
 const ENTITY_CODE: Record<EntityKey, string> = {
-  [E_TALLER]: "IFL",  [E_BM]: "BM",  [E_HOLDINGS]: "BBH",
+  [E_TALLER]: "IFL",  [E_BM]: "BM",  [E_HOLDINGS]: "BBH",  [E_UTOPIA]: "UTOPIA",
 };
 
 // The prompt. Written to be recoverable — if a field can't be read we want

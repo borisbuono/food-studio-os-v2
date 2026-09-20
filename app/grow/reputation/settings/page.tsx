@@ -2,7 +2,7 @@ import Link from "next/link";
 import { serverEntity } from "@/lib/serverVenue";
 import type { EntityKey } from "@/lib/entities";
 import ConnectIntegration from "@/app/administrate/finance/setup/[entity]/ConnectIntegration";
-import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 // Reviews adapters read from lib/integrations/reviews/*.ts and get routed by
 // entity via lib/integrations/registry.ts.
 
-const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL",
+const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH" | "UTOPIA"> = {
+  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA",
 };
 
 export default async function ReputationSettings() {

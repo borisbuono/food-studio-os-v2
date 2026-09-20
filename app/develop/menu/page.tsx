@@ -14,9 +14,14 @@ export default async function RepertoirePage() {
   const entity = serverEntity();
   const accent = ENTITY_ACCENT[entity];
 
+  // P0 fix 2026-09-21 (Utopia unblock): the list was unscoped, so every
+  // operator saw every house's recipes on their menu-develop surface.
+  // Filter by entity_id — recipes still on entity_id=NULL land in the
+  // legacy backfill migration in the same push.
   const { data } = await supabase
     .from("recipes")
     .select("*")
+    .eq("entity_id", entity)
     .order("name", { ascending: true });
   const recipes = (data || []) as any[];
 

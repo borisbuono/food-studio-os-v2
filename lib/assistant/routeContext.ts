@@ -123,25 +123,27 @@ const HANDLERS: Array<{
     is_service_route: false,
     handle: async (scope) => {
       const sb = supabaseServer();
-      const rid = scope.restaurant_id;
-      // Scope by restaurant_id — pre-2026-09-20 this was a global count and
-      // a chef in any tenant saw the whole recipes book.
-      const q = rid
-        ? sb.from("recipes").select("id", { count: "exact", head: true }).eq("restaurant_id", rid)
-        : sb.from("recipes").select("id", { count: "exact", head: true }).eq("entity_id", scope.entity.id);
-      const recipes = await q;
+      // P0 fix 2026-09-21 (Utopia unblock, audit RED-2): recipes table has
+      // no `restaurant_id` column — the pre-2026-09-21 restaurant-scoped
+      // branch silently returned 0 rows for BM/Taller (column error), and
+      // Chef confidently answered "the kitchen has no recipes". Only
+      // `entity_id` (UUID) is real; scope by that always.
+      const recipes = await sb
+        .from("recipes")
+        .select("id", { count: "exact", head: true })
+        .eq("entity_id", scope.entity.id);
       // recipe_imports.entity_id is a text column that historically held the
-      // EntityCode ("BM"/"IFL"/"BBH"). Filter by code when we have one, else
-      // fall back to the UUID (no rows for legacy tenants, which is
-      // correct — the pipeline isn't wired for Amsterdam yet).
+      // EntityCode ("BM"/"IFL"/"BBH"/"UTOPIA"). Filter by code when we have
+      // one, else fall back to the UUID (no rows for legacy tenants, which
+      // is correct — the pipeline isn't wired for Amsterdam yet).
       const importKey = scope.code || scope.entity.id;
       const pending = await sb.from("recipe_imports").select("id", { count: "exact", head: true }).eq("entity_id", importKey).in("status", ["parsed", "pending"]);
       return {
         title: "Recipes",
         reads: ["recipes", "recipe_imports"],
         queries: [
-          { table: "recipes", filter: rid ? "restaurant scope" : "entity scope", count: recipes.count ?? 0 },
-          { table: "recipe_imports", filter: (rid ? "restaurant scope AND " : "entity scope AND ") + "status IN (parsed,pending)", count: pending.count ?? 0 },
+          { table: "recipes", filter: "entity scope (entity_id = " + scope.entity.id + ")", count: recipes.count ?? 0 },
+          { table: "recipe_imports", filter: "entity scope AND status IN (parsed,pending)", count: pending.count ?? 0 },
         ],
       };
     },
@@ -151,15 +153,16 @@ const HANDLERS: Array<{
     is_service_route: false,
     handle: async (scope) => {
       const sb = supabaseServer();
-      const rid = scope.restaurant_id;
-      const q = rid
-        ? sb.from("recipes").select("id", { count: "exact", head: true }).eq("restaurant_id", rid)
-        : sb.from("recipes").select("id", { count: "exact", head: true }).eq("entity_id", scope.entity.id);
-      const rec = await q;
+      // P0 fix 2026-09-21 — see /develop/recipes handler; recipes has no
+      // restaurant_id column, only entity_id.
+      const rec = await sb
+        .from("recipes")
+        .select("id", { count: "exact", head: true })
+        .eq("entity_id", scope.entity.id);
       return {
         title: "Menu",
         reads: ["recipes"],
-        queries: [{ table: "recipes", filter: rid ? "restaurant scope" : "entity scope", count: rec.count ?? 0 }],
+        queries: [{ table: "recipes", filter: "entity scope (entity_id = " + scope.entity.id + ")", count: rec.count ?? 0 }],
       };
     },
   },

@@ -32,9 +32,12 @@ const HOLDING_DEFAULT_ROOM = "/administrate/holdings";
 
 // Restaurant UUIDs — mirrors app/page.tsx. Small enough to inline (three rows
 // today, once); if the mapping grows we'll pull it into `lib/entities.ts`.
+// P0 fix 2026-09-21 (Utopia unblock): sandbox venue joined the pinned three
+// so the /studio tile links to /h/utopia and its POS snapshot renders.
 const ENTITY_TO_RID: Record<string, string> = {
   "Bistro Mondo":      "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
   "Taller Sa Penya":   "ca83e06f-a24d-43d7-bce4-57ac341d190f",
+  "Utopia":            "a0000000-0000-4000-8000-000000000001",
 };
 
 function madridDateLabel(): string {

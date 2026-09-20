@@ -26,16 +26,17 @@
 // client components (DesktopSidebar, RoomSwitcher, ChefSlim etc). Server
 // pages import BOTH: types from here, DB lookups from the .server file.
 
-import { E_BM, E_TALLER, ENTITY_LABEL, ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
+import { E_BM, E_TALLER, E_UTOPIA, ENTITY_LABEL, ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 
 // HouseSlug is now `string` — any tenant with `entities.slug` set gets a
 // valid /h/<slug> route. The pinned literal union it used to be ("bm" |
 // "taller") stopped Amsterdam-shaped slugs at compile time.
 export type HouseSlug = string;
 
-// Pinned slugs — Boris's two operating venues, used as a default listing on
+// Pinned slugs — Boris's operating venues, used as a default listing on
 // the Studio surface until getMyHouses() lands the DB-driven equivalent.
-const PINNED_HOUSE_SLUGS: string[] = ["bm", "taller"];
+// Utopia joined 2026-09-21 as the sandbox venue (P0 unblock).
+const PINNED_HOUSE_SLUGS: string[] = ["bm", "taller", "utopia"];
 export const HOUSE_SLUGS: string[] = PINNED_HOUSE_SLUGS;
 
 // Sync — pure string test used by pure functions (scope.ts::scopeForUrl) that
@@ -53,6 +54,7 @@ export function slugLooksLikeHouse(slug: string): boolean {
 const PINNED_HOUSE_NAMES: Record<string, string> = {
   bm: "Bistro Mondo",
   taller: "Taller Sa Penya",
+  utopia: "Utopia",
 };
 
 // Sync — display label without hitting the DB. Kept sync because it is
@@ -94,11 +96,13 @@ export type House = {
 export const HOUSE_SLUG_TO_ENTITY: Record<string, EntityKey> = {
   bm:     E_BM,
   taller: E_TALLER,
+  utopia: E_UTOPIA,
 };
 
 export const ENTITY_TO_HOUSE_SLUG: Partial<Record<EntityKey, string>> = {
   [E_BM]:     "bm",
   [E_TALLER]: "taller",
+  [E_UTOPIA]: "utopia",
 };
 
 export function houseSlugForEntity(k: EntityKey | null | undefined): string | null {

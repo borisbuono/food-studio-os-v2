@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 import AgentCharterBoard from "@/components/AgentCharterBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 // /administrate/agent-charters — the OS-native Agent Task Charter surface.
 // Every agent spawned from the OS gets a charter row before it runs.

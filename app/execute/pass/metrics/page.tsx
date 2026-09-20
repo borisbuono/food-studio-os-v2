@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 // Kitchen anomaly tile — reads finance_anomalies rows of kind eod_cash_ratio_high for
 // the current entity. Surfaces the "cash > 15% of gross" case straight on the pass so
 // it never lives only in the finance corner of the OS. Rule: memory/pos_vs_accounting_separation.md.
-const ENTITY_TO_CODE: Record<EntityKey, "IFL"|"BM"|"BBH"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
+const ENTITY_TO_CODE: Record<EntityKey, "IFL" | "BM" | "BBH" | "UTOPIA"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 // Kitchen dashboard tiles — comp %, staff-meal %, waste % — the leading indicators the team
 // sees every service. Reads from v_operational_pnl (POS snapshot minus categorised deviations).

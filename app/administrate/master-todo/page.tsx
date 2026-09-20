@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 import MasterTodoBoard from "@/components/MasterTodoBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 // /administrate/master-todo — the OS-native Master_ToDo surface.
 // Mirrors Boris's Cowork-side PA orchestrator list. Ranks by impact_score

@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 import AssistantSettingsClient from "./AssistantSettingsClient";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL",
+const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH" | "UTOPIA"> = {
+  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA",
 };
 
 // Assistant Layer Sprint 5 — the config-as-data surface.
@@ -61,7 +61,9 @@ export default async function AssistantSettingsPage() {
       </section>
 
       <AssistantSettingsClient
-        entityCode={ec}
+        // Utopia falls through as UTOPIA -> narrow to BBH for the legacy
+        // 3-code client until the assistant settings surface is widened.
+        entityCode={(ec === "UTOPIA" ? "BBH" : ec) as "IFL" | "BM" | "BBH"}
         initialConfig={config || null}
         initialPlaybooks={playbooks || []}
         initialChannels={channels || []}
