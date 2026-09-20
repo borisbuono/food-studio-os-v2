@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { t as tr } from "@/lib/i18n";
 
 // The Capture Station.
 //
@@ -295,10 +296,10 @@ export default function CaptureStation({
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-white/60">
-            Capture · {entityLabel} · {entityCode}
+            {tr("capture.title")} · {entityLabel} · {entityCode}
           </p>
           <p className="font-serif text-lg text-white">
-            {type === "invoice" ? "Invoice" : type === "albaran" ? "Delivery note" : "Auto-detect"}
+            {type === "invoice" ? tr("capture.invoice") : type === "albaran" ? tr("capture.delivery") : "Auto-detect"}
           </p>
         </div>
         <div className="text-right">
@@ -322,7 +323,7 @@ export default function CaptureStation({
               (type === t ? "bg-white text-black" : "bg-white/10 text-white/80")
             }
           >
-            {t === "invoice" ? "Invoice" : t === "albaran" ? "Delivery note" : "Auto"}
+            {t === "invoice" ? tr("capture.invoice") : t === "albaran" ? tr("capture.delivery") : "Auto"}
           </button>
         ))}
       </div>

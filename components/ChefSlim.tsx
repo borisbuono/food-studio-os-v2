@@ -46,6 +46,7 @@ import { EntityKey, E_BM } from "@/lib/entities";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
 import { scopeForUrl } from "@/lib/scope";
 import { listHouses, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
+import { t } from "@/lib/i18n";
 
 type Msg = { role: "you" | "chef" | "sys"; text: string };
 
@@ -430,7 +431,7 @@ export default function ChefSlim() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder={listening ? "Listening…" : "Message Chef"}
+                placeholder={listening ? t("chef.listening") : t("chef.placeholder")}
                 rows={1}
                 disabled={listening}
                 className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-2xl border border-black/10 bg-paper px-3 py-2 font-sans text-[14px] leading-snug text-ink outline-none focus:border-ink/40"
@@ -459,7 +460,7 @@ export default function ChefSlim() {
               {/* Send */}
               <button
                 type="submit"
-                aria-label="Send"
+                aria-label={t("chef.send")}
                 disabled={!input.trim() || sending || listening}
                 className={
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#F7F7F4] transition disabled:opacity-40 " +

@@ -8,6 +8,7 @@ import {
   houseNameForSlug, type HouseSlug,
 } from "@/lib/houses";
 import { E_BM, E_TALLER } from "@/lib/entities";
+import { t } from "@/lib/i18n";
 
 // RoomSwitcher — Push 1 (2026-08-23), rebuilt for the three-level scope
 // (2026-08-31 Boris walk).
@@ -68,11 +69,19 @@ export default function RoomSwitcher({ compact = false }: { compact?: boolean })
   const houseSlug: HouseSlug = scope.houseSlug;
   const activeRoom = scope.level === "room" ? scope.room : "overview";
 
+  // Runway d2 (2026-09-20): chip labels run through t() so the Amsterdam
+  // launch can flip to Dutch (Overzicht / Keuken / Restaurant / Kantoor)
+  // via the fs_lang cookie. Falls back to English when there's no key.
+  const roomKey: Record<string, string> = {
+    kitchen: "rooms.kitchen",
+    dining: "rooms.dining",
+    office: "rooms.office",
+  };
   const chips: Array<{ key: string; label: string; href: string }> = [
-    { key: "overview", label: "Overview", href: `/h/${houseSlug}` },
+    { key: "overview", label: t("rooms.overview"), href: `/h/${houseSlug}` },
     ...HOUSE_ROOMS.map((r) => ({
       key: r,
-      label: HOUSE_ROOM_LABEL[r],
+      label: t(roomKey[r] || "") || HOUSE_ROOM_LABEL[r],
       href: `/h/${houseSlug}/${r}`,
     })),
   ];

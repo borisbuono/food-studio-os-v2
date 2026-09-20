@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { tServer, serverLang } from "@/lib/i18nServer";
 
 export const metadata: Metadata = {
   title: "Food Studios",
@@ -33,7 +34,9 @@ export default async function Welcome({ searchParams }: { searchParams?: { role?
   if (user) redirect("/");
 
   const role = (searchParams?.role || "").toLowerCase();
-  const tagline = ROLE_TAGLINE[role] || "built by operators for operators";
+  const L = serverLang();
+  const t = (k: string) => tServer(k, L);
+  const tagline = ROLE_TAGLINE[role] || t("welcome.landing.strap");
 
   return (
 
@@ -43,15 +46,15 @@ export default async function Welcome({ searchParams }: { searchParams?: { role?
       </header>
 
       <section>
-        <p className="font-mono text-[11px] uppercase tracking-wide text-clay">Food Studios OS</p>
+        <p className="font-mono text-[11px] uppercase tracking-wide text-clay">{t("welcome.landing.eyebrow")}</p>
         <h1 className="mt-3 font-serif text-[44px] leading-[1.05] text-ink lg:text-[64px]">
-          The chef-built<br/>operating system.
+          {t("welcome.landing.h1a")}<br/>{t("welcome.landing.h1b")}
         </h1>
         <p className="mt-3 font-mono text-[11px] uppercase tracking-wide text-clay">
-          the chef-built operating system · {tagline}
+          {t("welcome.landing.strap")} · {tagline}
         </p>
         <p className="mt-6 font-serif text-[19px] leading-relaxed text-ink-soft lg:text-[21px]">
-          Recipes, service, invoices, GP — one calm surface. Voice-first. Built at the pass, not the spreadsheet.
+          {t("welcome.landing.sub")}
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -59,10 +62,10 @@ export default async function Welcome({ searchParams }: { searchParams?: { role?
             href="/login"
             className="inline-flex items-center rounded-xl bg-ink px-6 py-4 font-sans text-[15px] font-medium text-paper transition hover:bg-ink/85"
           >
-            Sign in →
+            {t("common.signin")} →
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-wide text-clay">
-            Google · magic link · no password
+            {t("welcome.landing.auth")}
           </span>
         </div>
       </section>
@@ -73,7 +76,7 @@ export default async function Welcome({ searchParams }: { searchParams?: { role?
          operators land here to sign up. Kept as a generic strap so the
          footer still anchors the page. */}
       <footer className="mt-24 border-t border-black/10 pt-6 font-mono text-[10px] uppercase tracking-wide text-clay">
-        Food Studios · the chef-built operating system
+        {t("welcome.landing.footer")}
       </footer>
     </main>
   );

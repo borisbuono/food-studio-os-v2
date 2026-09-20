@@ -68,14 +68,17 @@ export default async function Settings() {
         <DensityToggle />
       </section>
 
-      {/* Language — moved out of the header 2026-09-10 (Boris walk). This is a
-          one-time choice, not a running affordance. The default is English;
-          the toggle persists via lib/i18n and is per-profile. */}
+      {/* Language — moved out of the header 2026-09-10 (Boris walk). One-time
+          choice, not a running affordance. Default English; persists per-device.
+          Runway d2 (2026-09-20): NL added for the Amsterdam launch. The header
+          chip cycles EN → NL → ES; the dedicated page (below) shows the three
+          options with native labels for staff who can't guess the code. */}
       <section className="mt-10 border-t border-line pt-6">
-        <p className="font-sans text-xs font-medium text-clay">Language · Idioma</p>
-        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">The OS speaks English by default. Switch once — the choice sticks.</p>
-        <div className="mt-3">
+        <p className="font-sans text-xs font-medium text-clay">Language · Idioma · Taal</p>
+        <p className="mt-2 font-serif italic text-[14px] text-ink-soft">English default. Nederlands and Español available.</p>
+        <div className="mt-3 flex items-center gap-4">
           <LangChooser />
+          <Link href="/administrate/settings/language" className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>All languages ›</Link>
         </div>
       </section>
     </main>

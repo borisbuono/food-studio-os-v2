@@ -16,6 +16,8 @@ import {
   type InviteRole,
 } from "@/lib/onboarding";
 import { countryProfile, slugify, type CountryCode } from "@/lib/countries";
+import { cookies } from "next/headers";
+import { langForCountry } from "@/lib/i18nDict";
 
 // ---- Step 2 — create the house ------------------------------------------
 export async function saveHouseAction(formData: FormData) {
@@ -42,6 +44,18 @@ export async function saveHouseAction(formData: FormData) {
     currency_code: cp.currency_code,
     timezone: cp.timezone,
   };
+
+  // Runway d2 (2026-09-20 — Amsterdam launch): seed fs_lang from country if
+  // the visitor hasn't set one yet. NL → nl for the Dutch operator; ES → es
+  // for Ibiza; else en. Never overrides an existing pick.
+  try {
+    const jar = cookies();
+    if (!jar.get("fs_lang")?.value) {
+      jar.set("fs_lang", langForCountry(country_code), {
+        path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+  } catch { /* read-only render — non-fatal */ }
 
   await writeOnboardingState({ step: 3, house, fiscal: fiscalDefaults });
   redirect("/onboard/step-3");
