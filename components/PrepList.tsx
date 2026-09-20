@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Full-screen prep list — kitchen team's phones are the primary surface,
@@ -19,6 +20,7 @@ type PrepItem = {
   status: "todo" | "in_progress" | "done" | "skipped";
   assignee_id: string | null;
   notes: string | null;
+  linked_recipe_id: string | null;
   completed_at: string | null;
   completed_by: string | null;
 };
@@ -59,6 +61,8 @@ export default function PrepList({
   const [addStation, setAddStation] = useState("");
   const [addQty, setAddQty] = useState("");
   const [addUnit, setAddUnit] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [savingRecipe, setSavingRecipe] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -133,6 +137,38 @@ export default function PrepList({
     }
   }, [entityId, serviceDate, reload]);
 
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
+
+  const saveSelectedAsRecipe = useCallback(async () => {
+    if (selected.size === 0) return;
+    setSavingRecipe(true); setError(null);
+    try {
+      const ids = Array.from(selected);
+      const res = await fetch(`/api/recipes/from-prep`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entity_id: entityId, prep_item_ids: ids }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "save failed");
+      setSelected(new Set());
+      await reload();
+      if (j?.recipe?.id) {
+        window.location.href = `/h/${houseSlug}/kitchen/recipes/${j.recipe.id}`;
+      }
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setSavingRecipe(false);
+    }
+  }, [entityId, selected, reload, houseSlug]);
+
   const addItem = useCallback(async () => {
     if (!addName.trim()) return;
     setBusy((b) => new Set(b).add("__add__"));
@@ -175,6 +211,12 @@ export default function PrepList({
             <p className="font-serif italic text-[12px] text-ink-soft">{serviceDate}</p>
           </div>
           <div className="flex flex-col gap-2 shrink-0">
+            <Link
+              href={`/h/${houseSlug}/kitchen/recipes`}
+              className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5 text-center"
+            >
+              Recipes
+            </Link>
             <button
               onClick={generateFromTemplate}
               disabled={loading}
@@ -269,6 +311,7 @@ export default function PrepList({
                   const done = it.status === "done";
                   const inProg = it.status === "in_progress";
                   const skipped = it.status === "skipped";
+                  const isSel = selected.has(it.id);
                   return (
                     <li key={it.id} className="flex items-center gap-3 px-3 py-3">
                       <button
@@ -298,6 +341,25 @@ export default function PrepList({
                           {it.target_covers != null ? ` · ${it.target_covers} covers` : ""}
                         </p>
                       </div>
+                      {it.linked_recipe_id ? (
+                        <Link
+                          href={`/h/${houseSlug}/kitchen/recipes/${it.linked_recipe_id}`}
+                          className="shrink-0 rounded-full border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink-soft hover:bg-black/5"
+                          aria-label="open linked recipe"
+                        >
+                          → recipe
+                        </Link>
+                      ) : null}
+                      <button
+                        onClick={() => toggleSelect(it.id)}
+                        aria-label="select for recipe"
+                        className={
+                          "shrink-0 flex h-8 w-8 items-center justify-center rounded-md border text-xs " +
+                          (isSel ? "border-ink bg-ink text-white" : "border-line text-ink-soft hover:bg-black/5")
+                        }
+                      >
+                        {isSel ? "✓" : "◇"}
+                      </button>
                     </li>
                   );
                 })}
@@ -306,6 +368,31 @@ export default function PrepList({
           ))}
         </section>
       )}
+
+      {selected.size > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <p className="font-mono text-[11px] uppercase tracking-wide text-clay">
+              {selected.size} selected
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelected(new Set())}
+                className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5"
+              >
+                Clear
+              </button>
+              <button
+                onClick={saveSelectedAsRecipe}
+                disabled={savingRecipe}
+                className="rounded-md bg-ink px-3 py-2 text-[12px] font-mono uppercase tracking-wide text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {savingRecipe ? "Saving…" : "Save as recipe"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
