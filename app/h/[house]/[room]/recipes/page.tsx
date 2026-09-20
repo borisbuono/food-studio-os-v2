@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 import RecipesList from "@/components/RecipesList";
 
 // /h/<slug>/kitchen/recipes — recipes for a house's kitchen. Grouped by

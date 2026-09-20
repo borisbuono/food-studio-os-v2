@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getHouseBySlug, houseNameForSlug, HOUSE_ROOM_LABEL, HOUSE_ROOM_LEGACY_PATH, isHouseRoom } from "@/lib/houses";
+import { houseNameForSlug, HOUSE_ROOM_LABEL, HOUSE_ROOM_LEGACY_PATH, isHouseRoom } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 
 // /h/<slug>/<room> — a room inside a house.
 //

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { entityTimezone, todayInTz, paidMinutes, nextDay, zonedWallClockToUtc, elapsedLabel } from "@/lib/labor";
 import RateManager from "./RateManager";

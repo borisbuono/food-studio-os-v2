@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getHouseBySlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 
 // /h/<slug>/office — mirror of the [room] catchall for the "office" room.
 //

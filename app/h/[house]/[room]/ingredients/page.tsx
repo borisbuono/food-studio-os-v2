@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 import IngredientAliasesAdmin from "@/components/IngredientAliasesAdmin";
 
 // /h/<slug>/kitchen/ingredients — manage ingredient_aliases. Boris links

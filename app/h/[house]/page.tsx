@@ -2,10 +2,8 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
-import {
-  getHouseBySlug, houseNameForSlug,
-  HOUSE_ROOMS, HOUSE_ROOM_LABEL,
-} from "@/lib/houses";
+import { houseNameForSlug, HOUSE_ROOMS, HOUSE_ROOM_LABEL } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 import { ENTITY_H1, publicNameForEntity, type EntityKey } from "@/lib/entities";
 import { HourlySpark } from "@/app/studio/HourlySpark";
 

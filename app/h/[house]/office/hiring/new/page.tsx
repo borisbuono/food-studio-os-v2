@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getHouseBySlug, houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug } from "@/lib/houses";
+import { getHouseBySlug } from "@/lib/houses.server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import NewOpeningForm from "./NewOpeningForm";
 
