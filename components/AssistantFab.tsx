@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
 
 // Assistant FAB (formerly Chef FAB v2) — Siri-style tap-to-start, bottom-sheet
@@ -443,8 +443,8 @@ export default function AssistantFab() {
     if (blob.size < 2400) return; // too short for a useful transcription
     interimInFlightRef.current = true;
     try {
-      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
       const entityCode = ENT_CODE[ent as string] || "IFL";
       const fd = new FormData();
       fd.append("audio", blob, `interim.${(mime.split("/")[1] || "webm").split(";")[0]}`);
@@ -519,8 +519,8 @@ export default function AssistantFab() {
         setTranscribing(true);
         setStatus(lang === "es" ? "Transcribiendo…" : "Transcribing…");
         try {
-          const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-          const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+          const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+          const ENT_CODE: Record<string, "IFL"|"BM"|"BBH"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
           const entityCode = ENT_CODE[ent as string] || "IFL";
           const fd = new FormData();
           fd.append("audio", blob, `voice.${(mime.split("/")[1] || "webm").split(";")[0]}`);
@@ -781,8 +781,8 @@ export default function AssistantFab() {
       // for a well-known operator phrase.
       const looksLikeRecon = /\b(reconcile|reconciliation|match)\b.*\b(bank|movements?|transacc?ions?)\b|\b(bank|movements?)\b.*\b(reconcile|match)\b|\brun\s+(the\s+)?matcher\b/i.test(t);
       if (looksLikeRecon) {
-        const rawEnt = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-        const entityCode = rawEnt === "bistro_mondo" ? "BM" : rawEnt === "holdings" ? "BBH" : "IFL";
+        const rawEnt = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+        const entityCode = rawEnt === E_BM ? "BM" : rawEnt === E_HOLDINGS ? "BBH" : "IFL";
         const rr = await fetch("/api/finance/reconciliation/match", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -803,7 +803,7 @@ export default function AssistantFab() {
       }
     } catch {}
     try {
-      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
       // Pillars #1 — always pass active_pillar so the orchestrator knows
       // which world the user is in (FOH / BOH / Office). We merge it onto
       // the existing page_context so any page-set intent is preserved.
@@ -886,7 +886,7 @@ export default function AssistantFab() {
   const saveFeedback = async (msgIdx: number) => {
     const m = log[msgIdx]; if (!m?.feedback?.body) return;
     setLog((l) => l.map((x, i) => i === msgIdx ? { ...x, feedback: null } : x));
-    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
+    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
     try {
       const r = await fetch("/api/chef/save-feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         kind: m.feedback.kind || "idea",
@@ -941,8 +941,8 @@ export default function AssistantFab() {
     if (!wineDraft?.name) return;
     setWineBusy(true);
     try {
-      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const rid = profile?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (!profile?.isAdmin ? profile?.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const rid = profile?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
       const sb = supabaseBrowser;
       const desc = [wineDraft.description, wineDraft.grape ? "Grape: " + wineDraft.grape : "", wineDraft.cuvee ? "Cuvée: " + wineDraft.cuvee : "", wineDraft.classification ? "Classification: " + wineDraft.classification : ""].filter(Boolean).join("\n\n") || null;
       const { data, error } = await sb.from("menu_items").insert({
@@ -1009,8 +1009,8 @@ export default function AssistantFab() {
     if (lastExtractRef.current === sid) return;
     if (userTurnCountRef.current < 2) return;
     lastExtractRef.current = sid;
-    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-    const ENTITY_CODE: Record<string, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+    const ent = (!profile?.isAdmin ? profile?.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+    const ENTITY_CODE: Record<string, "IFL"|"BM"|"BBH"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
     const entity_code = ENTITY_CODE[ent as string] || "IFL";
     try {
       fetch("/api/assistant/memory/extract", {

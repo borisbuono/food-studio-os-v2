@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Channel = { id: string; kind: string; name: string; section: string | null; restaurant_id: string | null };
@@ -42,8 +42,8 @@ export default function Messages() {
     (async () => {
       const p = await getMyProfile(); setProfile(p);
       if (!p) { setReady(true); return; }
-      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const r = p.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const r = p.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       setRid(r);
       await loadChannels(p, r);
       const { data: ppl } = await supabaseBrowser.from("profiles").select("id,name,role");

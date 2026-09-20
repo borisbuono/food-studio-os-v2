@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export default async function HoldingsMap() {
   // When the entity switcher = Holdings (BBH), the console is home.
   // The entity-map view stays reachable via /administrate/holdings/map for
   // anyone who wants the raw structural tree.
-  if (serverEntity() === "holdings") {
+  if (serverEntity() === E_HOLDINGS) {
     redirect("/administrate/holdings/console");
   }
 

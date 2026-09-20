@@ -21,7 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { EntityKey, RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { EntityKey, RESTAURANT_TO_ENTITY, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import type { EntityType } from "@/lib/scope";
 
 export type SwitcherEntry = {
@@ -43,13 +43,13 @@ export type SwitcherGroups = {
 // direct entities.id lookup. Match is case-insensitive on the entity's name;
 // aliases cover the "Boris Buono Holdings" vs "BBH" spelling divergence.
 const NAME_TO_KEY: Record<string, EntityKey> = {
-  "bistro mondo":               "bistro_mondo",
-  "taller":                     "taller",
-  "taller sa penya":            "taller",
-  "boris buono holdings":       "holdings",
-  "bbh":                        "holdings",
-  "ibiza food studios":         "holdings",
-  "ibiza food studio":          "holdings",
+  "bistro mondo":               E_BM,
+  "taller":                     E_TALLER,
+  "taller sa penya":            E_TALLER,
+  "boris buono holdings":       E_HOLDINGS,
+  "bbh":                        E_HOLDINGS,
+  "ibiza food studios":         E_HOLDINGS,
+  "ibiza food studio":          E_HOLDINGS,
 };
 
 function mapNameToKey(name: string): EntityKey | null {

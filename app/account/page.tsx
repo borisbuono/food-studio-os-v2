@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { ROLES, RoleKey, mapDbRole } from "@/lib/roles";
-import { ENTITY_ACCENT, ENTITY_LABEL, EntityKey } from "@/lib/entities";
+import { ENTITY_ACCENT, ENTITY_LABEL, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 
 const SWATCHES = [
@@ -22,7 +22,7 @@ export default function Account() {
     setUserAccent(localStorage.getItem("fs_user_accent"));
   }, []);
 
-  const entity: EntityKey = profile?.entity || "holdings";
+  const entity: EntityKey = profile?.entity || E_HOLDINGS;
   const venueLabel = profile?.entity ? ENTITY_LABEL[profile.entity] : (profile && !profile.isAdmin ? "Not assigned yet" : "All venues");
   const roleLabel = profile ? ROLES[mapDbRole(profile.dbRole).world as RoleKey].label : "—";
 

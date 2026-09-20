@@ -1,12 +1,11 @@
 import type { EntityKey } from "@/lib/entities";
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 // Venue → placeholder logo path used by RecipeCoverHero when no photo is set.
 // Boris can drop real logo files at these same paths to swap them in without touching code.
 // The wordmark is the generic fallback for unknown venues (e.g. future advisory clients).
 export const VENUE_LOGO: Record<EntityKey, string> = {
-  holdings: "/brand/logos/ibiza-food-studios.svg",
-  bistro_mondo: "/brand/logos/bistro-mondo.svg",
-  taller: "/brand/logos/taller.svg",
+  [E_HOLDINGS]: "/brand/logos/ibiza-food-studios.svg",  [E_BM]: "/brand/logos/bistro-mondo.svg",  [E_TALLER]: "/brand/logos/taller.svg",
 };
 export const FALLBACK_LOGO = "/brand/logos/food-studios-wordmark.svg";
 

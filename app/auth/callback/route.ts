@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { authCookieOptions } from "@/lib/authCookies";
+import { E_HOLDINGS } from "@/lib/entities";
 
 // Server-side OAuth / magic-link callback — standard Supabase Next.js
 // pattern (https://supabase.com/docs/guides/auth/server-side/nextjs).
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
           studio.cookies.set({
             ...cookieAttrs,
             name: "fs_entity",
-            value: "holdings",
+            value: E_HOLDINGS,
             path: "/",
             maxAge: 60 * 60 * 24 * 365,
             sameSite: "lax",

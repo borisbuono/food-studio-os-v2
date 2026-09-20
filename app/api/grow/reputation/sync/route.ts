@@ -5,15 +5,16 @@ import { googleBusinessAdapter } from "@/lib/integrations/reviews/google-busines
 import { tripAdvisorAdapter } from "@/lib/integrations/reviews/tripadvisor";
 import { theForkReviewsAdapter } from "@/lib/integrations/reviews/thefork";
 import type { ReviewsAdapter, EntityCode, ReviewRecord } from "@/lib/integrations/types";
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Map UI entity keys to the EntityCode used by adapters.
 function entityKeyToCode(key: string): EntityCode {
-  if (key === "taller") return "IFL";
-  if (key === "bistro_mondo") return "BM";
-  if (key === "holdings") return "BBH";
+  if (key === E_TALLER) return "IFL";
+  if (key === E_BM) return "BM";
+  if (key === E_HOLDINGS) return "BBH";
   return "IFL";
 }
 

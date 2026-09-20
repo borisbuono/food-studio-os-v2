@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Item = {
@@ -67,8 +67,8 @@ export default function ThePass() {
   useEffect(() => {
     (async () => {
       const p = await getMyProfile(); setProfile(p);
-      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const restaurant = p?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const restaurant = p?.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
       setRid(restaurant);
       const { data: zs } = await supabaseBrowser.from("zones").select("id,name,area").eq("restaurant_id", restaurant);
       const rname = (await supabaseBrowser.from("restaurants").select("name").eq("id", restaurant).maybeSingle()).data?.name;

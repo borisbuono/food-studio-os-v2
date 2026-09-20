@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey } from "@/lib/entities";
-
+import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ENTITY_CODE: Record<EntityKey, string> = {
-  holdings: "BBH",
-  bistro_mondo: "BM",
-  taller: "IFL",
+  [E_HOLDINGS]: "BBH",  [E_BM]: "BM",  [E_TALLER]: "IFL",
   
 };
 

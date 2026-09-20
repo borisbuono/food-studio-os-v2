@@ -6,7 +6,7 @@ import {
   entityForHouseSlug, houseNameForSlug,
   HOUSE_ROOMS, HOUSE_ROOM_LABEL,
 } from "@/lib/houses";
-import { ENTITY_TO_RESTAURANT, ENTITY_H1, publicNameForEntity } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, ENTITY_H1, publicNameForEntity, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { HourlySpark } from "@/app/studio/HourlySpark";
 
 // /h/<slug> — the house landing page.
@@ -27,8 +27,8 @@ export const dynamic = "force-dynamic";
 // ENTITY_TO_RESTAURANT but the values are already there — we just alias here
 // so a house-slug caller doesn't need to hop through EntityKey.
 const HOUSE_SLUG_TO_RESTAURANT_ID: Record<string, string | undefined> = {
-  bm: ENTITY_TO_RESTAURANT.bistro_mondo,        // fb4d008f-2d2a-4e0d-a525-6e0e36af0259
-  taller: ENTITY_TO_RESTAURANT.taller,          // ca83e06f-a24d-43d7-bce4-57ac341d190f
+  bm: ENTITY_TO_RESTAURANT[E_BM],        // fb4d008f-2d2a-4e0d-a525-6e0e36af0259
+  taller: ENTITY_TO_RESTAURANT[E_TALLER],          // ca83e06f-a24d-43d7-bce4-57ac341d190f
 };
 
 // House-specific subtitle. Legal entity + address anchor the mark so the

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import AcademyBoard from "@/components/AcademyBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 
 // /develop/academy — the Academy surface. Today's lesson at the top; the
 // full library filterable by category below.

@@ -42,7 +42,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { EntityKey } from "@/lib/entities";
+import { EntityKey, E_BM } from "@/lib/entities";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
 import { scopeForUrl } from "@/lib/scope";
 import { listHouses, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
@@ -150,8 +150,8 @@ export default function ChefSlim() {
     try {
       const ent = (!profile?.isAdmin
         ? profile?.entity
-        : (typeof window !== "undefined" ? ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo") : "bistro_mondo")
-      ) || "bistro_mondo";
+        : (typeof window !== "undefined" ? ((localStorage.getItem("fs_entity") as EntityKey) || E_BM) : E_BM)
+      ) || E_BM;
 
       const basePageCtx = (typeof window !== "undefined" ? (window as any).__fsAssistantContext : null) || {};
       const activePillar = pillarForRoute(pathname || "");

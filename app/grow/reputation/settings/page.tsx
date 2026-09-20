@@ -2,6 +2,7 @@ import Link from "next/link";
 import { serverEntity } from "@/lib/serverVenue";
 import type { EntityKey } from "@/lib/entities";
 import ConnectIntegration from "@/app/administrate/finance/setup/[entity]/ConnectIntegration";
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 // entity via lib/integrations/registry.ts.
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  holdings: "BBH", bistro_mondo: "BM", taller: "IFL",
+  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL",
 };
 
 export default async function ReputationSettings() {

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 const SOURCES = [
   { value: "walk_in", label: "Walk-in" },
   { value: "booking", label: "Booking" },
@@ -33,8 +32,8 @@ export default function NewGuest() {
     setBusy(true); setErr(null);
     try {
       const prof = await getMyProfile();
-      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "bistro_mondo";
-      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || E_BM;
+      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       const payload: any = {
         restaurant_id: rid,
         name: f.name.trim(),

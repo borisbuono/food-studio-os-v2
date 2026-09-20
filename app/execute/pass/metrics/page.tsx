@@ -2,12 +2,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 // Kitchen anomaly tile — reads finance_anomalies rows of kind eod_cash_ratio_high for
 // the current entity. Surfaces the "cash > 15% of gross" case straight on the pass so
 // it never lives only in the finance corner of the OS. Rule: memory/pos_vs_accounting_separation.md.
-const ENTITY_TO_CODE: Record<EntityKey, "IFL"|"BM"|"BBH"> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_TO_CODE: Record<EntityKey, "IFL"|"BM"|"BBH"> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 
 // Kitchen dashboard tiles — comp %, staff-meal %, waste % — the leading indicators the team
 // sees every service. Reads from v_operational_pnl (POS snapshot minus categorised deviations).
@@ -26,7 +25,7 @@ const pct = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(1) + "%";
 const eur = (n: number) => "€" + Math.round(Number(n) || 0).toLocaleString("en-GB");
 
 export default function KitchenPass() {
-  const [entity, setEntity] = useState<EntityKey>("bistro_mondo");
+  const [entity, setEntity] = useState<EntityKey>(E_BM);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [cashAnoms, setCashAnoms] = useState<Array<{ id: string; description: string; severity: number; last_seen_date: string }>>([]);
@@ -37,7 +36,7 @@ export default function KitchenPass() {
   }, []);
 
   useEffect(() => {
-    const rid = ENTITY_TO_RESTAURANT[entity] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+    const rid = ENTITY_TO_RESTAURANT[entity] || ENTITY_TO_RESTAURANT[E_BM]!;
     (async () => {
       setLoading(true);
       const q = await supabaseBrowser.from("v_operational_pnl")

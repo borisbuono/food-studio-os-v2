@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile, MyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Stage = "manage" | "maintain" | "learn";
@@ -58,8 +58,8 @@ export default function Academy() {
     (async () => {
       const p = await getMyProfile(); setProfile(p);
       if (!p) { setReady(true); return; }
-      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const rid = p.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (!p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const rid = p.restaurantId || ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
       setVenueName((await supabaseBrowser.from("restaurants").select("name").eq("id", rid).maybeSingle()).data?.name || "Your venue");
       const { data: zs } = await supabaseBrowser.from("zones").select("id,name,area").eq("restaurant_id", rid);
       const zoneIds = (zs || []).map((z: any) => z.id);

@@ -15,6 +15,7 @@ import {
   type Filing,
 } from "@/lib/holdings/consolidator";
 import { getIntercompanyFlows, countUnbookedIntercompany, type IntercompanyFlow, type FlowBookingStatus } from "@/lib/holdings/intercompany";
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,7 @@ export default async function HoldingsConsole() {
             );
           })}
         </div>
-        {currentEntity !== "holdings" ? (
+        {currentEntity !== E_HOLDINGS ? (
           <p className="mt-4 font-mono text-[10px] text-clay">Note · you're currently scoped to <span className="text-ink">{currentEntity}</span>. Drill links open in the current entity's dashboard — switch to Holdings in the top bar to browse all three.</p>
         ) : null}
       </section>

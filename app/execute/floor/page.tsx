@@ -4,8 +4,7 @@ import Link from "next/link";
 import { GuestChip } from "@/components/chips";
 import { supabaseBrowser as supabase } from "@/lib/supabaseBrowser";
 import { readEntityCookie } from "@/lib/ctx";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 export const dynamic = "force-dynamic";
 
 type Zone = { id: string; name: string; sort: number };
@@ -30,8 +29,8 @@ export default function FloorPlan() {
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null);
 
   useEffect(() => {
-    const ent = (readEntityCookie() || "bistro_mondo") as EntityKey;
-    const r = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+    const ent = (readEntityCookie() || E_BM) as EntityKey;
+    const r = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
     setRid(r);
   }, []);
 

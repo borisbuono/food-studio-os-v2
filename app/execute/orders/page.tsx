@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabaseBrowser as supabase } from "@/lib/supabaseBrowser";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Prov = { id: string; name: string; category: string | null; whatsapp: string | null; email: string | null; cutoff_time: string | null; delivery_schedule: string | null };
@@ -53,8 +53,8 @@ export default function Order() {
   const logOrder = async (channel: string) => {
     try {
       const p = await getMyProfile();
-      const ent = (p && !p.isAdmin ? p.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "bistro_mondo";
-      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (p && !p.isAdmin ? p.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || E_BM;
+      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       await supabaseBrowser.from("orders").insert({ restaurant_id: rid, provider_id: provider?.id || null, created_by: p?.id || null, status: "sent", channel, sent_at: new Date().toISOString(), order_date: new Date().toISOString().slice(0, 10), subtotal: total, total, notes: orderMessage() });
     } catch {}
   };

@@ -7,6 +7,7 @@ import {
   HOUSE_ROOMS, HOUSE_ROOM_LABEL, HOUSE_ROOM_LEGACY_PATH,
   houseNameForSlug, type HouseSlug,
 } from "@/lib/houses";
+import { E_BM, E_TALLER } from "@/lib/entities";
 
 // RoomSwitcher — Push 1 (2026-08-23), rebuilt for the three-level scope
 // (2026-08-31 Boris walk).
@@ -41,8 +42,8 @@ function readEntityCookieClient(): string | null {
   return m?.[1] ? decodeURIComponent(m[1]) : null;
 }
 function entityCookieToHouseSlug(entity: string | null): HouseSlug | null {
-  if (entity === "bistro_mondo") return "bm";
-  if (entity === "taller") return "taller";
+  if (entity === E_BM) return "bm";
+  if (entity === E_TALLER) return "taller";
   return null;
 }
 

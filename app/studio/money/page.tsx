@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT } from "@/lib/entities";
-
+import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 export const dynamic = "force-dynamic";
 
 // /studio/money — Studio-scoped portfolio finance.
@@ -82,8 +81,8 @@ export default async function StudioMoneyPage() {
     .map((e: any) => {
       const ent = RESTAURANT_TO_ENTITY;
       const found = Object.entries(ent).find(([, v]) => {
-        if (v === "bistro_mondo" && e.name === "Bistro Mondo") return true;
-        if (v === "taller" && e.name === "Taller Sa Penya") return true;
+        if (v === E_BM && e.name === "Bistro Mondo") return true;
+        if (v === E_TALLER && e.name === "Taller Sa Penya") return true;
         return false;
       });
       return found?.[0];
@@ -200,7 +199,7 @@ export default async function StudioMoneyPage() {
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">By house</p>
         <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {houses.map((e: any) => {
-            const rid = ENTITY_TO_RESTAURANT[e.name === "Bistro Mondo" ? "bistro_mondo" : "taller"];
+            const rid = ENTITY_TO_RESTAURANT[e.name === "Bistro Mondo" ? E_BM : E_TALLER];
             const pos = rid ? posByRid.get(rid) : null;
             const accGross = rid ? accByRid.get(rid) || 0 : 0;
             const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;

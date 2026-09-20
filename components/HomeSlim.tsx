@@ -28,7 +28,7 @@
 
 import Link from "next/link";
 import type { CompassData } from "@/components/HomeCompass";
-import { EntityKey, ENTITY_ACCENT, ENTITY_LABEL } from "@/lib/entities";
+import { EntityKey, ENTITY_ACCENT, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { useEffect, useState } from "react";
 import { onCtx, readEntityCookie } from "@/lib/ctx";
 
@@ -47,9 +47,9 @@ function servicePhaseLabel(phase: string): string {
 }
 
 export default function HomeSlim({ data }: { data: CompassData }) {
-  const [entity, setEntity] = useState<EntityKey>("bistro_mondo");
+  const [entity, setEntity] = useState<EntityKey>(E_BM);
   useEffect(() => {
-    setEntity((readEntityCookie() as EntityKey) || "bistro_mondo");
+    setEntity((readEntityCookie() as EntityKey) || E_BM);
     return onCtx(() => {
       const e = readEntityCookie() as EntityKey | null;
       if (e) setEntity(e);

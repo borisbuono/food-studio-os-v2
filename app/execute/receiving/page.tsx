@@ -3,7 +3,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Target = { id: string; kind: "inventory" | "wine"; name: string; unit: string | null; cost: number | null };
@@ -46,8 +46,8 @@ export default function Receiving() {
   useEffect(() => {
     (async () => {
       const p = await getMyProfile();
-      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const r = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const r = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       setRid(r);
       const [{ data: inv }, { data: wines }, { data: provs }] = await Promise.all([
         supabaseBrowser.from("inventory_items").select("id,name,unit,unit_cost").eq("restaurant_id", r),

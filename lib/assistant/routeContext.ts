@@ -1,6 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 // Route context — Chef's ground truth for the page the operator is
 // standing on right now.
 //
@@ -32,9 +31,9 @@ import type { EntityCode } from "@/lib/assistant/orchestrator";
 // EntityCode is the assistant-layer code (IFL / BM / BBH). IFL is the Taller
 // SL entity, whose operating venue is `taller` (restaurant ca83e06f…).
 const ENTITY_CODE_TO_KEY: Record<EntityCode, EntityKey | null> = {
-  IFL: "taller",
-  BM:  "bistro_mondo",
-  BBH: "holdings",
+  IFL: E_TALLER,
+  BM:  E_BM,
+  BBH: E_HOLDINGS,
 };
 
 export type RouteQueryResult = {

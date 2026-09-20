@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL } from "@/lib/entities";
+import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { setEntity as setEntityCtx, onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
 import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routing/pillar-map";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -48,9 +48,9 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     // (the neutral studio scope), not "bistro_mondo" — a fresh tenant with
     // no cookie was getting a Bistro-Mondo-branded sidebar on first paint.
     if (initialEntity) return initialEntity;
-    if (typeof window === "undefined") return "holdings";
+    if (typeof window === "undefined") return E_HOLDINGS;
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "holdings";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : E_HOLDINGS;
   });
   // Seed from the server-resolved profile so the sidebar identity chip
   // paints Boris on first render instead of flashing "Guest" and flipping.
@@ -98,7 +98,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
 
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "holdings";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || E_HOLDINGS;
       setEntity(e); writeCookie(e);
     };
     read();
@@ -161,7 +161,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
           <BrandMark
             entity={
               scope?.level === "studio"
-                ? "holdings"
+                ? E_HOLDINGS
                 : scope && (scope.level === "house" || scope.level === "room")
                   ? HOUSE_SLUG_TO_ENTITY[scope.houseSlug]
                   : entity

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 type MenuItem = { id: string; name: string; price: number | null; section: string | null; category: string | null };
 
 const TYPES = [
@@ -38,8 +37,8 @@ export default function NewCommercial() {
 
   useEffect(() => {
     (async () => {
-      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "bistro_mondo";
-      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || E_BM;
+      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
       const { data } = await supabaseBrowser
         .from("menu_items")
         .select("id,name,price,section,category")
@@ -63,8 +62,8 @@ export default function NewCommercial() {
     setBusy(true); setErr(null);
     try {
       const prof = await getMyProfile();
-      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || "bistro_mondo";
-      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (prof && !prof.isAdmin ? prof.entity : ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null)) || E_BM;
+      const rid = prof?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       const payload: any = {
         restaurant_id: rid,
         type: f.type,

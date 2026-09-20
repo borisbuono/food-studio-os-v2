@@ -22,7 +22,7 @@ export type EntitySlug =
 export function normaliseEntitySlug(input: string): "bm" | "taller" | "studio" | null {
   const s = String(input || "").trim().toLowerCase();
   if (!s) return null;
-  if (s === "bm" || s === "bistro-mondo" || s === "bistrot-mondo" || s === "bistro_mondo") return "bm";
+  if (s === "bm" || s === "bistro-mondo" || s === "bistrot-mondo") return "bm";
   if (s === "taller" || s === "taller-sa-penya" || s === "ibiza-food-lab" || s === "ifl") return "taller";
   if (s === "studio" || s === "food-studio" || s === "food-studios" || s === "bbh" || s === "holdings" || s === "ifs") return "studio";
   return null;

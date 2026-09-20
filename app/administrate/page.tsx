@@ -1,11 +1,11 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
-import { EntityKey } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 // Architecture v2 — the Administrate pillar landing.

@@ -1,7 +1,7 @@
 import HomeSwitch from "@/components/HomeSwitch";
 import type { CompassData, LoopStep, CompassAlert } from "@/components/HomeCompass";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { EntityKey, ENTITY_LABEL } from "@/lib/entities";
+import { EntityKey, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
@@ -13,15 +13,13 @@ const TALLER = "ca83e06f-a24d-43d7-bce4-57ac341d190f";
 // Utopia (a0000000-…-0001) intentionally dropped — trial archived 2026-08-22.
 
 // Entity code used by the finance tables (invoice_inbox / bank_movements share BM / IFL / BBH).
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 
 // Assumed service window per venue -- used to compute the service step state
 // and the "service in Xh" copy. These match the current operating hours; if a
 // venue reshapes, edit here (Boris: this could later come from a venue settings row).
 const SERVICE_HOURS: Record<EntityKey, { open: string; close: string }> = {
-  bistro_mondo: { open: "19:00", close: "23:30" },
-  taller: { open: "19:00", close: "23:30" },
-  holdings: { open: "19:00", close: "23:30" }, // synthetic (holdings is not a venue but keep the shape)
+  [E_BM]: { open: "19:00", close: "23:30" },  [E_TALLER]: { open: "19:00", close: "23:30" },  [E_HOLDINGS]: { open: "19:00", close: "23:30" }, // synthetic (holdings is not a venue but keep the shape)
 };
 
 // Madrid wall-clock helper -- server runs UTC.
@@ -83,7 +81,7 @@ export default async function Page() {
         try {
           cookies().set({
             name: "fs_entity",
-            value: "holdings",
+            value: E_HOLDINGS,
             path: "/",
             maxAge: 60 * 60 * 24 * 365,
             sameSite: "lax",
@@ -427,12 +425,12 @@ export default async function Page() {
     };
   }
 
-  const bm = compassFor(BM, "bistro_mondo");
-  const taller = compassFor(TALLER, "taller");
+  const bm = compassFor(BM, E_BM);
+  const taller = compassFor(TALLER, E_TALLER);
 
   // Holdings = rolled-up. Loop is the merged view; alerts are combined.
   const holdingsAlerts = [...bm.alerts, ...taller.alerts];
-  const holdings: CompassData["holdings"] = {
+  const holdings: CompassData[typeof E_HOLDINGS] = {
     label: "Ibiza Food Studios",
     now: { hhmm: now.hhmm, dateLabel },
     header: {
@@ -483,6 +481,6 @@ export default async function Page() {
     } : (bm.cashPosition || taller.cashPosition),
   };
 
-  const data: CompassData = { holdings, bistro_mondo: bm, taller };
+  const data: CompassData = { [E_HOLDINGS]: holdings, [E_BM]: bm, [E_TALLER]: taller };
   return <HomeSwitch data={data} />;
 }

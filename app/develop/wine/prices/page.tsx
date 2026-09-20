@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { noEmoji } from "@/lib/text";
 
 type Wine = { id: string; name: string; producer: string | null; cost: number | null; bottle_price: number | null };
@@ -38,8 +38,8 @@ export default function WinePrices() {
     setErr(""); setRows([]); setDone(null); setBusy(true);
     try {
       const p = await getMyProfile();
-      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || "bistro_mondo")) || "bistro_mondo";
-      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = (p && !p.isAdmin ? p.entity : ((localStorage.getItem("fs_entity") as EntityKey) || E_BM)) || E_BM;
+      const rid = p?.restaurantId || ENTITY_TO_RESTAURANT[ent as EntityKey] || ENTITY_TO_RESTAURANT[E_BM]!;
       setRid(rid);
       const { data: ws } = await supabaseBrowser.from("menu_items").select("id,name,producer,cost,bottle_price").eq("restaurant_id", rid).eq("section", "wine").eq("is_active", true);
       const wl = (ws || []) as Wine[]; setWines(wl);

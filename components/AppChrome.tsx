@@ -9,8 +9,7 @@ import RoomSwitcher from "@/components/RoomSwitcher";
 import AuthStatus from "@/components/AuthStatus";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
-import { EntityKey } from "@/lib/entities";
-
+import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
 // Boris asked (2026-08-19): "logging in on top of Bistro Mondo... it needs
@@ -146,7 +145,7 @@ function SlimTopBar({ initialProfile }: { initialProfile?: ServerProfile | null 
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
         <Link href="/" aria-label="Home" className="flex items-center">
-          <BrandMark entity="holdings" tone="light" />
+          <BrandMark entity={E_HOLDINGS} tone="light" />
         </Link>
         <div className="flex items-center gap-2">
           <span

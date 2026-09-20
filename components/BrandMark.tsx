@@ -1,5 +1,4 @@
-import { EntityKey, ENTITY_WORDMARK, publicNameForEntity } from "@/lib/entities";
-
+import { EntityKey, ENTITY_WORDMARK, publicNameForEntity, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 // The brand mark: icon PNG + wordmark text.
 //
 // Boris walk 2026-09-11: the mark used to render as icon-only PNG. Wordmark
@@ -28,13 +27,13 @@ export default function BrandMark({
   // "full" = the pre-built vertical lockup PNG (kept for the login / welcome
   // hero surfaces that still use it). Not the default any more.
   if (variant === "full") {
-    if (entity === "holdings") {
+    if (entity === E_HOLDINGS) {
       return <img src={`/brand/ifs-full-${color}.png`} alt="Ibiza Food Studio" className="h-16 w-auto" />;
     }
-    if (entity === "taller") {
+    if (entity === E_TALLER) {
       return <img src={`/brand/taller-${color}.png`} alt="Taller Sa Penya" className="h-11 w-auto" />;
     }
-    if (entity === "bistro_mondo") {
+    if (entity === E_BM) {
       return <img src={`/brand/bm-full-${color}.png`} alt="Bistro Mondo" className="h-14 w-auto" />;
     }
     return null;
@@ -43,22 +42,22 @@ export default function BrandMark({
   // Icon PNG for each venue. Icon-only keeps the historical heights; icon+text
   // uses a slightly smaller, uniform icon so the wordmark reads next to it.
   const iconSrc =
-    entity === "holdings"     ? `/brand/ifs-mark-${color}.png` :
-    entity === "taller"       ? `/brand/taller-${color}.png` :
-    entity === "bistro_mondo" ? `/brand/bm-mark-${color}.png` :
+    entity === E_HOLDINGS     ? `/brand/ifs-mark-${color}.png` :
+    entity === E_TALLER       ? `/brand/taller-${color}.png` :
+    entity === E_BM ? `/brand/bm-mark-${color}.png` :
     null;
   if (!iconSrc) return null;
 
   const iconAlt =
-    entity === "holdings"     ? "Ibiza Food Studio" :
-    entity === "taller"       ? "Taller Sa Penya" :
+    entity === E_HOLDINGS     ? "Ibiza Food Studio" :
+    entity === E_TALLER       ? "Taller Sa Penya" :
     "Bistro Mondo";
 
   if (iconOnly) {
     // Legacy per-venue heights preserved so existing tight mounts don't shift.
     const cls =
-      entity === "holdings"     ? "h-7 w-auto" :
-      entity === "taller"       ? "h-5 w-auto" :
+      entity === E_HOLDINGS     ? "h-7 w-auto" :
+      entity === E_TALLER       ? "h-5 w-auto" :
       "h-8 w-auto";
     return <img src={iconSrc} alt={iconAlt} className={cls} />;
   }
@@ -70,7 +69,7 @@ export default function BrandMark({
   // customer-visible wordmark, not the S.L. legal form. publicNameForEntity
   // is the right source for houses (BM, Taller) — for the umbrella we drop
   // the legal suffix here at the render surface.
-  const wordmarkText = entity === "holdings" ? "Food Studios" : wordmark;
+  const wordmarkText = entity === E_HOLDINGS ? "Food Studios" : wordmark;
   const wordmarkClass = ENTITY_WORDMARK[entity];
   return (
     <span className="flex items-center gap-2">

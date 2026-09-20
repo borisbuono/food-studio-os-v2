@@ -327,14 +327,14 @@ export function resolveScope(pathname: string, fallbackHouseSlug: HouseSlug | nu
   return { level: "house", houseSlug: fallbackHouseSlug };
 }
 
-// EntityKey → EntityType. Utopia is intentionally absent (archived 2026-08-22).
-// Once the switcher fully queries `entities` (Phase 3), the type comes straight
-// from the row and this lookup goes away.
-import type { EntityKey } from "@/lib/entities";
+// EntityKey (entities.id UUID) → EntityType. Utopia is intentionally absent
+// (archived 2026-08-22). Refactor 2026-09-20: keys are the E_* UUID constants;
+// legacy string keys ("holdings", "bistro_mondo", "taller") are gone.
+import { E_HOLDINGS, E_BM, E_TALLER, type EntityKey } from "@/lib/entities";
 export const ENTITY_KEY_TO_TYPE: Record<EntityKey, EntityType> = {
-  holdings:     "holding_company",
-  bistro_mondo: "operating_venue",
-  taller:       "operating_venue",
+  [E_HOLDINGS]: "holding_company",
+  [E_BM]:       "operating_venue",
+  [E_TALLER]:   "operating_venue",
 };
 
 export function entityTypeFor(k: EntityKey | null | undefined): EntityType {

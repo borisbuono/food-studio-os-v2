@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import CaptureStation from "./CaptureStation";
 import FabHidden from "@/components/FabHidden";
 import { serverEntity } from "@/lib/serverVenue";
-import { ENTITY_LABEL, ENTITY_ORDER, type EntityKey } from "@/lib/entities";
+import { ENTITY_LABEL, ENTITY_ORDER, type EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +74,7 @@ export default async function CapturePage({
       <CaptureStation
       initialType={type}
       entityLabel={ENTITY_LABEL[entity]}
-      entityCode={entity === "taller" ? "IFL" : entity === "bistro_mondo" ? "BM" : "BBH"}
+      entityCode={entity === E_TALLER ? "IFL" : entity === E_BM ? "BM" : "BBH"}
       />
     </>
   );

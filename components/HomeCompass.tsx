@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AssistantBriefPanel from "@/components/AssistantBriefPanel";
 import NewHiresStrip from "@/components/NewHiresStrip";
 import { ROLES, RoleKey } from "@/lib/roles";
-import { EntityKey, ENTITY_ORDER, ENTITY_LABEL, ENTITY_ACCENT } from "@/lib/entities";
+import { EntityKey, ENTITY_ORDER, ENTITY_LABEL, ENTITY_ACCENT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import { onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
 import { pillarForRole, PILLAR_LANDING } from "@/lib/routing/pillar-map";
@@ -66,7 +66,7 @@ export type CompassData = Record<EntityKey, {
   cashPosition: { latestEur: number | null; weekEnding: string | null; apPendienteEur: number | null } | null;
 }>;
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
   { href: "/develop/menu-engineering", label: "Develop", blurb: "Menu, recipes, wine, lexicon" },
@@ -232,7 +232,7 @@ export default function HomeCompass({ data }: { data: CompassData }) {
   const [role, setRole] = useState<RoleKey>("office");
   const [entity, setEntity] = useState<EntityKey>(() => {
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? c : "bistro_mondo";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : E_BM;
   });
   const [userAccent, setUserAccent] = useState<string | null>(null);
 

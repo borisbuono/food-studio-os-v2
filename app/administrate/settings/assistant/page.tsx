@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey } from "@/lib/entities";
+import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import AssistantSettingsClient from "./AssistantSettingsClient";
 
 export const dynamic = "force-dynamic";
 
 const ENTITY_CODE: Record<EntityKey, "IFL" | "BM" | "BBH"> = {
-  holdings: "BBH", bistro_mondo: "BM", taller: "IFL",
+  [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL",
 };
 
 // Assistant Layer Sprint 5 — the config-as-data surface.

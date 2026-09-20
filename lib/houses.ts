@@ -7,20 +7,16 @@
 //           └── Room (a functional area inside a house — Kitchen, Dining, Office)
 //
 // Rooms belong to a house. You cannot address "kitchen" without knowing
-// WHICH house's kitchen — that ambiguity is what the top-right chip strip
-// used to leak. This module maps between the URL slug used in /h/<slug>
-// routes and the existing EntityKey vocabulary, and hands out display
-// names for the chrome ("Bistro Mondo", "Taller Sa Penya").
+// WHICH house's kitchen. This module maps between the URL slug used in
+// /h/<slug> routes and the entities.id UUID that identifies the entity in
+// every downstream query.
 //
-// The `EntityKey` union already exists (lib/entities.ts) and is baked into
-// too many downstream call sites to rename in one pass. Rather than churn
-// that, we keep EntityKey as the internal identifier and expose a small
-// slug ↔ key ↔ name lookup here. When Phase 3 replaces EntityKey with a
-// direct entities.id query, houses.ts stays because the URL slug is a
-// separate concern (short, stable, human-typable).
+// Refactor 2026-09-20 (branch refactor/entity-uuid): EntityKey is now the
+// entities.id UUID; slug lives on entities.slug and drives URL routing.
+// BBH gets the DB slug 'holdings' but does NOT get a /h/holdings route —
+// Studio is /studio, not a house.
 
-import type { EntityKey } from "@/lib/entities";
-import { ENTITY_LABEL, ENTITY_TO_RESTAURANT } from "@/lib/entities";
+import { E_BM, E_TALLER, ENTITY_LABEL, ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 
 export type HouseSlug = "bm" | "taller";
 export const HOUSE_SLUGS: HouseSlug[] = ["bm", "taller"];
@@ -28,13 +24,13 @@ export const HOUSE_SLUGS: HouseSlug[] = ["bm", "taller"];
 // slug → EntityKey. Only operating venues have house slugs — BBH is the
 // umbrella (studio-level), not a house.
 export const HOUSE_SLUG_TO_ENTITY: Record<HouseSlug, EntityKey> = {
-  bm:     "bistro_mondo",
-  taller: "taller",
+  bm:     E_BM,
+  taller: E_TALLER,
 };
 
 export const ENTITY_TO_HOUSE_SLUG: Partial<Record<EntityKey, HouseSlug>> = {
-  bistro_mondo: "bm",
-  taller:       "taller",
+  [E_BM]:     "bm",
+  [E_TALLER]: "taller",
 };
 
 export function houseSlugForEntity(k: EntityKey | null | undefined): HouseSlug | null {

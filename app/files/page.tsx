@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey, ENTITY_SHORT } from "@/lib/entities";
+import { EntityKey, ENTITY_SHORT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import FilesBrowser from "./FilesBrowser";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { holdings: "BBH", bistro_mondo: "BM", taller: "IFL" };
+const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL" };
 
 // /files — the Files module landing.
 //

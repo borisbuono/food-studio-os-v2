@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 export const dynamic = "force-dynamic";
 
 type Guest = {
@@ -49,8 +48,8 @@ export default function GrowRelationships() {
 
   useEffect(() => {
     (async () => {
-      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || "bistro_mondo";
-      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+      const ent = ((typeof localStorage !== "undefined" && localStorage.getItem("fs_entity")) as EntityKey | null) || E_BM;
+      const rid = ENTITY_TO_RESTAURANT[ent] || ENTITY_TO_RESTAURANT[E_BM]!;
       const { data: gs } = await supabaseBrowser
         .from("guests")
         .select("id,name,email,phone,allergies,dietary,birthday,notes,first_visit_at,last_visit_at,lifetime_value_eur,source")

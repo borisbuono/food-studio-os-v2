@@ -2,8 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { ENTITY_TO_RESTAURANT, EntityKey } from "@/lib/entities";
-
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 const ENTITY_CODE: Record<string, "IFL" | "BM" | "BBH"> = { taller: "IFL", bistro_mondo: "BM", holdings: "BBH" };
 const eur = (n: number) => "€" + (Number.isFinite(n) ? n : 0).toFixed(2);
 const eurSigned = (n: number) => (n < 0 ? "−€" : n > 0 ? "+€" : "€") + Math.abs(n).toFixed(2);
@@ -71,7 +70,7 @@ const SYSTEM_CASH_DESCRIPTION =
   "Fresto Cash line deducted from Food (house rule — cash line = EOD mistakes, not revenue)";
 
 export default function NewEod() {
-  const [entity, setEntity] = useState<EntityKey>("bistro_mondo");
+  const [entity, setEntity] = useState<EntityKey>(E_BM);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const [uploadErr, setUploadErr] = useState("");
@@ -91,7 +90,7 @@ export default function NewEod() {
   }, []);
 
   const ec = ENTITY_CODE[entity] || "IFL";
-  const rid = ENTITY_TO_RESTAURANT[entity] || ENTITY_TO_RESTAURANT.bistro_mondo!;
+  const rid = ENTITY_TO_RESTAURANT[entity] || ENTITY_TO_RESTAURANT[E_BM]!;
 
   // Load the POS snapshot + any existing accounting row + existing deviations for the day.
   useEffect(() => {

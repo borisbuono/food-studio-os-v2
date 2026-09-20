@@ -1,6 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
-import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT } from "@/lib/entities";
-
+import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 // Holdings Console — consolidated read helpers.
 //
 // The console rolls up numbers across every operating entity into a group view.
@@ -91,9 +90,9 @@ export async function getGroupRevenueMTD(): Promise<{ by_entity: ByEntity<number
 
   const RID_TO_EC: Record<string, EntityCode> = {};
   for (const [rid, ek] of Object.entries(RESTAURANT_TO_ENTITY)) {
-    if (ek === "bistro_mondo") RID_TO_EC[rid] = "BM";
-    else if (ek === "taller") RID_TO_EC[rid] = "IFL";
-    else if (ek === "holdings") RID_TO_EC[rid] = "BBH";
+    if (ek === E_BM) RID_TO_EC[rid] = "BM";
+    else if (ek === E_TALLER) RID_TO_EC[rid] = "IFL";
+    else if (ek === E_HOLDINGS) RID_TO_EC[rid] = "BBH";
   }
 
   if (acc && !acc.error && Array.isArray(acc.data) && acc.data.length) {

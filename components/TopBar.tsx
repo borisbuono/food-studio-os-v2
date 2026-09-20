@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
+import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -39,7 +39,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     // no cookie was getting BM tomato branding on first paint.
     if (initialEntity) return initialEntity;
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "holdings";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : E_HOLDINGS;
   });
   const [role, setRole] = useState<RoleKey>("office");
   // Seed from the server-resolved profile so the top bar chip paints
@@ -83,7 +83,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "holdings";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || E_HOLDINGS;
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
       setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
@@ -128,7 +128,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
           <BrandMark
             entity={(() => {
               const s = scopeForUrl(pathname);
-              if (s?.level === "studio") return "holdings";
+              if (s?.level === "studio") return E_HOLDINGS;
               if (s && (s.level === "house" || s.level === "room")) return HOUSE_SLUG_TO_ENTITY[s.houseSlug];
               return entity;
             })()}
