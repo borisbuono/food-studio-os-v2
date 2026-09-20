@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { entityForHouseSlug, houseNameForSlug } from "@/lib/houses";
-import { ENTITY_TO_RESTAURANT, ENTITY_LABEL, E_HOLDINGS, EntityKey } from "@/lib/entities";
+import { ENTITY_LABEL, EntityKey } from "@/lib/entities";
 import ManualEodClient from "./ManualEodClient";
 
 // /h/[house]/office/eod — manual EOD entry surface.
@@ -86,5 +86,7 @@ export function generateMetadata({ params }: { params: { house: string } }) {
   return { title: `${houseNameForSlug(params.house)} · Enter close · Food Studios` };
 }
 
-// Suppress unused-import warnings for constants that document intent.
-export const _e = { ENTITY_TO_RESTAURANT, E_HOLDINGS };
+// (Runway d2 2026-09-20 — the previous `export const _e = {...}` here was
+// a lint-silencer for unused imports; Next.js rejects unknown page-file
+// exports and it broke the production build. Removed, along with the two
+// unused imports it referenced.)
