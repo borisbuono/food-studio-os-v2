@@ -22,6 +22,31 @@ type Recipe = {
   notes: string | null;
   linked_menu_item_id: string | null;
   is_active: boolean;
+  cost_per_portion_eur?: number | null;
+  cost_computed_at?: string | null;
+  cost_confidence?: "high" | "medium" | "low" | "missing" | null;
+};
+
+type CostBreakdown = {
+  cost_per_portion_eur: number | null;
+  confidence: "high" | "medium" | "low" | "missing";
+  yield_qty: number;
+  total_recipe_cost_eur: number;
+  ingredient_count: number;
+  priced_count: number;
+  missing_ingredients: string[];
+  breakdown: Array<{
+    ingredient_name: string;
+    quantity: number | null;
+    unit: string | null;
+    canonical_name: string | null;
+    unit_price_eur: number | null;
+    unit_conversion: number;
+    line_cost_eur: number | null;
+    price_sample_count: number;
+    status: "priced" | "unpriced" | "no_alias";
+    note?: string;
+  }>;
 };
 
 type Ingredient = {
@@ -56,6 +81,9 @@ export default function RecipeDetail({
   const [explodeDate, setExplodeDate] = useState<string>(tomorrowISO());
   const [explodeCovers, setExplodeCovers] = useState<string>("");
   const [explodeMsg, setExplodeMsg] = useState<string | null>(null);
+  const [cost, setCost] = useState<CostBreakdown | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costMsg, setCostMsg] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
@@ -83,6 +111,35 @@ export default function RecipeDetail({
   }, [recipeId]);
 
   useEffect(() => { reload(); }, [reload]);
+
+  const loadCost = useCallback(async () => {
+    setCostLoading(true);
+    try {
+      const res = await fetch(`/api/recipes/${recipeId}/cost-breakdown`, { cache: "no-store" });
+      const j = await res.json();
+      if (j?.ok) setCost(j as CostBreakdown);
+    } catch {} finally {
+      setCostLoading(false);
+    }
+  }, [recipeId]);
+
+  useEffect(() => { loadCost(); }, [loadCost]);
+
+  const recomputeCost = useCallback(async () => {
+    setCostLoading(true); setCostMsg(null);
+    try {
+      const res = await fetch(`/api/recipes/${recipeId}/compute-cost`, { method: "POST" });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "recompute failed");
+      setCostMsg(`Recomputed · ${j.confidence} · €${(j.cost_per_portion_eur ?? 0).toFixed(2)}/portion`);
+      await loadCost();
+      await reload();
+    } catch (e: any) {
+      setCostMsg(String(e?.message || e));
+    } finally {
+      setCostLoading(false);
+    }
+  }, [recipeId, loadCost, reload]);
 
   const setR = (patch: Partial<Recipe>) => {
     setRecipe((r) => r ? { ...r, ...patch } : r);
@@ -304,6 +361,16 @@ export default function RecipeDetail({
           </li>
         </ul>
 
+        <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Cost</h2>
+        <CostSection
+          cost={cost}
+          loading={costLoading}
+          msg={costMsg}
+          onRecompute={recomputeCost}
+          houseSlug={houseSlug}
+          sellPrice={recipe.sell_price_eur ?? null}
+        />
+
         <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Method</h2>
         <textarea
           value={recipe.method ?? ""}
@@ -361,5 +428,130 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="font-mono text-[10px] uppercase tracking-wide text-clay">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function ConfidenceChip({ c }: { c: "high" | "medium" | "low" | "missing" }) {
+  const styles: Record<string, string> = {
+    high:    "border-emerald-600 text-emerald-800 bg-emerald-50",
+    medium:  "border-amber-600 text-amber-800 bg-amber-50",
+    low:     "border-red-600 text-red-800 bg-red-50",
+    missing: "border-black/30 text-ink-soft bg-black/5",
+  };
+  return (
+    <span className={"inline-block rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide " + styles[c]}>
+      {c}
+    </span>
+  );
+}
+
+function eur(n: number | null | undefined) {
+  if (n === null || n === undefined || !Number.isFinite(Number(n))) return "—";
+  return "€" + Number(n).toFixed(2);
+}
+
+function CostSection({
+  cost, loading, msg, onRecompute, houseSlug, sellPrice,
+}: {
+  cost: CostBreakdown | null;
+  loading: boolean;
+  msg: string | null;
+  onRecompute: () => void;
+  houseSlug: string;
+  sellPrice: number | null;
+}) {
+  const showLie = cost && cost.confidence === "missing";
+  const cpp = cost?.cost_per_portion_eur ?? null;
+  const gm = cpp != null && sellPrice != null && sellPrice > 0
+    ? ((sellPrice - cpp) / sellPrice) * 100
+    : null;
+
+  return (
+    <div className="mt-1 rounded-md border border-line bg-white p-4">
+      <div className="flex flex-wrap items-baseline gap-4">
+        <div>
+          {showLie || cpp == null ? (
+            <p className="font-serif italic text-ink-soft">no cost data yet</p>
+          ) : (
+            <p className="font-serif text-3xl text-ink">{eur(cpp)}<span className="font-mono text-[11px] uppercase tracking-wide text-clay"> /portion</span></p>
+          )}
+        </div>
+        {cost ? <ConfidenceChip c={cost.confidence} /> : null}
+        {gm != null && !showLie ? (
+          <p className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">
+            gross margin <span className={gm < 60 ? "text-red-700" : "text-emerald-700"}>{gm.toFixed(1)}%</span>
+          </p>
+        ) : null}
+        <button
+          onClick={onRecompute}
+          disabled={loading}
+          className="ml-auto rounded-md border border-line px-3 py-1.5 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5 disabled:opacity-50"
+        >
+          {loading ? "…" : "Recompute"}
+        </button>
+      </div>
+      {msg ? (
+        <p className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay">{msg}</p>
+      ) : null}
+      {cost && cost.breakdown.length > 0 ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="py-1 pr-2 font-mono text-[10px] uppercase tracking-wide text-clay">Ingredient</th>
+                <th className="py-1 pr-2 text-right font-mono text-[10px] uppercase tracking-wide text-clay">Qty</th>
+                <th className="py-1 pr-2 font-mono text-[10px] uppercase tracking-wide text-clay">Unit</th>
+                <th className="py-1 pr-2 text-right font-mono text-[10px] uppercase tracking-wide text-clay">Unit €</th>
+                <th className="py-1 pr-2 text-right font-mono text-[10px] uppercase tracking-wide text-clay">Line €</th>
+                <th className="py-1 pr-2 font-mono text-[10px] uppercase tracking-wide text-clay">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cost.breakdown.map((b, i) => (
+                <tr
+                  key={i}
+                  className={"border-b border-black/5 align-top " + (b.status !== "priced" ? "bg-amber-50/60" : "")}
+                >
+                  <td className="py-1 pr-2">
+                    <span className="font-serif text-[13px]">{b.ingredient_name}</span>
+                    {b.canonical_name && b.canonical_name.toLowerCase() !== b.ingredient_name.toLowerCase() ? (
+                      <span className="ml-1 font-mono text-[10px] uppercase tracking-wide text-clay">→ {b.canonical_name}</span>
+                    ) : null}
+                    {b.status === "no_alias" ? (
+                      <Link
+                        href={`/h/${houseSlug}/kitchen/ingredients?prefill=${encodeURIComponent(b.ingredient_name)}`}
+                        className="ml-2 rounded-md border border-amber-500 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-800 hover:bg-amber-100"
+                      >
+                        + add alias
+                      </Link>
+                    ) : null}
+                  </td>
+                  <td className="py-1 pr-2 text-right font-mono text-[12px]">{b.quantity ?? "—"}</td>
+                  <td className="py-1 pr-2 font-mono text-[12px]">{b.unit ?? ""}</td>
+                  <td className="py-1 pr-2 text-right font-mono text-[12px]">{eur(b.unit_price_eur)}</td>
+                  <td className="py-1 pr-2 text-right font-mono text-[12px]">{eur(b.line_cost_eur)}</td>
+                  <td className="py-1 pr-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                    {b.status === "priced"
+                      ? `purchase_lines ×${b.price_sample_count}`
+                      : (b.note ?? b.status)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-black/20">
+                <td colSpan={4} className="pt-2 font-mono text-[10px] uppercase tracking-wide text-clay">
+                  {cost.priced_count} of {cost.ingredient_count} priced · yield {cost.yield_qty}
+                </td>
+                <td className="pt-2 text-right font-mono text-[13px]">{eur(cost.total_recipe_cost_eur)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ) : cost && cost.ingredient_count === 0 ? (
+        <p className="mt-2 font-serif italic text-ink-soft">Add ingredients above, then Recompute.</p>
+      ) : null}
+    </div>
   );
 }

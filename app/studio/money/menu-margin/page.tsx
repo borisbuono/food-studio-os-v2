@@ -76,7 +76,7 @@ function rowClass(r: Row) {
 export default async function MenuMarginPage({
   searchParams,
 }: {
-  searchParams?: { sort?: string; venue?: string };
+  searchParams?: { sort?: string; venue?: string; lowmargin?: string };
 }) {
   const sb = supabaseServer();
   const { data: userRes } = await sb.auth.getUser();
@@ -91,6 +91,7 @@ export default async function MenuMarginPage({
   }
 
   const sort = searchParams?.sort ?? "margin";
+  const lowmargin = searchParams?.lowmargin === "1";
 
   const { data: raw, error } = await sb
     .from("menu_dish_costing")
@@ -98,7 +99,10 @@ export default async function MenuMarginPage({
       "id, venue, section, dish_slug, dish_name, sell_price_eur, matched_recipe_id, matched_recipe_name, match_score, component_count, cost_per_portion_eur, gross_margin_eur, gross_margin_pct, cost_confidence, missing_components, computed_at"
     );
 
-  const rows: Row[] = ((raw as Row[] | null) || []).slice();
+  const rowsAll: Row[] = ((raw as Row[] | null) || []).slice();
+  const rows: Row[] = lowmargin
+    ? rowsAll.filter((r) => r.gross_margin_pct != null && r.gross_margin_pct < 60)
+    : rowsAll;
 
   // Sort helper — keeps rows without a margin at the bottom regardless of order.
   rows.sort((a, b) => {
@@ -164,8 +168,8 @@ export default async function MenuMarginPage({
         </p>
       )}
 
-      {/* Sort controls */}
-      <nav className="mt-6 flex gap-3">
+      {/* Sort controls + low-margin filter */}
+      <nav className="mt-6 flex flex-wrap gap-3">
         {[
           { k: "margin", label: "Margin" },
           { k: "price", label: "Price" },
@@ -173,7 +177,7 @@ export default async function MenuMarginPage({
         ].map((s) => (
           <Link
             key={s.k}
-            href={`?sort=${s.k}`}
+            href={`?sort=${s.k}${lowmargin ? "&lowmargin=1" : ""}`}
             className={
               "rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wide " +
               (sort === s.k
@@ -184,6 +188,17 @@ export default async function MenuMarginPage({
             {s.label}
           </Link>
         ))}
+        <Link
+          href={`?sort=${sort}${lowmargin ? "" : "&lowmargin=1"}`}
+          className={
+            "rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wide " +
+            (lowmargin
+              ? "border-red-600 bg-red-50 text-red-800"
+              : "border-black/20 text-ink hover:border-ink/60")
+          }
+        >
+          {lowmargin ? "Showing < 60% margin" : "Only low-margin"}
+        </Link>
       </nav>
 
       {error && (
