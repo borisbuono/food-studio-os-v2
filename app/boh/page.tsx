@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverRestaurantId } from "@/lib/serverVenue";
+import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
+import { houseSlugForEntity } from "@/lib/houses";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
@@ -10,21 +11,28 @@ export const dynamic = "force-dynamic";
 export default async function BohHome() {
   const supabase = supabaseServer();
   const rid = serverRestaurantId();
-  const today = new Date().toISOString().slice(0, 10);
+  const entity = serverEntity();
+  const houseSlug = houseSlugForEntity(entity); // null when scope is Studio
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Madrid" }); // Madrid trading date, derived ONCE
   const weekday = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
-  const [zonesRes, mepRes, tasksRes, albaransRes, recipesRes, menuRes] = await Promise.all([
+  const [zonesRes, mepRes, tasksRes, albaransRes, recipesRes, menuRes, prepListRes] = await Promise.all([
     supabase.from("zones").select("id,restaurant_id").eq("restaurant_id", rid),
     supabase.from("mep_dishes").select("id,zone_id,is_active").eq("is_active", true),
     supabase.from("tasks").select("id,zone_id,frequency_rule").eq("is_active", true).eq("task_type", "cleaning"),
     supabase.from("albarans").select("id,received_at,restaurant_id").eq("restaurant_id", rid).gte("received_at", today + "T00:00:00").lt("received_at", today + "T23:59:59"),
     supabase.from("recipes").select("id"),
     supabase.from("menu_items").select("id,category,is_active").eq("restaurant_id", rid).eq("is_active", true),
+    supabase.from("prep_lists").select("id,status").eq("entity_id", entity).eq("service_date", today),
   ]);
 
   const zoneIds = new Set((zonesRes.data || []).map((z: any) => z.id));
   const prep = (mepRes.data || []).filter((m: any) => zoneIds.has(m.zone_id)).length;
   const cleaningDue = (tasksRes.data || []).filter((t: any) => zoneIds.has(t.zone_id) && ((t.frequency_rule || "").startsWith("daily_") || t.frequency_rule === "weekly_" + weekday)).length;
+  const prepRows = prepListRes.data || [];
+  const prepTotal = prepRows.length;
+  const prepDone = prepRows.filter((r: any) => r.status === "done").length;
+  const prepHref = houseSlug ? `/h/${houseSlug}/kitchen/prep` : "/studio";
   const albarans = (albaransRes.data || []).length;
   const recipesCount = (recipesRes.data || []).length;
   const menuCount = (menuRes.data || []).length;
@@ -39,13 +47,26 @@ export default async function BohHome() {
 
       <section className="mt-10">
         <PillarTile
+          href={prepHref}
+          kicker={`Today's prep · ${today}`}
+          title="Prep list"
+          value={`${prepDone} / ${prepTotal}`}
+          status={prepTotal === 0
+            ? "Empty — generate from templates or add items."
+            : prepDone === prepTotal
+              ? "Everything done. Well ridden."
+              : `${prepTotal - prepDone} still to build`}
+          action="Open the prep list →"
+          flowChip="execute"
+        />
+        <PillarTile
           href="/execute/pass"
-          kicker="The Pass · prep + cleaning"
-          title="Prep"
+          kicker="The Pass · MEP + cleaning"
+          title="Pass"
           value={prep + cleaningDue}
           status={prep + cleaningDue === 0
             ? "Nothing on the list — start the day."
-            : `${prep} prep · ${cleaningDue} cleaning due today`}
+            : `${prep} MEP dishes · ${cleaningDue} cleaning due today`}
           action="Open the pass →"
           flowChip="execute"
         />
