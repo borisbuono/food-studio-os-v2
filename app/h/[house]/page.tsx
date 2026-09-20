@@ -132,6 +132,20 @@ export default async function HouseLandingPage({ params }: { params: { house: st
 
   const displayGuests = latest ? (latest.guests_daily ?? latest.guests ?? null) : null;
 
+  // Currently-on-floor count — labor module (runway d2). Cheap head-count
+  // over the open-shift index; feeds the daily-loop tile below.
+  let onFloor = 0;
+  try {
+    const sb = supabaseServer();
+    const { count } = await sb
+      .from("labor_shifts")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_id", entity)
+      .is("clock_out", null)
+      .not("clock_in", "is", null);
+    onFloor = count || 0;
+  } catch { /* table missing on very old envs → tile shows 0 */ }
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       {/* Top strip — house identity + date + Madrid clock. Room switcher
@@ -173,6 +187,30 @@ export default async function HouseLandingPage({ params }: { params: { house: st
           >
             + Enter today's close
           </Link>
+        </div>
+      </section>
+
+      {/* On the floor — labor module (runway d2). Live count of open shifts
+          for this house; tap-through to the clock kiosk or the labor admin. */}
+      <section className="mt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 border border-line px-4 py-3">
+          <p className="font-mono text-[11px] uppercase tracking-wide text-clay">
+            On the floor · <span className="tabular-nums text-ink">{onFloor}</span> {onFloor === 1 ? "person" : "people"} clocked in
+          </p>
+          <div className="flex gap-2">
+            <Link
+              href={`/h/${slug}/clock`}
+              className="border border-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-ink hover:text-paper"
+            >
+              Open clock
+            </Link>
+            <Link
+              href={`/h/${slug}/office/labor`}
+              className="border border-black/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-black/[.04]"
+            >
+              Labor dashboard
+            </Link>
+          </div>
         </div>
       </section>
 

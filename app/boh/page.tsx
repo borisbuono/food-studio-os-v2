@@ -37,6 +37,24 @@ export default async function BohHome() {
   const recipesCount = (recipesRes.data || []).length;
   const menuCount = (menuRes.data || []).length;
 
+  // "N chefs on shift" — labor module (runway d2). Counts open shifts with
+  // a kitchen-ish role for THIS entity. Free-text role means we filter on a
+  // small vocabulary + fall back to "any open shift" as the top-line count.
+  let chefsOnShift = 0;
+  let anyoneOnShift = 0;
+  try {
+    const { data: openShifts } = await supabase
+      .from("labor_shifts")
+      .select("id, role")
+      .eq("entity_id", entity)
+      .is("clock_out", null)
+      .not("clock_in", "is", null);
+    anyoneOnShift = (openShifts || []).length;
+    const kitchenRoles = new Set(["chef", "sous", "line", "pastry", "dish", "prep", "cook", "kitchen"]);
+    chefsOnShift = (openShifts || []).filter((s: any) => kitchenRoles.has((s.role || "").toLowerCase())).length;
+  } catch { /* pre-migration env — tile shows 0 */ }
+  const clockHref = houseSlug ? `/h/${houseSlug}/clock` : "/office";
+
   return (
     <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <PillarHeader
@@ -46,6 +64,17 @@ export default async function BohHome() {
       />
 
       <section className="mt-10">
+        <PillarTile
+          href={clockHref}
+          kicker="On shift · kitchen"
+          title="Clocked in"
+          value={chefsOnShift}
+          status={anyoneOnShift === 0
+            ? "No one clocked in yet — open the kiosk to tap in."
+            : `${chefsOnShift} chef${chefsOnShift === 1 ? "" : "s"} · ${anyoneOnShift} total in the house`}
+          action="Open the clock →"
+          flowChip="execute"
+        />
         <PillarTile
           href={prepHref}
           kicker={`Today's prep · ${today}`}
