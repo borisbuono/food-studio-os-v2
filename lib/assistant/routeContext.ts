@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import type { AssistantEntityScope, EntityCode } from "@/lib/assistant/orchestrator";
 // Route context — Chef's ground truth for the page the operator is
 // standing on right now.
 //
@@ -25,16 +26,13 @@ import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/l
 // entity-wide snapshot (kept for backwards compatibility, but re-weighted
 // down in the system prompt so it doesn't drown out the page).
 
-import type { EntityCode } from "@/lib/assistant/orchestrator";
-
-// Map assistant EntityCode → EntityKey → restaurant UUID.
-// EntityCode is the assistant-layer code (IFL / BM / BBH). IFL is the Taller
-// SL entity, whose operating venue is `taller` (restaurant ca83e06f…).
-const ENTITY_CODE_TO_KEY: Record<EntityCode, EntityKey | null> = {
-  IFL: E_TALLER,
-  BM:  E_BM,
-  BBH: E_HOLDINGS,
-};
+// Route context is scope-driven since 2026-09-20 (Chef multi-tenant
+// scoping). We do NOT map an EntityCode string → EntityKey any more; the
+// caller hands us an AssistantEntityScope whose `entity.id` is the UUID and
+// whose `restaurant_id` is populated for the pinned venues (BM / Taller).
+// A fourth tenant (Amsterdam) arrives with restaurant_id=null; every
+// handler either has an explicit restaurant-less path or is skipped so no
+// data crosses tenants. See TO_BORIS_chef_context_audit_2026-09-20.
 
 export type RouteQueryResult = {
   table: string;
@@ -55,8 +53,7 @@ export type RouteContext = {
 
 // The map. Longest-prefix wins in resolveRouteContext.
 type RouteHandler = (
-  entity: EntityCode,
-  restaurantId: string | null,
+  scope: AssistantEntityScope,
   route: string,
 ) => Promise<Omit<RouteContext, "route" | "is_service_route">>;
 
@@ -68,7 +65,8 @@ const HANDLERS: Array<{
   {
     prefix: "/develop/wine",
     is_service_route: false,
-    handle: async (_entity, restaurantId) => {
+    handle: async (scope) => {
+      const restaurantId = scope.restaurant_id;
       if (!restaurantId) {
         return {
           title: "Wine list",
@@ -123,16 +121,27 @@ const HANDLERS: Array<{
   {
     prefix: "/develop/recipes",
     is_service_route: false,
-    handle: async () => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const recipes = await sb.from("recipes").select("id", { count: "exact", head: true });
-      const pending = await sb.from("recipe_imports").select("id", { count: "exact", head: true }).in("status", ["parsed", "pending"]);
+      const rid = scope.restaurant_id;
+      // Scope by restaurant_id — pre-2026-09-20 this was a global count and
+      // a chef in any tenant saw the whole recipes book.
+      const q = rid
+        ? sb.from("recipes").select("id", { count: "exact", head: true }).eq("restaurant_id", rid)
+        : sb.from("recipes").select("id", { count: "exact", head: true }).eq("entity_id", scope.entity.id);
+      const recipes = await q;
+      // recipe_imports.entity_id is a text column that historically held the
+      // EntityCode ("BM"/"IFL"/"BBH"). Filter by code when we have one, else
+      // fall back to the UUID (no rows for legacy tenants, which is
+      // correct — the pipeline isn't wired for Amsterdam yet).
+      const importKey = scope.code || scope.entity.id;
+      const pending = await sb.from("recipe_imports").select("id", { count: "exact", head: true }).eq("entity_id", importKey).in("status", ["parsed", "pending"]);
       return {
         title: "Recipes",
         reads: ["recipes", "recipe_imports"],
         queries: [
-          { table: "recipes", filter: "all", count: recipes.count ?? 0 },
-          { table: "recipe_imports", filter: "status IN (parsed,pending)", count: pending.count ?? 0 },
+          { table: "recipes", filter: rid ? "restaurant scope" : "entity scope", count: recipes.count ?? 0 },
+          { table: "recipe_imports", filter: (rid ? "restaurant scope AND " : "entity scope AND ") + "status IN (parsed,pending)", count: pending.count ?? 0 },
         ],
       };
     },
@@ -140,20 +149,25 @@ const HANDLERS: Array<{
   {
     prefix: "/develop/menu",
     is_service_route: false,
-    handle: async () => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const rec = await sb.from("recipes").select("id", { count: "exact", head: true });
+      const rid = scope.restaurant_id;
+      const q = rid
+        ? sb.from("recipes").select("id", { count: "exact", head: true }).eq("restaurant_id", rid)
+        : sb.from("recipes").select("id", { count: "exact", head: true }).eq("entity_id", scope.entity.id);
+      const rec = await q;
       return {
         title: "Menu",
         reads: ["recipes"],
-        queries: [{ table: "recipes", filter: "all", count: rec.count ?? 0 }],
+        queries: [{ table: "recipes", filter: rid ? "restaurant scope" : "entity scope", count: rec.count ?? 0 }],
       };
     },
   },
   {
     prefix: "/execute/pass",
     is_service_route: true,
-    handle: async (_entity, restaurantId) => {
+    handle: async (scope) => {
+      const restaurantId = scope.restaurant_id;
       if (!restaurantId) {
         return { title: "Pass", reads: ["mep_dishes", "tasks", "zones"], queries: [] };
       }
@@ -180,10 +194,17 @@ const HANDLERS: Array<{
   {
     prefix: "/execute/orders",
     is_service_route: false,
-    handle: async (_entity, restaurantId) => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const providers = await sb.from("providers").select("id", { count: "exact", head: true });
-      const products = await sb.from("provider_products").select("id", { count: "exact", head: true }).eq("is_active", true);
+      const restaurantId = scope.restaurant_id;
+      // providers / provider_products scope: providers has restaurant_id;
+      // provider_products has provider_id → restaurant_id.
+      const providers = restaurantId
+        ? await sb.from("providers").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId)
+        : { count: 0 } as any;
+      const products = restaurantId
+        ? await sb.from("provider_products").select("id,providers!inner(restaurant_id)", { count: "exact", head: true }).eq("is_active", true).eq("providers.restaurant_id", restaurantId)
+        : { count: 0 } as any;
       const openOrders = restaurantId
         ? await sb.from("orders").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).is("delivered_at", null)
         : { count: 0 } as any;
@@ -191,8 +212,8 @@ const HANDLERS: Array<{
         title: "Orders",
         reads: ["providers", "provider_products", "orders"],
         queries: [
-          { table: "providers", filter: "all", count: providers.count ?? 0 },
-          { table: "provider_products", filter: "is_active=true", count: products.count ?? 0 },
+          { table: "providers", filter: "restaurant scope", count: providers.count ?? 0 },
+          { table: "provider_products", filter: "restaurant scope AND is_active=true", count: products.count ?? 0 },
           { table: "orders", filter: "restaurant scope AND delivered_at IS NULL", count: openOrders.count ?? 0 },
         ],
       };
@@ -201,20 +222,24 @@ const HANDLERS: Array<{
   {
     prefix: "/execute/bookings",
     is_service_route: true,
-    handle: async () => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const covers = await sb.from("covers").select("id", { count: "exact", head: true });
+      const restaurantId = scope.restaurant_id;
+      const covers = restaurantId
+        ? await sb.from("covers").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId)
+        : { count: 0 } as any;
       return {
         title: "Bookings",
         reads: ["covers"],
-        queries: [{ table: "covers", filter: "all (first 50 shown)", count: covers.count ?? 0 }],
+        queries: [{ table: "covers", filter: "restaurant scope (first 50 shown)", count: covers.count ?? 0 }],
       };
     },
   },
   {
     prefix: "/execute/inventory",
     is_service_route: false,
-    handle: async (_entity, restaurantId) => {
+    handle: async (scope) => {
+      const restaurantId = scope.restaurant_id;
       if (!restaurantId) {
         return { title: "Inventory", reads: ["inventory_items"], queries: [] };
       }
@@ -230,16 +255,24 @@ const HANDLERS: Array<{
   {
     prefix: "/administrate/finance/eod",
     is_service_route: false,
-    handle: async () => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const eod = await sb.from("eod_accounting").select("id", { count: "exact", head: true });
-      const recent = await sb.from("eod_accounting").select("report_date").order("report_date", { ascending: false }).limit(1);
+      const restaurantId = scope.restaurant_id;
+      if (!restaurantId) {
+        return {
+          title: "EOD accounting",
+          reads: ["eod_accounting"],
+          queries: [{ table: "eod_accounting", filter: "restaurant scope (no restaurant bound for this entity)", count: 0 }],
+        };
+      }
+      const eod = await sb.from("eod_accounting").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId);
+      const recent = await sb.from("eod_accounting").select("report_date").eq("restaurant_id", restaurantId).order("report_date", { ascending: false }).limit(1);
       const lastDate = ((recent as any).data || [])[0]?.report_date || null;
       return {
         title: "EOD accounting",
         reads: ["eod_accounting"],
         queries: [
-          { table: "eod_accounting", filter: "all rows across venues", count: eod.count ?? 0, note: lastDate ? "most recent report_date: " + lastDate : undefined },
+          { table: "eod_accounting", filter: "restaurant scope", count: eod.count ?? 0, note: lastDate ? "most recent report_date: " + lastDate : undefined },
         ],
       };
     },
@@ -247,7 +280,8 @@ const HANDLERS: Array<{
   {
     prefix: "/administrate/invoices",
     is_service_route: false,
-    handle: async (_entity, restaurantId) => {
+    handle: async (scope) => {
+      const restaurantId = scope.restaurant_id;
       if (!restaurantId) return { title: "Invoices", reads: ["orders", "providers"], queries: [] };
       const sb = supabaseServer();
       const orders = await sb.from("orders").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId);
@@ -265,16 +299,24 @@ const HANDLERS: Array<{
   {
     prefix: "/administrate/suppliers",
     is_service_route: false,
-    handle: async () => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const providers = await sb.from("providers").select("id", { count: "exact", head: true });
-      const products = await sb.from("provider_products").select("id", { count: "exact", head: true }).eq("is_active", true);
+      const restaurantId = scope.restaurant_id;
+      if (!restaurantId) {
+        return {
+          title: "Suppliers",
+          reads: ["providers", "provider_products"],
+          queries: [{ table: "providers", filter: "restaurant scope (none bound)", count: 0 }],
+        };
+      }
+      const providers = await sb.from("providers").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId);
+      const products = await sb.from("provider_products").select("id,providers!inner(restaurant_id)", { count: "exact", head: true }).eq("is_active", true).eq("providers.restaurant_id", restaurantId);
       return {
         title: "Suppliers",
         reads: ["providers", "provider_products"],
         queries: [
-          { table: "providers", filter: "all", count: providers.count ?? 0 },
-          { table: "provider_products", filter: "is_active=true", count: products.count ?? 0 },
+          { table: "providers", filter: "restaurant scope", count: providers.count ?? 0 },
+          { table: "provider_products", filter: "restaurant scope AND is_active=true", count: products.count ?? 0 },
         ],
       };
     },
@@ -282,29 +324,31 @@ const HANDLERS: Array<{
   {
     prefix: "/administrate/master-todo",
     is_service_route: false,
-    handle: async (entity) => {
+    handle: async (scope) => {
       const sb = supabaseServer();
-      const openAll = await sb.from("master_todos").select("id", { count: "exact", head: true }).not("status", "in", "(completed,deferred)");
-      const openEntity = await sb.from("master_todos").select("id", { count: "exact", head: true }).not("status", "in", "(completed,deferred)").eq("entity_code", entity);
+      const code = scope.code;
+      if (!code) {
+        // master_todos is keyed by legacy EntityCode string; non-pinned
+        // tenants have no rows. Return empty rather than the global count.
+        return {
+          title: "Master to-do",
+          reads: ["master_todos"],
+          queries: [{ table: "master_todos", filter: "entity_code scope (this tenant has no master_todos pipeline)", count: 0 }],
+        };
+      }
+      const openEntity = await sb.from("master_todos").select("id", { count: "exact", head: true }).not("status", "in", "(completed,deferred)").eq("entity_code", code);
       return {
         title: "Master to-do",
         reads: ["master_todos"],
         queries: [
-          { table: "master_todos", filter: "status NOT IN (completed,deferred), all entities", count: openAll.count ?? 0 },
-          { table: "master_todos", filter: "status NOT IN (completed,deferred), entity_code=" + entity, count: openEntity.count ?? 0 },
+          { table: "master_todos", filter: "status NOT IN (completed,deferred), entity_code=" + code, count: openEntity.count ?? 0 },
         ],
       };
     },
   },
 ];
 
-function resolveRestaurantId(entity: EntityCode): string | null {
-  const key = ENTITY_CODE_TO_KEY[entity];
-  if (!key) return null;
-  return ENTITY_TO_RESTAURANT[key] || null;
-}
-
-export async function getRouteContext(entity: EntityCode, route: string | null | undefined): Promise<RouteContext | null> {
+export async function getRouteContext(scope: AssistantEntityScope, route: string | null | undefined): Promise<RouteContext | null> {
   if (!route) return null;
   // Strip query string; match on path.
   const path = route.split("?")[0].split("#")[0];
@@ -314,9 +358,8 @@ export async function getRouteContext(entity: EntityCode, route: string | null |
     .sort((a, b) => b.prefix.length - a.prefix.length)
     .find((h) => path === h.prefix || path.startsWith(h.prefix + "/"));
   if (!match) return null;
-  const restaurantId = resolveRestaurantId(entity);
   try {
-    const partial = await match.handle(entity, restaurantId, path);
+    const partial = await match.handle(scope, path);
     return {
       route: path,
       is_service_route: match.is_service_route,
@@ -338,13 +381,16 @@ function partial_title(prefix: string) {
 }
 
 // Format the route context as a system-prompt block. Kept in the module so
-// the wording lives next to the data shape.
-export function formatRouteContextBlock(rc: RouteContext, entity: EntityCode): string {
+// the wording lives next to the data shape. `entityLabel` is the human name
+// of the current entity (e.g. "Bistro Mondo", or "Grote Zaal Amsterdam") —
+// used only for the "entity scope: " line. The pre-2026-09-20 signature
+// took an EntityCode string.
+export function formatRouteContextBlock(rc: RouteContext, entityLabel: EntityCode | string): string {
   const lines: string[] = [];
   lines.push("PAGE THE OPERATOR IS ON (this is the primary context — answer about THIS page):");
   lines.push("- route: " + rc.route);
   lines.push("- title: " + rc.title);
-  lines.push("- entity scope: " + entity);
+  lines.push("- entity scope: " + entityLabel);
   lines.push("- reads: " + rc.reads.join(", "));
   lines.push("- current query state (re-run just now, ground truth):");
   for (const q of rc.queries) {

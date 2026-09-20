@@ -1,5 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getRouteContext, formatRouteContextBlock, routeContextTokens, RouteContext } from "@/lib/assistant/routeContext";
+import { getEntityById, type EntityRow } from "@/lib/serverVenue";
+import { E_BM, E_TALLER, E_HOLDINGS, ENTITY_TO_RESTAURANT } from "@/lib/entities";
 
 // The Brain — the Assistant Layer orchestrator.
 //
@@ -16,8 +18,69 @@ import { getRouteContext, formatRouteContextBlock, routeContextTokens, RouteCont
 export type EntityCode = "IFL" | "BM" | "BBH";
 export type AssistantMode = "chat" | "brief" | "draft" | "extract";
 
+// Chef multi-tenant scoping (2026-09-20). The orchestrator's canonical
+// identity for the current entity is now the entities.id UUID, resolved to
+// an EntityRow at the top of every turn. `AssistantEntityScope` is that row
+// plus a legacy EntityCode when the UUID happens to be one of Boris's three
+// pinned houses (kept so tables that key by string code — invoice_inbox,
+// master_todos, recurring_bank_patterns — still resolve for him). For any
+// other tenant `code` is null and the code-keyed reads are skipped rather
+// than silently falling through to Taller. See TO_BORIS_chef_context_audit
+// _2026-09-20.md in 06_PA/_INBOX/.
+export type AssistantEntityScope = {
+  entity: EntityRow;
+  code: EntityCode | null;   // legacy string code for Boris's 3 pinned houses
+  restaurant_id: string | null; // set only for BM / Taller — used by route ctx
+  is_pinned: boolean;
+};
+
+// Public alias: legacy call sites still pass an EntityCode string ("BM" etc).
+// The scope resolver below accepts either an EntityCode or a UUID and returns
+// a full scope. Nothing in the assistant layer keys off EntityCode directly
+// any more — it only reads `scope.code` when it needs the legacy 3-letter tag.
+const CODE_TO_UUID: Record<EntityCode, string> = {
+  BM:  E_BM,
+  IFL: E_TALLER,
+  BBH: E_HOLDINGS,
+};
+const UUID_TO_CODE: Record<string, EntityCode> = {
+  [E_BM]:      "BM",
+  [E_TALLER]:  "IFL",
+  [E_HOLDINGS]:"BBH",
+};
+
+export function codeForEntityId(entity_id: string): EntityCode | null {
+  return UUID_TO_CODE[entity_id] || null;
+}
+
+// Fetch the entities row and produce a scope. Accepts either a UUID or a
+// legacy EntityCode ("BM" / "IFL" / "BBH"). Returns null when the entity is
+// unknown / inactive — the caller must refuse the turn in that case rather
+// than fall through to a default tenant.
+export async function resolveEntityScope(entityIdOrCode: string): Promise<AssistantEntityScope | null> {
+  if (!entityIdOrCode) return null;
+  const sb = supabaseServer();
+  // Accept legacy string codes for the three pinned houses.
+  const asCode = (["BM","IFL","BBH"] as EntityCode[]).includes(entityIdOrCode as EntityCode) ? entityIdOrCode as EntityCode : null;
+  const uuid = asCode ? CODE_TO_UUID[asCode] : entityIdOrCode;
+  const row = await getEntityById(sb, uuid);
+  if (!row) return null;
+  const code = UUID_TO_CODE[row.id] || null;
+  const rid = (ENTITY_TO_RESTAURANT as Record<string, string | undefined>)[row.id] || null;
+  return {
+    entity: row,
+    code,
+    restaurant_id: rid,
+    is_pinned: !!code,
+  };
+}
+
 export type AssistantContext = {
-  entity: EntityCode;
+  // `entity` stays for the FAB/log path — it's the legacy EntityCode when
+  // the current scope is one of Boris's three pinned houses, else the raw
+  // UUID string. Prefer `entity_scope.entity.name` in prompts.
+  entity: EntityCode | string;
+  entity_scope: AssistantEntityScope;
   today: string;
   now_hhmm: string;
   service_phase: "before" | "during" | "after" | "unknown";
@@ -148,20 +211,50 @@ const PRICE_OUT_PER_MTOK_EUR = PRICE_OUT_PER_MTOK_USD * USD_EUR_RATE;
 const PRICE_IN_PER_MTOK  = PRICE_IN_PER_MTOK_USD;
 const PRICE_OUT_PER_MTOK = PRICE_OUT_PER_MTOK_USD;
 
+// Legacy — kept as a fallback only for call sites that still pass an
+// EntityCode. New callers pass an AssistantEntityScope and read
+// scope.restaurant_id directly. This map does not need to grow when a
+// fourth tenant onboards.
 const ENTITY_TO_RID: Record<EntityCode, string> = {
   IFL: "ca83e06f-a24d-43d7-bce4-57ac341d190f",
   BM:  "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
   BBH: "",
 };
 
-function madridToday() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+function madridToday() { return tzDate("Europe/Madrid"); }
+function madridHHmm() { return tzHHmm("Europe/Madrid"); }
+// Timezone-parameterised versions used by the multi-tenant path. Amsterdam,
+// Ibiza and any future venue read their own tz off the entities row.
+function tzDate(tz: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz || "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
-function madridHHmm() {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+function tzHHmm(tz: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz || "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
   const hh = parts.find((p) => p.type === "hour")?.value || "00";
   const mm = parts.find((p) => p.type === "minute")?.value || "00";
   return hh + ":" + mm;
+}
+
+// Placeholder scope for an unknown entity id. Guarantees the system prompt
+// never falls through to a Boris-shaped default when the id is unrecognised.
+function emptyScopeFor(entityIdOrCode: string): AssistantEntityScope {
+  return {
+    entity: {
+      id: entityIdOrCode,
+      name: "(unknown entity)",
+      entity_type: "unknown",
+      city: null,
+      country_code: "",
+      currency_code: "EUR",
+      timezone: "Europe/Madrid",
+      vat_regime: null,
+      legal_name: null,
+      slug: null,
+    },
+    code: null,
+    restaurant_id: null,
+    is_pinned: false,
+  };
 }
 
 export class AssistantOrchestrator {
@@ -174,35 +267,59 @@ export class AssistantOrchestrator {
     return data || null;
   }
 
-  async getContext(entity: EntityCode, userId: string | null, pageContext: any | null, route?: string | null): Promise<AssistantContext> {
+  async getContext(entityOrScope: EntityCode | AssistantEntityScope, userId: string | null, pageContext: any | null, route?: string | null): Promise<AssistantContext> {
     const sb = supabaseServer();
-    const today = madridToday();
-    const rid = ENTITY_TO_RID[entity] || null;
+    // Resolve the entity scope from whatever the caller handed in.
+    let scope: AssistantEntityScope;
+    if (typeof entityOrScope === "string") {
+      const r = await resolveEntityScope(entityOrScope);
+      if (!r) {
+        // Unknown entity — refuse to leak. Return a minimal scope for the
+        // string with a synthetic empty EntityRow so the caller sees an
+        // "empty" tenant context and the system prompt says so plainly.
+        scope = emptyScopeFor(entityOrScope);
+      } else {
+        scope = r;
+      }
+    } else {
+      scope = entityOrScope;
+    }
+    const entity: EntityCode | string = scope.code || scope.entity.id;
+    const today = tzDate(scope.entity.timezone);
+    const nowHHmm = tzHHmm(scope.entity.timezone);
+    const rid = scope.restaurant_id;
 
     // Chef grounding: the page the user is on takes priority over
     // entity-wide state. Read route from the explicit arg or from
     // page_context (the FAB sets it there since 2026-08-22).
     const resolvedRoute: string | null = (route ?? (pageContext && (pageContext.route || pageContext.pathname))) || null;
-    const routeContextPromise = getRouteContext(entity, resolvedRoute).catch(() => null);
+    const routeContextPromise = getRouteContext(scope, resolvedRoute).catch(() => null);
         const cutoff14 = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    // Legacy code-keyed reads only fire for the pinned three houses whose
+    // Boris-era tables (invoice_inbox, bank_movements, master_todos etc.)
+    // key by 3-letter EntityCode. A tenant like Amsterdam has no rows in
+    // those tables at all — the queries are skipped rather than filtered
+    // with the UUID (which would silently return 0 and look like "nothing
+    // to do" instead of "this tenant isn't wired into that pipeline yet").
+    const codedEntity = scope.code; // "BM" | "IFL" | "BBH" | null
     const [eod, bookings, invInbox, bank, mep, tasks, anomalies, invitations, masterTodos, paSchedule, academyModuleLessons, academyProgress] = await Promise.all([
       rid ? sb.from("eod_accounting").select("revenue,actual_covers").eq("restaurant_id", rid).eq("report_date", today).maybeSingle() : Promise.resolve({ data: null } as any),
       rid ? sb.from("bookings").select("party_size,status").eq("restaurant_id", rid).eq("service_date", today) : Promise.resolve({ data: [] } as any),
-      sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", entity).not("match_status", "in", "(approved,rejected,duplicate)"),
-      sb.from("bank_movements").select("id").eq("entity_id", entity).eq("reconciled_to", "unmatched"),
+      codedEntity ? sb.from("invoice_inbox").select("amount_eur,match_status").eq("entity_id", codedEntity).not("match_status", "in", "(approved,rejected,duplicate)") : Promise.resolve({ data: [] } as any),
+      codedEntity ? sb.from("bank_movements").select("id").eq("entity_id", codedEntity).eq("reconciled_to", "unmatched") : Promise.resolve({ data: [] } as any),
       rid ? sb.from("mep_dishes").select("id,is_active").eq("is_active", true) : Promise.resolve({ data: [] } as any),
       rid ? sb.from("tasks").select("id,priority,status").in("status", ["open", "in_progress"]).limit(50) : Promise.resolve({ data: [] } as any),
-      sb.from("v_finance_anomalies_open").select("kind,severity,description").eq("entity_code", entity).limit(6),
-      sb.from("team_invitations")
+      codedEntity ? sb.from("v_finance_anomalies_open").select("kind,severity,description").eq("entity_code", codedEntity).limit(6) : Promise.resolve({ data: [] } as any),
+      codedEntity ? sb.from("team_invitations")
         .select("invited_email,invited_name,role,starting_date,accepted_at")
-        .eq("entity_code", entity)
+        .eq("entity_code", codedEntity)
         .not("accepted_at", "is", null)
         .is("revoked_at", null)
         .gte("accepted_at", cutoff14)
         .order("accepted_at", { ascending: false })
-        .limit(10),
+        .limit(10) : Promise.resolve({ data: [] } as any),
       // PA integration Sprint 1 — pull top-impact open master_todos.
-      sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20),
+      codedEntity ? sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20) : Promise.resolve({ data: [] } as any),
       userId ? sb.from("pa_schedule_state").select("morning_brief_time,evening_debrief_time,daily_academy_time,whatsapp_triage_hourly").eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null } as any),
       // Pillars #3 — Academy progress bundle for the current pillar / module.
       // We read the module from page_context.active_pillar; if we don't know
@@ -255,41 +372,43 @@ export class AssistantOrchestrator {
     const tasksOpen = (tasks.data || []).filter((t: any) => (t.priority || "") === "urgent" || (t.priority || "") === "high").length;
 
     const topTodos = ((masterTodos as any).data || [])
-      .filter((t: any) => !t.entity_code || t.entity_code === entity)
+      .filter((t: any) => !t.entity_code || (codedEntity && t.entity_code === codedEntity))
       .slice(0, 5)
       .map((t: any) => ({ title: t.title, impact_score: t.impact_score, source: t.source, due_at: t.due_at }));
 
-    const hh = Number(madridHHmm().slice(0, 2));
+    const hh = Number(nowHHmm.slice(0, 2));
     const svc: AssistantContext["service_phase"] = hh < 19 ? "before" : hh < 24 ? "during" : "after";
 
-    // Ad reactivation summary — best-effort, only surfaces when there are
-    // rows in platform_reactivation_state for meta-ads. Powers Chef FAB's
-    // "how's the BM ad situation" answer.
+    // Ad reactivation summary — Boris's Bistro Mondo meta-ads recovery flow.
+    // Only surfaces for BM (or any tenant that has rows in
+    // platform_reactivation_state). Non-pinned tenants skip the query entirely
+    // so no BM-specific "Disabled since" tag leaks into their prompt.
     let adReactivation: AssistantContext["ad_reactivation"] = null;
-    try {
+    if (codedEntity) try {
       const { data: prRows } = await sb.from("platform_reactivation_state")
         .select("step_key,done")
-        .eq("entity_code", entity).eq("platform", "meta-ads");
+        .eq("entity_code", codedEntity).eq("platform", "meta-ads");
       const steps = prRows || [];
       const REACT_KEYS = ["card_rotated","campaigns_audited","creative_refreshed","budget_set"];
       const doneKeys = new Set(steps.filter((r: any) => r.done).map((r: any) => r.step_key));
       const stepsDone = REACT_KEYS.filter((k) => doneKeys.has(k)).length;
-      if (steps.length > 0 || entity === "BM") {
+      if (steps.length > 0 || codedEntity === "BM") {
         adReactivation = {
           platform: "meta-ads",
-          status_label: entity === "BM" ? "Disabled" : null,
+          status_label: codedEntity === "BM" ? "Disabled" : null,
           steps_done: stepsDone,
           steps_total: REACT_KEYS.length,
           ready: stepsDone === REACT_KEYS.length,
-          disabled_since: entity === "BM" ? "2026-04-04" : null,
+          disabled_since: codedEntity === "BM" ? "2026-04-04" : null,
         };
       }
     } catch {}
 
     return {
       entity,
+      entity_scope: scope,
       today,
-      now_hhmm: madridHHmm(),
+      now_hhmm: nowHHmm,
       service_phase: svc,
       covers_booked: covers,
       eod_posted: !!eod.data,
@@ -309,8 +428,8 @@ export class AssistantOrchestrator {
       top_master_todos: topTodos,
       pa_schedule: (paSchedule as any).data || null,
       academy_progress_current_module: (() => {
-        const scope = pageContext && (pageContext.active_pillar === "foh" || pageContext.active_pillar === "boh" || pageContext.active_pillar === "office") ? pageContext.active_pillar : null;
-        if (!scope) return null;
+        const modScope = pageContext && (pageContext.active_pillar === "foh" || pageContext.active_pillar === "boh" || pageContext.active_pillar === "office") ? pageContext.active_pillar : null;
+        if (!modScope) return null;
         const lessons: any[] = ((academyModuleLessons as any)?.data) || [];
         const progress: any[] = ((academyProgress as any)?.data) || [];
         const byLesson = new Map<string, string>();
@@ -320,7 +439,7 @@ export class AssistantOrchestrator {
         const inProg = lessons.filter((l) => byLesson.get(l.id) === "in_progress").length;
         const next = lessons.find((l) => byLesson.get(l.id) !== "done");
         return {
-          module_scope: scope as "foh" | "boh" | "office",
+          module_scope: modScope as "foh" | "boh" | "office",
           total,
           done,
           in_progress: inProg,
@@ -333,18 +452,48 @@ export class AssistantOrchestrator {
     };
   }
 
-  async getMemory(entity: EntityCode, userId: string | null): Promise<AssistantMemoryFact[]> {
+  async getMemory(entityOrScope: EntityCode | AssistantEntityScope, userId: string | null): Promise<AssistantMemoryFact[]> {
     const sb = supabaseServer();
+    const scope = typeof entityOrScope === "string"
+      ? (await resolveEntityScope(entityOrScope)) || emptyScopeFor(entityOrScope)
+      : entityOrScope;
+    const codedEntity = scope.code;
+    // Memory scoping: a user's assistant_memory rows are already scoped by
+    // user_id, but a fact tagged "entity:BM" or "topic:BM-finance" must not
+    // surface when the current tenant is anything other than BM. Filter to
+    // memories whose scope is null / "global" / matches the current entity
+    // code (when we have one). This is the anti-leak for Boris's fiscal
+    // notes bleeding into an Amsterdam session.
     const [memRes, patRes] = await Promise.all([
       userId
-        ? sb.from("assistant_memory").select("fact,scope").eq("user_id", userId).is("retired_at", null).order("confirmed_at", { ascending: false }).limit(20)
+        ? sb.from("assistant_memory").select("fact,scope").eq("user_id", userId).is("retired_at", null).order("confirmed_at", { ascending: false }).limit(40)
         : Promise.resolve({ data: [] } as any),
-      // Bank reconciliation intelligence #3 — active recurring patterns become
-      // memory hints so the FAB can reason about "what does this movement look
-      // like?" using institutional knowledge.
-      sb.from("recurring_bank_patterns").select("label,pattern_type,expected_frequency,times_matched,bank_account").eq("entity_code", entity).is("disabled_at", null).order("times_matched", { ascending: false }).limit(15),
+      // Bank reconciliation intelligence #3 — Boris-only feature keyed by the
+      // legacy EntityCode. Skip for non-pinned tenants.
+      codedEntity
+        ? sb.from("recurring_bank_patterns").select("label,pattern_type,expected_frequency,times_matched,bank_account").eq("entity_code", codedEntity).is("disabled_at", null).order("times_matched", { ascending: false }).limit(15)
+        : Promise.resolve({ data: [] } as any),
     ]);
-    const mem: AssistantMemoryFact[] = ((memRes.data as any[]) || []).map((m: any) => ({ fact: m.fact, scope: m.scope }));
+    const rawMem = ((memRes.data as any[]) || []) as Array<{ fact: string; scope: string | null }>;
+    // Which scopes are OK for this tenant?
+    const allowed = (mScope: string | null | undefined): boolean => {
+      const s = String(mScope || "").toLowerCase().trim();
+      if (!s || s === "global") return true;
+      if (codedEntity) {
+        const c = codedEntity.toLowerCase();
+        if (s === "entity:" + c) return true;
+        if (s.startsWith("topic:") && s.includes(c)) return true;
+      }
+      // Untagged topic-scoped memories are treated as user-only universal
+      // (no entity tag) and pass through.
+      if (s.startsWith("topic:") && !codedEntity) return false;
+      if (s.startsWith("entity:")) return false;
+      return true;
+    };
+    const mem: AssistantMemoryFact[] = rawMem
+      .filter((m) => allowed(m.scope))
+      .slice(0, 20)
+      .map((m: any) => ({ fact: m.fact, scope: m.scope || undefined }));
     const patternHints: AssistantMemoryFact[] = ((patRes.data as any[]) || []).map((p: any) => ({
       fact: "Recurring bank pattern (" + p.pattern_type + ", " + p.expected_frequency + ", " + Number(p.times_matched || 0) + "x): " + p.label + (p.bank_account ? " on " + p.bank_account : ""),
       scope: "bank_pattern",
@@ -352,12 +501,17 @@ export class AssistantOrchestrator {
     return [...mem, ...patternHints];
   }
 
-  async getConfig(entity: EntityCode): Promise<AssistantConfig | null> {
+  async getConfig(entityOrScope: EntityCode | AssistantEntityScope): Promise<AssistantConfig | null> {
     const sb = supabaseServer();
-    const { data } = await sb.from("assistant_config").select("*").eq("entity_code", entity).maybeSingle();
+    const scope = typeof entityOrScope === "string"
+      ? (await resolveEntityScope(entityOrScope)) || emptyScopeFor(entityOrScope)
+      : entityOrScope;
+    const codedEntity = scope.code;
+    if (!codedEntity) return null; // no legacy config row for non-pinned tenants
+    const { data } = await sb.from("assistant_config").select("*").eq("entity_code", codedEntity).maybeSingle();
     if (!data) return null;
     return {
-      entity_code: entity,
+      entity_code: codedEntity,
       voice_profile: (data as any).voice_profile || "",
       personality_dials: (data as any).personality_dials || { formality: 0.5, warmth: 0.6, brevity: 0.6 },
       timezone: (data as any).timezone || "Europe/Madrid",
@@ -392,6 +546,15 @@ export class AssistantOrchestrator {
 
   private buildSystem(mode: AssistantMode, input: GenerateInput): string {
     const cfg = input.config;
+    const ctxForIdent = input.context;
+    const entityScope = ctxForIdent?.entity_scope || null;
+    // Dynamic per-tenant identity block. Old prompt opened with "You are the
+    // Food Studios Assistant" and then hardcoded Bistro Mondo / Taller / IFS
+    // as the only valid venue names. That leaks Boris's houses into every
+    // tenant's Chef turn. The identity block below is entity-driven so an
+    // Amsterdam venue sees Amsterdam context and only Amsterdam context.
+    const identityBlock = entityScope ? buildIdentityBlock(entityScope, ctxForIdent) : "";
+    const fiscalBlock = entityScope ? buildFiscalBlock(entityScope) : "";
     const voice = cfg?.voice_profile ? "\n\nVoice:\n" + cfg.voice_profile : "";
     const dials = cfg?.personality_dials
       ? "\n\nPersonality dials (0..1 sliders):\n- formality: " + cfg.personality_dials.formality
@@ -414,7 +577,7 @@ export class AssistantOrchestrator {
     //  3. Every proper noun in the output must trace back to context.
     //     We tell the model that explicitly. A post-check enforces it.
     const rc = ctx?.route_context || null;
-    const routeBlock = rc ? "\n\n" + formatRouteContextBlock(rc, ctx!.entity) : "";
+    const routeBlock = rc ? "\n\n" + formatRouteContextBlock(rc, entityScope?.entity.name || String(ctx!.entity)) : "";
     const routeIsService = rc?.is_service_route === true;
     // Suppress mid-service framing when we're on a page that isn't service.
     // We still let the model see today's date and the entity, just not the
@@ -422,9 +585,10 @@ export class AssistantOrchestrator {
     // reply as if it was 8pm on the pass.
     const suppressServiceFraming = !!ctx?.route && !routeIsService;
 
+    const localityLabel = entityScope?.entity.city || entityScope?.entity.country_code || "local";
     const shortStateLine = ctx
       ? "\n\nBackground OS state (do not lead with this — the page above is the primary context):\n"
-        + "- entity: " + ctx.entity + " · date: " + ctx.today + " " + ctx.now_hhmm + " Ibiza\n"
+        + "- entity: " + (entityScope?.entity.name || ctx.entity) + " · date: " + ctx.today + " " + ctx.now_hhmm + " " + localityLabel + "\n"
         + "- highest-impact open plate items across the OS: " + (ctx.top_master_todos?.length ?? 0)
         + (ctx.top_master_todos && ctx.top_master_todos.length
             ? "\n" + ctx.top_master_todos.slice(0, 3).map((t) => "    · " + t.title + " (impact " + t.impact_score + ")").join("\n")
@@ -432,8 +596,8 @@ export class AssistantOrchestrator {
       : "";
 
     const fullStateBlock = ctx
-      ? "\n\nOS state right now (" + ctx.entity + "):\n"
-        + "- date: " + ctx.today + " " + ctx.now_hhmm + " Ibiza\n"
+      ? "\n\nOS state right now (" + (entityScope?.entity.name || ctx.entity) + "):\n"
+        + "- date: " + ctx.today + " " + ctx.now_hhmm + " " + localityLabel + "\n"
         + "- service: " + ctx.service_phase + "\n"
         + "- covers booked today: " + ctx.covers_booked + "\n"
         + "- EOD posted: " + (ctx.eod_posted ? "yes · €" + (ctx.eod_revenue ?? 0) : "no") + "\n"
@@ -466,12 +630,18 @@ export class AssistantOrchestrator {
         + (ctx.page_context ? "\n- current page context: " + JSON.stringify(ctx.page_context).slice(0, 1500) : "")
       : "";
 
-    // Grounding rules — always included when we have real context.
-    // These are the anti-hallucination guardrails.
+    // Grounding rules — always included when we have real context. Now
+    // dynamic per entity: the only venue name the model is licensed to use
+    // is the current tenant's own name (and its legal name, if different).
+    // The old prompt whitelisted Boris's three houses across every turn,
+    // which meant a chef in the Amsterdam venue could still hear the model
+    // reason about Bistro Mondo.
+    const venueName = entityScope?.entity.name || String(ctx?.entity || "this venue");
+    const venueLegal = entityScope?.entity.legal_name;
     const groundingRules = ctx
       ? "\n\nGrounding rules (STRICT):\n"
         + "- Only reference numbers, venues, tables, or account balances that appear in the context above. Do not invent totals.\n"
-        + "- The only valid venue names are: Bistro Mondo (BM), Taller Sa Penya / Taller (IFL), Ibiza Food Studio (BBH). Never use any other venue name.\n"
+        + "- The venue you're helping with is " + venueName + (venueLegal && venueLegal !== venueName ? " (legal: " + venueLegal + ")" : "") + ". Do not name any other venue unless the user names it first — even if you have general knowledge of one.\n"
         + "- If the page has a route context, ANSWER ABOUT THAT PAGE. Do not pivot to unrelated finance/ops state unless the user explicitly asks about it.\n"
         + "- If a page-level query returns 0 rows and a filter looks buggy, say so plainly and name the buggy filter. Do not fabricate a business explanation.\n"
         + "- If you don't have data to answer, say 'I don't have that in the current context' rather than guessing.\n"
@@ -501,10 +671,12 @@ export class AssistantOrchestrator {
     // Pick the base prompt. For chat mode on non-service routes, use the
     // page-focused base which drops the "run the day" framing.
     const chatBase = (mode === "chat" && suppressServiceFraming) ? CHAT_BASE_PAGE_FOCUSED : CHAT_BASE;
-    if (mode === "chat")    return chatBase     + voice + dials + memBlock + ctxBlock + charterBlock + extra;
-    if (mode === "brief")   return BRIEF_BASE   + voice + dials + memBlock + ctxBlock + charterBlock + extra;
+    // identityBlock + fiscalBlock go RIGHT AFTER the base so "you are helping
+    // <user> at <entity>" is the first orienting fact the model reads.
+    if (mode === "chat")    return chatBase     + identityBlock + fiscalBlock + voice + dials + memBlock + ctxBlock + charterBlock + extra;
+    if (mode === "brief")   return BRIEF_BASE   + identityBlock + fiscalBlock + voice + dials + memBlock + ctxBlock + charterBlock + extra;
     if (mode === "extract") return EXTRACT_BASE + extra;
-    return DRAFT_BASE + voice + dials + memBlock + ctxBlock + charterBlock + extra;
+    return DRAFT_BASE + identityBlock + fiscalBlock + voice + dials + memBlock + ctxBlock + charterBlock + extra;
   }
 
   private modelFor(mode: AssistantMode) {
@@ -609,7 +781,7 @@ export class AssistantOrchestrator {
 
   async logInteraction(opts: {
     userId: string;
-    entity: EntityCode;
+    entity: EntityCode | string;
     route?: string | null;
     sessionId?: string | null;
     userPrompt: string;
@@ -683,19 +855,24 @@ export class AssistantOrchestrator {
   private verifyResponseTokens(text: string, input: GenerateInput): string {
     if (!text) return text;
     const ctx = input.context;
-    const knownVenues = new Set([
-      "Bistro Mondo", "Bistro-Mondo", "BM",
-      "Taller Sa Penya", "Taller",
-      "Ibiza Food Studio", "IFS", "IFL", "BBH",
-      "Ibiza", "Sa Penya", "Sa Cala", "Santa Gertrudis",
-      "Boris", "Food Studio", "Food Studios",
-    ]);
-    // Build a positive vocabulary from context: entity name, memory facts,
-    // route context tokens, page context blob.
+    const entityScope = ctx?.entity_scope || null;
+    // The old vocab hardcoded Boris's three houses + Ibiza place names +
+    // Boris's supplier tools. That's a Boris-specific allowlist. Rebuild
+    // it per-turn from the current entity — Boris still gets his names
+    // through (they're in his entity row + his memory) but Amsterdam gets
+    // Amsterdam's own vocabulary. See TO_BORIS_chef_context_audit_2026-09-20.
+    const knownVenues = new Set<string>();
+    if (entityScope) {
+      knownVenues.add(entityScope.entity.name);
+      if (entityScope.entity.legal_name) knownVenues.add(entityScope.entity.legal_name);
+      if (entityScope.entity.city) knownVenues.add(entityScope.entity.city);
+      if (entityScope.code) knownVenues.add(entityScope.code);
+      if (entityScope.entity.slug) knownVenues.add(entityScope.entity.slug);
+    }
     const vocab = new Set<string>();
-    for (const v of knownVenues) vocab.add(v.toLowerCase());
+    for (const v of knownVenues) vocab.add(String(v).toLowerCase());
     if (ctx) {
-      vocab.add(ctx.entity.toLowerCase());
+      vocab.add(String(ctx.entity).toLowerCase());
       for (const m of input.memory || []) vocab.add((m.fact || "").toLowerCase());
       for (const t of ctx.top_master_todos || []) vocab.add((t.title || "").toLowerCase());
       for (const a of ctx.top_anomalies || []) vocab.add((a.description || "").toLowerCase());
@@ -706,12 +883,15 @@ export class AssistantOrchestrator {
     // 4+ letters that aren't sentence starters we already know.
     const props = text.match(/\b[A-Z][a-zA-Z]{3,}(?:\s+[A-Z][a-zA-Z]{2,}){0,3}\b/g) || [];
     const suspicious: string[] = [];
+    // Universal English/Spanish/Dutch sentence-starters + kitchen/finance
+    // abbreviations. No venue names, no supplier names — those are the
+    // tenant-specific vocab above.
     const stop = new Set([
-      "I","Ibiza","OK","API","EOD","MEP","VAT","PDF","Chef","Food","Studios","Studio","Bistro","Mondo","Taller",
+      "I","OK","API","EOD","MEP","VAT","PDF","BTW","IVA","POS",
       "Yes","No","But","And","The","This","That","These","Those","Would","Could","Should","Please","Sorry","Look",
       "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday",
       "January","February","March","April","May","June","July","August","September","October","November","December",
-      "Supabase","Holded","Fresto","Wix","Amex","Pleo","Amazon","Google","WhatsApp","Gmail","CaixaBank",
+      "Supabase","Anthropic","Google","WhatsApp","Gmail","Chef","Food","Studio","Studios",
     ]);
     for (const p of props) {
       const key = p.toLowerCase();
@@ -782,3 +962,57 @@ Rules:
 const EXTRACT_BASE = `You are an extraction agent. Given a short piece of input (typically an email or a document snippet), you return STRICT JSON matching the schema in the user prompt. No prose, no code fences, no commentary. If the input does not match the shape being asked about, return the JSON with null / false fields — never invent.`;
 
 export const orchestrator = new AssistantOrchestrator();
+
+// -----------------------------------------------------------------------
+// Per-tenant system-prompt building blocks (2026-09-20)
+//
+// The Chef's system prompt used to open with a hardcoded "you help Boris at
+// Bistro Mondo / Taller / Ibiza Food Studio". These two helpers rebuild the
+// same orienting sentences from the entities row at request time so a chef
+// standing in a fresh tenant (e.g. Amsterdam) hears their own city, country
+// and fiscal grammar, and never the pinned three.
+// -----------------------------------------------------------------------
+function buildIdentityBlock(scope: AssistantEntityScope, ctx?: AssistantContext | null): string {
+  const e = scope.entity;
+  const room = (() => {
+    const r = String(ctx?.page_context?.active_pillar || "").toLowerCase();
+    if (r === "boh") return "kitchen";
+    if (r === "foh") return "dining room";
+    if (r === "office") return "office";
+    return null;
+  })();
+  const city = e.city ? " in " + e.city : "";
+  const country = e.country_code ? ", " + e.country_code : "";
+  const type = e.entity_type && e.entity_type !== "unknown" ? " (" + e.entity_type + ")" : "";
+  const roomLine = room ? "\nThe operator is standing in the " + room + " right now." : "";
+  return "\n\nYou are helping the operator at " + (e.name || "this venue") + type + city + country + "." + roomLine;
+}
+
+function buildFiscalBlock(scope: AssistantEntityScope): string {
+  const e = scope.entity;
+  const cc = (e.country_code || "").toUpperCase();
+  const currency = e.currency_code || "EUR";
+  const tz = e.timezone || "Europe/Madrid";
+  // Country-appropriate fiscal shorthand. Boris's ES tenants get the AEAT /
+  // 303 / 390 vocabulary. Dutch tenants get BTW / OB / KOR. Anything else
+  // stays generic. This is what the model should recognise if the operator
+  // uses those words in a question — it does not license the model to lead
+  // with them.
+  let vocab = "";
+  if (cc === "ES") {
+    vocab = "\n- Fiscal grammar (ES): VAT is IVA. Standard IVA 21% / reduced 10% / super-reduced 4%. Quarterly VAT return is Modelo 303; annual summary is Modelo 390. Withholding return is 111 / annual 190. Social security is TGSS. Tax authority is AEAT; portal login is Cl@ve or certificate. A sancionador is a penalty proceeding; an embargo is a wage/account seizure; an apremio is enforced collection.";
+  } else if (cc === "NL") {
+    vocab = "\n- Fiscal grammar (NL): VAT is BTW. Standard BTW 21% / reduced 9% / zero 0%. Quarterly VAT return is the BTW-aangifte (OB) filed via Mijn Belastingdienst Zakelijk. Small-business scheme is KOR. Payroll tax is loonheffing. Tax authority is de Belastingdienst.";
+  } else if (cc === "GB" || cc === "UK") {
+    vocab = "\n- Fiscal grammar (UK): VAT registration threshold applies. Standard VAT 20% / reduced 5% / zero-rated. Quarterly VAT return via Making Tax Digital. PAYE for payroll. Tax authority is HMRC.";
+  } else if (cc === "FR") {
+    vocab = "\n- Fiscal grammar (FR): VAT is TVA. Standard TVA 20% / intermediate 10% / reduced 5.5%. TVA return is filed via impots.gouv.fr. URSSAF is the social security agency.";
+  } else {
+    vocab = cc ? "\n- Fiscal grammar: this venue's country is " + cc + ". Use generic VAT terminology unless the operator introduces local terms." : "";
+  }
+  return "\n\nFiscal profile for this venue:\n"
+    + "- currency: " + currency + "\n"
+    + "- timezone: " + tz + "\n"
+    + (e.vat_regime ? "- VAT regime: " + e.vat_regime + "\n" : "")
+    + vocab.trim();
+}

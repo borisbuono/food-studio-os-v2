@@ -246,7 +246,7 @@ async function assembleSignals(entity: EntityCode | string, userId: string | nul
 
 function serialiseSignals(s: BriefSignals): string {
   const lines: string[] = [];
-  lines.push(`TODAY (${s.today.date}, ${s.today.now_hhmm} Ibiza, service phase ${s.today.service_phase}):`);
+  lines.push(`TODAY (${s.today.date}, ${s.today.now_hhmm} local, service phase ${s.today.service_phase}):`);
   lines.push(`- covers booked: ${s.today.covers_booked}`);
   if (s.today.upcoming_bookings.length) {
     lines.push("- upcoming bookings:");
@@ -282,7 +282,7 @@ function serialiseSignals(s: BriefSignals): string {
 
 const BRIEF_PROMPT = `Write today's morning brief for the operator.
 
-You have a structured signal assembly below. Weave it into 4 to 6 short editorial paragraphs — serif prose, no lists, no exclamation marks, no emojis. Match the entity's voice. Timezone-aware — use Ibiza local time.
+You have a structured signal assembly below. Weave it into 4 to 6 short editorial paragraphs — serif prose, no lists, no exclamation marks, no emojis. Match the entity's voice. Use the local time and locality named in the identity/fiscal blocks above; do not assume any particular city.
 
 Cover, in order:
 1. Today's headline — one sentence at the top of your reply, prefaced by exactly "HEADLINE: " on its own line. Keep it under 18 words. This is what the operator reads first, before the paragraphs.
@@ -295,7 +295,7 @@ Cover, in order:
 Rules:
 - Only use numbers and names from the signal assembly. Never invent.
 - If a section is empty, say so plainly ("Overnight was quiet.") rather than skip.
-- Match the entity's voice (Bistro Mondo = warm, Taller Sa Penya = quiet modernist, Holdings = sober).
+- Match the entity's voice given in the Voice block above. Do not import the voice of any other tenant.
 `;
 
 function extractHeadline(text: string): { headline: string; body: string } {

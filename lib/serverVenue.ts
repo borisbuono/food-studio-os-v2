@@ -48,3 +48,50 @@ export async function serverEntityFromProfile(): Promise<EntityKey> {
 export function serverRestaurantId(): string {
   return ENTITY_TO_RESTAURANT[serverEntity()] || ENTITY_TO_RESTAURANT[E_HOLDINGS] || "fb4d008f-2d2a-4e0d-a525-6e0e36af0259";
 }
+
+// The row shape the Chef context builder + system prompt need for any entity —
+// the three pinned houses and every future tenant. Kept minimal on purpose: no
+// secrets, no relationships, just the fields the prompt uses to speak in the
+// right language and scope reads to the right rows. Non-pinned entities read
+// this from the entities table at request time; the pinned three fall through
+// the same code path but hit the DB row that mirrors the constants in
+// lib/entities.ts.
+export type EntityRow = {
+  id: string;
+  name: string;
+  entity_type: string;
+  city: string | null;
+  country_code: string;   // ISO2, defaults ES in DB seed
+  currency_code: string;  // ISO3, defaults EUR
+  timezone: string;
+  vat_regime: string | null;
+  legal_name: string | null;
+  slug: string | null;
+};
+
+// Fetch a single entity row by UUID for the Chef context builder. Returns null
+// when the entity is unknown or inactive. The caller is expected to refuse the
+// turn in that case — we don't want to fall through to a Boris-shaped default.
+import type { SupabaseClient } from "@supabase/supabase-js";
+export async function getEntityById(sb: SupabaseClient, entity_id: string): Promise<EntityRow | null> {
+  if (!entity_id) return null;
+  const { data } = await sb
+    .from("entities")
+    .select("id, name, entity_type, city, country_code, currency_code, timezone, vat_regime, legal_name, slug")
+    .eq("id", entity_id)
+    .maybeSingle();
+  if (!data) return null;
+  const r = data as any;
+  return {
+    id: String(r.id),
+    name: String(r.name || ""),
+    entity_type: String(r.entity_type || "unknown"),
+    city: r.city || null,
+    country_code: (r.country_code || "ES").toUpperCase(),
+    currency_code: (r.currency_code || "EUR").toUpperCase(),
+    timezone: r.timezone || "Europe/Madrid",
+    vat_regime: r.vat_regime || null,
+    legal_name: r.legal_name || null,
+    slug: r.slug || null,
+  };
+}
