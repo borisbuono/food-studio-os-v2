@@ -153,6 +153,29 @@ export default async function HouseLandingPage({ params }: { params: { house: st
         </div>
       </section>
 
+      {/* EOD status tile — surfaces last-close date + a link to the manual
+          entry surface. Wired for the runway d2 manual EOD mode; on Fresto
+          houses it still lets the operator hop to /office/eod to key an
+          exception day by hand. */}
+      <section className="mt-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 border border-line px-4 py-3">
+          <p className="font-mono text-[11px] uppercase tracking-wide text-clay">
+            EOD status ·{" "}
+            {latest ? (
+              <>last close {humanDate(latest.date, today)}</>
+            ) : (
+              <>no close on record yet</>
+            )}
+          </p>
+          <Link
+            href={`/h/${slug}/office/eod`}
+            className="border border-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-ink hover:text-paper"
+          >
+            + Enter today's close
+          </Link>
+        </div>
+      </section>
+
       {/* Yesterday's close — one card. Boris rule: money · tickets · guests
           on one line, secondary line = last close date + peak hour. */}
       <section className="mt-8">
