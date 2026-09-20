@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { getMyMembershipContext } from "@/lib/memberships";
 
 export const dynamic = "force-dynamic";
 
@@ -285,6 +286,45 @@ export default async function OverviewPage() {
   const sb = supabaseServer();
   const today = madridToday();
 
+  // Tenant gate (Boris walk 2026-09-20). This page hardcodes BBH/BM/IFL —
+  // it's Boris's 3-company overview, not a generic Studio dashboard. A
+  // fresh operator (30-Sep Amsterdam customer) has no business seeing
+  // AEAT ejecutivas, TGSS apremio and BM↔IFL intercompany mismatches on
+  // day one. Check whether the signed-in user actually owns any of Boris's
+  // three legal entities; if not, render a neutral placeholder.
+  //   TODO: gate by country_code once the 20260920 migration is applied
+  //   — then STRIP fiscal register + intercompany + TGSS strip in the
+  //   non-ES path, and start reading THIS user's own entity rows.
+  const ctx = await getMyMembershipContext();
+  const memberEntityIds = new Set(ctx.memberships.map((m) => m.entity_id));
+  let showBorisRegister = false;
+  if (ctx.signedIn && memberEntityIds.size > 0) {
+    const { data: ents } = await sb
+      .from("entities")
+      .select("id, name")
+      .in("id", Array.from(memberEntityIds));
+    const names = new Set(((ents || []) as any[]).map((e) => e.name).filter(Boolean));
+    // Boris's known holding — if the current user is a member of it, they
+    // see the full 3-company overview. Otherwise the page renders empty.
+    showBorisRegister = names.has("Boris Buono Holdings") || names.has("Boris Buono Holdings SL") || names.has("BBH");
+  }
+
+  if (!showBorisRegister) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-6">
+        <header className="mb-6">
+          <h1 className="font-serif text-[28px] text-ink">Overview</h1>
+          <p className="mt-1 text-[13px] text-clay">Live · {today}</p>
+        </header>
+        <section className="rounded-lg border border-line bg-card p-6">
+          <p className="font-serif text-[15px] text-ink-soft">
+            The multi-entity overview is being generalised. For now, day-to-day numbers live inside each house — open a tile on the Studio page.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const [bbh, bm, ifl] = await Promise.all([
     loadEntityBlock(sb, "BBH", today),
     loadEntityBlock(sb, "BM", today),
@@ -299,6 +339,8 @@ export default async function OverviewPage() {
         <p className="mt-1 text-[13px] text-clay">Live · Madrid {today}</p>
       </header>
 
+      {/* TODO: gate by country_code === 'ES' once the 20260920 migration
+         is applied. Until then we rely on the ownership gate above. */}
       <section className="mb-6 rounded-lg border border-tomato/40 bg-tomato/5 p-3">
         <h3 className="font-mono text-[10px] uppercase tracking-wide text-tomato">Portfolio fires</h3>
         <ul className="mt-1 space-y-1 text-[13px] text-ink">

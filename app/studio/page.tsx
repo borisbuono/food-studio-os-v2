@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { RESTAURANT_TO_ENTITY, publicNameForEntity } from "@/lib/entities";
 import { GuestChip } from "./GuestChip";
 import { HourlySpark } from "./HourlySpark";
 
@@ -247,6 +247,19 @@ export default async function StudioPage() {
   const dateLabel = madridDateLabel();
   const clock = madridClock();
 
+  // Owner label — read from the signed-in user's profile so the strip below
+  // reads "Owner · <them>" instead of a hardcoded "Boris Buono". Falls back
+  // to the email prefix if the profile.name isn't set (fresh onboard).
+  // Boris walk 2026-09-20: first paying customer is not Boris; this strip
+  // was leaking his name into every operator's Studio hero. Dynamic now.
+  const { data: prof } = await sb
+    .from("profiles")
+    .select("name")
+    .eq("id", userRes.user.id)
+    .maybeSingle();
+  const ownerName = (prof?.name && String(prof.name).trim()) || (userRes.user.email?.split("@")[0]) || "Owner";
+  const legalEntityName = bbh?.name ? publicNameForEntity(bbh.name) : null;
+
   // Group tiles by entity_type for the section headers.
   const groups: { key: string; label: string; tiles: Tile[] }[] = [
     { key: "operating_venue", label: "Venues",    tiles: tiles.filter((t) => t.type === "operating_venue") },
@@ -274,7 +287,7 @@ export default async function StudioPage() {
                 render surface so we never leak the holding company name
                 to guests, partners or team members. */}
             <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-              Legal entity · Ibiza Food Studio S.L. · Owner · Boris Buono
+              {legalEntityName ? <>Legal entity · {legalEntityName} · </> : null}Owner · {ownerName}
             </p>
           </div>
           <div className="text-right">

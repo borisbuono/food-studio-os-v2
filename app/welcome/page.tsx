@@ -67,8 +67,13 @@ export default async function Welcome({ searchParams }: { searchParams?: { role?
         </div>
       </section>
 
+      {/* Boris walk 2026-09-20: the old footer listed his three houses by name
+         (Ibiza · Bistro Mondo · Taller Sa Penya · Ibiza Food Studio S.L.).
+         Fine when the OS was for one operator; a leak now that other
+         operators land here to sign up. Kept as a generic strap so the
+         footer still anchors the page. */}
       <footer className="mt-24 border-t border-black/10 pt-6 font-mono text-[10px] uppercase tracking-wide text-clay">
-        Ibiza · Bistro Mondo · Taller Sa Penya · Ibiza Food Studio S.L.
+        Food Studios · the chef-built operating system
       </footer>
     </main>
   );

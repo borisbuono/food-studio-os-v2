@@ -34,9 +34,12 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     // first client render matches the server HTML. readEntityCookie() reads
     // document.cookie, which is unavailable during SSR — seeding from it made
     // the server emit bistro_mondo and the client flip on hydration.
+    // Boris walk 2026-09-20 (runway d1): fallback default is "holdings"
+    // (the neutral studio scope), not "bistro_mondo" — a fresh tenant with
+    // no cookie was getting BM tomato branding on first paint.
     if (initialEntity) return initialEntity;
     const c = readEntityCookie() as EntityKey | null;
-    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "bistro_mondo";
+    return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : "holdings";
   });
   const [role, setRole] = useState<RoleKey>("office");
   // Seed from the server-resolved profile so the top bar chip paints
@@ -80,7 +83,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "bistro_mondo";
+      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || "holdings";
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
       setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");

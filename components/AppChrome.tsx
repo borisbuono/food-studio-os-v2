@@ -30,7 +30,9 @@ import { EntityKey } from "@/lib/entities";
 // (studio → hidden, house/room → rooms of THIS house), so AppChrome no
 // longer needs to pass a rooms array.
 
-const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms"];
+// /onboard/* also renders as a clean shell (no sidebar/topbar) — the wizard
+// is a first-time surface, chrome would drown out the flow.
+const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard"];
 
 function isPublic(path: string): boolean {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));

@@ -18,7 +18,10 @@ export default function Feedback() {
   return (
     <main className="mx-auto max-w-lg px-8 py-16">
       <h1 className="text-center font-serif text-3xl text-ink">How was it?</h1>
-      <p className="mt-2 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-clay">Bistro Mondo</p>
+      {/* Boris walk 2026-09-20: the "Bistro Mondo" kicker used to be baked
+         into this generic feedback page. Fresh tenants don't own BM, so
+         we drop the kicker until the venue is resolved from the current
+         entity context (TODO: wire from `serverEntity()` / entity name). */}
       <div className="mt-8 flex flex-wrap justify-center gap-2">
         {RATINGS.map((r, n) => (
           <button key={n} onClick={() => setRating(n)} className={"rounded-full px-4 py-2 font-sans text-[13px] transition " + (rating === n ? "bg-[color:var(--accent)] text-[#F7F7F4]" : "border border-black/15 text-ink-soft")}>{r}</button>

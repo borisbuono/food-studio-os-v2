@@ -44,6 +44,10 @@ const PUBLIC_PAGE_PREFIXES = [
   // Public lead-capture form — placeholder shipped overnight 2026-09-11.
   // The comm/design agent replaces the component; the path stays public.
   "/leads/capture",
+  // Self-serve onboarding step 1 is the sign-up gate — must be reachable
+  // signed-out. Steps 2-5 run their own auth check server-side and
+  // redirect back to /onboard/step-1 with a bounced session.
+  "/onboard/step-1",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([
@@ -51,6 +55,7 @@ const PUBLIC_PAGE_EXACT = new Set<string>([
   "/login",
   "/booking-terms",
   "/leads/capture",
+  "/onboard/step-1",
 ]);
 
 const PUBLIC_API_PREFIXES = [

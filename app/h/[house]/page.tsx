@@ -33,6 +33,9 @@ const HOUSE_SLUG_TO_RESTAURANT_ID: Record<string, string | undefined> = {
 
 // House-specific subtitle. Legal entity + address anchor the mark so the
 // visitor can tell BM (Sant Joan) from Taller (Sa Penya) at a glance.
+// TODO (2026-09-20 runway d1): read legal_name + city from `entities`
+// instead of hardcoding — this only works for Boris's two houses today
+// and any new tenant's house slug will fall through to the blank string.
 const HOUSE_SUBTITLE: Record<string, string> = {
   bm:     "Legal entity · Bistro Mondo · Sant Joan de Labritja, Ibiza",
   taller: "Legal entity · Ibiza Food Studio S.L. · Plaza Sa Penya, Ibiza",

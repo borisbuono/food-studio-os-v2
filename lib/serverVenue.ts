@@ -6,13 +6,17 @@ const KEYS: EntityKey[] = ["holdings", "bistro_mondo", "taller"];
 
 // The venue the current view is scoped to. Priority:
 //  1. fs_entity cookie (explicit user choice, set by the switcher)
-//  2. signed-in user's profiles.restaurant_id (first-visit default)
-//  3. "bistro_mondo" (safe fallback — Utopia trial is archived,
-//     see 2026-08-22 Phase 1 entity migration.)
+//  2. signed-in user's profiles.restaurant_id (first-visit default,
+//     via `serverEntityFromProfile()` below)
+//  3. "holdings" (neutral studio scope). Boris walk 2026-09-20 flipped
+//     this from "bistro_mondo" to "holdings" so a fresh operator's first
+//     paint isn't Bistro-Mondo-branded before their cookie lands. The
+//     old Utopia-archive rationale (2026-08-22 Phase 1) still applies
+//     — Utopia stays out of KEYS.
 export function serverEntity(): EntityKey {
   const c = cookies().get("fs_entity")?.value as EntityKey | undefined;
   if (c && KEYS.includes(c)) return c;
-  return "bistro_mondo";
+  return "holdings";
 }
 
 // Async variant that consults the profile when the cookie is missing.
@@ -31,7 +35,7 @@ export async function serverEntityFromProfile(): Promise<EntityKey> {
       if (key && KEYS.includes(key)) return key;
     }
   } catch {}
-  return "bistro_mondo";
+  return "holdings";
 }
 
 export function serverRestaurantId(): string {
