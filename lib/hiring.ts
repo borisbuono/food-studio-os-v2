@@ -27,6 +27,7 @@ export const CANDIDATE_STATUSES = [
   "hired",
   "rejected",
   "withdrew",
+  "pool",
 ] as const;
 export type CandidateStatus = (typeof CANDIDATE_STATUSES)[number];
 

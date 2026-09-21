@@ -1,7 +1,8 @@
 import { extractClientIp, hashIp } from "@/lib/leads/rateLimit";
 import { parseCv, readPerson, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
 import { mirrorColumns } from "@/lib/hiring-sop-server";
-import { applyClient, EXTRA_PERSON_Q, KIND_LABEL, PERSON_Q, SIGNATURE_Q, WORK_STYLE, workStyleLines, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
+import { sendApplicantConfirmation } from "@/lib/email/hiring";
+import { APPLY_CONTACT, applyClient, EXTRA_PERSON_Q, KIND_LABEL, PERSON_Q, SIGNATURE_Q, WORK_STYLE, workStyleLines, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,6 +132,16 @@ export async function POST(req: Request, { params }: { params: { house: string }
   const { id, entity_id, token } = sub as { id: string; entity_id: string; token: string };
 
   // From here the application is saved. Everything below is best-effort.
+  const lang = s(form.get("lang"), 2) === "en" ? "en" : "es";
+  await sb.rpc("apply_set_lang", { p_id: id, p_token: token, p_lang: lang });
+  const mail = await sendApplicantConfirmation({
+    to: email,
+    name,
+    house: house.name,
+    lang,
+    contact: APPLY_CONTACT[params.house] || "info@ibzfoodstudio.com",
+  });
+  if (mail.sent) await sb.rpc("apply_mark_confirmed", { p_id: id, p_token: token });
   let cvPath: string | null = null;
   if (file) {
     const ext = file.mediaType === "application/pdf" ? "pdf" : file.mediaType.split("/")[1] || "jpg";

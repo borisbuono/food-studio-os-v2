@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ACTIVE_CANDIDATE_STATUSES, CANDIDATE_STATUSES, CandidateStatus } from "@/lib/hiring";
 import { IntakeForm, ProfileBlock, QuestionsBlock, type SopCandidate } from "./CandidateSop";
 import OfferSlots from "./OfferSlots";
+import NextSteps from "./NextSteps";
 
 type Candidate = {
   id: string;
@@ -36,6 +37,7 @@ const COLUMN_LABEL: Record<CandidateStatus, string> = {
   hired: "Hired",
   rejected: "Rejected",
   withdrew: "Withdrew",
+  pool: "Pool (later)",
 };
 
 export default function CandidateKanban({
@@ -84,7 +86,7 @@ export default function CandidateKanban({
   }
 
   const cols = showArchived
-    ? ([...KANBAN_COLUMNS, "rejected", "withdrew"] as CandidateStatus[])
+    ? ([...KANBAN_COLUMNS, "pool", "rejected", "withdrew"] as CandidateStatus[])
     : KANBAN_COLUMNS;
 
   const drawer = drawerId ? candidates.find((c) => c.id === drawerId) || null : null;
@@ -200,7 +202,7 @@ export default function CandidateKanban({
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
           />
-          <span className="text-clay">Show archived</span>
+          <span className="text-clay">Show pool &amp; archived</span>
         </label>
       </div>
 
@@ -385,6 +387,7 @@ function CandidateDrawer({
         </div>
 
         <ProfileBlock c={candidate} onUpdated={onCandidate} />
+        <NextSteps c={candidate as any} onCandidate={onCandidate} />
         <QuestionsBlock
           c={candidate}
           touches={touches}

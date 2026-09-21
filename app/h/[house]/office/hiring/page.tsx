@@ -5,6 +5,7 @@ import { getHouseBySlug } from "@/lib/houses.server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ACTIVE_CANDIDATE_STATUSES } from "@/lib/hiring";
 import CandidateKanban from "./CandidateKanban";
+import PurgeCvs from "./PurgeCvs";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ type Candidate = {
   cv_path?: string | null;
   retain_until?: string | null;
   answers?: any;
+  team_member_id?: string | null;
 };
 
 export default async function HiringPage({ params }: { params: { house: string } }) {
@@ -68,7 +70,7 @@ export default async function HiringPage({ params }: { params: { house: string }
     sb
       .from("candidates")
       .select(
-        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience, phone, email, notes, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, retain_until, answers"
+        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience, phone, email, notes, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, retain_until, answers, team_member_id"
       )
       .eq("entity_id", entity_id)
       .order("updated_at", { ascending: false }),
@@ -177,7 +179,8 @@ export default async function HiringPage({ params }: { params: { house: string }
         <span className="select-all font-mono text-ink">https://foodstudio.ai/apply/{slug}?src=instagram</span>
         {" "}— change <span className="font-mono">src=</span> to whatsapp, web… to see where people come from.
         Add <span className="font-mono">&amp;lang=en</span> for English, <span className="font-mono">&amp;area=sala</span> or{" "}
-        <span className="font-mono">&amp;kind=stage_3d</span> to preselect.
+        <span className="font-mono">&amp;kind=stage_3d</span> to preselect.{" "}
+        <PurgeCvs entityId={entity_id} />
       </p>
 
       {/* Candidate kanban */}

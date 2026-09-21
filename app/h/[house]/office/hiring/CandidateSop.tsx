@@ -23,6 +23,7 @@ export type SopCandidate = {
   cv_path?: string | null;
   retain_until?: string | null;
   answers?: any;
+  team_member_id?: string | null;
 };
 
 const LOW = 0.6;
