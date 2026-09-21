@@ -56,6 +56,9 @@ const PUBLIC_PAGE_PREFIXES = [
   // Public job application page — candidates arrive from an Instagram /
   // WhatsApp link with no account. Posts to /api/public/apply/<slug>.
   "/apply/",
+  // Public booking page (Cal.com model) — visitors and interview candidates
+  // pick a slot with no account. Posts to /api/public/book/<slug>.
+  "/book/",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([
