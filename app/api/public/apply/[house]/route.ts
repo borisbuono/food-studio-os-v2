@@ -139,7 +139,7 @@ export async function POST(req: Request, { params }: { params: { house: string }
     name,
     house: house.name,
     lang,
-    contact: APPLY_CONTACT[params.house] || "info@ibzfoodstudio.com",
+    contact: APPLY_CONTACT[params.house] || "hola@ibzfoodstudio.com",
   });
   if (mail.sent) await sb.rpc("apply_mark_confirmed", { p_id: id, p_token: token });
   let cvPath: string | null = null;

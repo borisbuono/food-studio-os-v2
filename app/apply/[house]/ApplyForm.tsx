@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EMPTY_ANSWERS, EXTRA_PERSON_Q, PERSON_Q, SIGNATURE_Q, WORK_STYLE, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
+import { EMPTY_ANSWERS, EXTRA_PERSON_Q, PERSON_Q, SIGNATURE_Q, WORK_STYLE, type ApplyAnswers, type ApplyArea, type ApplyKind, type BrandKit } from "@/lib/hiring-apply";
 
 type Lang = "es" | "en";
 type Opening = { id: string; title: string; station: string | null; hours_per_week: number | null };
@@ -91,6 +91,7 @@ export default function ApplyForm(props: {
   legalName: string;
   accent: string;
   contact: string;
+  brandKit: BrandKit;
   openings: Opening[];
   preselect: string;
   initialLang: Lang;
@@ -98,8 +99,21 @@ export default function ApplyForm(props: {
   initialKind: string;
   source: string;
   utm: string;
+  embed?: boolean;
 }) {
-  const { slug, houseName, legalName, accent, contact, openings } = props;
+  const { slug, houseName, legalName, accent, contact, brandKit, openings, embed = false } = props;
+  // Brand values (fall back to something neutral if brand_kit is missing).
+  const ground = brandKit?.palette?.ground || "#faf8f5";
+  const ink = brandKit?.palette?.ink || "#111827";
+  const displayFamily = brandKit?.typography?.display?.family;
+  const bodyFamily = brandKit?.typography?.body?.family;
+  const displayFont = displayFamily ? `"${displayFamily}", Georgia, serif` : "Georgia, serif";
+  const bodyFont = bodyFamily ? `"${bodyFamily}", system-ui, -apple-system, Segoe UI, sans-serif` : "system-ui, -apple-system, Segoe UI, sans-serif";
+  // Embed mode strips the outer chrome (bg + top padding + full-viewport
+  // height) so the page sits flush inside a Wix iframe on the venue sites.
+  const outerBg = embed ? "transparent" : ground;
+  const mainClass = embed ? "px-5 pb-16 pt-4" : "min-h-screen px-5 pb-24 pt-8";
+  const doneClass = embed ? "px-5 py-10" : "min-h-screen px-5 py-16";
   const [lang, setLang] = useState<Lang>(props.initialLang);
   const t = T[lang];
   const [step, setStep] = useState(0);
@@ -171,17 +185,17 @@ export default function ApplyForm(props: {
 
   if (done)
     return (
-      <main className="min-h-screen bg-[#faf8f5] px-5 py-16 text-neutral-900">
+      <main className={doneClass} style={{ background: outerBg, color: ink, fontFamily: bodyFont }}>
         <div className="mx-auto max-w-md">
           <p className="text-xs uppercase tracking-[0.2em]" style={{ color: accent }}>{houseName}</p>
-          <h1 className="mt-3 font-serif text-3xl">{t.thanks(name.split(" ")[0] || name)}</h1>
-          <p className="mt-4 text-lg leading-relaxed text-neutral-700">{t.thanksBody}</p>
+          <h1 className="mt-3 text-3xl" style={{ fontFamily: displayFont }}>{t.thanks(name.split(" ")[0] || name)}</h1>
+          <p className="mt-4 text-lg leading-relaxed opacity-80">{t.thanksBody}</p>
         </div>
       </main>
     );
 
   return (
-    <main className="min-h-screen bg-[#faf8f5] px-5 pb-24 pt-8 text-neutral-900">
+    <main className={mainClass} style={{ background: outerBg, color: ink, fontFamily: bodyFont }}>
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.2em]" style={{ color: accent }}>{houseName} · Ibiza</p>
@@ -198,14 +212,14 @@ export default function ApplyForm(props: {
             ))}
           </div>
         </div>
-        <h1 className="mt-4 font-serif text-3xl leading-tight">{t.hello}</h1>
-        <p className="mt-2 text-neutral-600">{t.lede(houseName)}</p>
+        <h1 className="mt-4 text-3xl leading-tight" style={{ fontFamily: displayFont }}>{t.hello}</h1>
+        <p className="mt-2 opacity-70">{t.lede(houseName)}</p>
 
         <ol className="mt-6 flex gap-1.5">
           {t.steps.map((s, i) => (
             <li key={s} className="flex-1">
               <div className="h-1 rounded-full" style={{ background: i <= step ? accent : "rgba(0,0,0,.1)" }} />
-              <div className={`mt-1 text-[11px] ${i === step ? "font-medium" : "text-neutral-500"}`}>{s}</div>
+              <div className={`mt-1 text-[11px] ${i === step ? "font-medium" : "opacity-60"}`}>{s}</div>
             </li>
           ))}
         </ol>
@@ -234,7 +248,7 @@ export default function ApplyForm(props: {
             </div>
             <div className="mt-5 rounded-xl border border-dashed border-black/20 bg-white/60 p-4">
               <p className="text-sm font-medium">{t.stageQ}</p>
-              <p className="mt-1 text-xs text-neutral-600">{t.stageLede}</p>
+              <p className="mt-1 text-xs opacity-70">{t.stageLede}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {([["stage_1d", t.s1d], ["stage_3d", t.s3d], ["stage_1w", t.s1w]] as const).map(([k, l]) => (
                   <button
@@ -273,7 +287,7 @@ export default function ApplyForm(props: {
             <p className={label}>{t.cv}</p>
             <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-black/20 bg-white px-4 py-8 text-center">
               <span className="text-base font-medium">{file ? file.name : t.cvPick}</span>
-              <span className="mt-1 text-xs text-neutral-500">{t.cvHint}</span>
+              <span className="mt-1 text-xs opacity-60">{t.cvHint}</span>
               <input type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </label>
             <label className={label}>{t.note}<textarea className={input} rows={4} value={a.note} onChange={(e) => set("note")(e.target.value)} /></label>
@@ -307,11 +321,11 @@ export default function ApplyForm(props: {
 
         {step === 3 && (
           <section>
-            <h2 className="mt-6 font-serif text-xl">{t.wsTitle}</h2>
-            <p className="mt-1 text-sm text-neutral-600">{t.wsLede}</p>
+            <h2 className="mt-6 text-xl" style={{ fontFamily: displayFont }}>{t.wsTitle}</h2>
+            <p className="mt-1 text-sm opacity-70">{t.wsLede}</p>
             {WORK_STYLE.map((w) => (
               <div key={w.k} className="mt-5">
-                <p className="text-xs uppercase tracking-wide text-neutral-500">{w.dim[lang]}</p>
+                <p className="text-xs uppercase tracking-wide opacity-60">{w.dim[lang]}</p>
                 <div className="mt-1.5 grid grid-cols-2 gap-2">
                   {(["a", "b"] as const).map((side) => {
                     const on = a.work_style[w.k] === side;
@@ -335,8 +349,8 @@ export default function ApplyForm(props: {
 
         {step === 4 && (
           <section>
-            <h2 className="mt-6 font-serif text-xl">{t.personTitle}</h2>
-            <p className="mt-1 text-sm text-neutral-600">{t.personLede}</p>
+            <h2 className="mt-6 text-xl" style={{ fontFamily: displayFont }}>{t.personTitle}</h2>
+            <p className="mt-1 text-sm opacity-70">{t.personLede}</p>
             <label className={label}>
               {SIGNATURE_Q[a.area === "sala" ? "sala" : "cocina"][lang]}
               <textarea className={input} rows={2} value={a.craft1} onChange={(e) => set("craft1")(e.target.value)} />
@@ -360,10 +374,10 @@ export default function ApplyForm(props: {
           <section>
             <div className="mt-5 rounded-xl border border-black/10 bg-white p-4 text-sm leading-relaxed">
               <p className="font-medium">{name} · {email} · {phone}</p>
-              <p className="mt-1 text-neutral-600">{file ? file.name : "—"}</p>
+              <p className="mt-1 opacity-70">{file ? file.name : "—"}</p>
             </div>
             <p className={label}>{t.privacyTitle}</p>
-            <p className="mt-1 text-sm leading-relaxed text-neutral-600">{t.privacy(legalName, contact)}</p>
+            <p className="mt-1 text-sm leading-relaxed opacity-80">{t.privacy(legalName, contact)}</p>
             <label className="mt-4 flex items-start gap-3 text-sm">
               <input type="checkbox" className="mt-1 h-5 w-5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
               <span>{t.consent}</span>

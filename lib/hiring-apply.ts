@@ -1,8 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // Shared by the public apply page and its API route.
+//
+// Data-request contact for the privacy notice. Per COM's 2026-09-21 brief the
+// canonical box is `hola@{domain}`. `entities.contact_email` doesn't exist
+// as a column yet, so this map IS the fallback the RPC would have produced.
 export const APPLY_CONTACT: Record<string, string> = {
-  bm: "info@bistro-mondo.com",
-  taller: "info@ibzfoodstudio.com",
+  bm: "hola@bistro-mondo.com",
+  taller: "hola@ibzfoodstudio.com",
 };
 
 export type ApplyArea = "cocina" | "sala";
@@ -105,11 +109,25 @@ export function applyClient(): SupabaseClient {
   return anonClient;
 }
 
+export type BrandPalette = {
+  accent?: string | null;
+  ground?: string | null;
+  ink?: string | null;
+  [k: string]: unknown;
+};
+export type BrandTypography = {
+  display?: { family?: string | null; source?: string | null } | null;
+  body?: { family?: string | null; source?: string | null } | null;
+  [k: string]: unknown;
+};
+export type BrandKit = { palette?: BrandPalette | null; typography?: BrandTypography | null } | null;
+
 export type ApplyPageInfo = {
   id: string;
   name: string;
   legal_name: string;
   accent: string | null;
+  brand_kit: BrandKit;
   openings: Array<{ id: string; title: string; station: string | null; role: string | null; languages_required: string[] | null }>;
 };
 
