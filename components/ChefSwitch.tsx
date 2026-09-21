@@ -13,12 +13,14 @@
 // path as the original switch so the layout.tsx import doesn't change.
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import AssistantFab from "@/components/AssistantFab";
 import ChefSlim from "@/components/ChefSlim";
 
 export default function ChefSwitch() {
   const [useLegacy, setUseLegacy] = useState(false);
   const [ready, setReady] = useState(false);
+  const pathname = usePathname() || "";
 
   useEffect(() => {
     try {
@@ -40,5 +42,7 @@ export default function ChefSwitch() {
   }, []);
 
   if (!ready) return null; // avoid double-mount flash
+  // Public candidate pages: no staff assistant floating over the form.
+  if (pathname.startsWith("/apply/")) return null;
   return useLegacy ? <AssistantFab /> : <ChefSlim />;
 }

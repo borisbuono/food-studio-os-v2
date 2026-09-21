@@ -11,10 +11,12 @@ const T = {
     hello: "Trabaja con nosotros",
     lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Unos diez minutos. Nos importa más quién eres que tu CV, y cada candidatura la lee una persona.`,
     area: "¿Dónde?", cocina: "Cocina", sala: "Sala",
-    kind: "¿Qué buscas?", job: "Trabajo", s1d: "Stage 1 día", s3d: "Stage 3 días", s1w: "Stage 1 semana",
+    kind: "¿Qué buscas?", job: "Trabajo", s1d: "1 día", s3d: "3 días", s1w: "1 semana",
+    jobFull: "Trabajo · jornada completa", jobPart: "Trabajo · media jornada",
+    stageQ: "¿O prefieres hacer un stage con nosotros?", stageLede: "Unos días en la cocina o en la sala para conocernos. Elige cuánto tiempo:",
     stageDates: "¿Qué fechas te vienen bien para el stage?",
     stationSala: "¿Qué experiencia tienes en sala, vinos o barra, y dónde quieres crecer?",
-    needChoice: "Elige cocina o sala, y trabajo o stage.",
+    needChoice: "Elige qué buscas y dónde: cocina o sala.",
     schedule: "¿Qué jornada?", full: "Completa", part: "Parcial", season: "Temporada",
     foodHandler: "¿Tienes el carnet de manipulador de alimentos?", expired: "Caducado",
     craftTitle: "El oficio", craftLede: "Contesta como se lo contarías a un compañero. Dos o tres frases bastan.",
@@ -45,10 +47,12 @@ const T = {
     hello: "Work with us",
     lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About ten minutes. We care more about who you are than your CV, and a person reads every application.`,
     area: "Where?", cocina: "Kitchen", sala: "Front of house", 
-    kind: "What are you looking for?", job: "Job", s1d: "Stage 1 day", s3d: "Stage 3 days", s1w: "Stage 1 week",
+    kind: "What are you looking for?", job: "Job", s1d: "1 day", s3d: "3 days", s1w: "1 week",
+    jobFull: "Job · full time", jobPart: "Job · part time",
+    stageQ: "Or would you rather do a stage with us?", stageLede: "A few days in the kitchen or on the floor to get to know each other. Choose how long:",
     stageDates: "Which dates suit you for the stage?",
     stationSala: "What experience do you have on the floor, with wine or behind the bar, and where do you want to grow?",
-    needChoice: "Choose kitchen or front of house, and job or stage.",
+    needChoice: "Choose what you're looking for, and kitchen or front of house.",
     schedule: "Hours?", full: "Full time", part: "Part time", season: "Season",
     foodHandler: "Do you have a food-handler certificate (carnet de manipulador)?", expired: "Expired",
     craftTitle: "The craft", craftLede: "Answer as you'd explain it to a colleague. Two or three sentences are enough.",
@@ -155,23 +159,10 @@ export default function ApplyForm(props: {
   const label = "mt-5 block text-sm font-medium";
   const btn = "rounded-full px-6 py-3 text-base font-medium text-white disabled:opacity-50";
 
-  function Choice({ k, opts }: { k: keyof ApplyAnswers; opts: Array<[string, string]> }) {
-    return (
-      <div className="mt-2 flex flex-wrap gap-2">
-        {opts.map(([v, l]) => (
-          <button
-            type="button"
-            key={v}
-            onClick={() => set(k)(v)}
-            className="rounded-full border px-4 py-2 text-sm"
-            style={a[k] === v ? { background: accent, borderColor: accent, color: "#fff" } : { borderColor: "rgba(0,0,0,.2)" }}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-    );
-  }
+  const choice = (k: keyof ApplyAnswers, opts: Array<[string, string]>) => (
+    <ChoiceRow value={a[k]} opts={opts} accent={accent} onPick={(v) => set(k)(v)} />
+  );
+
 
   if (done)
     return (
@@ -219,16 +210,42 @@ export default function ApplyForm(props: {
 
         {step === 0 && (
           <section>
-            <p className={label}>{t.area}</p>
-            <Choice k="area" opts={[["cocina", t.cocina], ["sala", t.sala]]} />
             <p className={label}>{t.kind}</p>
-            <Choice k="kind" opts={[["job", t.job], ["stage_1d", t.s1d], ["stage_3d", t.s3d], ["stage_1w", t.s1w]]} />
-            {a.kind === "job" ? (
-              <>
-                <p className={label}>{t.schedule}</p>
-                <Choice k="schedule" opts={[["full", t.full], ["part", t.part], ["season", t.season]]} />
-              </>
-            ) : null}
+            <div className="mt-2 grid gap-2">
+              {([["full", t.jobFull], ["part", t.jobPart]] as const).map(([sch, l]) => {
+                const on = a.kind === "job" && a.schedule === sch;
+                return (
+                  <button
+                    type="button"
+                    key={sch}
+                    onClick={() => setA((p) => ({ ...p, kind: "job", schedule: sch }))}
+                    className="rounded-xl border px-4 py-3 text-left text-base"
+                    style={on ? { background: accent, borderColor: accent, color: "#fff" } : { borderColor: "rgba(0,0,0,.2)", background: "#fff" }}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-5 rounded-xl border border-dashed border-black/20 bg-white/60 p-4">
+              <p className="text-sm font-medium">{t.stageQ}</p>
+              <p className="mt-1 text-xs text-neutral-600">{t.stageLede}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {([["stage_1d", t.s1d], ["stage_3d", t.s3d], ["stage_1w", t.s1w]] as const).map(([k, l]) => (
+                  <button
+                    type="button"
+                    key={k}
+                    onClick={() => setA((p) => ({ ...p, kind: k, schedule: "" }))}
+                    className="rounded-full border px-4 py-2 text-sm"
+                    style={a.kind === k ? { background: accent, borderColor: accent, color: "#fff" } : { borderColor: "rgba(0,0,0,.2)" }}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className={label}>{t.area}</p>
+            {choice("area", [["cocina", t.cocina], ["sala", t.sala]])}
             <label className={label}>{t.name}<input className={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
             <label className={label}>{t.email}<input className={input} type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
             <label className={label}>{t.phone}<input className={input} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label>
@@ -261,7 +278,7 @@ export default function ApplyForm(props: {
         {step === 2 && (
           <section>
             <p className={label}>{t.rtw}</p>
-            <Choice k="right_to_work" opts={[["yes", t.yes], ["in_progress", t.inProgress], ["no", t.no]]} />
+            {choice("right_to_work", [["yes", t.yes], ["in_progress", t.inProgress], ["no", t.no]])}
             {isStage ? (
               <label className={label}>{t.stageDates}<input className={input} value={a.stage_dates} onChange={(e) => set("stage_dates")(e.target.value)} /></label>
             ) : (
@@ -272,14 +289,14 @@ export default function ApplyForm(props: {
               </>
             )}
             <p className={label}>{t.weekends}</p>
-            <Choice k="weekends" opts={[["yes", t.yes], ["some", t.some], ["no", t.no]]} />
+            {choice("weekends", [["yes", t.yes], ["some", t.some], ["no", t.no]])}
             <label className={label}>{t.lives}<input className={input} value={a.lives_where} onChange={(e) => set("lives_where")(e.target.value)} /></label>
             <label className={label}>{t.transport(houseName)}<input className={input} value={a.transport} onChange={(e) => set("transport")(e.target.value)} /></label>
             <label className={label}>{t.refs}<textarea className={input} rows={2} value={a.references} onChange={(e) => set("references")(e.target.value)} /></label>
             <p className={label}>{t.allergens}</p>
-            <Choice k="allergen_training" opts={[["yes", t.yes], ["no", t.no]]} />
+            {choice("allergen_training", [["yes", t.yes], ["no", t.no]])}
             <p className={label}>{t.foodHandler}</p>
-            <Choice k="food_handler" opts={[["yes", t.yes], ["expired", t.expired], ["no", t.no]]} />
+            {choice("food_handler", [["yes", t.yes], ["expired", t.expired], ["no", t.no]])}
           </section>
         )}
 
@@ -339,5 +356,36 @@ export default function ApplyForm(props: {
         </div>
       </div>
     </main>
+  );
+}
+
+// Top-level so it keeps its identity between renders: a component declared
+// inside the form remounts on every keystroke/tap, which can swallow taps on
+// mobile Safari.
+function ChoiceRow({
+  value,
+  opts,
+  accent,
+  onPick,
+}: {
+  value: string;
+  opts: Array<[string, string]>;
+  accent: string;
+  onPick: (v: string) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {opts.map(([v, l]) => (
+        <button
+          type="button"
+          key={v}
+          onClick={() => onPick(v)}
+          className="rounded-full border px-4 py-2 text-sm"
+          style={value === v ? { background: accent, borderColor: accent, color: "#fff" } : { borderColor: "rgba(0,0,0,.2)" }}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
   );
 }

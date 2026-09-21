@@ -30,7 +30,7 @@ import type { ServerProfile } from "@/lib/serverProfile";
 //    the house in scope AND the house has switched on (entities.foh_enabled /
 //    entities.bookings_enabled). Access loads from /api/my-memberships; until
 //    it resolves only universal routes show (fail closed).
-const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard"];
+const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard", "/apply/"];
 function isPublic(path: string): boolean {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
 }

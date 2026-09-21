@@ -33,7 +33,7 @@ import { brandForPath } from "@/lib/brandScope";
 
 // /onboard/* also renders as a clean shell (no sidebar/topbar) — the wizard
 // is a first-time surface, chrome would drown out the flow.
-const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard"];
+const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard", "/apply/"];
 
 function isPublic(path: string): boolean {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
