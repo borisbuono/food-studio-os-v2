@@ -37,6 +37,9 @@ export type ApplyAnswers = {
   p_mirror: string;
   p_curious: string;
   p_team: string;
+  p_why: string;
+  p_proud: string;
+  work_style: Record<string, "a" | "b">;
   note: string;
 };
 
@@ -81,6 +84,9 @@ export const EMPTY_ANSWERS: ApplyAnswers = {
   craft2: "",
   p_hard: "",
   p_love: "",
+  p_why: "",
+  p_proud: "",
+  work_style: {},
   p_mirror: "",
   p_curious: "",
   p_team: "",
@@ -106,3 +112,28 @@ export type ApplyPageInfo = {
   accent: string | null;
   openings: Array<{ id: string; title: string; station: string | null; role: string | null; languages_required: string[] | null }>;
 };
+
+
+// Work style: ten quick either/or taps. Not a test and no type label —
+// it maps how someone likes to work so a team can be balanced on purpose.
+export const WORK_STYLE: Array<{ k: string; dim: { es: string; en: string }; a: { es: string; en: string }; b: { es: string; en: string } }> = [
+  { k: "plan", dim: { es: "Organización", en: "Organisation" }, a: { es: "Me gusta tenerlo todo planificado", en: "I like everything planned" }, b: { es: "Me adapto sobre la marcha", en: "I adapt as I go" } },
+  { k: "pace", dim: { es: "Ritmo", en: "Pace" }, a: { es: "Prefiero hacer pocas cosas perfectas", en: "I'd rather do a few things perfectly" }, b: { es: "Prefiero sacar mucho volumen bien", en: "I'd rather push a lot of volume well" } },
+  { k: "lead", dim: { es: "En el equipo", en: "In the team" }, a: { es: "Suelo tomar la iniciativa y tirar del grupo", en: "I tend to take the lead" }, b: { es: "Prefiero apoyar y hacer muy bien mi parte", en: "I'd rather support and nail my part" } },
+  { k: "energy", dim: { es: "Energía", en: "Energy" }, a: { es: "Me carga el ruido y la gente", en: "Noise and people charge me up" }, b: { es: "Rindo mejor en calma y concentrado/a", en: "I work best calm and focused" } },
+  { k: "speak", dim: { es: "Cuando algo no va", en: "When something's off" }, a: { es: "Lo digo en el momento", en: "I say it there and then" }, b: { es: "Espero el momento adecuado para hablarlo", en: "I wait for the right moment to raise it" } },
+  { k: "novelty", dim: { es: "Rutina", en: "Routine" }, a: { es: "Me gusta una rutina bien hecha", en: "I like a routine done well" }, b: { es: "Me aburro si no hay cosas nuevas", en: "I get bored without new things" } },
+  { k: "pressure", dim: { es: "Bajo presión", en: "Under pressure" }, a: { es: "Me crezco", en: "I rise to it" }, b: { es: "Necesito un plan claro para rendir", en: "I need a clear plan to perform" } },
+  { k: "autonomy", dim: { es: "Instrucciones", en: "Instructions" }, a: { es: "Prefiero que me digan exactamente qué hacer", en: "Tell me exactly what to do" }, b: { es: "Dame el objetivo y déjame hacerlo a mi manera", en: "Give me the goal and let me do it my way" } },
+  { k: "learn", dim: { es: "Aprendo", en: "I learn" }, a: { es: "Mirando y repitiendo", en: "By watching and repeating" }, b: { es: "Entendiendo el porqué", en: "By understanding the why" } },
+  { k: "stay", dim: { es: "Trayectoria", en: "Path" }, a: { es: "Me gusta quedarme años en un sitio", en: "I like to stay somewhere for years" }, b: { es: "Me gusta cambiar y conocer sitios", en: "I like moving on and seeing new places" } },
+];
+
+export const EXTRA_PERSON_Q = {
+  p_why: { es: "¿Por qué nosotros? ¿Qué te llama de este sitio?", en: "Why us? What draws you to this place?" },
+  p_proud: { es: "Algo de lo que estés orgulloso/a, dentro o fuera del trabajo.", en: "Something you're proud of, at work or outside it." },
+};
+
+export function workStyleLines(ws: Record<string, "a" | "b"> | undefined, lang: "es" | "en" = "es"): string[] {
+  return WORK_STYLE.filter((w) => ws?.[w.k]).map((w) => `${w.dim[lang]}: ${(ws![w.k] === "a" ? w.a : w.b)[lang]}`);
+}

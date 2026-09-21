@@ -48,6 +48,7 @@ export type PeopleRead = {
   traits: Array<{ trait: string; signal: "clear" | "some" | "not shown"; evidence: string }>;
   ask_in_interview: string[];
   summary: string;
+  team_note?: string;
 };
 
 export const LOW_CONFIDENCE = 0.6;
@@ -292,14 +293,15 @@ export function retainUntil(from = new Date()): string {
 // ---------- the person, read from their own words ----------
 
 const PEOPLE_SYSTEM = `You help a restaurant owner in Ibiza cast a team. He reads every application himself; you prepare his reading.
-You get a candidate's short written answers to six open questions about themselves (one about their dish or what makes a table happy). The owner can judge skills himself; your job is the person and how they would fit a small team.
+You get a candidate's short written answers to open questions about themselves, plus ten either/or "work style" choices they tapped. The owner can judge skills himself; your job is the person and how they would fit a small team.
 Return ONLY JSON:
 {"craft_depth": 0|1|2|3, "craft_note": "one line in English on what the craft answers show",
  "traits": [ {"trait": "warmth", ...}, {"trait": "curiosity"}, {"trait": "work ethic"}, {"trait": "empathy"}, {"trait": "self-awareness"}, {"trait": "integrity"} ] — each {"trait","signal":"clear"|"some"|"not shown","evidence":"their own words, quoted, max 20 words, or empty"},
  "ask_in_interview": ["three short follow-up questions, in the candidate's language, that dig into what the answers left open"],
- "summary": "two plain sentences in English: who this person seems to be at work, from their own words"}
+ "summary": "two plain sentences in English: who this person seems to be at work, from their own words",
+ "team_note": "one or two sentences in English on how they would sit in a small kitchen or floor team, from their work-style choices: what they bring, what kind of colleague balances them, what to watch. Practical, not a label."}
 Rules: evidence only — quote them, never invent. "not shown" when the answers don't show it; short answers are not a red flag by themselves. craft_depth: how much care and taste the dish/table answer shows — 0 blank, 1 generic, 2 specific, 3 specific with a clear why. craft_note describes that answer in one line.
-Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No psychological diagnosis or personality typing. No hire/no-hire verdict — that is his call.`;
+Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No psychological diagnosis, no personality types or labels (no MBTI, no Big Five scores). Work-style choices are preferences, not traits: describe them, do not judge them. No hire/no-hire verdict — that is his call.`;
 
 export async function readPerson(
   area: "cocina" | "sala",

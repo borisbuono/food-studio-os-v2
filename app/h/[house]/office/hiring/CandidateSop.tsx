@@ -5,6 +5,7 @@
 // Nothing here sends a message — Boris copies/opens in mail, sends, taps Mark sent.
 
 import { useEffect, useState } from "react";
+import { WORK_STYLE } from "@/lib/hiring-apply";
 
 type Field = { value: any; confidence: number };
 export type SopCandidate = {
@@ -221,6 +222,7 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
         <div className="mt-3 border-t border-black/10 pt-2">
           <div className="font-semibold">The person, in their own words</div>
           <p className="mt-1">{p.people_read.value.summary}</p>
+          {p.people_read.value.team_note ? <p className="mt-1">In a team: {p.people_read.value.team_note}</p> : null}
           <p className="mt-1 text-clay">Dish / table answer: {p.people_read.value.craft_note}</p>
           <ul className="mt-1 space-y-0.5">
             {(p.people_read.value.traits || []).map((t: any, i: number) => (
@@ -242,6 +244,24 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
               </ol>
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {c.answers?.work_style && Object.keys(c.answers.work_style).length ? (
+        <div className="mt-3 border-t border-black/10 pt-2">
+          <div className="font-semibold">How they like to work</div>
+          <table className="mt-1 w-full text-[11px]">
+            <tbody>
+              {WORK_STYLE.map((w) => {
+                const v = c.answers.work_style[w.k];
+                return (
+                  <tr key={w.k}>
+                    <td className={`w-1/2 py-0.5 pr-2 text-right ${v === "a" ? "font-medium" : "text-clay/60"}`}>{w.a.en}</td>
+                    <td className={`w-1/2 py-0.5 pl-2 ${v === "b" ? "font-medium" : "text-clay/60"}`}>{w.b.en}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : null}
       {c.score != null ? (

@@ -1,7 +1,7 @@
 import { extractClientIp, hashIp } from "@/lib/leads/rateLimit";
 import { parseCv, readPerson, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
 import { mirrorColumns } from "@/lib/hiring-sop-server";
-import { applyClient, KIND_LABEL, PERSON_Q, SIGNATURE_Q, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
+import { applyClient, EXTRA_PERSON_Q, KIND_LABEL, PERSON_Q, SIGNATURE_Q, WORK_STYLE, workStyleLines, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,12 +70,27 @@ export async function POST(req: Request, { params }: { params: { house: string }
     p_mirror: s(form.get("p_mirror"), 2000),
     p_curious: s(form.get("p_curious"), 2000),
     p_team: s(form.get("p_team"), 2000),
+    p_why: s(form.get("p_why"), 2000),
+    p_proud: s(form.get("p_proud"), 2000),
+    work_style: (() => {
+      try {
+        const raw = JSON.parse(String(form.get("work_style") || "{}"));
+        const out: Record<string, "a" | "b"> = {};
+        for (const w of WORK_STYLE) if (raw?.[w.k] === "a" || raw?.[w.k] === "b") out[w.k] = raw[w.k];
+        return out;
+      } catch {
+        return {};
+      }
+    })(),
     note: s(form.get("note"), 4000),
   };
   const area = a.area === "sala" ? "sala" : "cocina";
   const qa = [
     { q: SIGNATURE_Q[area].es, a: a.craft1 },
     ...PERSON_Q.map((x) => ({ q: x.es(area), a: a[x.k] })),
+    { q: EXTRA_PERSON_Q.p_why.es, a: a.p_why },
+    { q: EXTRA_PERSON_Q.p_proud.es, a: a.p_proud },
+    { q: "Forma de trabajar (elegido entre dos opciones)", a: workStyleLines(a.work_style, "es").join("\n") },
   ];
   const isStage = a.kind !== "job";
   const touch = [

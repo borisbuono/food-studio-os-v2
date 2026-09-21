@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EMPTY_ANSWERS, PERSON_Q, SIGNATURE_Q, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
+import { EMPTY_ANSWERS, EXTRA_PERSON_Q, PERSON_Q, SIGNATURE_Q, WORK_STYLE, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
 
 type Lang = "es" | "en";
 type Opening = { id: string; title: string; station: string | null; hours_per_week: number | null };
@@ -9,7 +9,7 @@ type Opening = { id: string; title: string; station: string | null; hours_per_we
 const T = {
   es: {
     hello: "Trabaja con nosotros",
-    lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Unos cinco minutos. Nos importa más quién eres que tu CV, y cada candidatura la lee una persona.`,
+    lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Unos siete minutos. Nos importa más quién eres que tu CV, y cada candidatura la lee una persona.`,
     area: "¿Dónde?", cocina: "Cocina", sala: "Sala",
     kind: "¿Qué buscas?", job: "Trabajo", s1d: "1 día", s3d: "3 días", s1w: "1 semana",
     jobFull: "Trabajo · jornada completa", jobPart: "Trabajo · media jornada",
@@ -20,8 +20,10 @@ const T = {
     schedule: "¿Qué jornada?", full: "Completa", part: "Parcial", season: "Temporada",
     foodHandler: "¿Tienes el carnet de manipulador de alimentos?", expired: "Caducado",
     craftTitle: "El oficio", craftLede: "Contesta como se lo contarías a un compañero. Dos o tres frases bastan.",
+    wsTitle: "Cómo trabajas", wsLede: "Diez toques rápidos. Elige la que más se parece a ti — no hay respuesta mejor, nos sirve para equilibrar el equipo.",
+    wsNeed: "Elige una opción en cada fila.",
     personTitle: "Sobre ti", personLede: "Sin respuestas buenas o malas, y con una frase basta. Queremos saber cómo eres para armar un buen equipo.",
-    steps: ["Tú", "CV", "Práctico", "Sobre ti", "Enviar"],
+    steps: ["Tú", "CV", "Práctico", "Cómo trabajas", "Sobre ti", "Enviar"],
     name: "Nombre y apellidos", email: "Email", phone: "Teléfono (WhatsApp)",
     role: "¿Algún puesto concreto?", open: "Candidatura espontánea",
     cv: "Sube tu CV", cvHint: "PDF o una foto del papel. Máx. 10 MB.", cvPick: "Elegir archivo o hacer foto",
@@ -45,7 +47,7 @@ const T = {
   },
   en: {
     hello: "Work with us",
-    lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About five minutes. We care more about who you are than your CV, and a person reads every application.`,
+    lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About seven minutes. We care more about who you are than your CV, and a person reads every application.`,
     area: "Where?", cocina: "Kitchen", sala: "Front of house", 
     kind: "What are you looking for?", job: "Job", s1d: "1 day", s3d: "3 days", s1w: "1 week",
     jobFull: "Job · full time", jobPart: "Job · part time",
@@ -56,8 +58,10 @@ const T = {
     schedule: "Hours?", full: "Full time", part: "Part time", season: "Season",
     foodHandler: "Do you have a food-handler certificate (carnet de manipulador)?", expired: "Expired",
     craftTitle: "The craft", craftLede: "Answer as you'd explain it to a colleague. Two or three sentences are enough.",
+    wsTitle: "How you work", wsLede: "Ten quick taps. Pick the one that's more like you — there's no better answer, it helps us balance the team.",
+    wsNeed: "Pick one option in each row.",
     personTitle: "About you", personLede: "No right or wrong answers, and one sentence is enough. We want to know who you are so we can build a good team.",
-    steps: ["You", "CV", "Practical", "About you", "Send"],
+    steps: ["You", "CV", "Practical", "How you work", "About you", "Send"],
     name: "Full name", email: "Email", phone: "Phone (WhatsApp)",
     role: "A specific opening?", open: "Open application",
     cv: "Upload your CV", cvHint: "PDF or a photo of the paper. Max 10 MB.", cvPick: "Choose file or take photo",
@@ -123,6 +127,7 @@ export default function ApplyForm(props: {
     if (n > 0 && step === 0 && (!a.area || !a.kind)) return setErr(t.needChoice);
     if (n > 0 && step === 0 && (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !phone.trim())) return setErr(t.need);
     if (n > 1 && step === 1 && !file && !a.note.trim()) return setErr(t.needCv);
+    if (n > 3 && step === 3 && WORK_STYLE.some((w) => !a.work_style[w.k])) return setErr(t.wsNeed);
     setStep(n);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -138,7 +143,7 @@ export default function ApplyForm(props: {
       fd.set("phone", phone);
       if (opening) fd.set("job_opening_id", opening);
       if (file) fd.set("file", file);
-      for (const [k, v] of Object.entries(a)) fd.set(k, v);
+      for (const [k, v] of Object.entries(a)) fd.set(k, typeof v === "string" ? v : JSON.stringify(v));
       fd.set("consent", "yes");
       fd.set("company", hp);
       fd.set("source", props.source);
@@ -160,7 +165,7 @@ export default function ApplyForm(props: {
   const btn = "rounded-full px-6 py-3 text-base font-medium text-white disabled:opacity-50";
 
   const choice = (k: keyof ApplyAnswers, opts: Array<[string, string]>) => (
-    <ChoiceRow value={a[k]} opts={opts} accent={accent} onPick={(v) => set(k)(v)} />
+    <ChoiceRow value={String(a[k] ?? "")} opts={opts} accent={accent} onPick={(v) => set(k)(v)} />
   );
 
 
@@ -302,6 +307,34 @@ export default function ApplyForm(props: {
 
         {step === 3 && (
           <section>
+            <h2 className="mt-6 font-serif text-xl">{t.wsTitle}</h2>
+            <p className="mt-1 text-sm text-neutral-600">{t.wsLede}</p>
+            {WORK_STYLE.map((w) => (
+              <div key={w.k} className="mt-5">
+                <p className="text-xs uppercase tracking-wide text-neutral-500">{w.dim[lang]}</p>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {(["a", "b"] as const).map((side) => {
+                    const on = a.work_style[w.k] === side;
+                    return (
+                      <button
+                        type="button"
+                        key={side}
+                        onClick={() => setA((p) => ({ ...p, work_style: { ...p.work_style, [w.k]: side } }))}
+                        className="rounded-xl border px-3 py-3 text-left text-sm leading-snug"
+                        style={on ? { background: accent, borderColor: accent, color: "#fff" } : { borderColor: "rgba(0,0,0,.2)", background: "#fff" }}
+                      >
+                        {w[side][lang]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {step === 4 && (
+          <section>
             <h2 className="mt-6 font-serif text-xl">{t.personTitle}</h2>
             <p className="mt-1 text-sm text-neutral-600">{t.personLede}</p>
             <label className={label}>
@@ -314,10 +347,16 @@ export default function ApplyForm(props: {
                 <textarea className={input} rows={2} value={a[q.k]} onChange={(e) => set(q.k)(e.target.value)} />
               </label>
             ))}
+            {(["p_why", "p_proud"] as const).map((k) => (
+              <label key={k} className={label}>
+                {EXTRA_PERSON_Q[k][lang]}
+                <textarea className={input} rows={2} value={a[k]} onChange={(e) => set(k)(e.target.value)} />
+              </label>
+            ))}
           </section>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <section>
             <div className="mt-5 rounded-xl border border-black/10 bg-white p-4 text-sm leading-relaxed">
               <p className="font-medium">{name} · {email} · {phone}</p>
@@ -338,7 +377,7 @@ export default function ApplyForm(props: {
           {step > 0 ? (
             <button onClick={() => go(step - 1)} className="text-sm underline" disabled={busy}>{t.back}</button>
           ) : <span />}
-          {step < 4 ? (
+          {step < 5 ? (
             <button onClick={() => go(step + 1)} className={btn} style={{ background: accent }}>{t.next}</button>
           ) : (
             <button onClick={submit} disabled={busy} className={btn} style={{ background: accent }}>{busy ? t.sending : t.send}</button>
