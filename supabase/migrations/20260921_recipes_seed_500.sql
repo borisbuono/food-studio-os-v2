@@ -1,0 +1,13 @@
+-- recipes: _seed_500 (2026-09-21) — DATA RECORD, applied via fn_recipe_create_shared.
+-- Source: db/seed/recipes_seed_2026-09-21.json (485 unique names, drafted by Claude Sonnet
+-- sub-agents per category: mother sauces, stocks, doughs, staples, pickles/ferments/preserves,
+-- oils/condiments/spice blends/dressings, pastry, signature plates, and support/tools).
+-- Each row: canonical on BBH + mirrors on BM and Taller, metadata:
+--   batch='seed_500_2026-09-21', needs_boris_review=true, public_candidate=true, drafted_by='claude-sonnet'
+-- public_slug reserved, is_public=false. Nothing is visible at /recipes/<slug> until Boris
+-- approves it in /studio/recipes/review (approve clears needs_boris_review AND sets is_public).
+-- 7 cross-agent duplicates archived (is_archived, metadata.duplicate_of):
+--   Garlic Confit, Chicken Stock, Fish Stock, Brown Veal Stock, Prawn Stock, Almond Tuile, Candied Orange Peel.
+-- Re-run: select public.fn_recipe_create_shared(x || '{"mirrors":["bm","taller"]}') from jsonb_array_elements(<file>) x;
+--   (idempotent on lower(name) + batch)
+select 1;
