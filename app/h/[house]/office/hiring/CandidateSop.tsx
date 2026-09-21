@@ -21,6 +21,7 @@ export type SopCandidate = {
   score_reasons?: Array<{ label: string; points: number }> | null;
   cv_path?: string | null;
   retain_until?: string | null;
+  answers?: any;
 };
 
 const LOW = 0.6;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EMPTY_ANSWERS, type ApplyAnswers } from "@/lib/hiring-apply";
+import { EMPTY_ANSWERS, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
 
 type Lang = "es" | "en";
 type Opening = { id: string; title: string; station: string | null; hours_per_week: number | null };
@@ -9,10 +9,15 @@ type Opening = { id: string; title: string; station: string | null; hours_per_we
 const T = {
   es: {
     hello: "Trabaja con nosotros",
-    lede: (h: string) => `Cocina en ${h}. Cuatro pasos, dos minutos. Cada candidatura la lee una persona.`,
+    lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Cuatro pasos, dos minutos. Cada candidatura la lee una persona.`,
+    area: "¿Dónde?", cocina: "Cocina", sala: "Sala",
+    kind: "¿Qué buscas?", job: "Trabajo", s1d: "Stage 1 día", s3d: "Stage 3 días", s1w: "Stage 1 semana",
+    stageDates: "¿Qué fechas te vienen bien para el stage?",
+    stationSala: "¿Qué experiencia tienes en sala, vinos o barra, y dónde quieres crecer?",
+    needChoice: "Elige cocina o sala, y trabajo o stage.",
     steps: ["Tú", "Tu CV", "Unas preguntas", "Enviar"],
     name: "Nombre y apellidos", email: "Email", phone: "Teléfono (WhatsApp)",
-    role: "¿Para qué puesto?", open: "Candidatura espontánea — cocina",
+    role: "¿Algún puesto concreto?", open: "Candidatura espontánea",
     cv: "Sube tu CV", cvHint: "PDF o una foto del papel. Máx. 10 MB.", cvPick: "Elegir archivo o hacer foto",
     note: "¿Algo que quieras contarnos? (opcional)",
     rtw: "¿Tienes permiso de trabajo en España?", yes: "Sí", no: "No", inProgress: "En trámite",
@@ -34,10 +39,15 @@ const T = {
   },
   en: {
     hello: "Work with us",
-    lede: (h: string) => `Kitchen at ${h}. Four steps, two minutes. A person reads every application.`,
+    lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. Four steps, two minutes. A person reads every application.`,
+    area: "Where?", cocina: "Kitchen", sala: "Front of house", 
+    kind: "What are you looking for?", job: "Job", s1d: "Stage 1 day", s3d: "Stage 3 days", s1w: "Stage 1 week",
+    stageDates: "Which dates suit you for the stage?",
+    stationSala: "What experience do you have on the floor, with wine or behind the bar, and where do you want to grow?",
+    needChoice: "Choose kitchen or front of house, and job or stage.",
     steps: ["You", "Your CV", "A few questions", "Send"],
     name: "Full name", email: "Email", phone: "Phone (WhatsApp)",
-    role: "Which role?", open: "Open application — kitchen",
+    role: "A specific opening?", open: "Open application",
     cv: "Upload your CV", cvHint: "PDF or a photo of the paper. Max 10 MB.", cvPick: "Choose file or take photo",
     note: "Anything you'd like to tell us? (optional)",
     rtw: "Do you have the right to work in Spain?", yes: "Yes", no: "No", inProgress: "In progress",
@@ -67,11 +77,14 @@ export default function ApplyForm(props: {
   contact: string;
   openings: Opening[];
   preselect: string;
+  initialLang: Lang;
+  initialArea: string;
+  initialKind: string;
   source: string;
   utm: string;
 }) {
   const { slug, houseName, legalName, accent, contact, openings } = props;
-  const [lang, setLang] = useState<Lang>("es");
+  const [lang, setLang] = useState<Lang>(props.initialLang);
   const t = T[lang];
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -79,7 +92,12 @@ export default function ApplyForm(props: {
   const [phone, setPhone] = useState("");
   const [opening, setOpening] = useState(openings.find((o) => o.id === props.preselect)?.id || "");
   const [file, setFile] = useState<File | null>(null);
-  const [a, setA] = useState<ApplyAnswers>(EMPTY_ANSWERS);
+  const [a, setA] = useState<ApplyAnswers>({
+    ...EMPTY_ANSWERS,
+    area: (["cocina", "sala"].includes(props.initialArea) ? props.initialArea : "") as ApplyArea | "",
+    kind: (["job", "stage_1d", "stage_3d", "stage_1w"].includes(props.initialKind) ? props.initialKind : "") as ApplyKind | "",
+  });
+  const isStage = !!a.kind && a.kind !== "job";
   const [consent, setConsent] = useState(false);
   const [hp, setHp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,6 +108,7 @@ export default function ApplyForm(props: {
 
   function go(n: number) {
     setErr("");
+    if (n > 0 && step === 0 && (!a.area || !a.kind)) return setErr(t.needChoice);
     if (n > 0 && step === 0 && (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !phone.trim())) return setErr(t.need);
     if (n > 1 && step === 1 && !file && !a.note.trim()) return setErr(t.needCv);
     setStep(n);
@@ -162,9 +181,18 @@ export default function ApplyForm(props: {
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.2em]" style={{ color: accent }}>{houseName} · Ibiza</p>
-          <button onClick={() => setLang(lang === "es" ? "en" : "es")} className="text-xs underline">
-            {lang === "es" ? "English" : "Español"}
-          </button>
+          <div className="flex overflow-hidden rounded-full border border-black/20 text-xs">
+            {(["es", "en"] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className="px-3 py-1.5"
+                style={lang === l ? { background: accent, color: "#fff" } : undefined}
+              >
+                {l === "es" ? "Español" : "English"}
+              </button>
+            ))}
+          </div>
         </div>
         <h1 className="mt-4 font-serif text-3xl leading-tight">{t.hello}</h1>
         <p className="mt-2 text-neutral-600">{t.lede(houseName)}</p>
@@ -183,9 +211,14 @@ export default function ApplyForm(props: {
 
         {step === 0 && (
           <section>
+            <p className={label}>{t.area}</p>
+            <Choice k="area" opts={[["cocina", t.cocina], ["sala", t.sala]]} />
+            <p className={label}>{t.kind}</p>
+            <Choice k="kind" opts={[["job", t.job], ["stage_1d", t.s1d], ["stage_3d", t.s3d], ["stage_1w", t.s1w]]} />
             <label className={label}>{t.name}<input className={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
             <label className={label}>{t.email}<input className={input} type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
             <label className={label}>{t.phone}<input className={input} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label>
+            {openings.length ? (
             <label className={label}>
               {t.role}
               <select className={input} value={opening} onChange={(e) => setOpening(e.target.value)}>
@@ -195,6 +228,7 @@ export default function ApplyForm(props: {
                 ))}
               </select>
             </label>
+            ) : null}
           </section>
         )}
 
@@ -214,14 +248,20 @@ export default function ApplyForm(props: {
           <section>
             <p className={label}>{t.rtw}</p>
             <Choice k="right_to_work" opts={[["yes", t.yes], ["in_progress", t.inProgress], ["no", t.no]]} />
-            <label className={label}>{t.start}<input className={input} type="date" value={a.start_date} onChange={(e) => set("start_date")(e.target.value)} /></label>
-            <label className={label}>{t.notice}<input className={input} value={a.notice} onChange={(e) => set("notice")(e.target.value)} /></label>
-            <label className={label}>{t.salary}<input className={input} value={a.salary} onChange={(e) => set("salary")(e.target.value)} /></label>
+            {isStage ? (
+              <label className={label}>{t.stageDates}<input className={input} value={a.stage_dates} onChange={(e) => set("stage_dates")(e.target.value)} /></label>
+            ) : (
+              <>
+                <label className={label}>{t.start}<input className={input} type="date" value={a.start_date} onChange={(e) => set("start_date")(e.target.value)} /></label>
+                <label className={label}>{t.notice}<input className={input} value={a.notice} onChange={(e) => set("notice")(e.target.value)} /></label>
+                <label className={label}>{t.salary}<input className={input} value={a.salary} onChange={(e) => set("salary")(e.target.value)} /></label>
+              </>
+            )}
             <p className={label}>{t.weekends}</p>
             <Choice k="weekends" opts={[["yes", t.yes], ["some", t.some], ["no", t.no]]} />
             <label className={label}>{t.lives}<input className={input} value={a.lives_where} onChange={(e) => set("lives_where")(e.target.value)} /></label>
             <label className={label}>{t.transport(houseName)}<input className={input} value={a.transport} onChange={(e) => set("transport")(e.target.value)} /></label>
-            <label className={label}>{t.station}<input className={input} value={a.station} onChange={(e) => set("station")(e.target.value)} /></label>
+            <label className={label}>{a.area === "sala" ? t.stationSala : t.station}<input className={input} value={a.station} onChange={(e) => set("station")(e.target.value)} /></label>
             <label className={label}>{t.refs}<textarea className={input} rows={2} value={a.references} onChange={(e) => set("references")(e.target.value)} /></label>
             <p className={label}>{t.allergens}</p>
             <Choice k="allergen_training" opts={[["yes", t.yes], ["no", t.no]]} />

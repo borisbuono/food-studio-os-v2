@@ -46,6 +46,7 @@ type Candidate = {
   score_reasons?: Array<{ label: string; points: number }> | null;
   cv_path?: string | null;
   retain_until?: string | null;
+  answers?: any;
 };
 
 export default async function HiringPage({ params }: { params: { house: string } }) {
@@ -67,7 +68,7 @@ export default async function HiringPage({ params }: { params: { house: string }
     sb
       .from("candidates")
       .select(
-        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience, phone, email, notes, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, retain_until"
+        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience, phone, email, notes, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, retain_until, answers"
       )
       .eq("entity_id", entity_id)
       .order("updated_at", { ascending: false }),
@@ -175,6 +176,8 @@ export default async function HiringPage({ params }: { params: { house: string }
         Link for Instagram / WhatsApp:{" "}
         <span className="select-all font-mono text-ink">https://foodstudio.ai/apply/{slug}?src=instagram</span>
         {" "}— change <span className="font-mono">src=</span> to whatsapp, web… to see where people come from.
+        Add <span className="font-mono">&amp;lang=en</span> for English, <span className="font-mono">&amp;area=sala</span> or{" "}
+        <span className="font-mono">&amp;kind=stage_3d</span> to preselect.
       </p>
 
       {/* Candidate kanban */}

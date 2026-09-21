@@ -1,7 +1,7 @@
 import { extractClientIp, hashIp } from "@/lib/leads/rateLimit";
 import { parseCv, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
 import { mirrorColumns } from "@/lib/hiring-sop-server";
-import { applyClient, type ApplyAnswers, type ApplyPageInfo } from "@/lib/hiring-apply";
+import { applyClient, KIND_LABEL, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +48,9 @@ export async function POST(req: Request, { params }: { params: { house: string }
   }
 
   const a: ApplyAnswers = {
+    area: pick(s(form.get("area"), 10), ["cocina", "sala"]) || "cocina",
+    kind: pick(s(form.get("kind"), 10), ["job", "stage_1d", "stage_3d", "stage_1w"]) || "job",
+    stage_dates: s(form.get("stage_dates"), 300),
     right_to_work: pick(s(form.get("right_to_work"), 20), ["yes", "no", "in_progress"]),
     start_date: s(form.get("start_date"), 20),
     notice: s(form.get("notice"), 200),
@@ -60,7 +63,9 @@ export async function POST(req: Request, { params }: { params: { house: string }
     allergen_training: pick(s(form.get("allergen_training"), 10), ["yes", "no"]),
     note: s(form.get("note"), 4000),
   };
+  const isStage = a.kind !== "job";
   const touch = [
+    `${a.area === "sala" ? "SALA" : "COCINA"} · ${KIND_LABEL[(a.kind || "job") as ApplyKind].es.toUpperCase()}${isStage && a.stage_dates ? ` · fechas: ${a.stage_dates}` : ""}`,
     `Right to work: ${a.right_to_work || "—"}`,
     `Start: ${a.start_date || "—"}${a.notice ? ` (notice: ${a.notice})` : ""}`,
     `Salary: ${a.salary || "—"}`,
@@ -110,7 +115,11 @@ export async function POST(req: Request, { params }: { params: { house: string }
     email: F(email),
     phone: F(phone),
     right_to_work: F(a.right_to_work === "in_progress" ? "unknown" : a.right_to_work),
-    availability: F([a.start_date && `from ${a.start_date}`, a.notice && `notice: ${a.notice}`].filter(Boolean).join(", ")),
+    availability: F(
+      isStage
+        ? `${KIND_LABEL[a.kind as ApplyKind].en}${a.stage_dates ? ` — ${a.stage_dates}` : ""}`
+        : [a.start_date && `from ${a.start_date}`, a.notice && `notice: ${a.notice}`].filter(Boolean).join(", ")
+    ),
     salary_expectation: F(a.salary),
     weekends: a.weekends ? { value: a.weekends !== "no", confidence: 1 } : undefined,
     location: F(a.lives_where),
@@ -125,6 +134,7 @@ export async function POST(req: Request, { params }: { params: { house: string }
   let summary: string | null = null;
   const extra: string[] = [];
   if (a.right_to_work === "in_progress") extra.push("right to work: permit in progress");
+  if (isStage) extra.push(`${KIND_LABEL[a.kind as ApplyKind].en} request — needs a contract + alta or an education convenio before day 1`);
   if (file && !cvPath) extra.push("CV upload failed — ask them to resend");
   try {
     const parsed = await parseCv(file ? { base64: file.base64, mediaType: file.mediaType } : null, `${a.note}\nLives: ${a.lives_where}`);
@@ -134,7 +144,7 @@ export async function POST(req: Request, { params }: { params: { house: string }
     extra.push("CV not read automatically — " + (e?.message || "error"));
   }
   const opening = house.openings.find((o) => o.id === openingId) || null;
-  const { score, reasons } = scoreCandidate(profile, opening);
+  const { score, reasons } = scoreCandidate(profile, opening, a.area);
   const m = mirrorColumns(profile) as Record<string, any>;
   await sb.rpc("apply_finish", {
     p_id: id,

@@ -5,7 +5,19 @@ export const APPLY_CONTACT: Record<string, string> = {
   taller: "info@ibzfoodstudio.com",
 };
 
+export type ApplyArea = "cocina" | "sala";
+export type ApplyKind = "job" | "stage_1d" | "stage_3d" | "stage_1w";
+export const KIND_LABEL: Record<ApplyKind, { es: string; en: string }> = {
+  job: { es: "Trabajo", en: "Job" },
+  stage_1d: { es: "Stage 1 día", en: "Stage 1 day" },
+  stage_3d: { es: "Stage 3 días", en: "Stage 3 days" },
+  stage_1w: { es: "Stage 1 semana", en: "Stage 1 week" },
+};
+
 export type ApplyAnswers = {
+  area: ApplyArea | "";
+  kind: ApplyKind | "";
+  stage_dates: string;
   right_to_work: "yes" | "no" | "in_progress" | "";
   start_date: string;
   notice: string;
@@ -20,6 +32,9 @@ export type ApplyAnswers = {
 };
 
 export const EMPTY_ANSWERS: ApplyAnswers = {
+  area: "",
+  kind: "",
+  stage_dates: "",
   right_to_work: "",
   start_date: "",
   notice: "",

@@ -231,6 +231,7 @@ export default function CandidateKanban({
                       ) : null}
                     </div>
                     <div className="mt-0.5 text-[10px] text-clay">
+                      {c.answers?.area ? `${c.answers.area === "sala" ? "sala" : "cocina"}${c.answers.kind && c.answers.kind !== "job" ? ` · ${String(c.answers.kind).replace("stage_", "stage ")}` : ""} · ` : ""}
                       {c.source || "—"}
                       {c.years_experience ? ` · ${c.years_experience}y` : ""}
                       {c.languages?.length ? ` · ${c.languages.join(",")}` : ""}

@@ -16,7 +16,7 @@ export default async function ApplyPage({
   searchParams,
 }: {
   params: { house: string };
-  searchParams: { src?: string; utm_source?: string; utm_campaign?: string; role?: string };
+  searchParams: { src?: string; utm_source?: string; utm_campaign?: string; role?: string; lang?: string; area?: string; kind?: string };
 }) {
   const { data } = await applyClient().rpc("apply_page_info", { p_slug: params.house });
   const ent = data as ApplyPageInfo | null;
@@ -33,6 +33,9 @@ export default async function ApplyPage({
       contact={APPLY_CONTACT[params.house] || "info@ibzfoodstudio.com"}
       openings={openings.map((o) => ({ id: o.id, title: o.title, station: o.station, hours_per_week: null }))}
       preselect={searchParams.role || ""}
+      initialLang={searchParams.lang === "en" ? "en" : "es"}
+      initialArea={searchParams.area || ""}
+      initialKind={searchParams.kind || ""}
       source={source}
       utm={searchParams.utm_campaign || ""}
     />

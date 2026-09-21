@@ -19,6 +19,7 @@ export type CvProfile = {
   lives_on_island_year_round: Field<boolean>;
   languages: Field<string[]>;           // ISO-ish: es, en, fr, it, de, ca, ar…
   kitchen_years: Field<number>;         // hospitality kitchen experience only
+  foh_years?: Field<number>;            // front-of-house experience
   total_years: Field<number>;
   current_role: Field;
   roles_held: Field<string[]>;          // "Jefa de partida cuarto frío — Can Mimosa (2026–)"
@@ -47,10 +48,11 @@ name, phone, email, location (town/island as written),
 lives_on_island_year_round (boolean — true only if the CV or cover note says so),
 languages (array of 2-letter codes, include "es" if the CV is written in fluent Spanish),
 kitchen_years (number — sum of professional kitchen jobs only, count internships; exclude non-hospitality jobs),
+foh_years (number — sum of front-of-house jobs: waiter, bartender, sommelier, host, maître; exclude non-hospitality jobs),
 total_years (number, all work),
 current_role (string), roles_held (array of "Role — Place (start–end)" newest first, kitchen and non-kitchen),
 stations (array, Spanish kitchen terms as written: cuarto frío, pastelería, caliente, parrilla, etc.),
-seniority (one of commis|ayudante|cocinero|jefe_partida|sous_chef|chef),
+seniority (one of commis|ayudante|cocinero|jefe_partida|sous_chef|chef — jefe_partida ONLY if the CV literally says jefe/jefa de partida or chef de partie; "cocinero de partida X" is cocinero; front-of-house: camarero→cocinero level, jefe de rango/encargado→jefe_partida, maître→sous_chef),
 training (array of qualifications, short),
 right_to_work ("yes" if EU/Spanish national or permit stated, "unknown" otherwise — do NOT infer from name or nationality guesses),
 availability (short string), wants_year_round (boolean).
@@ -113,14 +115,17 @@ export type ScoreLine = { label: string; points: number };
 
 export function scoreCandidate(
   p: Partial<CvProfile>,
-  opening: { role?: string | null; station?: string | null; languages_required?: string[] | null } | null
+  opening: { role?: string | null; station?: string | null; languages_required?: string[] | null } | null,
+  area: "cocina" | "sala" | "" = "cocina"
 ): { score: number; reasons: ScoreLine[] } {
   const r: ScoreLine[] = [];
   const add = (label: string, points: number) => r.push({ label, points });
 
-  const ky = Number(p.kitchen_years?.value ?? NaN);
-  if (!isNaN(ky)) add(`${ky} yrs in kitchens`, ky >= 3 ? 25 : ky >= 1 ? 15 : 5);
-  else add("kitchen experience unclear", 0);
+  const sala = area === "sala";
+  const ky = Number((sala ? p.foh_years?.value : p.kitchen_years?.value) ?? NaN);
+  const where = sala ? "front of house" : "kitchens";
+  if (!isNaN(ky)) add(`${ky} yrs in ${where}`, ky >= 3 ? 25 : ky >= 1 ? 15 : 5);
+  else add(`${where} experience unclear`, 0);
 
   const sen = String(p.seniority?.value || "");
   if (["jefe_partida", "sous_chef", "chef"].includes(sen)) add(`runs a section (${sen.replace("_", " ")})`, 10);
@@ -135,7 +140,7 @@ export function scoreCandidate(
 
   const langs = p.languages?.value || [];
   if (langs.includes("es")) add("Spanish", 10);
-  if (langs.includes("en")) add("English", 5);
+  if (langs.includes("en")) add("English", sala ? 10 : 5);
   for (const l of opening?.languages_required || []) {
     if (!langs.includes(l.toLowerCase().slice(0, 2))) add(`missing required language ${l}`, -10);
   }

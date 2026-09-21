@@ -43,13 +43,13 @@ export function mirrorColumns(p: Partial<CvProfile>) {
 export async function rescore(sb: SupabaseClient, candidate_id: string) {
   const { data: c } = await sb
     .from("candidates")
-    .select("id, profile, job_opening_id")
+    .select("id, profile, job_opening_id, answers")
     .eq("id", candidate_id)
     .maybeSingle();
   if (!c) return null;
   const opening = await openingFor(sb, c.job_opening_id as string | null);
   const p = (c.profile || {}) as Partial<CvProfile>;
-  const { score, reasons } = scoreCandidate(p, opening);
+  const { score, reasons } = scoreCandidate(p, opening, ((c.answers as any)?.area as "cocina" | "sala") || "cocina");
   await sb
     .from("candidates")
     .update({ score, score_reasons: reasons, review_flags: reviewFlags(p) })
