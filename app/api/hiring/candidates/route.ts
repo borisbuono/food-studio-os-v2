@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   let q = sb
     .from("candidates")
     .select(
-      "id, entity_id, job_opening_id, name, phone, email, source, source_ref, languages, years_experience, right_to_work, cv_url, status, status_history, rejection_reason, assigned_to, notes, created_at, updated_at"
+      "id, entity_id, job_opening_id, name, phone, email, source, source_ref, languages, years_experience, right_to_work, cv_url, status, status_history, rejection_reason, assigned_to, notes, created_at, updated_at, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, parsed_at, retain_until"
     )
     .eq("entity_id", entity)
     .order("updated_at", { ascending: false });

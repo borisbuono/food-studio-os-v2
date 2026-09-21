@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ACTIVE_CANDIDATE_STATUSES, CANDIDATE_STATUSES, CandidateStatus } from "@/lib/hiring";
+import { IntakeForm, ProfileBlock, QuestionsBlock, type SopCandidate } from "./CandidateSop";
 
 type Candidate = {
   id: string;
@@ -14,7 +15,7 @@ type Candidate = {
   right_to_work: string | null;
   updated_at: string;
   years_experience: number | null;
-};
+} & Omit<SopCandidate, "id" | "name" | "status">;
 
 const KANBAN_COLUMNS: CandidateStatus[] = [
   "new",
@@ -106,8 +107,28 @@ export default function CandidateKanban({
     }
   }
 
+  function upsertCandidate(c: any) {
+    setCandidates((prev) => {
+      const i = prev.findIndex((x) => x.id === c.id);
+      if (i === -1) return [c, ...prev];
+      const next = [...prev];
+      next[i] = { ...next[i], ...c };
+      return next;
+    });
+  }
+
   return (
     <div className="mt-3">
+      <div className="mb-3">
+        <IntakeForm
+          entityId={entityId}
+          openings={openings}
+          onCreated={(c) => {
+            upsertCandidate(c);
+            setDrawerId(c.id);
+          }}
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <label className="flex items-center gap-1">
           <span className="text-clay">Opening</span>
@@ -200,7 +221,15 @@ export default function CandidateKanban({
                     onClick={() => setDrawerId(c.id)}
                     className="cursor-pointer rounded border border-black/10 bg-white px-2 py-1.5 text-xs hover:border-black/30"
                   >
-                    <div className="font-medium">{c.name}</div>
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="font-medium">{c.name}</span>
+                      {c.score != null ? (
+                        <span className="tabular-nums text-[10px] text-clay">
+                          {c.review_flags?.length ? "⚑ " : ""}
+                          {c.score}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="mt-0.5 text-[10px] text-clay">
                       {c.source || "—"}
                       {c.years_experience ? ` · ${c.years_experience}y` : ""}
@@ -222,6 +251,7 @@ export default function CandidateKanban({
           openings={openings}
           onClose={() => setDrawerId(null)}
           onAdvance={advanceStatus}
+          onCandidate={upsertCandidate}
           busy={busy}
         />
       ) : null}
@@ -236,6 +266,7 @@ function CandidateDrawer({
   openings,
   onClose,
   onAdvance,
+  onCandidate,
   busy,
 }: {
   slug: string;
@@ -244,6 +275,7 @@ function CandidateDrawer({
   openings: Array<{ id: string; title: string }>;
   onClose: () => void;
   onAdvance: (id: string, target: CandidateStatus, reason?: string) => void;
+  onCandidate: (c: any) => void;
   busy: boolean;
 }) {
   const [touches, setTouches] = useState<any[]>([]);
@@ -349,6 +381,16 @@ function CandidateDrawer({
             {candidate.right_to_work || "—"}
           </div>
         </div>
+
+        <ProfileBlock c={candidate} onUpdated={onCandidate} />
+        <QuestionsBlock
+          c={candidate}
+          touches={touches}
+          onCandidate={onCandidate}
+          onTouch={(t, replaceId) =>
+            setTouches((prev) => [t, ...prev.filter((x) => x.id !== replaceId && x.id !== t.id)])
+          }
+        />
 
         {/* Advance */}
         <div className="mt-4">

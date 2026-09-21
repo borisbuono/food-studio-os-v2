@@ -34,6 +34,18 @@ type Candidate = {
   right_to_work: string | null;
   updated_at: string;
   years_experience: number | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  profile?: any;
+  summary?: string | null;
+  location?: string | null;
+  availability?: string | null;
+  review_flags?: string[] | null;
+  score?: number | null;
+  score_reasons?: Array<{ label: string; points: number }> | null;
+  cv_path?: string | null;
+  retain_until?: string | null;
 };
 
 export default async function HiringPage({ params }: { params: { house: string } }) {
@@ -55,7 +67,7 @@ export default async function HiringPage({ params }: { params: { house: string }
     sb
       .from("candidates")
       .select(
-        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience"
+        "id, entity_id, job_opening_id, name, status, source, languages, right_to_work, updated_at, years_experience, phone, email, notes, profile, summary, location, availability, review_flags, score, score_reasons, cv_path, retain_until"
       )
       .eq("entity_id", entity_id)
       .order("updated_at", { ascending: false }),
