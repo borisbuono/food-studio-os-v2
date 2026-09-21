@@ -39,6 +39,8 @@ type Row = {
   gross_margin_eur: number | null;
   gross_margin_pct: number | null;
   cost_confidence: "high" | "medium" | "low";
+  price_asof: string | null;
+  price_tier: "fresh" | "recent" | "stale" | null;
   missing_components: any;
   computed_at: string;
 };
@@ -107,7 +109,7 @@ export default async function MenuMarginPage({
   const { data: raw, error } = await sb
     .from("menu_dish_costing")
     .select(
-      "id, venue, section, dish_slug, dish_name, sell_price_eur, matched_recipe_id, matched_recipe_name, match_score, component_count, cost_per_portion_eur, gross_margin_eur, gross_margin_pct, cost_confidence, missing_components, computed_at"
+      "id, venue, section, dish_slug, dish_name, sell_price_eur, matched_recipe_id, matched_recipe_name, match_score, component_count, cost_per_portion_eur, gross_margin_eur, gross_margin_pct, cost_confidence, price_asof, price_tier, missing_components, computed_at"
     );
 
   const rowsAll: Row[] = ((raw as Row[] | null) || []).slice();
@@ -130,7 +132,14 @@ export default async function MenuMarginPage({
     const seen = new Map<string, string | null>();
     for (const a of (al as any[]) || []) {
       const n = String(a.canonical_name || "").trim();
-      if (n && !seen.has(n)) seen.set(n, a.unit ?? null);
+      // The alias seeder swept in supplier names, "Holded invoice (...)" and
+      // OCR noise. Keep the list to things that read like an ingredient:
+      // no legal-entity suffix, no document words, and some real letters.
+      if (!n || seen.has(n)) continue;
+      if (/\b(s\.?l\.?u?|s\.?a\.?|c\.?b\.?|sdad|coop|gmbh|aps|scp)\b/i.test(n)) continue;
+      if (/(factura|albar[aá]n|invoice|holded|canon |deposit|rent |alquiler|compra |service notes)/i.test(n)) continue;
+      if (n.length < 3 || n.length > 60) continue;
+      seen.set(n, a.unit ?? null);
     }
     canonicalsByVenue[venue] = [...seen.entries()]
       .map(([name, unit]) => ({ name, unit }))
@@ -319,7 +328,19 @@ export default async function MenuMarginPage({
                           )}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{eur(r.sell_price_eur)}</td>
-                        <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{eur(r.cost_per_portion_eur)}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">
+                          {eur(r.cost_per_portion_eur)}
+                          {r.cost_per_portion_eur != null && r.price_asof && r.price_tier !== "fresh" && (
+                            <span
+                              className={
+                                "block font-mono text-[9px] uppercase tracking-wide " +
+                                (r.price_tier === "stale" ? "text-red-700" : "text-clay")
+                              }
+                            >
+                              prices to {r.price_asof}
+                            </span>
+                          )}
+                        </td>
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{eur(r.gross_margin_eur)}</td>
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{pct(r.gross_margin_pct)}</td>
                         <td className="py-2 pr-3">
@@ -366,9 +387,11 @@ export default async function MenuMarginPage({
             eating into staff and rent.
           </li>
           <li>
-            <b>confidence</b> — <i>high</i> means the recipe has costed components with recent
-            purchase-line prices; <i>medium</i> leans on hand-entered cost_per_portion; <i>low</i> means
-            no reliable cost at all.
+            <b>confidence</b> — <i>high</i> every ingredient priced from an invoice under 30 days
+            old; <i>medium</i> priced but some prices up to 6 months old; <i>low</i> either thin
+            coverage or a price over 180 days old. Any dish carrying an old price prints
+            <i> prices to &lt;date&gt;</i> under the cost — the number is real, the market may have
+            moved.
           </li>
           <li>
             The Taller tasting menu prints one price for the whole flight, not per course. Rows here
