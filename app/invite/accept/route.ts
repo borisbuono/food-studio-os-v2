@@ -28,6 +28,12 @@ function page(title: string, body: string, status = 400) {
 </div></body></html>`;
   return new NextResponse(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 }
+// invite role → team_members.default_role vocabulary
+// (worker | chef | maitre | manager | owner).
+const TM_ROLE: Record<string, string> = {
+  owner: "owner", manager: "manager", chef: "chef", waiter: "maitre", office: "manager",
+};
+
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 export async function GET(req: NextRequest) {
@@ -64,6 +70,8 @@ export async function GET(req: NextRequest) {
     return page("Invite expired", "This invite is older than 30 days. Ask whoever invited you to send a fresh one.", 410);
   }
 
+  const role = String(inv.role || "manager") as InviteRole;
+
   // team_members — a user can already have several rows; reuse the first.
   const { data: tms } = await sb.from("team_members").select("id").eq("auth_user_id", user.id).limit(1);
   let personId: string | null = (tms || [])[0]?.id ?? null;
@@ -71,14 +79,19 @@ export async function GET(req: NextRequest) {
     const meta: any = user.user_metadata || {};
     const { data: tm, error: tmErr } = await sb
       .from("team_members")
-      .insert({ auth_user_id: user.id, name: meta.full_name || meta.name || myEmail, email: myEmail, status: "active" })
+      .insert({
+        auth_user_id: user.id,
+        name: meta.full_name || meta.name || myEmail,
+        email: myEmail,
+        status: "active",
+        default_role: TM_ROLE[role] || "worker",   // NOT NULL column
+      })
       .select("id")
       .single();
     if (tmErr || !tm) return page("Couldn't join", "We couldn't create your team profile. Try again, or ask the house owner to check the invite.", 500);
     personId = tm.id as string;
   }
 
-  const role = String(inv.role || "manager") as InviteRole;
   const { data: others } = await sb
     .from("memberships").select("id").eq("person_id", personId).eq("status", "active").neq("entity_id", inv.entity_id).limit(1);
   const { error: memErr } = await sb.from("memberships").upsert(

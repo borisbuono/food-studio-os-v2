@@ -90,3 +90,9 @@ update public.profiles p
  where tm.auth_user_id = p.id
    and m.role = 'owner' and m.status = 'active'
    and coalesce(p.role, 'worker') = 'worker';
+
+-- ---- team_members.default_role -------------------------------------------
+-- NOT NULL with no default: the wizard's team_members insert (step 3) threw
+-- inside its best-effort try/catch, so the new owner silently got no
+-- membership row. Found 2026-09-21 replaying the fixed wizard on live data.
+alter table public.team_members alter column default_role set default 'worker';

@@ -147,7 +147,10 @@ export async function saveFiscalAndCreateEntityAction(formData: FormData) {
       const displayName = (u.user?.user_metadata as any)?.full_name || email || "Owner";
       const { data: newTm } = await sb
         .from("team_members")
-        .insert({ auth_user_id: uid, name: displayName, email, status: "active" })
+        // default_role is NOT NULL with no default — omitting it made this
+        // insert fail silently inside the catch below, so the owner never got
+        // a membership (found 2026-09-21 replaying the wizard on live DB).
+        .insert({ auth_user_id: uid, name: displayName, email, status: "active", default_role: "owner" })
         .select("id")
         .single();
       personId = newTm?.id ?? null;
