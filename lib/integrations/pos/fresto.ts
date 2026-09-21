@@ -169,8 +169,24 @@ export interface FrestoCredentials {
 }
 
 export function getFrestoCredentials(entity: EntityCode): FrestoCredentials | null {
-  const id = process.env[`FRESTO_CLIENT_ID_${entity}`];
-  const secret = process.env[`FRESTO_CLIENT_SECRET_${entity}`];
+  // Two accepted naming conventions on Vercel:
+  //   1) Legacy (shipped 2026-08): FRESTO_CLIENT_ID_{BM,IFL,BBH} +
+  //      FRESTO_CLIENT_SECRET_{BM,IFL,BBH}. Still documented on the
+  //      FrestoSyncCard.
+  //   2) New (2026-09-20 pos_credentials refactor): {PREFIX}_CLIENT_ID +
+  //      {PREFIX}_CLIENT_SECRET where PREFIX is the value stored in
+  //      pos_credentials.env_key_prefix. For BM/IFL the seeded prefix is
+  //      FRESTO_BM / FRESTO_IFL → FRESTO_BM_CLIENT_ID / FRESTO_IFL_CLIENT_ID.
+  // Read both to survive the transition — whichever Boris pasted into
+  // Vercel wins. The seeded prefix is entity-derivable (FRESTO_{code}), so
+  // we don't need an async DB round-trip for the common case.
+  const seededPrefix = `FRESTO_${entity}`;
+  const id =
+    process.env[`${seededPrefix}_CLIENT_ID`] ||
+    process.env[`FRESTO_CLIENT_ID_${entity}`];
+  const secret =
+    process.env[`${seededPrefix}_CLIENT_SECRET`] ||
+    process.env[`FRESTO_CLIENT_SECRET_${entity}`];
   if (!id || !secret) return null;
   return { entity, client_id: id, client_secret: secret };
 }

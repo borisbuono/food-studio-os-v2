@@ -59,8 +59,8 @@ export default function FrestoSyncCard({ entity, status, appOrigin }: {
         {status === "connected"
           ? "OAuth credentials found for this entity. Backfill orderlines + Z Reports from Fresto's Data Service. Webhooks land automatically once configured in Fresto."
           : entity === "BBH"
-            ? "BBH has no POS today — credentials optional. Env vars FRESTO_CLIENT_ID_BBH / FRESTO_CLIENT_SECRET_BBH are reserved for when a holding-level venue lands."
-            : "Set FRESTO_CLIENT_ID_" + entity + " and FRESTO_CLIENT_SECRET_" + entity + " on Vercel. Ask Carl (cl@fresto.io) for the credential pair."}
+            ? "BBH has no POS today — credentials optional. Env vars FRESTO_BBH_CLIENT_ID / FRESTO_BBH_CLIENT_SECRET (legacy FRESTO_CLIENT_ID_BBH / FRESTO_CLIENT_SECRET_BBH also accepted) are reserved for when a holding-level venue lands."
+            : "Set FRESTO_" + entity + "_CLIENT_ID and FRESTO_" + entity + "_CLIENT_SECRET on Vercel — legacy FRESTO_CLIENT_ID_" + entity + " / FRESTO_CLIENT_SECRET_" + entity + " also accepted. Ask Carl (cl@fresto.io) for the credential pair."}
       </p>
 
       {status === "connected" ? (
