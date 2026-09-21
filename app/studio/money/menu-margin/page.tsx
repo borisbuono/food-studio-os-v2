@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { E_BM, E_TALLER } from "@/lib/entities";
 import AddMissingIngredient from "@/components/AddMissingIngredient";
+import MatchRecipe, { type RecipeOption } from "@/components/MatchRecipe";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,37 @@ export default async function MenuMarginPage({
       .map(([name, unit]) => ({ name, unit }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+  // Every active recipe of the venue, so a wrong match can be repointed
+  // from the row instead of from a SQL prompt.
+  const recipesByVenue: Record<string, RecipeOption[]> = {};
+  for (const [venue, entityId] of Object.entries(VENUE_ENTITY)) {
+    const { data: rs } = await sb
+      .from("recipes")
+      .select("id, name")
+      .eq("entity_id", entityId)
+      .eq("is_active", true)
+      .order("name");
+    const ids = ((rs as any[]) || []).map((r) => r.id as string);
+    // Count ingredients in JS: recipe_ingredients has three FKs to recipes
+    // (recipe_id, linked_recipe_id, sub_recipe_id), so a PostgREST embed is
+    // ambiguous and errors out.
+    const ingCount = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: ri } = await sb
+        .from("recipe_ingredients")
+        .select("recipe_id")
+        .in("recipe_id", ids.slice(i, i + 200));
+      for (const row of (ri as any[]) || []) {
+        ingCount.set(row.recipe_id, (ingCount.get(row.recipe_id) || 0) + 1);
+      }
+    }
+    recipesByVenue[venue] = ((rs as any[]) || []).map((r) => ({
+      id: r.id as string,
+      name: String(r.name ?? "(unnamed)"),
+      ing: ingCount.get(r.id) || 0,
+    }));
+  }
+
   const matchedIds = [...new Set(rowsAll.map((r) => r.matched_recipe_id).filter(Boolean))] as string[];
   const yieldById = new Map<string, number>();
   if (matchedIds.length) {
@@ -344,14 +376,14 @@ export default async function MenuMarginPage({
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{eur(r.gross_margin_eur)}</td>
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{pct(r.gross_margin_pct)}</td>
                         <td className="py-2 pr-3">
-                          {r.matched_recipe_name ? (
-                            <span className="font-serif text-[12px] text-ink-soft">
-                              {r.matched_recipe_name}
-                              {r.component_count ? ` · ${r.component_count} comp.` : ""}
-                            </span>
-                          ) : (
-                            <span className="font-mono text-[10px] uppercase tracking-wide text-red-700">no match</span>
-                          )}
+                          <MatchRecipe
+                            rowId={r.id}
+                            currentId={r.matched_recipe_id}
+                            currentName={r.matched_recipe_name}
+                            componentCount={r.component_count}
+                            manual={r.match_score === 1}
+                            recipes={recipesByVenue[venue] || []}
+                          />
                         </td>
                         <td className="py-2 pr-3">{confidenceBadge(r.cost_confidence)}</td>
                       </tr>
@@ -399,8 +431,14 @@ export default async function MenuMarginPage({
             purpose.
           </li>
           <li>
-            Source: <code>menu_dish_costing</code>. Rebuild with the overnight script; the page is
-            server-rendered and always shows the current row set.
+            <b>wrong recipe on a dish?</b> Use <i>change</i> in the Recipe column — pick the right
+            one, unlink the guess, or create an empty recipe named after the dish. The row
+            recosts immediately and the link is marked <i>set by hand</i> so the matcher's
+            guesses stay distinguishable from your decisions.
+          </li>
+          <li>
+            Source: <code>menu_dish_costing</code>. Costs refresh on every invoice capture and
+            again nightly; the page is server-rendered and always shows the current row set.
           </li>
         </ul>
       </section>
