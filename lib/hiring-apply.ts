@@ -127,6 +127,11 @@ export type ApplyPageInfo = {
   name: string;
   legal_name: string;
   accent: string | null;
+  tax_id: string | null;
+  address_line1: string | null;
+  city: string | null;
+  postal_code: string | null;
+  country: string | null;
   brand_kit: BrandKit;
   openings: Array<{ id: string; title: string; station: string | null; role: string | null; languages_required: string[] | null }>;
 };

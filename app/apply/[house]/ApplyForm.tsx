@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { EMPTY_ANSWERS, EXTRA_PERSON_Q, PERSON_Q, SIGNATURE_Q, WORK_STYLE, type ApplyAnswers, type ApplyArea, type ApplyKind, type BrandKit } from "@/lib/hiring-apply";
 
 type Lang = "es" | "en";
@@ -37,18 +37,24 @@ const T = {
     station: "¿En qué partida eres más fuerte y dónde quieres crecer?",
     allergens: "¿Formación en alérgenos y manipulación de alimentos?",
     privacyTitle: "Tus datos",
-    privacy: (legal: string, contact: string) =>
-      `Responsable: ${legal}. Usamos tus datos solo para gestionar tu candidatura. Una herramienta de IA lee tu CV y ordena tus respuestas para que las revisemos antes; la decisión la toma siempre una persona. Los guardamos un máximo de 12 meses y luego los borramos, salvo que te contratemos. No los cedemos a nadie. Puedes pedir acceso, corrección o borrado cuando quieras en ${contact}.`,
+    privacyIntro: "Usamos tus datos solo para gestionar tu candidatura. Una herramienta de IA lee tu CV y ordena tus respuestas para que las revisemos antes; la decisión la toma siempre una persona. No los cedemos a nadie. Puedes pedir acceso, corrección o borrado cuando quieras.",
+    privacyController: "Responsable del tratamiento",
+    privacyCif: "CIF",
+    privacyAddress: "Domicilio social",
+    privacyContact: "Solicitudes de datos",
+    privacyRetention: "Plazo de conservación",
+    retentionValue: "12 meses desde el envío (luego borramos, salvo que te contratemos).",
     consent: "He leído lo anterior y acepto que tratéis mis datos para esta candidatura.",
     next: "Siguiente", back: "Atrás", send: "Enviar candidatura", sending: "Enviando…",
     need: "Rellena nombre, email y teléfono.", needCv: "Sube tu CV o cuéntanos tu experiencia en el campo de texto.", needConsent: "Marca la casilla para poder enviarla.",
+    needLegal: "Este formulario aún no puede aceptar candidaturas: falta información legal obligatoria (CIF o domicilio social). Escríbenos a",
     thanks: (n: string) => `Gracias, ${n}.`,
     thanksBody: "Tu candidatura ha llegado. La leemos personalmente y te escribimos en unos días.",
   },
   en: {
     hello: "Work with us",
     lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About seven minutes. We care more about who you are than your CV, and a person reads every application.`,
-    area: "Where?", cocina: "Kitchen", sala: "Front of house", 
+    area: "Where?", cocina: "Kitchen", sala: "Front of house",
     kind: "What are you looking for?", job: "Job", s1d: "1 day", s3d: "3 days", s1w: "1 week",
     jobFull: "Job · full time, full week", jobPart: "Extra shifts · odd days",
     stageQ: "Or would you rather do a stage with us?", stageLede: "A training stage of a few days in the kitchen or on the floor. It carries a small training fee; we give you the details when we get in touch. Choose how long:",
@@ -75,15 +81,29 @@ const T = {
     station: "Which station are you strongest on, and where do you want to grow?",
     allergens: "Allergen and food-handling training?",
     privacyTitle: "Your data",
-    privacy: (legal: string, contact: string) =>
-      `Controller: ${legal}. We use your details only to handle your application. An AI tool reads your CV and sorts your answers so we can review them faster; a person always makes the decision. We keep them for at most 12 months and then delete them, unless we hire you. We never share them. Ask for access, correction or deletion any time at ${contact}.`,
+    privacyIntro: "We use your details only to handle your application. An AI tool reads your CV and sorts your answers so we can review them faster; a person always makes the decision. We never share them. Ask for access, correction or deletion any time.",
+    privacyController: "Data controller",
+    privacyCif: "CIF",
+    privacyAddress: "Registered address",
+    privacyContact: "Data requests",
+    privacyRetention: "Retention",
+    retentionValue: "12 months from submission (then deleted, unless we hire you).",
     consent: "I've read the above and agree to you processing my details for this application.",
     next: "Next", back: "Back", send: "Send application", sending: "Sending…",
     need: "Fill in name, email and phone.", needCv: "Upload your CV or tell us about your experience in the text box.", needConsent: "Tick the box to send it.",
+    needLegal: "This form cannot accept applications yet — required legal information is missing (CIF or registered address). Please write to",
     thanks: (n: string) => `Thank you, ${n}.`,
     thanksBody: "Your application is in. We read it ourselves and will write to you within a few days.",
   },
 };
+
+// If either the CIF or the registered address is missing on entities, we
+// can't legally show a data-controller notice. Block the submit button
+// (a red banner appears on the consent step) rather than shipping a
+// half-notice — the ship note flags the venue so Boris can fill it.
+function formatAddress(line1: string | null, postal: string | null, city: string | null, country: string | null): string {
+  return [line1, [postal, city].filter(Boolean).join(" "), country].filter(Boolean).join(", ");
+}
 
 export default function ApplyForm(props: {
   slug: string;
@@ -91,6 +111,11 @@ export default function ApplyForm(props: {
   legalName: string;
   accent: string;
   contact: string;
+  taxId: string | null;
+  addressLine1: string | null;
+  city: string | null;
+  postalCode: string | null;
+  country: string | null;
   brandKit: BrandKit;
   openings: Opening[];
   preselect: string;
@@ -101,19 +126,7 @@ export default function ApplyForm(props: {
   utm: string;
   embed?: boolean;
 }) {
-  const { slug, houseName, legalName, accent, contact, brandKit, openings, embed = false } = props;
-  // Brand values (fall back to something neutral if brand_kit is missing).
-  const ground = brandKit?.palette?.ground || "#faf8f5";
-  const ink = brandKit?.palette?.ink || "#111827";
-  const displayFamily = brandKit?.typography?.display?.family;
-  const bodyFamily = brandKit?.typography?.body?.family;
-  const displayFont = displayFamily ? `"${displayFamily}", Georgia, serif` : "Georgia, serif";
-  const bodyFont = bodyFamily ? `"${bodyFamily}", system-ui, -apple-system, Segoe UI, sans-serif` : "system-ui, -apple-system, Segoe UI, sans-serif";
-  // Embed mode strips the outer chrome (bg + top padding + full-viewport
-  // height) so the page sits flush inside a Wix iframe on the venue sites.
-  const outerBg = embed ? "transparent" : ground;
-  const mainClass = embed ? "px-5 pb-16 pt-4" : "min-h-screen px-5 pb-24 pt-8";
-  const doneClass = embed ? "px-5 py-10" : "min-h-screen px-5 py-16";
+  const { slug, houseName, legalName, accent, contact, brandKit, openings, embed = false, taxId, addressLine1, city, postalCode, country } = props;
   const [lang, setLang] = useState<Lang>(props.initialLang);
   const t = T[lang];
   const [step, setStep] = useState(0);
@@ -134,6 +147,17 @@ export default function ApplyForm(props: {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
+  // Brand values (fall back to something neutral if brand_kit is missing).
+  const ground = brandKit?.palette?.ground || "#faf8f5";
+  const ink = brandKit?.palette?.ink || "#111827";
+  const displayFamily = brandKit?.typography?.display?.family;
+  const bodyFamily = brandKit?.typography?.body?.family;
+  const displayFont = displayFamily ? `"${displayFamily}", Georgia, serif` : "Georgia, serif";
+  const bodyFont = bodyFamily ? `"${bodyFamily}", system-ui, -apple-system, Segoe UI, sans-serif` : "system-ui, -apple-system, Segoe UI, sans-serif";
+
+  const legalReady = !!(taxId && addressLine1);
+  const registeredAddress = useMemo(() => formatAddress(addressLine1, postalCode, city, country), [addressLine1, postalCode, city, country]);
+
   const set = (k: keyof ApplyAnswers) => (v: string) => setA((p) => ({ ...p, [k]: v }));
 
   function go(n: number) {
@@ -147,6 +171,7 @@ export default function ApplyForm(props: {
   }
 
   async function submit() {
+    if (!legalReady) return; // button is disabled anyway
     if (!consent) return setErr(t.needConsent);
     setBusy(true);
     setErr("");
@@ -182,6 +207,14 @@ export default function ApplyForm(props: {
     <ChoiceRow value={String(a[k] ?? "")} opts={opts} accent={accent} onPick={(v) => set(k)(v)} />
   );
 
+  // Embed mode strips the outer chrome (bg + top padding + rounded margins)
+  // so the page sits flush inside a Wix iframe on bistro-mondo.com/careers
+  // and ibzfoodstudio.com/careers.
+  const outerBg = embed ? "transparent" : ground;
+  const mainClass = embed
+    ? "px-5 pb-16 pt-4"
+    : "min-h-screen px-5 pb-24 pt-8";
+  const doneClass = embed ? "px-5 py-10" : "min-h-screen px-5 py-16";
 
   if (done)
     return (
@@ -377,10 +410,25 @@ export default function ApplyForm(props: {
               <p className="mt-1 opacity-70">{file ? file.name : "—"}</p>
             </div>
             <p className={label}>{t.privacyTitle}</p>
-            <p className="mt-1 text-sm leading-relaxed opacity-80">{t.privacy(legalName, contact)}</p>
+            <p className="mt-1 text-sm leading-relaxed opacity-80">{t.privacyIntro}</p>
+            {legalReady ? (
+              <dl className="mt-3 grid grid-cols-[max-content,1fr] gap-x-3 gap-y-1 text-sm">
+                <dt className="opacity-60">{t.privacyController}</dt><dd>{legalName}</dd>
+                <dt className="opacity-60">{t.privacyCif}</dt><dd>{taxId}</dd>
+                <dt className="opacity-60">{t.privacyAddress}</dt><dd>{registeredAddress}</dd>
+                <dt className="opacity-60">{t.privacyContact}</dt><dd><a className="underline" href={`mailto:${contact}`}>{contact}</a></dd>
+                <dt className="opacity-60">{t.privacyRetention}</dt><dd>{t.retentionValue}</dd>
+              </dl>
+            ) : (
+              <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+                <p>
+                  {t.needLegal} <a className="underline font-medium" href={`mailto:${contact}`}>{contact}</a>.
+                </p>
+              </div>
+            )}
             <label className="mt-4 flex items-start gap-3 text-sm">
-              <input type="checkbox" className="mt-1 h-5 w-5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-              <span>{t.consent}</span>
+              <input type="checkbox" className="mt-1 h-5 w-5" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={!legalReady} />
+              <span className={legalReady ? "" : "opacity-50"}>{t.consent}</span>
             </label>
           </section>
         )}
@@ -394,7 +442,15 @@ export default function ApplyForm(props: {
           {step < 5 ? (
             <button onClick={() => go(step + 1)} className={btn} style={{ background: accent }}>{t.next}</button>
           ) : (
-            <button onClick={submit} disabled={busy} className={btn} style={{ background: accent }}>{busy ? t.sending : t.send}</button>
+            <button
+              onClick={submit}
+              disabled={busy || !legalReady}
+              className={btn}
+              style={{ background: accent }}
+              title={legalReady ? undefined : t.needLegal}
+            >
+              {busy ? t.sending : t.send}
+            </button>
           )}
         </div>
       </div>

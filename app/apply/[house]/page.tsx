@@ -18,7 +18,8 @@ export async function generateMetadata({ params }: { params: { house: string } }
 
 // Turn a brand_kits typography family into a Google Fonts URL fragment.
 // `Baloo 2` → `Baloo+2:wght@400;600;700`. Weights are baked in so headings
-// have body and the form UI has a normal weight to fall back on.
+// have something with body and the form UI has a normal weight to fall back
+// on. Returns null for anything without a Google source.
 function googleFontFragment(family: string | null | undefined, weights: number[]): string | null {
   if (!family) return null;
   return `${family.replace(/\s+/g, "+")}:wght@${weights.join(";")}`;
@@ -45,6 +46,7 @@ export default async function ApplyPage({
     googleFontFragment(displayFamily, [400, 600, 700]),
     googleFontFragment(bodyFamily, [400, 500, 600]),
   ].filter(Boolean) as string[];
+  // dedupe (BM's body / display share no family, but a future kit could)
   const uniq = Array.from(new Set(parts));
   const fontHref = uniq.length
     ? `https://fonts.googleapis.com/css2?${uniq.map((p) => `family=${p}`).join("&")}&display=swap`
@@ -67,6 +69,11 @@ export default async function ApplyPage({
         legalName={ent.legal_name || ent.name}
         accent={ent.accent || "#111111"}
         contact={APPLY_CONTACT[params.house] || "hola@ibzfoodstudio.com"}
+        taxId={ent.tax_id}
+        addressLine1={ent.address_line1}
+        city={ent.city}
+        postalCode={ent.postal_code}
+        country={ent.country}
         brandKit={ent.brand_kit}
         openings={openings.map((o) => ({ id: o.id, title: o.title, station: o.station, hours_per_week: null }))}
         preselect={searchParams.role || ""}
