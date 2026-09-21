@@ -28,7 +28,7 @@ export type ApplyAnswers = {
   references: string;
   station: string;
   allergen_training: "yes" | "no" | "";
-  schedule: "full" | "part" | "season" | "";
+  schedule: "full" | "extras" | "";
   food_handler: "yes" | "no" | "expired" | "";
   craft1: string;
   craft2: string;

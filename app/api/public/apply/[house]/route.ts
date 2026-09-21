@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: { params: { house: string }
     references: s(form.get("references"), 1000),
     station: s(form.get("station"), 300),
     allergen_training: pick(s(form.get("allergen_training"), 10), ["yes", "no"]),
-    schedule: pick(s(form.get("schedule"), 10), ["full", "part", "season"]),
+    schedule: pick(s(form.get("schedule"), 10), ["full", "extras"]),
     food_handler: pick(s(form.get("food_handler"), 10), ["yes", "no", "expired"]),
     craft1: s(form.get("craft1"), 2000),
     craft2: s(form.get("craft2"), 2000),

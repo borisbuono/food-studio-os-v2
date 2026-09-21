@@ -12,7 +12,7 @@ const T = {
     lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Unos siete minutos. Nos importa más quién eres que tu CV, y cada candidatura la lee una persona.`,
     area: "¿Dónde?", cocina: "Cocina", sala: "Sala",
     kind: "¿Qué buscas?", job: "Trabajo", s1d: "1 día", s3d: "3 días", s1w: "1 semana",
-    jobFull: "Trabajo · jornada completa", jobPart: "Trabajo · media jornada",
+    jobFull: "Trabajo · jornada completa", jobPart: "Extras · días sueltos",
     stageQ: "¿O prefieres hacer un stage con nosotros?", stageLede: "Un stage formativo de unos días en la cocina o en la sala. Tiene un pequeño coste de formación; te damos el detalle cuando te contactemos. Elige cuánto tiempo:",
     stageDates: "¿Qué fechas te vienen bien para el stage?",
     stationSala: "¿Qué experiencia tienes en sala, vinos o barra, y dónde quieres crecer?",
@@ -50,7 +50,7 @@ const T = {
     lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About seven minutes. We care more about who you are than your CV, and a person reads every application.`,
     area: "Where?", cocina: "Kitchen", sala: "Front of house", 
     kind: "What are you looking for?", job: "Job", s1d: "1 day", s3d: "3 days", s1w: "1 week",
-    jobFull: "Job · full time", jobPart: "Job · part time",
+    jobFull: "Job · full time, full week", jobPart: "Extra shifts · odd days",
     stageQ: "Or would you rather do a stage with us?", stageLede: "A training stage of a few days in the kitchen or on the floor. It carries a small training fee; we give you the details when we get in touch. Choose how long:",
     stageDates: "Which dates suit you for the stage?",
     stationSala: "What experience do you have on the floor, with wine or behind the bar, and where do you want to grow?",
@@ -217,7 +217,7 @@ export default function ApplyForm(props: {
           <section>
             <p className={label}>{t.kind}</p>
             <div className="mt-2 grid gap-2">
-              {([["full", t.jobFull], ["part", t.jobPart]] as const).map(([sch, l]) => {
+              {([["full", t.jobFull], ["extras", t.jobPart]] as const).map(([sch, l]) => {
                 const on = a.kind === "job" && a.schedule === sch;
                 return (
                   <button
