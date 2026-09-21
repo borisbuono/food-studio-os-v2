@@ -23,9 +23,22 @@ type Recipe = {
   cost_per_portion: number | null;
   is_active: boolean;
   ingredient_count?: number;
+  // Shared recipes (2026-09-21)
+  is_mirror?: boolean;
+  is_public?: boolean;
+  public_slug?: string | null;
+  is_draft?: boolean;
+  is_mine?: boolean;
 };
 
-const CATEGORIES = ["", "starter", "main", "dessert", "side", "sauce", "stock", "component"];
+type View = "all" | "mine" | "shared" | "public" | "draft";
+const VIEWS: { key: View; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "mine", label: "Mine" },
+  { key: "shared", label: "Shared" },
+  { key: "public", label: "Public" },
+  { key: "draft", label: "Draft" },
+];
 
 export default function RecipesList({ entityId, houseSlug }: { entityId: string; houseSlug: string }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -33,6 +46,7 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState<string>("");
+  const [view, setView] = useState<View>("all");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newStation, setNewStation] = useState("");
@@ -56,15 +70,33 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
 
   useEffect(() => { reload(); }, [reload]);
 
-  const filtered = useMemo(() => {
-    if (!cat) return recipes;
-    return recipes.filter((r) => (r.category || "") === cat);
-  }, [recipes, cat]);
+  const inView = useCallback((r: Recipe, v: View) =>
+    v === "all" ? true
+    : v === "mine" ? !r.is_mirror
+    : v === "shared" ? !!r.is_mirror
+    : v === "public" ? !!r.is_public
+    : !!r.is_draft, []);
+
+  const viewCounts = useMemo(() => {
+    const c: Record<View, number> = { all: 0, mine: 0, shared: 0, public: 0, draft: 0 };
+    for (const r of recipes) for (const v of VIEWS) if (inView(r, v.key)) c[v.key]++;
+    return c;
+  }, [recipes, inView]);
+
+  const categories = useMemo(
+    () => ["", ...Array.from(new Set(recipes.map((r) => r.category).filter(Boolean) as string[])).sort()],
+    [recipes],
+  );
+
+  const filtered = useMemo(
+    () => recipes.filter((r) => inView(r, view) && (!cat || (r.category || "") === cat)),
+    [recipes, cat, view, inView],
+  );
 
   const byStation = useMemo(() => {
     const map = new Map<string, Recipe[]>();
     for (const r of filtered) {
-      const k = r.station || "Unassigned";
+      const k = r.station || (r.category ? r.category.replace(/-/g, " ") : "Unassigned");
       (map.get(k) || map.set(k, []).get(k))!.push(r);
     }
     return Array.from(map.entries());
@@ -102,7 +134,7 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
             <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
               {houseSlug.toUpperCase()} · Kitchen · Recipes
             </p>
-            <h1 className="mt-0.5 font-serif text-xl leading-tight">{recipes.length} recipes</h1>
+            <h1 className="mt-0.5 font-serif text-xl leading-tight">{filtered.length} recipes</h1>
             <p className="font-serif italic text-[12px] text-ink-soft">Tap a recipe to open · Explode → prep from detail</p>
           </div>
           <div className="flex flex-col gap-2 shrink-0">
@@ -133,11 +165,29 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
             onChange={(e) => setCat(e.target.value)}
             className="rounded-md border border-line px-3 py-2 text-sm"
           >
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c || "all"} value={c}>{c ? c : "all categories"}</option>
             ))}
           </select>
         </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Recipe filter">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              role="tab"
+              aria-selected={view === v.key}
+              onClick={() => setView(v.key)}
+              className={
+                "rounded-full border px-3 py-1 font-mono text-[11px] uppercase tracking-wide " +
+                (view === v.key ? "border-ink bg-ink text-white" : "border-line text-ink-soft hover:bg-black/5")
+              }
+            >
+              {v.label} · {viewCounts[v.key]}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wide text-clay">🌐 public · 🔗 shared (edit on origin) · ✏️ editable here</p>
 
         {creating ? (
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -195,7 +245,13 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
                         className="flex items-center gap-3 px-3 py-3 hover:bg-black/5"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="font-serif text-[16px] leading-tight">{r.name}</p>
+                          <p className="font-serif text-[16px] leading-tight">
+                            {r.name}
+                            <span className="ml-2 whitespace-nowrap text-[12px]" aria-hidden>
+                              {r.is_public ? "🌐" : ""}{r.is_mirror ? "🔗" : "✏️"}
+                            </span>
+                            {r.is_draft ? <span className="ml-1 font-mono text-[9px] uppercase tracking-wide text-tomato">draft</span> : null}
+                          </p>
                           <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wide text-clay">
                             {r.category || "—"}
                             {r.yield_qty != null ? ` · yields ${formatQty(r.yield_qty)} ${r.yield_unit || ""}` : ""}

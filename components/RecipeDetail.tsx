@@ -25,6 +25,11 @@ type Recipe = {
   cost_per_portion_eur?: number | null;
   cost_computed_at?: string | null;
   cost_confidence?: "high" | "medium" | "low" | "missing" | null;
+  // Shared recipes (2026-09-21): a mirror's content lives on its origin.
+  origin_recipe_id?: string | null;
+  is_public?: boolean | null;
+  public_slug?: string | null;
+  metadata?: Record<string, any> | null;
 };
 
 type CostBreakdown = {
@@ -162,10 +167,17 @@ export default function RecipeDetail({
     if (!recipe) return;
     setSaving(true); setError(null);
     try {
+      const venueOnly = !!recipe.origin_recipe_id;
       const res = await fetch(`/api/recipes/${recipeId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(venueOnly ? {
+          // Mirror: only this venue's own fields. Content is edited on the origin.
+          station: recipe.station,
+          cover_multiplier: recipe.cover_multiplier,
+          sell_price_eur: recipe.sell_price_eur,
+          linked_menu_item_id: recipe.linked_menu_item_id,
+        } : {
           name: recipe.name,
           station: recipe.station,
           category: recipe.category,
@@ -242,6 +254,9 @@ export default function RecipeDetail({
     );
   }
 
+  const isMirror = !!recipe.origin_recipe_id;
+  const isOrigin = !isMirror && recipe.entity_id !== entityId;
+
   return (
     <main className="min-h-screen bg-white text-ink">
       <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur px-4 py-3">
@@ -252,6 +267,7 @@ export default function RecipeDetail({
             </p>
             <input
               value={recipe.name}
+              readOnly={isMirror}
               onChange={(e) => setR({ name: e.target.value })}
               className="mt-0.5 w-full bg-transparent font-serif text-xl leading-tight focus:outline-none"
             />
@@ -282,29 +298,45 @@ export default function RecipeDetail({
         </div>
       ) : null}
 
+      {isMirror ? (
+        <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-black/5 px-3 py-2 text-[12px]">
+          <span>🔗 Shared recipe — mirrored from the Food Studio library. Name, ingredients and method are read-only here; station and price stay yours.</span>
+          <Link href={`/h/${houseSlug}/kitchen/recipes/${recipe.origin_recipe_id}`} className="font-mono text-[11px] uppercase tracking-wide underline">
+            Edit origin →
+          </Link>
+        </div>
+      ) : isOrigin ? (
+        <div className="mx-4 mt-3 rounded-md border border-line bg-black/5 px-3 py-2 text-[12px]">
+          ✏️ Editing the origin. Saved changes reach every kitchen that shares this recipe.
+          {recipe.is_public && recipe.public_slug ? (
+            <> · 🌐 Public at <a className="underline" href={`/recipes/${recipe.public_slug}`} target="_blank" rel="noreferrer">/recipes/{recipe.public_slug}</a></>
+          ) : recipe.metadata?.needs_boris_review ? <> · awaiting review</> : null}
+        </div>
+      ) : null}
+
       <section className="px-4 pb-24 pt-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Station">
             <input value={recipe.station ?? ""} onChange={(e) => setR({ station: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
           </Field>
           <Field label="Category">
-            <select value={recipe.category ?? ""} onChange={(e) => setR({ category: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm">
-              {["", "starter", "main", "dessert", "side", "sauce", "stock", "component"].map((c) => (
+            <select value={recipe.category ?? ""} disabled={isMirror} onChange={(e) => setR({ category: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm">
+              {Array.from(new Set(["", "starter", "main", "dessert", "side", "sauce", "stock", "component", ...(recipe.category ? [recipe.category] : [])])).map((c) => (
                 <option key={c || "none"} value={c}>{c || "—"}</option>
               ))}
             </select>
           </Field>
           <Field label="Yield qty">
-            <input inputMode="decimal" value={recipe.yield_qty ?? ""} onChange={(e) => setR({ yield_qty: e.target.value === "" ? null : Number(e.target.value) })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
+            <input inputMode="decimal" value={recipe.yield_qty ?? ""} disabled={isMirror} onChange={(e) => setR({ yield_qty: e.target.value === "" ? null : Number(e.target.value) })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
           </Field>
           <Field label="Yield unit">
-            <input value={recipe.yield_unit ?? ""} onChange={(e) => setR({ yield_unit: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
+            <input value={recipe.yield_unit ?? ""} disabled={isMirror} onChange={(e) => setR({ yield_unit: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
           </Field>
           <Field label="Portion size">
-            <input inputMode="decimal" value={recipe.portion_size ?? ""} onChange={(e) => setR({ portion_size: e.target.value === "" ? null : Number(e.target.value) })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
+            <input inputMode="decimal" value={recipe.portion_size ?? ""} disabled={isMirror} onChange={(e) => setR({ portion_size: e.target.value === "" ? null : Number(e.target.value) })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
           </Field>
           <Field label="Portion unit">
-            <input value={recipe.portion_unit ?? ""} onChange={(e) => setR({ portion_unit: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
+            <input value={recipe.portion_unit ?? ""} disabled={isMirror} onChange={(e) => setR({ portion_unit: e.target.value || null })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
           </Field>
           <Field label="Cover multiplier">
             <input inputMode="decimal" value={recipe.cover_multiplier ?? ""} onChange={(e) => setR({ cover_multiplier: e.target.value === "" ? null : Number(e.target.value) })} className="w-full rounded-md border border-line px-3 py-2 text-sm" />
@@ -315,6 +347,7 @@ export default function RecipeDetail({
         </div>
 
         <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Ingredients</h2>
+        <fieldset disabled={isMirror} className="contents">
         <ul className="mt-1 divide-y divide-line rounded-md border border-line bg-white">
           {ings.map((i, idx) => (
             <li key={i.id || `new-${idx}`} className="grid grid-cols-12 gap-2 px-3 py-2">
@@ -360,6 +393,7 @@ export default function RecipeDetail({
             </button>
           </li>
         </ul>
+        </fieldset>
 
         <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Cost</h2>
         <CostSection
@@ -374,6 +408,7 @@ export default function RecipeDetail({
         <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Method</h2>
         <textarea
           value={recipe.method ?? ""}
+          readOnly={isMirror}
           onChange={(e) => setR({ method: e.target.value || null })}
           rows={10}
           className="mt-1 w-full rounded-md border border-line px-3 py-2 font-serif text-sm leading-relaxed"
@@ -383,6 +418,7 @@ export default function RecipeDetail({
         <h2 className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Notes</h2>
         <textarea
           value={recipe.notes ?? ""}
+          readOnly={isMirror}
           onChange={(e) => setR({ notes: e.target.value || null })}
           rows={3}
           className="mt-1 w-full rounded-md border border-line px-3 py-2 font-serif text-sm leading-relaxed"

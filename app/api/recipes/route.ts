@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
   let q = sb
     .from("recipes")
-    .select("id, entity_id, name, station, category, yield_qty, yield_unit, portion_size, portion_unit, cover_multiplier, sell_price_eur, cost_per_serving_eur, cost_per_portion, is_active, linked_menu_item_id, created_at, updated_at")
+    .select("id, entity_id, name, station, category, yield_qty, yield_unit, portion_size, portion_unit, cover_multiplier, sell_price_eur, cost_per_serving_eur, cost_per_portion, is_active, linked_menu_item_id, created_at, updated_at, origin_recipe_id, is_public, public_slug, metadata")
     .eq("entity_id", entity)
     .eq("is_active", true)
     .order("station", { ascending: true, nullsFirst: false })
@@ -49,17 +49,48 @@ export async function GET(req: Request) {
   const recipes = data || [];
   const ids = recipes.map((r: any) => r.id);
   const counts: Record<string, number> = {};
-  if (ids.length) {
-    const { data: ings } = await sb
-      .from("recipe_ingredients")
-      .select("recipe_id")
-      .in("recipe_id", ids);
+  // Chunked + parallel: with the shared library a venue has ~700 recipes and
+  // ~9k ingredient rows, over PostgREST's 1000-row page cap in one request.
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 40) chunks.push(ids.slice(i, i + 40));
+  const results = await Promise.all(chunks.map((c) =>
+    sb.from("recipe_ingredients").select("recipe_id").in("recipe_id", c).limit(1000)));
+  for (const { data: ings } of results)
     for (const row of ings || []) counts[(row as any).recipe_id] = (counts[(row as any).recipe_id] || 0) + 1;
+
+  // Shared recipes (2026-09-21): a mirror's public / review state lives on
+  // its origin row. Readable through the mirror-venue RLS policy.
+  const originIds = Array.from(new Set(recipes.map((r: any) => r.origin_recipe_id).filter(Boolean))) as string[];
+  const origins: Record<string, { is_public: boolean; public_slug: string | null; draft: boolean }> = {};
+  for (let i = 0; i < originIds.length; i += 300) {
+    const { data: os } = await sb
+      .from("recipes")
+      .select("id, is_public, public_slug, metadata")
+      .in("id", originIds.slice(i, i + 300));
+    for (const o of (os || []) as any[]) {
+      origins[o.id] = {
+        is_public: !!o.is_public,
+        public_slug: o.public_slug ?? null,
+        draft: !!o.metadata?.needs_boris_review || o.metadata?.status === "shell",
+      };
+    }
   }
 
   return Response.json({
     ok: true,
-    recipes: recipes.map((r: any) => ({ ...r, ingredient_count: counts[r.id] || 0 })),
+    recipes: recipes.map((r: any) => {
+      const o = r.origin_recipe_id ? origins[r.origin_recipe_id] : null;
+      const { metadata, ...rest } = r;
+      return {
+        ...rest,
+        ingredient_count: counts[r.id] || 0,
+        is_mirror: !!r.origin_recipe_id,
+        is_public: o ? o.is_public : !!r.is_public,
+        public_slug: o ? o.public_slug : r.public_slug ?? null,
+        is_draft: o ? o.draft : (!!metadata?.needs_boris_review || metadata?.status === "shell"),
+        is_mine: !r.origin_recipe_id,
+      };
+    }),
     count: recipes.length,
   });
 }
