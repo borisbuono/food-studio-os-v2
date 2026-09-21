@@ -155,7 +155,7 @@ export async function POST(req: Request, { params }: { params: { house: string }
   let summary: string | null = null;
   const extra: string[] = [];
   if (a.right_to_work === "in_progress") extra.push("right to work: permit in progress");
-  if (isStage) extra.push(`${KIND_LABEL[a.kind as ApplyKind].en} request — needs a contract + alta or an education convenio before day 1`);
+  if (isStage) extra.push(`${KIND_LABEL[a.kind as ApplyKind].en} request (educational, fee) — confirm fee + invoice + insurance; no productive work unless on contract/alta`);
   if (file && !cvPath) extra.push("CV upload failed — ask them to resend");
   const [cvRes, personRes] = await Promise.allSettled([
     parseCv(file ? { base64: file.base64, mediaType: file.mediaType } : null, `${a.note}\nLives: ${a.lives_where}`),
