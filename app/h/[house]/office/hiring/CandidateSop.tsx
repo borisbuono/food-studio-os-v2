@@ -135,6 +135,8 @@ const PROFILE_ROWS: Array<[string, string]> = [
   ["references", "References"],
   ["station_preference", "Station pref."],
   ["allergen_training", "Allergens"],
+  ["food_handler", "Carnet manip."],
+  ["schedule", "Hours"],
 ];
 
 export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c: any) => void }) {
@@ -214,6 +216,33 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
             ))}
           </ul>
         </details>
+      ) : null}
+      {p.people_read?.value ? (
+        <div className="mt-3 border-t border-black/10 pt-2">
+          <div className="font-semibold">The person, in their own words</div>
+          <p className="mt-1">{p.people_read.value.summary}</p>
+          <p className="mt-1 text-clay">Craft: {p.people_read.value.craft_note}</p>
+          <ul className="mt-1 space-y-0.5">
+            {(p.people_read.value.traits || []).map((t: any, i: number) => (
+              <li key={i}>
+                <span className={t.signal === "clear" ? "font-medium" : t.signal === "some" ? "" : "text-clay"}>
+                  {t.trait} · {t.signal}
+                </span>
+                {t.evidence ? <span className="text-clay"> — “{t.evidence}”</span> : null}
+              </li>
+            ))}
+          </ul>
+          {p.people_read.value.ask_in_interview?.length ? (
+            <div className="mt-2">
+              <div className="text-clay">Ask in the interview:</div>
+              <ol className="list-decimal pl-4">
+                {p.people_read.value.ask_in_interview.map((q: string, i: number) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {c.score != null ? (
         <div className="mt-3">

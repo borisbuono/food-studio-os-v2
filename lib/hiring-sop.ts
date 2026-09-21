@@ -37,6 +37,17 @@ export type CvProfile = {
   references?: Field;
   station_preference?: Field;
   allergen_training?: Field;
+  food_handler?: Field;
+  schedule?: Field;
+  people_read?: Field<PeopleRead>;
+};
+
+export type PeopleRead = {
+  craft_depth: 0 | 1 | 2 | 3; // 0 blank/vague · 1 generic · 2 knows it · 3 knows it and why
+  craft_note: string;
+  traits: Array<{ trait: string; signal: "clear" | "some" | "not shown"; evidence: string }>;
+  ask_in_interview: string[];
+  summary: string;
 };
 
 export const LOW_CONFIDENCE = 0.6;
@@ -150,6 +161,9 @@ export function scoreCandidate(
   else if (rtw === "no") add("no right to work", -30);
   else add("right to work not yet confirmed", 0);
 
+  const depth = p.people_read?.value?.craft_depth;
+  if (typeof depth === "number" && depth > 0) add(`craft answers: ${["", "generic", "knows it", "knows it and why"][depth]}`, depth * 4);
+  if (p.food_handler?.value === "yes") add("food-handler card", 5);
   if (p.weekends?.value === true) add("works weekends", 5);
   if (p.weekends?.value === false) add("no weekends", -15);
   if (p.references?.value) add("references offered", 5);
@@ -170,7 +184,7 @@ const QUESTIONS: Q[] = [
   { key: "transport", es: "Estamos en Sant Joan de Labritja, en el norte. ¿Dónde vives y cómo vendrías (coche, moto…)?", en: "We're in Sant Joan de Labritja, in the north. Where do you live and how would you get here?" },
   { key: "references", es: "¿Nos puedes dar el contacto de uno o dos jefes de cocina anteriores como referencia?", en: "Could you share one or two previous head chefs we can call as references?" },
   { key: "station_preference", es: "¿En qué partida te sientes más fuerte y en cuál te gustaría crecer?", en: "Which station are you strongest on, and where would you like to grow?" },
-  { key: "allergen_training", es: "¿Tienes formación en alérgenos y manipulación de alimentos?", en: "Do you have allergen and food-handling training?" },
+  { key: "allergen_training", es: "¿Tienes el carnet de manipulador de alimentos en vigor? ¿Y formación en alérgenos?", en: "Do you have a valid food-handler certificate (carnet de manipulador)? And allergen training?" },
 ];
 
 const PRIVACY_ES =
@@ -274,4 +288,29 @@ export function retainUntil(from = new Date()): string {
   const d = new Date(from);
   d.setFullYear(d.getFullYear() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+
+// ---------- the person, read from their own words ----------
+
+const PEOPLE_SYSTEM = `You help a restaurant owner in Ibiza cast a team. He reads every application himself; you prepare his reading.
+You get a candidate's written answers: two craft questions and five questions about themselves.
+Return ONLY JSON:
+{"craft_depth": 0|1|2|3, "craft_note": "one line in English on what the craft answers show",
+ "traits": [ {"trait": "warmth", ...}, {"trait": "curiosity"}, {"trait": "work ethic"}, {"trait": "empathy"}, {"trait": "self-awareness"}, {"trait": "integrity"} ] — each {"trait","signal":"clear"|"some"|"not shown","evidence":"their own words, quoted, max 20 words, or empty"},
+ "ask_in_interview": ["three short follow-up questions, in the candidate's language, that dig into what the answers left open"],
+ "summary": "two plain sentences in English: who this person seems to be at work, from their own words"}
+Rules: evidence only — quote them, never invent. "not shown" when the answers don't show it; short answers are not a red flag by themselves. craft_depth: 0 blank or vague, 1 generic, 2 correct method, 3 correct method plus why/what goes wrong.
+Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No psychological diagnosis or personality typing. No hire/no-hire verdict — that is his call.`;
+
+export async function readPerson(
+  area: "cocina" | "sala",
+  qa: Array<{ q: string; a: string }>
+): Promise<PeopleRead | null> {
+  if (!qa.some((x) => x.a.trim())) return null;
+  const text = `Area: ${area === "sala" ? "front of house" : "kitchen"}\n\n` + qa.map((x) => `Q: ${x.q}\nA: ${x.a || "(blank)"}`).join("\n\n");
+  const txt = await callClaude([{ type: "text", text }], PEOPLE_SYSTEM, 1500);
+  const j = stripJson(txt);
+  if (!j || !Array.isArray(j.traits)) return null;
+  return j as PeopleRead;
 }

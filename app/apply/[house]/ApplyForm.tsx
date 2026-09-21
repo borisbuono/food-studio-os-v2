@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EMPTY_ANSWERS, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
+import { CRAFT_Q, EMPTY_ANSWERS, PERSON_Q, type ApplyAnswers, type ApplyArea, type ApplyKind } from "@/lib/hiring-apply";
 
 type Lang = "es" | "en";
 type Opening = { id: string; title: string; station: string | null; hours_per_week: number | null };
@@ -9,13 +9,17 @@ type Opening = { id: string; title: string; station: string | null; hours_per_we
 const T = {
   es: {
     hello: "Trabaja con nosotros",
-    lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Cuatro pasos, dos minutos. Cada candidatura la lee una persona.`,
+    lede: (h: string) => `Cocina y sala en ${h}. Trabajo o stage. Unos diez minutos. Nos importa más quién eres que tu CV, y cada candidatura la lee una persona.`,
     area: "¿Dónde?", cocina: "Cocina", sala: "Sala",
     kind: "¿Qué buscas?", job: "Trabajo", s1d: "Stage 1 día", s3d: "Stage 3 días", s1w: "Stage 1 semana",
     stageDates: "¿Qué fechas te vienen bien para el stage?",
     stationSala: "¿Qué experiencia tienes en sala, vinos o barra, y dónde quieres crecer?",
     needChoice: "Elige cocina o sala, y trabajo o stage.",
-    steps: ["Tú", "Tu CV", "Unas preguntas", "Enviar"],
+    schedule: "¿Qué jornada?", full: "Completa", part: "Parcial", season: "Temporada",
+    foodHandler: "¿Tienes el carnet de manipulador de alimentos?", expired: "Caducado",
+    craftTitle: "El oficio", craftLede: "Contesta como se lo contarías a un compañero. Dos o tres frases bastan.",
+    personTitle: "Tú, como persona", personLede: "Aquí no hay respuestas buenas o malas. Queremos saber cómo eres para armar un buen equipo.",
+    steps: ["Tú", "CV", "Práctico", "Oficio", "Tú, persona", "Enviar"],
     name: "Nombre y apellidos", email: "Email", phone: "Teléfono (WhatsApp)",
     role: "¿Algún puesto concreto?", open: "Candidatura espontánea",
     cv: "Sube tu CV", cvHint: "PDF o una foto del papel. Máx. 10 MB.", cvPick: "Elegir archivo o hacer foto",
@@ -39,13 +43,17 @@ const T = {
   },
   en: {
     hello: "Work with us",
-    lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. Four steps, two minutes. A person reads every application.`,
+    lede: (h: string) => `Kitchen and front of house at ${h}. Job or stage. About ten minutes. We care more about who you are than your CV, and a person reads every application.`,
     area: "Where?", cocina: "Kitchen", sala: "Front of house", 
     kind: "What are you looking for?", job: "Job", s1d: "Stage 1 day", s3d: "Stage 3 days", s1w: "Stage 1 week",
     stageDates: "Which dates suit you for the stage?",
     stationSala: "What experience do you have on the floor, with wine or behind the bar, and where do you want to grow?",
     needChoice: "Choose kitchen or front of house, and job or stage.",
-    steps: ["You", "Your CV", "A few questions", "Send"],
+    schedule: "Hours?", full: "Full time", part: "Part time", season: "Season",
+    foodHandler: "Do you have a food-handler certificate (carnet de manipulador)?", expired: "Expired",
+    craftTitle: "The craft", craftLede: "Answer as you'd explain it to a colleague. Two or three sentences are enough.",
+    personTitle: "You, the person", personLede: "No right or wrong answers here. We want to know who you are so we can build a good team.",
+    steps: ["You", "CV", "Practical", "Craft", "You, the person", "Send"],
     name: "Full name", email: "Email", phone: "Phone (WhatsApp)",
     role: "A specific opening?", open: "Open application",
     cv: "Upload your CV", cvHint: "PDF or a photo of the paper. Max 10 MB.", cvPick: "Choose file or take photo",
@@ -215,6 +223,12 @@ export default function ApplyForm(props: {
             <Choice k="area" opts={[["cocina", t.cocina], ["sala", t.sala]]} />
             <p className={label}>{t.kind}</p>
             <Choice k="kind" opts={[["job", t.job], ["stage_1d", t.s1d], ["stage_3d", t.s3d], ["stage_1w", t.s1w]]} />
+            {a.kind === "job" ? (
+              <>
+                <p className={label}>{t.schedule}</p>
+                <Choice k="schedule" opts={[["full", t.full], ["part", t.part], ["season", t.season]]} />
+              </>
+            ) : null}
             <label className={label}>{t.name}<input className={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
             <label className={label}>{t.email}<input className={input} type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
             <label className={label}>{t.phone}<input className={input} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label>
@@ -261,14 +275,42 @@ export default function ApplyForm(props: {
             <Choice k="weekends" opts={[["yes", t.yes], ["some", t.some], ["no", t.no]]} />
             <label className={label}>{t.lives}<input className={input} value={a.lives_where} onChange={(e) => set("lives_where")(e.target.value)} /></label>
             <label className={label}>{t.transport(houseName)}<input className={input} value={a.transport} onChange={(e) => set("transport")(e.target.value)} /></label>
-            <label className={label}>{a.area === "sala" ? t.stationSala : t.station}<input className={input} value={a.station} onChange={(e) => set("station")(e.target.value)} /></label>
             <label className={label}>{t.refs}<textarea className={input} rows={2} value={a.references} onChange={(e) => set("references")(e.target.value)} /></label>
             <p className={label}>{t.allergens}</p>
             <Choice k="allergen_training" opts={[["yes", t.yes], ["no", t.no]]} />
+            <p className={label}>{t.foodHandler}</p>
+            <Choice k="food_handler" opts={[["yes", t.yes], ["expired", t.expired], ["no", t.no]]} />
           </section>
         )}
 
         {step === 3 && (
+          <section>
+            <h2 className="mt-6 font-serif text-xl">{t.craftTitle}</h2>
+            <p className="mt-1 text-sm text-neutral-600">{t.craftLede}</p>
+            <label className={label}>{a.area === "sala" ? t.stationSala : t.station}<textarea className={input} rows={3} value={a.station} onChange={(e) => set("station")(e.target.value)} /></label>
+            {CRAFT_Q[a.area === "sala" ? "sala" : "cocina"][lang].map((q, i) => (
+              <label key={i} className={label}>
+                {q}
+                <textarea className={input} rows={4} value={i === 0 ? a.craft1 : a.craft2} onChange={(e) => set(i === 0 ? "craft1" : "craft2")(e.target.value)} />
+              </label>
+            ))}
+          </section>
+        )}
+
+        {step === 4 && (
+          <section>
+            <h2 className="mt-6 font-serif text-xl">{t.personTitle}</h2>
+            <p className="mt-1 text-sm text-neutral-600">{t.personLede}</p>
+            {PERSON_Q.map((q) => (
+              <label key={q.k} className={label}>
+                {q[lang](a.area)}
+                <textarea className={input} rows={3} value={a[q.k]} onChange={(e) => set(q.k)(e.target.value)} />
+              </label>
+            ))}
+          </section>
+        )}
+
+        {step === 5 && (
           <section>
             <div className="mt-5 rounded-xl border border-black/10 bg-white p-4 text-sm leading-relaxed">
               <p className="font-medium">{name} · {email} · {phone}</p>
@@ -289,7 +331,7 @@ export default function ApplyForm(props: {
           {step > 0 ? (
             <button onClick={() => go(step - 1)} className="text-sm underline" disabled={busy}>{t.back}</button>
           ) : <span />}
-          {step < 3 ? (
+          {step < 5 ? (
             <button onClick={() => go(step + 1)} className={btn} style={{ background: accent }}>{t.next}</button>
           ) : (
             <button onClick={submit} disabled={busy} className={btn} style={{ background: accent }}>{busy ? t.sending : t.send}</button>

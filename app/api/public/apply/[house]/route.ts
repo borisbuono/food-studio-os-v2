@@ -1,7 +1,7 @@
 import { extractClientIp, hashIp } from "@/lib/leads/rateLimit";
-import { parseCv, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
+import { parseCv, readPerson, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
 import { mirrorColumns } from "@/lib/hiring-sop-server";
-import { applyClient, KIND_LABEL, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
+import { applyClient, CRAFT_Q, KIND_LABEL, PERSON_Q, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,8 +61,25 @@ export async function POST(req: Request, { params }: { params: { house: string }
     references: s(form.get("references"), 1000),
     station: s(form.get("station"), 300),
     allergen_training: pick(s(form.get("allergen_training"), 10), ["yes", "no"]),
+    schedule: pick(s(form.get("schedule"), 10), ["full", "part", "season"]),
+    food_handler: pick(s(form.get("food_handler"), 10), ["yes", "no", "expired"]),
+    craft1: s(form.get("craft1"), 2000),
+    craft2: s(form.get("craft2"), 2000),
+    p_hard: s(form.get("p_hard"), 2000),
+    p_love: s(form.get("p_love"), 2000),
+    p_mirror: s(form.get("p_mirror"), 2000),
+    p_curious: s(form.get("p_curious"), 2000),
+    p_team: s(form.get("p_team"), 2000),
     note: s(form.get("note"), 4000),
   };
+  const area = a.area === "sala" ? "sala" : "cocina";
+  const craftQ = CRAFT_Q[area].es;
+  const qa = [
+    { q: area === "sala" ? "Experiencia en sala / vinos / barra y dónde quiere crecer" : "Partida más fuerte y dónde quiere crecer", a: a.station },
+    { q: craftQ[0], a: a.craft1 },
+    { q: craftQ[1], a: a.craft2 },
+    ...PERSON_Q.map((x) => ({ q: x.es(area), a: a[x.k] })),
+  ];
   const isStage = a.kind !== "job";
   const touch = [
     `${a.area === "sala" ? "SALA" : "COCINA"} · ${KIND_LABEL[(a.kind || "job") as ApplyKind].es.toUpperCase()}${isStage && a.stage_dates ? ` · fechas: ${a.stage_dates}` : ""}`,
@@ -73,8 +90,10 @@ export async function POST(req: Request, { params }: { params: { house: string }
     `Lives: ${a.lives_where || "—"} · Transport: ${a.transport || "—"}`,
     `References: ${a.references || "—"}`,
     `Strongest station / wants to grow: ${a.station || "—"}`,
-    `Allergen & food-handling training: ${a.allergen_training || "—"}`,
-    a.note ? `\n${a.note}` : "",
+    `Allergen training: ${a.allergen_training || "—"} · Carnet manipulador: ${a.food_handler || "—"}`,
+    a.kind === "job" ? `Jornada: ${a.schedule || "—"}` : "",
+    ...qa.map((x) => `\n— ${x.q}\n${x.a || "(sin respuesta)"}`),
+    a.note ? `\n— Nota\n${a.note}` : "",
   ].join("\n");
 
   const openingId = s(form.get("job_opening_id"), 60);
@@ -127,6 +146,8 @@ export async function POST(req: Request, { params }: { params: { house: string }
     references: F(a.references),
     station_preference: F(a.station),
     allergen_training: F(a.allergen_training),
+    food_handler: F(a.food_handler),
+    schedule: F(a.schedule),
   };
   for (const k of Object.keys(declared)) if (declared[k] === undefined) delete declared[k];
 
@@ -136,13 +157,20 @@ export async function POST(req: Request, { params }: { params: { house: string }
   if (a.right_to_work === "in_progress") extra.push("right to work: permit in progress");
   if (isStage) extra.push(`${KIND_LABEL[a.kind as ApplyKind].en} request — needs a contract + alta or an education convenio before day 1`);
   if (file && !cvPath) extra.push("CV upload failed — ask them to resend");
-  try {
-    const parsed = await parseCv(file ? { base64: file.base64, mediaType: file.mediaType } : null, `${a.note}\nLives: ${a.lives_where}`);
-    profile = { ...parsed.profile, ...declared } as Partial<CvProfile>;
-    summary = parsed.summary;
-  } catch (e: any) {
-    extra.push("CV not read automatically — " + (e?.message || "error"));
+  const [cvRes, personRes] = await Promise.allSettled([
+    parseCv(file ? { base64: file.base64, mediaType: file.mediaType } : null, `${a.note}\nLives: ${a.lives_where}`),
+    readPerson(area, qa),
+  ]);
+  if (cvRes.status === "fulfilled") {
+    profile = { ...cvRes.value.profile, ...declared } as Partial<CvProfile>;
+    summary = cvRes.value.summary;
+  } else {
+    extra.push("CV not read automatically — " + ((cvRes.reason as any)?.message || "error"));
   }
+  if (personRes.status === "fulfilled" && personRes.value) {
+    (profile as any).people_read = { value: personRes.value, confidence: 1 };
+  }
+  if (a.food_handler !== "yes") extra.push(a.food_handler === "expired" ? "carnet de manipulador expired" : "no carnet de manipulador declared");
   const opening = house.openings.find((o) => o.id === openingId) || null;
   const { score, reasons } = scoreCandidate(profile, opening, a.area);
   const m = mirrorColumns(profile) as Record<string, any>;
