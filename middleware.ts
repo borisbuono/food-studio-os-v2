@@ -116,8 +116,16 @@ function hasFileExtension(pathname: string): boolean {
   return /\.[a-zA-Z0-9]{2,5}$/.test(pathname);
 }
 
+// Public recipe pages — /recipes/<slug> (Boris ruling 2026-09-21). Only a
+// single non-UUID slug segment: /recipes, /recipes/<uuid>, /recipes/<id>/edit
+// and /recipes/<id>/cook stay behind the auth wall. The page reads through
+// the public_recipe_by_slug RPC, which only returns reviewed + published rows.
+const PUBLIC_RECIPE_SLUG = /^\/recipes\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/;
+const UUID_SEGMENT = /^\/recipes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i;
+
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PAGE_EXACT.has(pathname)) return true;
+  if (PUBLIC_RECIPE_SLUG.test(pathname) && !UUID_SEGMENT.test(pathname)) return true;
   if (PUBLIC_STATIC_EXACT.has(pathname)) return true;
   for (const p of PUBLIC_PAGE_PREFIXES) if (pathname.startsWith(p)) return true;
   for (const p of PUBLIC_API_PREFIXES) {
