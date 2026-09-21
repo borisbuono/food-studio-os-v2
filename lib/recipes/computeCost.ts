@@ -20,14 +20,20 @@
 //   missing = <30% priced — DO NOT PUBLISH A LIE
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { E_BM, E_TALLER, E_HOLDINGS, type EntityKey } from "@/lib/entities";
+import { E_BM, E_TALLER, E_HOLDINGS, E_UTOPIA } from "@/lib/entities";
 
 // entity_id (UUID) → entity_code used in purchase_lines
 export const ENTITY_CODE_FOR_PL: Record<string, string> = {
   [E_TALLER]:   "IFL",
   [E_BM]:       "BM",
   [E_HOLDINGS]: "BBH",
+  [E_UTOPIA]:   "UTOPIA",
 };
+
+// Reverse map: purchase_lines.entity_code → entity_id.
+export const ENTITY_ID_FOR_PL_CODE: Record<string, string> = Object.fromEntries(
+  Object.entries(ENTITY_CODE_FOR_PL).map(([id, code]) => [code, id])
+);
 
 export type Confidence = "high" | "medium" | "low" | "missing";
 
@@ -250,7 +256,11 @@ export async function computeRecipeCost(
   const breakdown: IngredientBreakdown[] = ings.map((i, idx) => {
     const canonical = ingCanonical[idx];
     const priced = canonical ? priceMap[canonical] : undefined;
-    const conv = canonical ? (aliases[normalizeName(i.ingredient_name)]?.conversion || 1) : 1;
+    // Recipe quantities are expressed in the CANONICAL unit. unit_conversion
+    // belongs to the purchase side (pack → canonical) and is already folded
+    // into unitPrice above; applying it again here double-counted whenever a
+    // recipe line happened to be spelled like a pack-size alias.
+    const conv = 1;
     const qty = i.quantity == null ? null : Number(i.quantity);
 
     if (!canonical) {

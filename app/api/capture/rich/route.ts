@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recomputeAfterIngest } from "@/lib/recipes/recompute";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
 import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
@@ -314,6 +315,18 @@ export async function POST(req: NextRequest) {
       if (!linesErr) linesInserted = count || rows.length;
     }
 
+    // 5) Recompute recipe cost for every recipe that uses an ingredient
+    //    these lines feed (via ingredient_aliases), then republish the
+    //    affected menu-margin rows. Non-fatal: the capture already landed.
+    let recompute: any = null;
+    if (linesInserted > 0) {
+      try {
+        recompute = await recomputeAfterIngest(sb, entCode, rawLines.map((ln) => s(ln.product_name)));
+      } catch (e: any) {
+        recompute = { error: String(e?.message || e) };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       capture_id: inboxId,
@@ -331,6 +344,7 @@ export async function POST(req: NextRequest) {
       grand_total_eur: n(extracted.grand_total_eur),
       lines: rawLines,
       lines_stored: linesInserted,
+      recompute,
       extraction_confidence: extracted.extraction_confidence || null,
       raw_ocr_text: extracted.raw_ocr_text || null,
       doc_url,

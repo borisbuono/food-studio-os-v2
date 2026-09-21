@@ -75,6 +75,10 @@ const PUBLIC_API_PREFIXES = [
   "/api/integrations/fresto/webhook/",
   // Public lead capture — rate-limited + honeypot-guarded in the route.
   "/api/leads/capture",
+  // Nightly recipe-cost refresh, called by /api/cron/pos-nightly with the
+  // CRON_SECRET bearer. The route itself rejects anything without the
+  // secret or a signed-in session.
+  "/api/recipes/compute-all-entities",
 ];
 
 const PUBLIC_STATIC_EXACT = new Set<string>([

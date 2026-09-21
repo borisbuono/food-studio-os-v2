@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
+import { E_BM, E_TALLER } from "@/lib/entities";
+import AddMissingIngredient from "@/components/AddMissingIngredient";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,7 @@ type Row = {
 };
 
 const VENUE_LABEL: Record<string, string> = { bm: "Bistro Mondo", taller: "Taller Sa Penya" };
+const VENUE_ENTITY: Record<string, string> = { bm: E_BM, taller: E_TALLER };
 
 function eur(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -76,7 +79,7 @@ function rowClass(r: Row) {
 export default async function MenuMarginPage({
   searchParams,
 }: {
-  searchParams?: { sort?: string; venue?: string; lowmargin?: string };
+  searchParams?: { sort?: string; venue?: string; lowmargin?: string; lowconf?: string };
 }) {
   const sb = supabaseServer();
   const { data: userRes } = await sb.auth.getUser();
@@ -92,6 +95,14 @@ export default async function MenuMarginPage({
 
   const sort = searchParams?.sort ?? "margin";
   const lowmargin = searchParams?.lowmargin === "1";
+  const lowconf = searchParams?.lowconf === "1";
+  const qs = (o: { sort?: string; lowmargin?: boolean; lowconf?: boolean }) => {
+    const p = new URLSearchParams();
+    p.set("sort", o.sort ?? sort);
+    if (o.lowmargin ?? lowmargin) p.set("lowmargin", "1");
+    if (o.lowconf ?? lowconf) p.set("lowconf", "1");
+    return "?" + p.toString();
+  };
 
   const { data: raw, error } = await sb
     .from("menu_dish_costing")
@@ -100,9 +111,41 @@ export default async function MenuMarginPage({
     );
 
   const rowsAll: Row[] = ((raw as Row[] | null) || []).slice();
-  const rows: Row[] = lowmargin
-    ? rowsAll.filter((r) => r.gross_margin_pct != null && r.gross_margin_pct < 60)
-    : rowsAll;
+  const rows: Row[] = rowsAll.filter((r) => {
+    if (lowmargin && !(r.gross_margin_pct != null && r.gross_margin_pct < 60)) return false;
+    if (lowconf && !(r.cost_confidence === "low" || r.cost_per_portion_eur == null)) return false;
+    return true;
+  });
+
+  // Inline "add missing ingredient" needs: the priceable canonical names
+  // per venue (datalist) and each matched recipe's yield, so the form can
+  // say what the quantity is for.
+  const canonicalsByVenue: Record<string, Array<{ name: string; unit: string | null }>> = {};
+  for (const [venue, entityId] of Object.entries(VENUE_ENTITY)) {
+    const { data: al } = await sb
+      .from("ingredient_aliases")
+      .select("canonical_name, unit")
+      .eq("entity_id", entityId)
+      .limit(5000);
+    const seen = new Map<string, string | null>();
+    for (const a of (al as any[]) || []) {
+      const n = String(a.canonical_name || "").trim();
+      if (n && !seen.has(n)) seen.set(n, a.unit ?? null);
+    }
+    canonicalsByVenue[venue] = [...seen.entries()]
+      .map(([name, unit]) => ({ name, unit }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const matchedIds = [...new Set(rowsAll.map((r) => r.matched_recipe_id).filter(Boolean))] as string[];
+  const yieldById = new Map<string, number>();
+  if (matchedIds.length) {
+    const { data: ry } = await sb.from("recipes").select("id, yield_qty, servings").in("id", matchedIds);
+    for (const r of (ry as any[]) || []) {
+      const y = Number(r.yield_qty);
+      const sv = Number(r.servings);
+      yieldById.set(r.id, Number.isFinite(y) && y > 0 ? y : Number.isFinite(sv) && sv > 0 ? sv : 1);
+    }
+  }
 
   // Sort helper — keeps rows without a margin at the bottom regardless of order.
   rows.sort((a, b) => {
@@ -177,7 +220,7 @@ export default async function MenuMarginPage({
         ].map((s) => (
           <Link
             key={s.k}
-            href={`?sort=${s.k}${lowmargin ? "&lowmargin=1" : ""}`}
+            href={qs({ sort: s.k })}
             className={
               "rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wide " +
               (sort === s.k
@@ -189,7 +232,7 @@ export default async function MenuMarginPage({
           </Link>
         ))}
         <Link
-          href={`?sort=${sort}${lowmargin ? "" : "&lowmargin=1"}`}
+          href={qs({ lowmargin: !lowmargin })}
           className={
             "rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wide " +
             (lowmargin
@@ -198,6 +241,17 @@ export default async function MenuMarginPage({
           }
         >
           {lowmargin ? "Showing < 60% margin" : "Only low-margin"}
+        </Link>
+        <Link
+          href={qs({ lowconf: !lowconf })}
+          className={
+            "rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-wide " +
+            (lowconf
+              ? "border-red-600 bg-red-50 text-red-800"
+              : "border-black/20 text-ink hover:border-ink/60")
+          }
+        >
+          {lowconf ? "Showing needs-data" : "Needs data"}
         </Link>
       </nav>
 
@@ -215,6 +269,11 @@ export default async function MenuMarginPage({
 
         return (
           <section key={venue} className="mt-10">
+            <datalist id={`canon-${venue}`}>
+              {(canonicalsByVenue[venue] || []).map((c) => (
+                <option key={c.name} value={c.name} />
+              ))}
+            </datalist>
             <div className="flex items-baseline justify-between">
               <h2 className="font-serif text-[22px] text-ink">{VENUE_LABEL[venue] ?? venue}</h2>
               <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
@@ -248,6 +307,15 @@ export default async function MenuMarginPage({
                             <p className="mt-1 font-serif italic text-[11px] text-red-700">
                               {missing.map((m: any) => m.note ?? JSON.stringify(m)).join(" · ")}
                             </p>
+                          )}
+                          {r.matched_recipe_id && (r.cost_confidence === "low" || r.cost_per_portion_eur == null) && (
+                            <AddMissingIngredient
+                              recipeId={r.matched_recipe_id}
+                              recipeName={r.matched_recipe_name ?? "recipe"}
+                              yieldQty={yieldById.get(r.matched_recipe_id) ?? 1}
+                              datalistId={`canon-${venue}`}
+                              canonicals={canonicalsByVenue[venue] || []}
+                            />
                           )}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono text-[13px] text-ink">{eur(r.sell_price_eur)}</td>

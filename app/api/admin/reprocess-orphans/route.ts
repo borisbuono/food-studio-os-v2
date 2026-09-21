@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recomputeAfterIngest } from "@/lib/recipes/recompute";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -184,6 +185,14 @@ async function handle() {
       const ins = await sb.from("purchase_lines").insert(rows, { count: "exact" });
       if (!ins.error) linesInserted = ins.count || rows.length;
     }
+    let recompute: any = null;
+    if (linesInserted > 0) {
+      try {
+        recompute = await recomputeAfterIngest(sb, "BM", rawLines.map((ln: any) => s(ln.product_name)));
+      } catch (err: any) {
+        recompute = { error: String(err?.message || err) };
+      }
+    }
 
     results.push({
       path,
@@ -197,6 +206,7 @@ async function handle() {
       grand_total_eur: e.grand_total_eur ?? null,
       lines_printed: rawLines.length,
       lines_stored: linesInserted,
+      recompute,
       extraction_confidence: e.extraction_confidence || null,
     });
   }

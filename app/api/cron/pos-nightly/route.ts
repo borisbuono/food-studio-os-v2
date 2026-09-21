@@ -177,6 +177,30 @@ export async function GET(req: NextRequest) {
     email_scan_error = e?.message || String(e);
   }
 
+  // Piggyback #2: nightly recipe-cost refresh across every entity, then
+  // republish menu_dish_costing. Own function invocation (maxDuration 300)
+  // so a slow recompute can't eat the Fresto sync's budget.
+  let recipe_cost: any = null;
+  try {
+    const origin = new URL(req.url).origin;
+    const r = await fetch(origin + "/api/recipes/compute-all-entities", {
+      method: "POST",
+      headers: { ...(process.env.CRON_SECRET ? { authorization: "Bearer " + process.env.CRON_SECRET } : {}) },
+    });
+    const j = await r.json().catch(() => null);
+    recipe_cost = {
+      http: r.status,
+      ok: r.ok && !!j?.ok,
+      menu_rows_updated: j?.menu_rows_updated ?? null,
+      skipped: j?.skipped ?? null,
+      per_entity: Array.isArray(j?.per_entity)
+        ? j.per_entity.map((p: any) => ({ entity: p.entity, processed: p.processed, tallies: p.tallies, failed_count: p.failed_count }))
+        : null,
+    };
+  } catch (e: any) {
+    recipe_cost = { ok: false, error: e?.message || String(e) };
+  }
+
   // Audit trail so we can see when the cron ran and what it moved.
   try {
     await sb.from("assistant_actions").insert({
@@ -190,6 +214,7 @@ export async function GET(req: NextRequest) {
         yesterday,
         dry_run: FRESTO_DRY_RUN(),
         force,
+        recipe_cost,
         per_venue: perVenue.map((p) => ({
           entity: p.entity, days: p.days, inserted: p.inserted, updated: p.updated,
           empty: p.empty, failed: p.failed, error: p.error,
@@ -211,6 +236,7 @@ export async function GET(req: NextRequest) {
     force,
     email_scan_ok,
     email_scan_error,
+    recipe_cost,
     per_venue: perVenue,
   });
 }
