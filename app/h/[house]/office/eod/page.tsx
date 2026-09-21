@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug, houseLocale } from "@/lib/houses";
 import { getHouseBySlug } from "@/lib/houses.server";
 import { ENTITY_LABEL, type EntityKey } from "@/lib/entities";
 import ManualEodClient from "./ManualEodClient";
@@ -80,6 +80,8 @@ export default async function ManualEodPage({ params }: { params: { house: strin
         entityId={entity}
         houseSlug={slug}
         today={today}
+        currencyCode={house.currency_code}
+        locale={houseLocale(house)}
       />
     </main>
   );

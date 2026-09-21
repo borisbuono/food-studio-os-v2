@@ -16,7 +16,11 @@ import Link from "next/link";
 type Props = {
   entityId: string;
   houseSlug: string;
-  today: string; // Madrid YYYY-MM-DD, from the SSR wrapper
+  today: string; // house-local YYYY-MM-DD, from the SSR wrapper
+  // House currency + locale, passed from the server so the number pad reads
+  // in the operator's own money (stress test 2026-09-21).
+  currencyCode?: string;
+  locale?: string;
 };
 
 type Form = {
@@ -40,9 +44,16 @@ function yesterday(today: string): string {
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
 }
-function eur(n: number): string {
-  if (!Number.isFinite(n)) return "€0";
-  return "€" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function money(n: number, currency: string, locale: string): string {
+  const v = Number.isFinite(n) ? n : 0;
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency", currency,
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(v);
+  } catch {
+    return `${currency} ${v.toFixed(2)}`;
+  }
 }
 function num(s: string): number {
   const n = Number(String(s).replace(",", "."));
@@ -56,7 +67,10 @@ const EMPTY: Omit<Form, "date"> = {
   cash: "", card: "", notes: "",
 };
 
-export default function ManualEodClient({ entityId, houseSlug, today }: Props) {
+export default function ManualEodClient({ entityId, houseSlug, today, currencyCode, locale }: Props) {
+  const currency = (currencyCode || "EUR").toUpperCase();
+  const loc = locale || "en-GB";
+  const eur = (n: number) => money(n, currency, loc);
   const [form, setForm] = useState<Form>({ date: yesterday(today), ...EMPTY });
   const [missing, setMissing] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -223,7 +237,7 @@ export default function ManualEodClient({ entityId, houseSlug, today }: Props) {
             <div>
               <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Payment Δ</p>
               <p className={"font-serif text-[22px] " + (Math.abs(paymentDelta) < 0.005 ? "text-ink" : "text-tomato")}>
-                {(paymentDelta >= 0 ? "+" : "") + eur(paymentDelta).replace("€", "")}€
+                {(paymentDelta >= 0 ? "+" : "") + eur(paymentDelta)}
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { houseNameForSlug } from "@/lib/houses";
+import { houseNameForSlug, houseMoney, type House } from "@/lib/houses";
 import { getHouseBySlug } from "@/lib/houses.server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { entityTimezone, todayInTz, paidMinutes, nextDay, zonedWallClockToUtc, elapsedLabel } from "@/lib/labor";
@@ -19,7 +19,8 @@ type ShiftRow = {
   break_minutes: number | null; hourly_rate_eur: number | null;
 };
 
-function eur(n: number): string { return "€" + n.toFixed(2); }
+// House currency, not a hardcoded euro (stress test 2026-09-21).
+function eur(house: House, n: number): string { return houseMoney(house, n, 2); }
 
 export default async function LaborPage({ params }: { params: { house: string } }) {
   const slug = params.house;
@@ -229,7 +230,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
                     <td className="tabular-nums">{r.clock_out ? new Date(r.clock_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                     <td className="text-right tabular-nums">{r.break_minutes ? `${r.break_minutes}m` : "—"}</td>
                     <td className="text-right tabular-nums">{(r.paid_minutes / 60).toFixed(2)}</td>
-                    <td className="text-right tabular-nums">{r.cost_eur == null ? "—" : eur(r.cost_eur)}</td>
+                    <td className="text-right tabular-nums">{r.cost_eur == null ? "—" : eur(house, r.cost_eur)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -255,7 +256,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
                   .map(([uid, x]) => (
                     <li key={uid} className="flex justify-between border-t border-black/5 py-1">
                       <span>{x.name || uid.slice(0, 8)}</span>
-                      <span className="tabular-nums text-clay">{(x.minutes / 60).toFixed(1)}h · {eur(Math.round(x.cost * 100) / 100)}</span>
+                      <span className="tabular-nums text-clay">{(x.minutes / 60).toFixed(1)}h · {eur(house, Math.round(x.cost * 100) / 100)}</span>
                     </li>
                   ))}
               </ul>
@@ -270,7 +271,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
                   .map(([role, x]) => (
                     <li key={role} className="flex justify-between border-t border-black/5 py-1">
                       <span>{role}</span>
-                      <span className="tabular-nums text-clay">{(x.minutes / 60).toFixed(1)}h · {eur(Math.round(x.cost * 100) / 100)}</span>
+                      <span className="tabular-nums text-clay">{(x.minutes / 60).toFixed(1)}h · {eur(house, Math.round(x.cost * 100) / 100)}</span>
                     </li>
                   ))}
               </ul>
@@ -278,7 +279,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
           </div>
         </div>
         <p className="mt-3 text-xs text-clay">
-          Week total: <span className="tabular-nums">{(weekMinutes / 60).toFixed(1)}h</span> · <span className="tabular-nums">{eur(Math.round(weekCost * 100) / 100)}</span>
+          Week total: <span className="tabular-nums">{(weekMinutes / 60).toFixed(1)}h</span> · <span className="tabular-nums">{eur(house, Math.round(weekCost * 100) / 100)}</span>
         </p>
       </section>
 

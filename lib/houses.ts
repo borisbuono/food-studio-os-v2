@@ -86,6 +86,46 @@ export type House = {
 };
 
 // ---------------------------------------------------------------------------
+// House-aware formatting. Every /h/<slug>/** surface must render money and
+// dates in the HOUSE's currency and locale, not Ibiza's — "€" + en-GB was
+// hardcoded across the house pages, so a US or UK tenant saw euro signs on
+// dollar amounts (onboarding stress test 2026-09-21, polish list).
+
+type HouseFormatBase = Pick<House, "currency_code" | "country_code"> & Partial<Pick<House, "timezone">>;
+
+const COUNTRY_LOCALE: Record<string, string> = {
+  ES: "es-ES", NL: "nl-NL", FR: "fr-FR", IT: "it-IT",
+  PT: "pt-PT", DE: "de-DE", GB: "en-GB", US: "en-US",
+};
+
+export function houseLocale(house: HouseFormatBase | null | undefined): string {
+  return COUNTRY_LOCALE[(house?.country_code || "ES").toUpperCase()] || "en-GB";
+}
+
+// Money in the house's own currency. `dp` defaults to 0 (tile figures);
+// pass 2 where cents matter (labor cost, manual EOD).
+export function houseMoney(house: HouseFormatBase | null | undefined, n: number, dp: 0 | 2 = 0): string {
+  const currency = (house?.currency_code || "EUR").toUpperCase();
+  try {
+    return new Intl.NumberFormat(houseLocale(house), {
+      style: "currency", currency,
+      minimumFractionDigits: dp, maximumFractionDigits: dp,
+    }).format(n);
+  } catch {
+    // Unknown currency code in the DB — never crash a dashboard over it.
+    return `${currency} ${n.toFixed(dp)}`;
+  }
+}
+
+export function houseDateTime(
+  house: HouseFormatBase | null | undefined,
+  opts: Intl.DateTimeFormatOptions,
+  when: Date = new Date(),
+): string {
+  return new Intl.DateTimeFormat(houseLocale(house), { timeZone: house?.timezone, ...opts }).format(when);
+}
+
+// ---------------------------------------------------------------------------
 // Legacy pinned maps — kept for the client components that still key styling
 // on the three primary UUIDs. New callers should prefer getHouseBySlug()
 // from lib/houses.server.ts.

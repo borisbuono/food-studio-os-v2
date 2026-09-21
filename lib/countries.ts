@@ -25,17 +25,18 @@ export type CountryProfile = {
   timezone: string;
   currency_code: string;
   tax_id_label: string;
+  locale: string;          // BCP-47, for money + date formatting on that house's surfaces
 };
 
 export const COUNTRY_PROFILES: Record<CountryCode, CountryProfile> = {
-  ES: { code: "ES", name: "Spain",         vat: { standard: 21, reduced_food: 10, zero: 0 }, timezone: "Europe/Madrid",    currency_code: "EUR", tax_id_label: "CIF" },
-  NL: { code: "NL", name: "Netherlands",   vat: { standard: 21, reduced_food: 9,  zero: 0 }, timezone: "Europe/Amsterdam", currency_code: "EUR", tax_id_label: "KVK / BTW" },
-  FR: { code: "FR", name: "France",        vat: { standard: 20, reduced_food: 10, zero: 0 }, timezone: "Europe/Paris",     currency_code: "EUR", tax_id_label: "SIRET" },
-  IT: { code: "IT", name: "Italy",         vat: { standard: 22, reduced_food: 10, zero: 0 }, timezone: "Europe/Rome",      currency_code: "EUR", tax_id_label: "Partita IVA" },
-  PT: { code: "PT", name: "Portugal",      vat: { standard: 23, reduced_food: 13, zero: 0 }, timezone: "Europe/Lisbon",    currency_code: "EUR", tax_id_label: "NIF" },
-  DE: { code: "DE", name: "Germany",       vat: { standard: 19, reduced_food: 7,  zero: 0 }, timezone: "Europe/Berlin",    currency_code: "EUR", tax_id_label: "USt-IdNr" },
-  GB: { code: "GB", name: "United Kingdom",vat: { standard: 20, reduced_food: 5,  zero: 0 }, timezone: "Europe/London",    currency_code: "GBP", tax_id_label: "VAT no." },
-  US: { code: "US", name: "United States", vat: { standard: 0,  reduced_food: 0,  zero: 0 }, timezone: "America/New_York", currency_code: "USD", tax_id_label: "EIN" },
+  ES: { code: "ES", name: "Spain",         vat: { standard: 21, reduced_food: 10, zero: 0 }, timezone: "Europe/Madrid",    currency_code: "EUR", tax_id_label: "CIF", locale: "es-ES" },
+  NL: { code: "NL", name: "Netherlands",   vat: { standard: 21, reduced_food: 9,  zero: 0 }, timezone: "Europe/Amsterdam", currency_code: "EUR", tax_id_label: "KVK / BTW", locale: "nl-NL" },
+  FR: { code: "FR", name: "France",        vat: { standard: 20, reduced_food: 10, zero: 0 }, timezone: "Europe/Paris",     currency_code: "EUR", tax_id_label: "SIRET", locale: "fr-FR" },
+  IT: { code: "IT", name: "Italy",         vat: { standard: 22, reduced_food: 10, zero: 0 }, timezone: "Europe/Rome",      currency_code: "EUR", tax_id_label: "Partita IVA", locale: "it-IT" },
+  PT: { code: "PT", name: "Portugal",      vat: { standard: 23, reduced_food: 13, zero: 0 }, timezone: "Europe/Lisbon",    currency_code: "EUR", tax_id_label: "NIF", locale: "pt-PT" },
+  DE: { code: "DE", name: "Germany",       vat: { standard: 19, reduced_food: 7,  zero: 0 }, timezone: "Europe/Berlin",    currency_code: "EUR", tax_id_label: "USt-IdNr", locale: "de-DE" },
+  GB: { code: "GB", name: "United Kingdom",vat: { standard: 20, reduced_food: 5,  zero: 0 }, timezone: "Europe/London",    currency_code: "GBP", tax_id_label: "VAT no.", locale: "en-GB" },
+  US: { code: "US", name: "United States", vat: { standard: 0,  reduced_food: 0,  zero: 0 }, timezone: "America/New_York", currency_code: "USD", tax_id_label: "EIN", locale: "en-US" },
 };
 
 export const COUNTRY_ORDER: CountryCode[] = ["NL", "ES", "FR", "IT", "PT", "DE", "GB", "US"];

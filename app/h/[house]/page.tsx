@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { houseNameForSlug, HOUSE_ROOMS, HOUSE_ROOM_LABEL } from "@/lib/houses";
+import { houseNameForSlug, HOUSE_ROOMS, HOUSE_ROOM_LABEL, houseLocale, houseMoney, type House } from "@/lib/houses";
 import { getHouseBySlug } from "@/lib/houses.server";
 import { ENTITY_H1, publicNameForEntity, type EntityKey } from "@/lib/entities";
 import { HourlySpark } from "@/app/studio/HourlySpark";
@@ -29,28 +29,30 @@ export const dynamic = "force-dynamic";
 // the entities row, and every formatter takes an explicit `tz` string
 // resolved once from house.timezone at the top of the render.
 
-function eur(n: number): string {
-  return "€" + Math.round(n).toLocaleString("en-GB");
+// Money + dates follow the HOUSE's currency and locale — a US tenant used to
+// see "€" on dollars and en-GB dates (stress test 2026-09-21, polish list).
+function eur(house: House, n: number): string {
+  return houseMoney(house, n, 0);
 }
-function tzDateLabel(tz: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+function tzDateLabel(house: House, tz: string): string {
+  return new Intl.DateTimeFormat(houseLocale(house), {
     timeZone: tz, weekday: "long", day: "numeric", month: "long",
   }).format(new Date());
 }
-function tzClock(tz: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+function tzClock(house: House, tz: string): string {
+  return new Intl.DateTimeFormat(houseLocale(house), {
     timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(new Date());
 }
 // Human-readable close date — "3 Sep", "yesterday", "today". Same helper as
 // the Studio tile so the two surfaces read the same way.
-function humanDate(iso: string, today: string): string {
+function humanDate(house: House, iso: string, today: string): string {
   if (iso === today) return "today";
   const yest = new Date(today + "T12:00:00Z");
   yest.setUTCDate(yest.getUTCDate() - 1);
   if (iso === yest.toISOString().slice(0, 10)) return "yesterday";
   const d = new Date(iso + "T12:00:00Z");
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
+  return new Intl.DateTimeFormat(houseLocale(house), { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
 }
 function tzToday(tz: string): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -104,8 +106,8 @@ export default async function HouseLandingPage({ params }: { params: { house: st
   ].filter(Boolean) as string[];
   const subtitle = subtitleParts.length >= 2 ? subtitleParts.join(" · ") : "";
   const tz = house.timezone;
-  const dateLabel = tzDateLabel(tz);
-  const clock = tzClock(tz);
+  const dateLabel = tzDateLabel(house, tz);
+  const clock = tzClock(house, tz);
   const today = tzToday(tz);
   const tzLabel = tzShortLabel(tz);
   const h1Class = ENTITY_H1[entity as EntityKey] || "font-serif text-3xl text-ink";
@@ -183,7 +185,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
           <p className="font-mono text-[11px] uppercase tracking-wide text-clay">
             EOD status ·{" "}
             {latest ? (
-              <>last close {humanDate(latest.date, today)}</>
+              <>last close {humanDate(house, latest.date, today)}</>
             ) : (
               <>no close on record yet</>
             )}
@@ -228,7 +230,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
         {latest ? (
           <div className="mt-3 rounded-lg border border-black/10 bg-paper/50 p-5">
             <p className="font-serif text-[24px] text-ink leading-tight">
-              {eur(latest.total_gross_eur ?? 0)}
+              {eur(house, latest.total_gross_eur ?? 0)}
               {latest.tickets != null ? (
                 <span className="font-sans text-[15px] text-ink-soft"> · {latest.tickets} tickets</span>
               ) : null}
@@ -237,11 +239,11 @@ export default async function HouseLandingPage({ params }: { params: { house: st
               ) : null}
             </p>
             <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
-              <span>Last close {humanDate(latest.date, today)}</span>
+              <span>Last close {humanDate(house, latest.date, today)}</span>
               {latest.peak_hour ? (
                 <span title={`Peak revenue hour (${tzLabel})`}>
                   · peak {latest.peak_hour}:00
-                  {latest.peak_hour_revenue ? ` (${eur(latest.peak_hour_revenue)})` : null}
+                  {latest.peak_hour_revenue ? ` (${eur(house, latest.peak_hour_revenue)})` : null}
                 </span>
               ) : null}
             </p>

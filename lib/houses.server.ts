@@ -28,7 +28,7 @@ export const getHouseBySlug = cache(async (slug: string): Promise<House | null> 
     .from("entities")
     .select("id, slug, name, legal_name, city, timezone, country_code, currency_code, accent_color, entity_type, status")
     .eq("slug", s)
-    .in("entity_type", ["operating_venue", "operating"])
+    .eq("entity_type", "operating_venue")   // "operating" was dead — not in entities_entity_type_check
     .eq("status", "active")
     .maybeSingle();
   if (!e) return null;
@@ -83,17 +83,24 @@ export async function entityForHouseSlug(slug: string): Promise<string | null> {
 export const getMyHouses = cache(async (user_id: string): Promise<House[]> => {
   if (!user_id) return [];
   const sb = supabaseServer();
-  const { data: person } = await sb
+  // One auth user can own SEVERAL team_members rows — Boris has two, one per
+  // venue lineage. .maybeSingle() ERRORS on >1 row, so this returned [] for
+  // exactly the account that has the most houses, and taking only the first
+  // row would have shown one lineage's houses and hidden the other's. Collect
+  // every person_id and union their memberships (same pattern as
+  // lib/memberships.ts). Found 2026-09-21 after the onboarding stress test.
+  const { data: people } = await sb
     .from("team_members")
-    .select("id")
-    .eq("auth_user_id", user_id)
-    .maybeSingle();
-  const person_id = (person as any)?.id as string | undefined;
-  if (!person_id) return [];
+    .select("id, status")
+    .eq("auth_user_id", user_id);
+  const personIds = (people || [])
+    .filter((r: any) => r.status !== "archived")
+    .map((r: any) => r.id as string);
+  if (!personIds.length) return [];
   const { data: m } = await sb
     .from("memberships")
     .select("entity_id")
-    .eq("person_id", person_id)
+    .in("person_id", personIds)
     .eq("status", "active");
   const ids = Array.from(new Set((m || []).map((r: any) => r.entity_id as string)));
   if (!ids.length) return [];
@@ -101,7 +108,7 @@ export const getMyHouses = cache(async (user_id: string): Promise<House[]> => {
     .from("entities")
     .select("id, slug, name, legal_name, city, timezone, country_code, currency_code, accent_color, entity_type, status")
     .in("id", ids)
-    .in("entity_type", ["operating_venue", "operating"])
+    .eq("entity_type", "operating_venue")
     .eq("status", "active");
   const houses: House[] = (es || []).map((e: any) => ({
     id: e.id as string,
