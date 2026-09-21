@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { myPersonIds } from "@/lib/calendar.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
   if (readErr) return Response.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!cand) return Response.json({ ok: false, error: "candidate not found" }, { status: 404 });
 
+  const myIds = await myPersonIds();
   const { data, error } = await sb
     .from("interviews")
     .insert({
@@ -62,9 +64,11 @@ export async function POST(req: Request) {
       scheduled_at: scheduled_at.toISOString(),
       format: body.format ? String(body.format).trim().slice(0, 40) : null,
       location: body.location ? String(body.location).trim().slice(0, 200) : null,
-      interviewer_ids: Array.isArray(body.interviewer_ids)
+      // Default the interviewer to whoever schedules it, so the interview lands
+      // on their /me/calendar (calendar _hr_wire, 2026-09-21).
+      interviewer_ids: Array.isArray(body.interviewer_ids) && body.interviewer_ids.length
         ? body.interviewer_ids.map((s) => String(s)).filter(Boolean)
-        : null,
+        : myIds.length ? [myIds[0]] : null,
       notes: body.notes ? String(body.notes).slice(0, 2000) : null,
       status: "scheduled",
     })

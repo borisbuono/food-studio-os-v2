@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ACTIVE_CANDIDATE_STATUSES, CANDIDATE_STATUSES, CandidateStatus } from "@/lib/hiring";
 import { IntakeForm, ProfileBlock, QuestionsBlock, type SopCandidate } from "./CandidateSop";
+import OfferSlots from "./OfferSlots";
 
 type Candidate = {
   id: string;
@@ -460,6 +461,8 @@ function CandidateDrawer({
         {/* Interview */}
         <div className="mt-5">
           <h4 className="text-[11px] font-semibold uppercase tracking-wide text-clay">Schedule interview</h4>
+          <OfferSlots candidateId={candidate.id} phone={candidate.phone} email={candidate.email} />
+          <p className="mt-2 text-[10px] text-clay">…or set a time yourself:</p>
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
             <input
               type="datetime-local"
