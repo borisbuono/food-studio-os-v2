@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 import { verifyFrestoSignature, resolveEntityFromSlug, extractBusinessDate } from "@/lib/integrations/pos/fresto-webhook";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   let payload: any = {};
   try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true }; }
 
-  const sb = supabaseServer();
+  const sb = supabaseJob();
 
   // Headers we care about — sanitise sensitive values.
   const safeHeaders: Record<string, string> = {};

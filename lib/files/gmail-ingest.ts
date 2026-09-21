@@ -12,7 +12,7 @@
 //
 // The cron entrypoint (/api/cron/files-inbox) drives this every 15 min.
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 import {
   listMessagesWithAttachments,
   downloadAttachment,
@@ -83,7 +83,7 @@ function extFromFilename(name: string, mime: string): string {
 async function findGmailChannelForMailbox(
   mailbox: AdminMailbox,
 ): Promise<AssistantChannelRow | null> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data } = await sb.from("assistant_channels")
     .select("id,user_id,channel_type,account_ref,auth_ref,settings,created_at,revoked_at")
     .eq("channel_type", "gmail")
@@ -101,7 +101,7 @@ async function existingKeys(
 ): Promise<Set<string>> {
   const out = new Set<string>();
   if (!messageIds.length) return out;
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data } = await sb.from("files_inbox")
     .select("source_ref,file_url")
     .eq("source", source)
@@ -168,7 +168,7 @@ export async function ingestForMailbox(
   const messageIds = messages.map((m) => m.message_id);
   const seenKeys = await existingKeys(source, messageIds);
 
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   for (const msg of messages) {
     for (const att of msg.attachments) {
       const mime = att.mime_type.toLowerCase();

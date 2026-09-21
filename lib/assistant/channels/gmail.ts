@@ -18,7 +18,7 @@
 // `settings.auto_send` flag is true. The default UI puts every operator in
 // "Draft only" mode.
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 import { encryptSecret, decryptSecret } from "@/lib/integrations/vault";
 import type { AssistantChannelRow } from "@/types/db";
 
@@ -51,7 +51,7 @@ export function gmailScopeString() {
 
 async function loadAuth(auth_ref: string | null): Promise<{ auth: GmailAuth; rowId: string } | null> {
   if (!auth_ref) return null;
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data } = await sb.from("entity_integrations")
     .select("id,encrypted_key,key_iv,key_tag")
     .eq("id", auth_ref)
@@ -71,7 +71,7 @@ async function loadAuth(auth_ref: string | null): Promise<{ auth: GmailAuth; row
 }
 
 async function saveAuth(rowId: string, auth: GmailAuth) {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const enc = encryptSecret(JSON.stringify(auth));
   await sb.from("entity_integrations").update({
     encrypted_key: enc.encrypted_key,
@@ -90,7 +90,7 @@ export async function persistAuthForChannel(opts: {
   email: string;
   auth: GmailAuth;
 }): Promise<string> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const enc = encryptSecret(JSON.stringify(opts.auth));
 
   // Revoke any previous gmail row for this entity+user pair — we key on the

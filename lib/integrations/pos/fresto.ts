@@ -111,8 +111,8 @@ export async function persistFrestoRowToPos(params: {
   imported_by?: string | null;
   raw_payload?: any;
 }): Promise<{ id: string; existed: boolean }> {
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const sb = supabaseServer();
+  const { supabaseJob } = await import("@/lib/supabaseJob");
+  const sb = supabaseJob();
   const { row } = params;
   const found = await sb.from("eod_pos")
     .select("id")
@@ -1071,8 +1071,8 @@ export const frestoAdapter: PosAdapter = {
     }));
   },
   async pullDay(restaurant_id: string, date: string): Promise<PosDailySale | null> {
-    const { supabaseServer } = await import("@/lib/supabaseServer");
-    const sb = supabaseServer();
+    const { supabaseJob } = await import("@/lib/supabaseJob");
+    const sb = supabaseJob();
     const { data } = await sb.from("eod_pos")
       .select("food_net_eur,wine_net_eur,bar_net_eur,softdrinks_net_eur,tips_eur,total_gross_eur,covers,guests,tickets")
       .eq("restaurant_id", restaurant_id)

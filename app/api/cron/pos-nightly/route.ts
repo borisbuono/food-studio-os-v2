@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasServiceRole } from "@/lib/supabaseJob";
 import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN, refreshFrestoMasters } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
 import { cronAuthorized, cronDb, startRun, finishRun } from "@/lib/cron/heartbeat";

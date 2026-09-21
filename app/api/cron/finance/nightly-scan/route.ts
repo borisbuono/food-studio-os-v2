@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { detectAll, type EntityCode } from "@/lib/finance/anomaly-detector";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Audit
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   await sb.from("assistant_actions").insert({
     user_id: null,
     action_kind: "anomaly_scan",

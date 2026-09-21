@@ -48,6 +48,11 @@ const PUBLIC_PAGE_PREFIXES = [
   // signed-out. Steps 2-5 run their own auth check server-side and
   // redirect back to /onboard/step-1 with a bounced session.
   "/onboard/step-1",
+  // Team invitation landing — the recipient hits /team/join?token=... straight
+  // from the invitation email BEFORE they have a session. The page itself uses
+  // the get_invitation_by_token RPC to resolve the token; the finalize route
+  // is called only after magic-link sign-in and is not public.
+  "/team/join",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([
@@ -56,6 +61,7 @@ const PUBLIC_PAGE_EXACT = new Set<string>([
   "/booking-terms",
   "/leads/capture",
   "/onboard/step-1",
+  "/team/join",
 ]);
 
 const PUBLIC_API_PREFIXES = [

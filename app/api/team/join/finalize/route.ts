@@ -35,22 +35,18 @@ export async function POST(req: Request) {
   const email = u.user?.email?.toLowerCase() || null;
   if (!uid || !email) return Response.json({ ok: false, error: "auth" }, { status: 401 });
 
-  // 1. Resolve invitation.
-  const { data: inv, error: invErr } = await sb
-    .from("team_invitations")
-    .select("id,invited_email,restaurant_id,entity_code,role,accepted_at,revoked_at,expires_at")
-    .eq("magic_link_token", token)
-    .maybeSingle();
-  if (invErr || !inv) return Response.json({ ok: false, error: "invitation not found" }, { status: 404 });
-  if (inv.revoked_at) return Response.json({ ok: false, error: "invitation revoked" }, { status: 410 });
-  if (inv.expires_at && new Date(inv.expires_at) < new Date()) return Response.json({ ok: false, error: "invitation expired" }, { status: 410 });
-  if ((inv.invited_email || "").toLowerCase() !== email) {
-    return Response.json({ ok: false, error: "email mismatch — sign in with the invited email" }, { status: 403 });
-  }
-
-  // 2. Mark accepted (idempotent — no-op if already accepted).
-  if (!inv.accepted_at) {
-    await sb.from("team_invitations").update({ accepted_at: new Date().toISOString() }).eq("id", inv.id);
+  // 1 + 2. Resolve the invitation and mark it accepted, in one definer RPC.
+  //
+  // team_invitations is manager-only under RLS since the Phase 3.5 rollout, and
+  // the person finishing onboarding is not a manager, so a direct table read here
+  // returns nothing. accept_invitation_by_token() re-checks live / not-revoked /
+  // not-expired and that the caller's email matches before it writes.
+  const { data: accepted, error: invErr } = await sb.rpc("accept_invitation_by_token", { p_token: token });
+  const inv = Array.isArray(accepted) ? accepted[0] : accepted;
+  if (invErr || !inv) {
+    const msg = invErr?.message || "invitation not found";
+    const status = /email mismatch/i.test(msg) ? 403 : /not signed in/i.test(msg) ? 401 : /not found|no longer live/i.test(msg) ? 410 : 400;
+    return Response.json({ ok: false, error: msg }, { status });
   }
 
   // 3. Profile patch. Existing sync_my_profile_from_invite already binds

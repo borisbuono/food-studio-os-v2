@@ -20,7 +20,7 @@
 //      with platform, failure_date, and failure_reason. We only pay tokens
 //      on threads that already look like billing failures.
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 import { orchestrator } from "@/lib/assistant/orchestrator";
 import { listRecentThreads, getThread } from "@/lib/assistant/channels/gmail";
 import type { AssistantChannelRow } from "@/types/db";
@@ -171,7 +171,7 @@ export async function scanChannel(channel: AssistantChannelRow, opts?: { since?:
   }
   summary.threads_seen = threads.length;
 
-  const sb = supabaseServer();
+  const sb = supabaseJob();
 
   for (const t of threads) {
     // Prefilter — cheap. Skip anything that doesn't smell like a billing failure.
@@ -255,7 +255,7 @@ export async function scanChannel(channel: AssistantChannelRow, opts?: { since?:
 // Run across every connected Gmail channel with triage enabled. Nightly
 // entry point.
 export async function scanAll(opts?: { since?: Date }): Promise<ScanRunSummary> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data } = await sb.from("assistant_channels")
     .select("id,user_id,channel_type,account_ref,auth_ref,settings,created_at,revoked_at")
     .eq("channel_type", "gmail")

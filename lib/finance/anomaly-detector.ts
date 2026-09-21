@@ -21,7 +21,7 @@
 // nightly runs, on-demand runs, and FAB-triggered runs are all auditable.
 
 import { createHash } from "node:crypto";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 
 export type EntityCode = "IFL" | "BM" | "BBH";
 
@@ -105,7 +105,7 @@ function stddev(nums: number[]): number {
 export async function detectEodCashRatioHigh(entity: EntityCode): Promise<AnomalyCandidate[]> {
   const rid = ENTITY_TO_RID[entity];
   if (!rid) return [];
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(30);
   const { data } = await sb.from("eod_pos")
     .select("id,date,cash_declared_eur,total_gross_eur")
@@ -139,7 +139,7 @@ export async function detectEodCashRatioHigh(entity: EntityCode): Promise<Anomal
 export async function detectEodNoSource(entity: EntityCode): Promise<AnomalyCandidate[]> {
   const rid = ENTITY_TO_RID[entity];
   if (!rid) return [];
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(60);
   const { data } = await sb.from("eod_accounting")
     .select("id,report_date,revenue,eod_pos_id")
@@ -163,7 +163,7 @@ export async function detectEodNoSource(entity: EntityCode): Promise<AnomalyCand
 // Detector 3 — bank movements unmatched > N days
 // --------------------------------------------------------------------------
 export async function detectBankUnmatchedLong(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const cutoff = daysAgoISO(UNMATCHED_BANK_DAYS);
   const { data } = await sb.from("bank_movements")
     .select("id,amount_eur,description,movement_date,reconciled_to")
@@ -189,7 +189,7 @@ export async function detectBankUnmatchedLong(entity: EntityCode): Promise<Anoma
 // Detector 4 — invoice without a supplier link
 // --------------------------------------------------------------------------
 export async function detectInvoiceMissingSupplier(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(90);
   const { data } = await sb.from("invoice_inbox")
     .select("id,amount_eur,arrived_at,provider_id,match_status,flagged_reason")
@@ -215,7 +215,7 @@ export async function detectInvoiceMissingSupplier(entity: EntityCode): Promise<
 // Detector 5 — invoice amount is an outlier vs. the supplier's rolling avg
 // --------------------------------------------------------------------------
 export async function detectInvoiceAmountOutlier(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(180);
   const { data } = await sb.from("invoice_inbox")
     .select("id,amount_eur,arrived_at,provider_id,match_status")
@@ -258,7 +258,7 @@ export async function detectInvoiceAmountOutlier(entity: EntityCode): Promise<An
 // (Same amount + same day + same |description| landing twice on the ledger.)
 // --------------------------------------------------------------------------
 export async function detectDuplicateAsiento(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(90);
   const { data } = await sb.from("bank_movements")
     .select("id,amount_eur,description,movement_date")
@@ -296,7 +296,7 @@ export async function detectDuplicateAsiento(entity: EntityCode): Promise<Anomal
 // suggests the invoice was posted first and reconciled later, backwards.)
 // --------------------------------------------------------------------------
 export async function detectPostingBeforeBank(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(90);
   // Pull invoices approved recently and paired bank movements.
   const [invRes, bankRes] = await Promise.all([
@@ -345,7 +345,7 @@ export async function detectPostingBeforeBank(entity: EntityCode): Promise<Anoma
 export async function detectVatRatioDeviation(entity: EntityCode): Promise<AnomalyCandidate[]> {
   const rid = ENTITY_TO_RID[entity];
   if (!rid) return [];
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const monthStart = new Date().toISOString().slice(0, 7) + "-01";
   const [revRes, vatRes] = await Promise.all([
     sb.from("eod_accounting").select("revenue,report_date").eq("restaurant_id", rid).gte("report_date", monthStart),
@@ -376,7 +376,7 @@ export async function detectVatRatioDeviation(entity: EntityCode): Promise<Anoma
 // on the counterpart entity — the classic BBH↔IFL/BM lending pattern.)
 // --------------------------------------------------------------------------
 export async function detectIntercompanyGhost(entity: EntityCode): Promise<AnomalyCandidate[]> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const since = daysAgoISO(90);
   const { data } = await sb.from("bank_movements")
     .select("id,entity_id,amount_eur,description,movement_date,reconciled_to")
@@ -442,7 +442,7 @@ export async function detectAll(entity: EntityCode, opts?: { user_id?: string | 
   }));
   for (const r of results) candidates.push(...r);
 
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   let upserted = 0;
   for (const c of candidates) {
     const meta_hash = hashMeta(c.entity_code, c.kind, c.meta || {});
@@ -499,7 +499,7 @@ export async function detectAll(entity: EntityCode, opts?: { user_id?: string | 
 // Read helpers — used by the FAB, the UI, and the compass strip.
 // --------------------------------------------------------------------------
 export async function openAnomalies(entity: EntityCode) {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data } = await sb.from("v_finance_anomalies_open")
     .select("id,entity_code,kind,description,severity,detected_at,first_seen_date,last_seen_date,meta,source_table,source_id")
     .eq("entity_code", entity);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 import { verifyFrestoSignature, resolveEntityFromSlug, extractBusinessDate } from "@/lib/integrations/pos/fresto-webhook";
 import { persistPullToPos, pullZReport } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   let payload: any = {};
   try { payload = JSON.parse(raw); } catch { payload = { _parse_error: true }; }
 
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const safeHeaders: Record<string, string> = {};
   req.headers.forEach((v, k) => {
     if (k.toLowerCase() === "authorization" || k.toLowerCase() === "cookie") return;

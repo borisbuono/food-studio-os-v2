@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { ingestForMailbox, type AdminMailbox } from "@/lib/files/gmail-ingest";
 import { classifyFile } from "@/lib/files/classifier";
 
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
   // Sweep any lingering pending_classify rows too — happens if a previous
   // sweep ingested but the classifier throw before it could run.
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data: stragglers } = await sb.from("files_inbox")
     .select("id")
     .eq("status", "pending_classify")

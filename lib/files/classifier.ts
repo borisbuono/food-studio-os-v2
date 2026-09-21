@@ -15,7 +15,7 @@
 // why. That keeps the triage UI functional in dev/preview without paying
 // tokens.
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob } from "@/lib/supabaseJob";
 
 // Categories that mirror files_documents.category — plus 'modelo' and
 // 'photo' which are inbox-only observations (modelos map to 'gestoria'
@@ -100,7 +100,7 @@ export function inboxCategoryToLibraryCategory(c: InboxCategory | null): string 
 
 // Load raw bytes from Supabase Storage.
 async function loadBytes(path: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   // path is stored as "documents-inbox/<yyyy-mm-dd>/<id>_<name>" — strip the
   // bucket prefix if present.
   const bucket = "documents-inbox";
@@ -171,7 +171,7 @@ function entityFromSource(source: string): EntityCode | null {
 // writes the suggested_* fields back. Idempotent: if the row is already
 // classified/filed/rejected the call is a no-op.
 export async function classifyFile(inbox_id: string): Promise<{ ok: boolean; result?: ClassifyResult; error?: string }> {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   const { data: row, error: readErr } = await sb.from("files_inbox")
     .select("id,file_url,mime_type,status,source,sender,subject")
     .eq("id", inbox_id)
@@ -323,7 +323,7 @@ export async function classifyFile(inbox_id: string): Promise<{ ok: boolean; res
 
 // Write suggested_* fields, move status to needs_triage, and log the action.
 async function writeClassification(inbox_id: string, result: ClassifyResult) {
-  const sb = supabaseServer();
+  const sb = supabaseJob();
   await sb.from("files_inbox").update({
     suggested_category: result.category,
     suggested_entity: result.entity,

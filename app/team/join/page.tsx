@@ -32,6 +32,7 @@ type Invitation = {
   starting_date: string | null;
   language: string;
   accepted_at: string | null;
+  venue_name?: string | null;
 };
 
 export default function TeamJoin() {
@@ -55,20 +56,19 @@ export default function TeamJoin() {
   useEffect(() => {
     if (!token) { setStatus("bad_token"); return; }
     (async () => {
-      const { data, error } = await supabaseBrowser
-        .from("team_invitations")
-        .select("id,invited_email,invited_name,invited_phone,role,restaurant_id,entity_code,starting_date,language,accepted_at")
-        .eq("magic_link_token", token)
-        .maybeSingle();
-      if (error || !data) { setStatus("bad_token"); return; }
-      setInv(data as Invitation);
-      setName(data.invited_name || "");
-      setPhone(data.invited_phone || "");
-      if (data.accepted_at) { setStatus("already"); return; }
-      if (data.restaurant_id) {
-        const { data: v } = await supabaseBrowser.from("restaurants").select("name").eq("id", data.restaurant_id).maybeSingle();
-        if (v?.name) setVenueName(v.name);
-      }
+      // Token lookup goes through a SECURITY DEFINER RPC, not a table read.
+      // team_invitations is manager-only under RLS since the Phase 3.5 rollout —
+      // an anon SELECT policy here would let anyone list every live invitation
+      // (tokens included). get_invitation_by_token returns at most one row and
+      // never returns the token itself.
+      const { data, error } = await supabaseBrowser.rpc("get_invitation_by_token", { p_token: token });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) { setStatus("bad_token"); return; }
+      setInv(row as Invitation);
+      setName(row.invited_name || "");
+      setPhone(row.invited_phone || "");
+      if (row.accepted_at) { setStatus("already"); return; }
+      if (row.venue_name) setVenueName(row.venue_name);
       setStatus("ready");
     })();
   }, [token]);

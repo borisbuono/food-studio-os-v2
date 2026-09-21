@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { cronDb } from "@/lib/cron/heartbeat";
 import { gmailApiFetch } from "@/lib/assistant/channels/gmail";
 import { parseGuestsFromEmailBody } from "@/lib/integrations/pos/fresto";
@@ -93,8 +93,9 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization") || "";
   if (secret && auth === `Bearer ${secret}`) return true;
-  const sb = supabaseServer();
-  const { data: userRes } = await sb.auth.getUser();
+  // Session check must use the request-bound client — the job client has no cookie.
+  const { supabaseServer } = await import("@/lib/supabaseServer");
+  const { data: userRes } = await supabaseServer().auth.getUser();
   return !!userRes?.user;
 }
 
