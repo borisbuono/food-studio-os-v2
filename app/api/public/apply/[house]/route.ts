@@ -1,7 +1,7 @@
 import { extractClientIp, hashIp } from "@/lib/leads/rateLimit";
 import { parseCv, readPerson, retainUntil, reviewFlags, scoreCandidate, type CvProfile } from "@/lib/hiring-sop";
 import { mirrorColumns } from "@/lib/hiring-sop-server";
-import { applyClient, CRAFT_Q, KIND_LABEL, PERSON_Q, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
+import { applyClient, KIND_LABEL, PERSON_Q, SIGNATURE_Q, type ApplyAnswers, type ApplyKind, type ApplyPageInfo } from "@/lib/hiring-apply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,11 +73,8 @@ export async function POST(req: Request, { params }: { params: { house: string }
     note: s(form.get("note"), 4000),
   };
   const area = a.area === "sala" ? "sala" : "cocina";
-  const craftQ = CRAFT_Q[area].es;
   const qa = [
-    { q: area === "sala" ? "Experiencia en sala / vinos / barra y dónde quiere crecer" : "Partida más fuerte y dónde quiere crecer", a: a.station },
-    { q: craftQ[0], a: a.craft1 },
-    { q: craftQ[1], a: a.craft2 },
+    { q: SIGNATURE_Q[area].es, a: a.craft1 },
     ...PERSON_Q.map((x) => ({ q: x.es(area), a: a[x.k] })),
   ];
   const isStage = a.kind !== "job";
@@ -89,7 +86,6 @@ export async function POST(req: Request, { params }: { params: { house: string }
     `Weekends/holidays: ${a.weekends || "—"}`,
     `Lives: ${a.lives_where || "—"} · Transport: ${a.transport || "—"}`,
     `References: ${a.references || "—"}`,
-    `Strongest station / wants to grow: ${a.station || "—"}`,
     `Allergen training: ${a.allergen_training || "—"} · Carnet manipulador: ${a.food_handler || "—"}`,
     a.kind === "job" ? `Jornada: ${a.schedule || "—"}` : "",
     ...qa.map((x) => `\n— ${x.q}\n${x.a || "(sin respuesta)"}`),

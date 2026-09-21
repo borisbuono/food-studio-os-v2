@@ -221,7 +221,7 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
         <div className="mt-3 border-t border-black/10 pt-2">
           <div className="font-semibold">The person, in their own words</div>
           <p className="mt-1">{p.people_read.value.summary}</p>
-          <p className="mt-1 text-clay">Craft: {p.people_read.value.craft_note}</p>
+          <p className="mt-1 text-clay">Dish / table answer: {p.people_read.value.craft_note}</p>
           <ul className="mt-1 space-y-0.5">
             {(p.people_read.value.traits || []).map((t: any, i: number) => (
               <li key={i}>

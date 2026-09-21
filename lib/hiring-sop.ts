@@ -161,8 +161,6 @@ export function scoreCandidate(
   else if (rtw === "no") add("no right to work", -30);
   else add("right to work not yet confirmed", 0);
 
-  const depth = p.people_read?.value?.craft_depth;
-  if (typeof depth === "number" && depth > 0) add(`craft answers: ${["", "generic", "knows it", "knows it and why"][depth]}`, depth * 4);
   if (p.food_handler?.value === "yes") add("food-handler card", 5);
   if (p.weekends?.value === true) add("works weekends", 5);
   if (p.weekends?.value === false) add("no weekends", -15);
@@ -294,13 +292,13 @@ export function retainUntil(from = new Date()): string {
 // ---------- the person, read from their own words ----------
 
 const PEOPLE_SYSTEM = `You help a restaurant owner in Ibiza cast a team. He reads every application himself; you prepare his reading.
-You get a candidate's written answers: two craft questions and five questions about themselves.
+You get a candidate's short written answers to six open questions about themselves (one about their dish or what makes a table happy). The owner can judge skills himself; your job is the person and how they would fit a small team.
 Return ONLY JSON:
 {"craft_depth": 0|1|2|3, "craft_note": "one line in English on what the craft answers show",
  "traits": [ {"trait": "warmth", ...}, {"trait": "curiosity"}, {"trait": "work ethic"}, {"trait": "empathy"}, {"trait": "self-awareness"}, {"trait": "integrity"} ] — each {"trait","signal":"clear"|"some"|"not shown","evidence":"their own words, quoted, max 20 words, or empty"},
  "ask_in_interview": ["three short follow-up questions, in the candidate's language, that dig into what the answers left open"],
  "summary": "two plain sentences in English: who this person seems to be at work, from their own words"}
-Rules: evidence only — quote them, never invent. "not shown" when the answers don't show it; short answers are not a red flag by themselves. craft_depth: 0 blank or vague, 1 generic, 2 correct method, 3 correct method plus why/what goes wrong.
+Rules: evidence only — quote them, never invent. "not shown" when the answers don't show it; short answers are not a red flag by themselves. craft_depth: how much care and taste the dish/table answer shows — 0 blank, 1 generic, 2 specific, 3 specific with a clear why. craft_note describes that answer in one line.
 Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No psychological diagnosis or personality typing. No hire/no-hire verdict — that is his call.`;
 
 export async function readPerson(
