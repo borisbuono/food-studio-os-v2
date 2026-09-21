@@ -1,3 +1,4 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // Shared by the public apply page and its API route.
 export const APPLY_CONTACT: Record<string, string> = {
   bm: "info@bistro-mondo.com",
@@ -30,4 +31,24 @@ export const EMPTY_ANSWERS: ApplyAnswers = {
   station: "",
   allergen_training: "",
   note: "",
+};
+
+// Anon, session-less client for the public apply surface. It can only call the
+// apply_* SECURITY DEFINER functions and upload one CV per live submission —
+// no service-role key involved. Server-side use only.
+let anonClient: SupabaseClient | null = null;
+export function applyClient(): SupabaseClient {
+  if (!anonClient)
+    anonClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "fs-apply" },
+    });
+  return anonClient;
+}
+
+export type ApplyPageInfo = {
+  id: string;
+  name: string;
+  legal_name: string;
+  accent: string | null;
+  openings: Array<{ id: string; title: string; station: string | null; role: string | null; languages_required: string[] | null }>;
 };
