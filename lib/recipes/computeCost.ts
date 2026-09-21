@@ -246,7 +246,12 @@ export async function computeRecipeCost(
       }
       if (window.length === 0) {
         tier = "stale";
-        window = usable;
+        // Old rows span years and the qty column doesn't mean the same thing
+        // across them — the same croissant box appears as qty 1, qty 60 and
+        // (OCR) qty 601. Averaging those is arithmetic on nonsense, so a
+        // stale price is the LATEST invoice only, not a three-year mean.
+        const newestDay = usable.reduce((mx, row) => Math.max(mx, timeOf(row)), 0);
+        window = usable.filter((row) => timeOf(row) === newestDay);
       }
 
       let totalCost = 0;
