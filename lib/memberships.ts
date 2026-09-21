@@ -88,8 +88,9 @@ export type MyMembershipContext = {
 // (20260921_entity_feature_flags.sql) hasn't landed on this env yet.
 async function loadAllEntities(sb: ReturnType<typeof supabaseServer>): Promise<AccessibleEntity[]> {
   const base = "id, name, slug, entity_type, status, parent_entity_id, timezone, is_active";
+  const flagsCols = ", foh_enabled, bookings_enabled, hiring_enabled, academy_enabled";
   let rows: any[] = [];
-  const res = await sb.from("entities").select(base + ", foh_enabled, bookings_enabled").eq("is_active", true);
+  const res = await sb.from("entities").select(base + flagsCols).eq("is_active", true);
   if (!res.error && Array.isArray(res.data)) {
     rows = res.data as any[];
   } else {
@@ -106,8 +107,10 @@ async function loadAllEntities(sb: ReturnType<typeof supabaseServer>): Promise<A
       status: String(r.status ?? "active"),
       parent_entity_id: r.parent_entity_id ?? null,
       timezone: r.timezone ?? null,
-      foh_enabled: typeof r.foh_enabled === "boolean" ? r.foh_enabled : d.foh_enabled,
+      foh_enabled:      typeof r.foh_enabled      === "boolean" ? r.foh_enabled      : d.foh_enabled,
       bookings_enabled: typeof r.bookings_enabled === "boolean" ? r.bookings_enabled : d.bookings_enabled,
+      hiring_enabled:   typeof r.hiring_enabled   === "boolean" ? r.hiring_enabled   : d.hiring_enabled,
+      academy_enabled:  typeof r.academy_enabled  === "boolean" ? r.academy_enabled  : d.academy_enabled,
     };
   });
 }

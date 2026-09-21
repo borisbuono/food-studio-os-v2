@@ -27,6 +27,8 @@ export type AccessibleEntity = {
   timezone?: string | null;
   foh_enabled: boolean;
   bookings_enabled: boolean;
+  hiring_enabled: boolean;
+  academy_enabled: boolean;
 };
 
 export type MembershipLite = {
@@ -41,10 +43,13 @@ export function isOperating(entityType: string | null | undefined): boolean {
 }
 
 // Sensible defaults when the DB predates 20260921_entity_feature_flags.sql:
-// operating venues have a dining room + bookings, nothing else does.
-export function defaultFlags(entityType: string): { foh_enabled: boolean; bookings_enabled: boolean } {
+// operating venues run all four surfaces, nothing else does.
+export function defaultFlags(entityType: string): {
+  foh_enabled: boolean; bookings_enabled: boolean;
+  hiring_enabled: boolean; academy_enabled: boolean;
+} {
   const on = isOperating(entityType);
-  return { foh_enabled: on, bookings_enabled: on };
+  return { foh_enabled: on, bookings_enabled: on, hiring_enabled: on, academy_enabled: on };
 }
 
 export function filterAccessibleEntities(
@@ -69,21 +74,27 @@ export function filterAccessibleEntities(
 
 // --- Command palette gating --------------------------------------------------
 
+export type RouteFeature = "foh" | "bookings" | "hiring" | "academy";
+
 export type RouteGate = {
   // Room the route belongs to. Omitted = universal (Files, Account, Home).
   room?: PaletteRoom;
   // Entity feature the route depends on.
-  feature?: "foh" | "bookings";
+  feature?: RouteFeature;
 };
 
 export type PaletteAccess = {
   rooms: Set<PaletteRoom>;
   foh: boolean;
   bookings: boolean;
+  hiring: boolean;
+  academy: boolean;
 };
 
 // Nothing loaded yet (or signed out) → universal routes only. Fail closed.
-export const NO_ACCESS: PaletteAccess = { rooms: new Set(), foh: false, bookings: false };
+export const NO_ACCESS: PaletteAccess = {
+  rooms: new Set(), foh: false, bookings: false, hiring: false, academy: false,
+};
 
 // Which rooms a membership opens. Owner → everything incl. Studio. Office
 // (manager / admin) → the whole house, because managers run the floor and
@@ -121,14 +132,18 @@ export function paletteAccessFor(
 
   return {
     rooms,
-    foh: scopeEntities.some((e) => e.foh_enabled),
+    foh:      scopeEntities.some((e) => e.foh_enabled),
     bookings: scopeEntities.some((e) => e.bookings_enabled),
+    hiring:   scopeEntities.some((e) => e.hiring_enabled),
+    academy:  scopeEntities.some((e) => e.academy_enabled),
   };
 }
 
 export function canSeeRoute(gate: RouteGate, access: PaletteAccess): boolean {
   if (gate.room && !access.rooms.has(gate.room)) return false;
-  if (gate.feature === "foh" && !access.foh) return false;
+  if (gate.feature === "foh"      && !access.foh)      return false;
   if (gate.feature === "bookings" && !access.bookings) return false;
+  if (gate.feature === "hiring"   && !access.hiring)   return false;
+  if (gate.feature === "academy"  && !access.academy)  return false;
   return true;
 }

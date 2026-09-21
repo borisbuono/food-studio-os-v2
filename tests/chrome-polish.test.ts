@@ -15,8 +15,16 @@ function eq(name: string, got: unknown, want: unknown) {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : `  got=${JSON.stringify(got)} want=${JSON.stringify(want)}`}`);
 }
 
-const E = (id: string, type: string, parent: string | null = null, foh = true, bk = true): AccessibleEntity =>
-  ({ id, name: id, slug: id, entity_type: type, status: "active", parent_entity_id: parent, foh_enabled: foh, bookings_enabled: bk });
+const E = (
+  id: string, type: string, parent: string | null = null,
+  foh = true, bk = true, hire = true, acad = true,
+): AccessibleEntity =>
+  ({
+    id, name: id, slug: id, entity_type: type, status: "active",
+    parent_entity_id: parent,
+    foh_enabled: foh, bookings_enabled: bk,
+    hiring_enabled: hire, academy_enabled: acad,
+  });
 const all = [
   E("holdings", "holding_company", null, false, false),
   E("bm", "operating_venue", "holdings"),
