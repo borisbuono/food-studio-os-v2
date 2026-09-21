@@ -29,6 +29,14 @@ import {
   type CostResult,
 } from "@/lib/recipes/computeCost";
 
+// Safety cap on the auto-recompute triggered by one ingest — a supplier
+// statement with dozens of line items can spread alias hits across
+// hundreds of recipes, and blocking the capture handler on that big a
+// batch would time out the request. Over the cap we mark `capped` in the
+// response so the caller can see it, and the nightly
+// `/api/recipes/compute-all-entities` cron picks up what we skipped.
+export const INGEST_RECIPE_CAP = 100;
+
 export type AliasIndex = {
   byKey: Map<string, string>;               // normalised alias/canonical → canonical
   aliasesByCanonical: Map<string, string[]>; // canonical → normalised patterns
@@ -220,6 +228,7 @@ export type IngestRecompute = {
   failed: Array<{ id: string; error: string }>;
   menu_rows_updated: number;
   skipped?: string;
+  capped?: { total: number; ran: number };
 };
 
 // Call right after purchase_lines rows are written.
@@ -244,8 +253,16 @@ export async function recomputeAfterIngest(
   const canonicals = canonicalsForProducts(idx, rawProductTexts);
   if (canonicals.size === 0) return { ...empty, skipped: "no product matched an alias" };
 
-  const recipeIds = await recipesUsingCanonicals(sb, entityId, idx, canonicals);
-  if (recipeIds.length === 0) return { ...empty, canonicals: [...canonicals], skipped: "no recipe uses these ingredients" };
+  const recipeIdsAll = await recipesUsingCanonicals(sb, entityId, idx, canonicals);
+  if (recipeIdsAll.length === 0) return { ...empty, canonicals: [...canonicals], skipped: "no recipe uses these ingredients" };
+
+  // Cap the ingest recompute so a big statement can't wedge the handler.
+  // Deterministic ordering: recipesUsingCanonicals returns ids in the
+  // order recipe rows come back from Postgres; slice takes the first N.
+  const recipeIds = recipeIdsAll.slice(0, INGEST_RECIPE_CAP);
+  const capped = recipeIdsAll.length > INGEST_RECIPE_CAP
+    ? { total: recipeIdsAll.length, ran: recipeIds.length }
+    : undefined;
 
   const sum = await recomputeRecipes(sb, recipeIds);
   const menu = await refreshMenuMargin(sb, { recipeIds, results: sum.results });
@@ -257,5 +274,6 @@ export async function recomputeAfterIngest(
     tallies: sum.tallies,
     failed: sum.failed,
     menu_rows_updated: menu.updated,
+    ...(capped ? { capped } : {}),
   };
 }
