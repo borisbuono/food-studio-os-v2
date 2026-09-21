@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { loadEvents, myEntities, peopleNames } from "@/lib/calendar.server";
 import { addDaysYmd, mondayOf, zonedParts, zonedToUtc } from "@/lib/calendar";
 import CalendarView from "@/components/calendar/CalendarView";
+import GoogleConnect from "@/components/calendar/GoogleConnect";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export default async function MyCalendarPage() {
         entitySlugs={mine.slugs}
         entityNames={mine.names}
         extraActions={
-          <Link href="/me/today" className="rounded border border-black/15 px-2 py-1">Today</Link>
+          <>
+            <Link href="/me/today" className="rounded border border-black/15 px-2 py-1">Today</Link>
+            <GoogleConnect />
+          </>
         }
       />
     </main>
