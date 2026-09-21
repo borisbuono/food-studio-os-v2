@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
-import { EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
+import { resolveVenueScope } from "@/lib/serverVenue";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
 // Office pillar — books, team, holdings, ads. The operator's back-office.
@@ -15,9 +13,11 @@ const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 // exposes those labels.
 export default async function OfficeHome() {
   const supabase = supabaseServer();
-  const entity = serverEntity();
-  const rid = serverRestaurantId();
-  const ec = ENTITY_CODE[entity] || "IFL";
+  // Dynamic scope — an unknown tenant used to fall back to "IFL" and see
+  // Ibiza Food Lab's invoices + bank rows (stress test 2026-09-21).
+  const scope = await resolveVenueScope();
+  const rid = scope.restaurantId;
+  const ec = scope.legacyCode;
   const today = new Date().toISOString().slice(0, 10);
 
   const [eodRes, unapprovedRes, bankRes, teamRes, chartersRes, campaignsRes, commercialsRes] = await Promise.all([

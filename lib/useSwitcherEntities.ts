@@ -21,7 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
-import { EntityKey, RESTAURANT_TO_ENTITY, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, RESTAURANT_TO_ENTITY, E_BM, E_TALLER, E_HOLDINGS, isPrimaryEntity } from "@/lib/entities";
 import type { EntityType } from "@/lib/scope";
 
 export type SwitcherEntry = {
@@ -105,6 +105,22 @@ export function useSwitcherEntities(): SwitcherGroups {
               .from("profiles").select("role").eq("id", uid).maybeSingle();
             const role = (prof?.role || "").toLowerCase();
             if (role.includes("admin") || role.includes("owner")) isAdminHint = true;
+            // Self-serve owners now get profiles.role='owner' (stress test
+            // 2026-09-21, blocker #4). That must NOT unlock every entity in
+            // the switcher: the admin hint only holds for users with no
+            // memberships (legacy accounts) or at least one pinned house.
+            if (isAdminHint) {
+              const { data: tms } = await supabaseBrowser
+                .from("team_members").select("id").eq("auth_user_id", uid);
+              const pids = (tms || []).map((t: any) => t.id);
+              if (pids.length) {
+                const { data: ms } = await supabaseBrowser
+                  .from("memberships").select("entity_id")
+                  .in("person_id", pids).eq("status", "active");
+                const ids = (ms || []).map((m: any) => m.entity_id as string);
+                if (ids.length && !ids.some((id) => isPrimaryEntity(id))) isAdminHint = false;
+              }
+            }
           }
           if (email) {
             const { data: tms } = await supabaseBrowser

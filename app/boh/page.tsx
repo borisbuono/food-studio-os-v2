@@ -1,6 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverEntity, serverRestaurantId } from "@/lib/serverVenue";
-import { houseSlugForEntity } from "@/lib/houses";
+import { resolveVenueScope } from "@/lib/serverVenue";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +9,13 @@ export const dynamic = "force-dynamic";
 // the daily loop vs the menu arc.
 export default async function BohHome() {
   const supabase = supabaseServer();
-  const rid = serverRestaurantId();
-  const entity = serverEntity();
-  const houseSlug = houseSlugForEntity(entity); // null when scope is Studio
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Madrid" }); // Madrid trading date, derived ONCE
+  // Dynamic scope — non-pinned tenants resolve to THEIR entity, never BM
+  // (onboarding stress test 2026-09-21, blocker #2).
+  const scope = await resolveVenueScope();
+  const rid = scope.restaurantId;
+  const entity = scope.entity;
+  const houseSlug = scope.slug; // null when scope is Studio
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: scope.timezone }); // house trading date, derived ONCE
   const weekday = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
   const [zonesRes, mepRes, tasksRes, albaransRes, recipesRes, menuRes, prepListRes] = await Promise.all([

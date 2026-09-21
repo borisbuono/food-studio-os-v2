@@ -1,5 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverRestaurantId } from "@/lib/serverVenue";
+import { resolveVenueScope } from "@/lib/serverVenue";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // here.
 export default async function FohHome() {
   const supabase = supabaseServer();
-  const rid = serverRestaurantId();
+  const rid = (await resolveVenueScope()).restaurantId; // dynamic tenant scope (stress test 09-21)
   const today = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
   const monthStart = new Date();

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { authCookieOptions } from "@/lib/authCookies";
-import { E_HOLDINGS } from "@/lib/entities";
+import { E_HOLDINGS, isPrimaryEntity } from "@/lib/entities";
 
 // Server-side OAuth / magic-link callback — standard Supabase Next.js
 // pattern (https://supabase.com/docs/guides/auth/server-side/nextjs).
@@ -95,13 +95,20 @@ export async function GET(request: NextRequest) {
       if (personIds.length) {
         const { data: mRows } = await supabase
           .from("memberships")
-          .select("role, status")
+          .select("role, status, entity_id, is_default")
           .in("person_id", personIds)
           .eq("status", "active");
         const raw = mRows || [];
         const isOwner = raw.some((m: any) => String(m.role || "").toLowerCase() === "owner");
         const isMulti = raw.length > 1;
-        if (isOwner || isMulti) {
+        // Self-serve tenants (no membership on a pinned Ibiza entity) must
+        // never be stamped with the Holdings cookie — that scoped their
+        // Studio to Boris's books (stress test 2026-09-21). They get their
+        // own default house instead.
+        const onPinned = raw.some((m: any) => isPrimaryEntity(m.entity_id));
+        const ownDefault = (raw.find((m: any) => m.is_default) || raw[0])?.entity_id as string | undefined;
+        const landingEntity = onPinned ? E_HOLDINGS : (ownDefault || "");
+        if ((isOwner || isMulti) && landingEntity) {
           // Rewrite the response as a redirect to /studio and set fs_entity=holdings.
           const studio = NextResponse.redirect(new URL("/studio", origin));
           // Copy every cookie the auth SDK wrote onto our original response.
@@ -114,7 +121,7 @@ export async function GET(request: NextRequest) {
           studio.cookies.set({
             ...cookieAttrs,
             name: "fs_entity",
-            value: E_HOLDINGS,
+            value: landingEntity,
             path: "/",
             maxAge: 60 * 60 * 24 * 365,
             sameSite: "lax",

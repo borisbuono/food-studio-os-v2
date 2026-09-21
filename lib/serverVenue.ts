@@ -6,6 +6,7 @@ import {
   isPrimaryEntity,
   type EntityKey,
 } from "./entities";
+import { cache } from "react";
 import { supabaseServer } from "./supabaseServer";
 
 // The venue the current view is scoped to. Priority:
@@ -46,8 +47,104 @@ export async function serverEntityFromProfile(): Promise<EntityKey> {
 }
 
 export function serverRestaurantId(): string {
+  // A non-pinned tenant's UUID cookie must NOT fall through to Bistro Mondo's
+  // restaurant id (stress test 2026-09-21). Return a UUID that matches no
+  // row so restaurant-scoped reads come back empty on surfaces that haven't
+  // moved to resolveVenueScope() yet.
+  const c = cookies().get("fs_entity")?.value || "";
+  if (c && !isPrimaryEntity(c) && /^[0-9a-f-]{36}$/i.test(c)) return "00000000-0000-0000-0000-000000000000";
   return ENTITY_TO_RESTAURANT[serverEntity()] || ENTITY_TO_RESTAURANT[E_HOLDINGS] || "fb4d008f-2d2a-4e0d-a525-6e0e36af0259";
 }
+
+// ---- Dynamic venue scope (onboarding stress test 2026-09-21, blocker #2) ---
+//
+// serverEntity()/serverRestaurantId() only know the pinned UUIDs; any other
+// tenant's cookie fell through to E_HOLDINGS + Bistro Mondo's restaurant id,
+// so an Amsterdam operator tapping "Kitchen" saw Ibiza data. The legacy
+// /boh /foh /office pillars now call resolveVenueScope() instead:
+//   1. fs_entity cookie = pinned UUID → pinned constants (unchanged path).
+//   2. fs_entity cookie = other UUID  → honoured ONLY if the signed-in user
+//      holds an active membership on it; restaurant looked up by entity_id.
+//   3. no / invalid cookie → the user's default (else first) active
+//      membership; only a user with zero memberships gets the legacy
+//      E_HOLDINGS default.
+// A non-pinned tenant without a restaurants row gets NO_MATCH_ID, so
+// restaurant-scoped queries return nothing instead of someone else's rows.
+export const NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
+
+// Legacy text code used by invoice_inbox / bank_movements / academy_lessons
+// (.entity_id / .entity_code columns predate the UUID refactor).
+const PINNED_LEGACY_CODE: Record<string, string> = {
+  "d1ee19b6-5fb4-460c-8326-685dc86e47df": "BBH",
+  "387f1045-0340-4029-a1e4-28b15c372680": "BM",
+  "daec58d9-44a2-4c24-9183-2a87219093fb": "IFL",
+  "f365f49d-4cd1-43d1-955f-03c21816ad22": "UTOPIA",
+};
+
+export type VenueScope = {
+  entity: string;          // entities.id UUID
+  restaurantId: string;    // restaurants.id, or NO_MATCH_ID
+  legacyCode: string;      // BBH/BM/IFL/UTOPIA for pinned; the UUID otherwise
+  slug: string | null;     // house slug for /h/<slug>/… links
+  timezone: string;
+  pinned: boolean;
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function pinnedScope(k: EntityKey): VenueScope {
+  const slugs: Record<string, string> = {
+    "387f1045-0340-4029-a1e4-28b15c372680": "bm",
+    "daec58d9-44a2-4c24-9183-2a87219093fb": "taller",
+    "f365f49d-4cd1-43d1-955f-03c21816ad22": "utopia",
+  };
+  return {
+    entity: k,
+    restaurantId: ENTITY_TO_RESTAURANT[k] || ENTITY_TO_RESTAURANT[E_HOLDINGS] || "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
+    legacyCode: PINNED_LEGACY_CODE[k] || "BBH",
+    slug: slugs[k] ?? null,
+    timezone: "Europe/Madrid",
+    pinned: true,
+  };
+}
+
+export const resolveVenueScope = cache(async (): Promise<VenueScope> => {
+  const c = cookies().get("fs_entity")?.value || "";
+  if (isPrimaryEntity(c)) return pinnedScope(c);
+
+  const sb = supabaseServer();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u?.user?.id;
+  if (!uid) return pinnedScope(E_HOLDINGS);
+
+  // A user can own several team_members rows (Boris has two) — never
+  // .maybeSingle() here.
+  const { data: tms } = await sb.from("team_members").select("id").eq("auth_user_id", uid);
+  const personIds = (tms || []).map((t: any) => t.id as string);
+  const { data: mems } = personIds.length
+    ? await sb.from("memberships").select("entity_id,is_default").in("person_id", personIds).eq("status", "active")
+    : { data: [] as any[] };
+  const memberOf = (mems || []) as Array<{ entity_id: string; is_default: boolean | null }>;
+
+  let target: string | null = null;
+  if (UUID_RE.test(c) && memberOf.some((m) => m.entity_id === c)) target = c;
+  if (!target) target = (memberOf.find((m) => m.is_default) || memberOf[0])?.entity_id ?? null;
+  if (!target) return pinnedScope(E_HOLDINGS); // zero memberships — legacy default
+  if (isPrimaryEntity(target)) return pinnedScope(target);
+
+  const [{ data: ent }, { data: rest }] = await Promise.all([
+    sb.from("entities").select("id,slug,timezone").eq("id", target).maybeSingle(),
+    sb.from("restaurants").select("id").eq("entity_id", target).limit(1),
+  ]);
+  return {
+    entity: target,
+    restaurantId: ((rest || [])[0] as any)?.id || NO_MATCH_ID,
+    legacyCode: target,
+    slug: (ent as any)?.slug ?? null,
+    timezone: (ent as any)?.timezone || "Europe/Madrid",
+    pinned: false,
+  };
+});
 
 // The row shape the Chef context builder + system prompt need for any entity —
 // the three pinned houses and every future tenant. Kept minimal on purpose: no

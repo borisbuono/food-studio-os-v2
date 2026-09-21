@@ -1,20 +1,17 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverEntity } from "@/lib/serverVenue";
-import { EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
+import { resolveVenueScope } from "@/lib/serverVenue";
 import AcademyBoard from "@/components/AcademyBoard";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 // Pillars #3 — the foh-scoped Academy surface. Same shared table
 // (academy_lessons), filtered by module_scope containing 'foh'.
 // Existing /develop/academy remains the parent list (all lessons).
 export default async function FohAcademyPage() {
   const sb = supabaseServer();
-  const entity = serverEntity();
-  const ec = ENTITY_CODE[entity] || "IFL";
+  const ec = (await resolveVenueScope()).legacyCode; // dynamic tenant scope (stress test 09-21)
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: u } = await sb.auth.getUser();

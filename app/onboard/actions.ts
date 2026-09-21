@@ -16,8 +16,9 @@ import {
   type InviteRole,
 } from "@/lib/onboarding";
 import { countryProfile, slugify, type CountryCode } from "@/lib/countries";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { langForCountry } from "@/lib/i18nDict";
+import { sendInviteEmail } from "@/lib/email/invite";
 
 // ---- Step 2 — create the house ------------------------------------------
 export async function saveHouseAction(formData: FormData) {
@@ -99,7 +100,10 @@ export async function saveFiscalAndCreateEntityAction(formData: FormData) {
   const insertRow: Record<string, any> = {
     name: house.trading_name,
     slug,
-    entity_type: "house",
+    // Must match entities_entity_type_check (holding_company / operating_venue /
+    // advisory_client / partner / landlord). "house" broke every self-serve
+    // signup — stress test 2026-09-21, blocker #1.
+    entity_type: "operating_venue",
     legal_name: house.legal_name || null,
     country: cp.name,                   // legacy column, keep populated
     country_code: house.country_code || "ES",
@@ -128,11 +132,14 @@ export async function saveFiscalAndCreateEntityAction(formData: FormData) {
   // still lets them continue — the operator can be granted access manually.
   try {
     let personId: string | null = null;
-    const { data: existingTm } = await sb
+    // .limit(1), not .maybeSingle(): a user can own several team_members
+    // rows and maybeSingle() errors on >1, which silently created a duplicate.
+    const { data: tmRows } = await sb
       .from("team_members")
       .select("id")
       .eq("auth_user_id", uid)
-      .maybeSingle();
+      .limit(1);
+    const existingTm = (tmRows || [])[0] as { id?: string } | undefined;
     if (existingTm?.id) {
       personId = existingTm.id as string;
     } else {
@@ -162,6 +169,12 @@ export async function saveFiscalAndCreateEntityAction(formData: FormData) {
     }
   } catch { /* best-effort */ }
 
+  // profiles.language defaults to 'en'; carry the country language over
+  // unless the user already picked one (stress test 2026-09-21).
+  try {
+    await sb.from("profiles").update({ language: langForCountry(house.country_code) }).eq("id", uid).eq("language", "en");
+  } catch { /* non-fatal */ }
+
   await writeOnboardingState({
     step: 4,
     fiscal,
@@ -184,28 +197,67 @@ export async function inviteTeammateAction(formData: FormData) {
   // POST through the internal API so we exercise the same code path a later
   // "invite from settings" surface will use.
   const sb = supabaseServer();
-  await sb.rpc; // touch to avoid unused-import lints when RPC unused
+  const { data: me } = await sb.auth.getUser();
+  const token = cryptoRandomToken();
   const { error: tokErr } = await sb
     .from("pending_invites")
     .insert({
       entity_id: state.entity_id,
       email,
       role,
-      token: cryptoRandomToken(),
-      invited_by: (await sb.auth.getUser()).data.user?.id ?? null,
+      token,
+      invited_by: me.user?.id ?? null,
     });
   if (tokErr) redirect("/onboard/step-4?e=" + encodeURIComponent(tokErr.message));
 
+  // Transactional email (stress test 2026-09-21, blocker #4). Soft-fail: the
+  // step-4 list always shows a copyable accept link as the fallback.
+  let emailed = false;
+  try {
+    const h = headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    const proto = h.get("x-forwarded-proto") || "https";
+    const meta: any = me.user?.user_metadata || {};
+    const r = await sendInviteEmail({
+      email, role, token,
+      houseName: state.house?.trading_name || "your house",
+      inviterName: meta.full_name || meta.name || null,
+      origin: host ? `${proto}://${host}` : null,
+    });
+    emailed = r.emailed;
+  } catch { /* soft-fail */ }
+
   const invited = [...(state.invited || []), { email, role }];
   await writeOnboardingState({ invited });
-  redirect("/onboard/step-4?ok=1");
+  redirect(`/onboard/step-4?ok=1&sent=${emailed ? "1" : "0"}`);
 }
 
 // ---- Step 5 — land -------------------------------------------------------
 export async function completeOnboardingAction() {
   const state = await readOnboardingState();
   if (!state.slug) redirect("/onboard/step-3?e=missing_entity");
-  await writeOnboardingState({ step: 5, completed_at: new Date().toISOString() });
+  const completedAt = new Date().toISOString();
+  await writeOnboardingState({ step: 5, completed_at: completedAt });
+
+  // Entity-level completion (stress test 2026-09-21): external checks read
+  // entities.onboarding_progress, not the per-user wizard state.
+  if (state.entity_id) {
+    try {
+      const sb = supabaseServer();
+      const { data: ent } = await sb.from("entities").select("onboarding_progress").eq("id", state.entity_id).maybeSingle();
+      const prev: any = (ent as any)?.onboarding_progress || {};
+      const steps = Array.from(new Set([...(Array.isArray(prev.steps_completed) ? prev.steps_completed : []), 1, 2, 3, 4, 5]));
+      await sb.from("entities").update({
+        onboarding_progress: {
+          ...prev,
+          started_at: prev.started_at || (state as any).started_at || completedAt,
+          completed_at: completedAt,
+          current_step: 5,
+          steps_completed: steps,
+        },
+      }).eq("id", state.entity_id);
+    } catch { /* non-fatal — wizard state already records completion */ }
+  }
 
   // Set fs_entity cookie so the app shell paints the right house on landing.
   const { cookies } = await import("next/headers");

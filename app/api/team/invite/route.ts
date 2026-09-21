@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { INVITE_ROLES } from "@/lib/onboarding";
+import { sendInviteEmail } from "@/lib/email/invite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,21 +46,20 @@ export async function POST(req: Request) {
   // Membership check: the inviter must sit inside this entity. We look up
   // team_members.id from auth_user_id, then any active membership row on
   // the target entity.
-  const { data: tm } = await sb
+  const { data: tms } = await sb
     .from("team_members")
     .select("id")
-    .eq("auth_user_id", uid)
-    .maybeSingle();
-  const personId = tm?.id;
-  if (personId) {
-    const { data: mem } = await sb
+    .eq("auth_user_id", uid);
+  const personIds = (tms || []).map((t: any) => t.id as string);
+  if (personIds.length) {
+    const { data: mems } = await sb
       .from("memberships")
       .select("id")
-      .eq("person_id", personId)
+      .in("person_id", personIds)
       .eq("entity_id", entity_id)
       .eq("status", "active")
-      .maybeSingle();
-    if (!mem) return Response.json({ ok: false, error: "forbidden — not a member of this house" }, { status: 403 });
+      .limit(1);
+    if (!mems || !mems.length) return Response.json({ ok: false, error: "forbidden — not a member of this house" }, { status: 403 });
   } else {
     // No team_members row → we accept the invite if this user is the entity
     // owner (onboarded_by). Onboarding just created it, so the wizard-driven
@@ -88,19 +88,26 @@ export async function POST(req: Request) {
     .single();
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
 
-  // Best-effort email send via Supabase's magic-link. Failure is non-fatal —
-  // the caller can hand out the token directly (or wire in transactional
-  // email later without touching this endpoint).
+  // Transactional email (2026-09-21). The old signInWithOtp ran on the
+  // inviter's session (PKCE verifier in the wrong browser) and pointed at
+  // /team/join, which reads team_invitations — not pending_invites. Soft-fail:
+  // accept_url is returned so the caller can share it by hand.
+  let emailed = false;
+  let accept_url = new URL(`/invite/accept?token=${token}`, req.url).toString();
   try {
-    const url = new URL("/team/join", req.url);
-    url.searchParams.set("token", token);
-    await sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: url.toString() },
+    const { data: ent } = await sb.from("entities").select("name").eq("id", entity_id).maybeSingle();
+    const meta: any = u.user?.user_metadata || {};
+    const r = await sendInviteEmail({
+      email, role, token,
+      houseName: (ent as any)?.name || "your house",
+      inviterName: meta.full_name || meta.name || null,
+      origin: new URL(req.url).origin,
     });
+    emailed = r.emailed;
+    accept_url = r.acceptUrl;
   } catch { /* soft-fail */ }
 
-  return Response.json({ ok: true, invite: inserted });
+  return Response.json({ ok: true, invite: inserted, emailed, accept_url });
 }
 
 function randomToken(): string {
