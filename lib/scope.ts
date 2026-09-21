@@ -228,6 +228,11 @@ const STUDIO: SidebarSection[] = [
       // house's own tree.
       { href: "/studio/houses",                       label: "Houses" },
       { href: "/studio/people",                       label: "People" },
+      // Task #34 (2026-09-21): portfolio destinations for the non-operating
+      // relationships. Studio-scoped; ?demo=1 shows the Utopia demo set.
+      { href: "/studio/advisory",                     label: "Advisory" },
+      { href: "/studio/partners",                     label: "Partners" },
+      { href: "/studio/landlords",                    label: "Landlords" },
       { href: "/studio/money",                        label: "Money" },
       { href: "/studio/command",                      label: "Command" },
     ],

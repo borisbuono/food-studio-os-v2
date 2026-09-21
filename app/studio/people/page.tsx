@@ -68,13 +68,16 @@ export default async function StudioPeoplePage() {
   for (const [eid, rid] of ridByEntity) entityByRid.set(rid, eid);
 
   // Roster, scoped: a member counts when their default restaurant belongs to
-  // one of my houses, or their operator entity is one I can see.
+  // one of my houses, or their operator entity is one I can see. Status
+  // carries archived state (fn_person_merge sets 'removed' when folding
+  // duplicates from task #35 into one canonical person); no archived_at
+  // column exists on team_members.
   const { data: members } = await sb
     .from("team_members")
-    .select("id,name,email,default_role,default_restaurant_id,operator_entity_id,status,first_login_at,invited_at,archived_at")
+    .select("id,name,email,default_role,default_restaurant_id,operator_entity_id,status,first_login_at,invited_at")
     .order("name");
   const roster = (members || []).filter((m: any) => {
-    if (m.archived_at) return false;
+    if (["removed", "archived"].includes(String(m.status || ""))) return false;
     const rid = m.default_restaurant_id ? String(m.default_restaurant_id) : null;
     if (rid && entityByRid.has(rid)) return true;
     const oe = m.operator_entity_id ? String(m.operator_entity_id) : null;

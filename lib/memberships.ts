@@ -115,6 +115,31 @@ async function loadAllEntities(sb: ReturnType<typeof supabaseServer>): Promise<A
   });
 }
 
+// Every team_members ("person") row this auth user IS.
+//
+// Task #50 — a person can hold more than one login. The DB function
+// fn_person_ids_for_uid (20260921_person_merge_and_auth_links.sql) is the one
+// place that rule lives; this falls back to the old auth_user_id lookup if the
+// migration hasn't landed on the environment yet.
+export async function resolvePersonIds(
+  sb: ReturnType<typeof supabaseServer>,
+  authUserId: string,
+): Promise<string[]> {
+  const rpc = await sb.rpc("fn_person_ids_for_uid", { uid: authUserId });
+  if (!rpc.error && Array.isArray(rpc.data)) {
+    return (rpc.data as any[])
+      .map((r: any) => (typeof r === "string" ? r : r?.fn_person_ids_for_uid ?? r?.id))
+      .filter(Boolean) as string[];
+  }
+  const { data: tmRows } = await sb
+    .from("team_members")
+    .select("id, status")
+    .eq("auth_user_id", authUserId);
+  return (tmRows || [])
+    .filter((r: any) => r.status !== "archived" && r.status !== "removed")
+    .map((r: any) => r.id as string);
+}
+
 // Read the signed-in user's memberships. Owner-first resolution: if any active
 // membership is `owner`, primaryRoom = studio regardless of the others.
 export async function getMyMembershipContext(): Promise<MyMembershipContext> {
@@ -133,13 +158,12 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
   // taking the first non-archived row; person_id in `memberships` is the
   // team_members.id but each team_members row is scoped to one operator_entity,
   // so we collect ALL person_ids that share this auth user.
-  const { data: tmRows } = await sb
-    .from("team_members")
-    .select("id, status")
-    .eq("auth_user_id", user.id);
-  const personIds = (tmRows || [])
-    .filter((r: any) => r.status !== "archived")
-    .map((r: any) => r.id as string);
+  // Task #50 (2026-09-21): one person may sign in from several accounts, so
+  // resolution runs through fn_person_ids_for_uid — team_members.auth_user_id
+  // OR a person_auth_link row claimed by this uid OR one whose email matches
+  // this uid's auth email (unless can_sign_in is false, e.g. info@, a shared
+  // mailbox that must never become somebody's identity).
+  const personIds = await resolvePersonIds(sb, user.id);
 
   if (!personIds.length) {
     return {
@@ -237,13 +261,7 @@ export async function countActiveMemberships(personId: string): Promise<number> 
 export async function countActiveMembershipsForAuthUser(authUserId: string): Promise<number> {
   if (!authUserId) return 0;
   const sb = supabaseServer();
-  const { data: tmRows } = await sb
-    .from("team_members")
-    .select("id, status")
-    .eq("auth_user_id", authUserId);
-  const personIds = (tmRows || [])
-    .filter((r: any) => r.status !== "archived")
-    .map((r: any) => r.id as string);
+  const personIds = await resolvePersonIds(sb, authUserId);
   if (!personIds.length) return 0;
   const { count } = await sb
     .from("memberships")

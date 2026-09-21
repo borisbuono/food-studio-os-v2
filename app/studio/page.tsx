@@ -7,6 +7,7 @@ import { isOperating } from "@/lib/access/tenantScope";
 import { getHouseSnapshots, type PosSnap } from "@/lib/studio/houseSnapshots.server";
 import { todayInTz } from "@/lib/studio/closeStatus";
 import { HousePosBlock } from "./HousePosBlock";
+import { reactivateEntity } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,12 @@ export const dynamic = "force-dynamic";
 //         └── ROOM   ← revealed when the owner clicks a tile (default: Office)
 //               └── STATION   ← Push 2
 
-const ADVISORY_DEFAULT_ROOM = "/administrate/advisor";
-const PARTNER_DEFAULT_ROOM = "/administrate/partner";
-const LANDLORD_DEFAULT_ROOM = "/administrate/landlord";
+// Task #34 (2026-09-21): non-operating tiles land on the Studio-scoped
+// destination pages. /administrate/partner and /administrate/landlord never
+// existed — those two tiles were 404s.
+const ADVISORY_DEFAULT_ROOM = "/studio/advisory";
+const PARTNER_DEFAULT_ROOM = "/studio/partners";
+const LANDLORD_DEFAULT_ROOM = "/studio/landlords";
 
 function madridDateLabel(): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -83,8 +87,14 @@ export default async function StudioPage() {
   // this user holds a membership on, plus (for owners) their holding's
   // advisory / partner / landlord children. "Owner -> every row in the
   // table" leaked Bistro Mondo + Taller to Utopia's owner.
+  // Task #51 (2026-09-21): only status='active' entities get a tile. Dormant
+  // ones collapse into the footer below with an owner-only "reactivate";
+  // 'ended' entities are not shown at all.
   const ents = ctx.entities.filter((e) => e.status === "active");
   const houses = ents.filter((e) => e.entity_type !== "holding_company");
+  const dormant = ctx.entities
+    .filter((e) => e.status === "dormant" && e.entity_type !== "holding_company")
+    .sort((a, b) => a.entity_type.localeCompare(b.entity_type) || a.name.localeCompare(b.name));
   const opIds = houses.filter((e) => isOperating(e.entity_type)).map((e) => e.id);
   const snaps = await getHouseSnapshots(opIds);
 
@@ -111,8 +121,7 @@ export default async function StudioPage() {
         };
       }
       if (e.entity_type === "advisory_client") {
-        return { ...base, operating: false, href: ADVISORY_DEFAULT_ROOM,
-          status: (e.status || "active").toLowerCase() === "dormant" ? "dormant" : "engagement active" };
+        return { ...base, operating: false, href: ADVISORY_DEFAULT_ROOM, status: "engagement active" };
       }
       if (e.entity_type === "partner") return { ...base, operating: false, href: PARTNER_DEFAULT_ROOM, status: "licence active" };
       if (e.entity_type === "landlord") return { ...base, operating: false, href: LANDLORD_DEFAULT_ROOM, status: "lease live" };
@@ -220,6 +229,37 @@ export default async function StudioPage() {
           </ul>
         </section>
       ))}
+
+      {/* Dormant footer (task #51) — collapsed, owner can reactivate. */}
+      {dormant.length ? (
+        <section className="mt-14 border-t border-black/10 pt-4">
+          <details>
+            <summary className="cursor-pointer select-none font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink">
+              Dormant · {dormant.length}
+            </summary>
+            <ul className="mt-3 divide-y divide-line">
+              {dormant.map((e) => (
+                <li key={e.id} className="flex items-center justify-between gap-3 py-2">
+                  <p className="font-sans text-[13px] text-ink-soft">
+                    {e.name}
+                    <span className="ml-2 font-mono text-[9px] uppercase tracking-wide text-clay">
+                      {e.entity_type.replace("_", " ")}
+                    </span>
+                  </p>
+                  {ctx.isOwner ? (
+                    <form action={reactivateEntity}>
+                      <input type="hidden" name="entity_id" value={e.id} />
+                      <button type="submit" className="font-mono text-[10px] uppercase tracking-wide text-clay underline hover:text-ink">
+                        Reactivate
+                      </button>
+                    </form>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </section>
+      ) : null}
 
       {/* Empty state — user is owner/multi-role but no entities match. */}
       {groups.length === 0 ? (
