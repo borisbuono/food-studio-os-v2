@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { usePathname, useRouter } from "next/navigation";
+import { isPrimaryEntity, EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -11,7 +11,8 @@ import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, r
 import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
 import { scopeForUrl, resolveScope } from "@/lib/scope";
 import { HOUSE_SLUG_TO_ENTITY, houseSlugForEntity } from "@/lib/houses";
-import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
+import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
+import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
 // The old Develop/Execute/Administrate/Grow labels are gone from the nav;
@@ -49,6 +50,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   );
   const [loaded, setLoaded] = useState(false);
   const pathname = usePathname() || "";
+  const router = useRouter();
   const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
   const switcher = useSwitcherEntities();
@@ -83,7 +85,16 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || E_HOLDINGS;
+      // Cookie wins (task #27): the server forces it on sign-in, and a
+      // stale localStorage value from another user/device must not win
+      // and get written back over it.
+      // A self-serve tenant's entity is a UUID that isn't one of the pinned
+      // four, so accept any UUID-shaped value rather than only pinned ones.
+      const ok = (v: string | null) => !!v && (isPrimaryEntity(v) || /^[0-9a-f-]{36}$/i.test(v));
+      const ck = readEntityCookie();
+      const ls = localStorage.getItem("fs_entity");
+      const e = (ok(ck) ? ck : ok(ls) ? ls : E_HOLDINGS) as EntityKey;
+      try { if (ls !== e) localStorage.setItem("fs_entity", e); } catch {}
       const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
       setEntity(e); setRole(r); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
@@ -99,6 +110,23 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   // The pillar nav is universal — every role now sees the three pillars,
   // gated at the DB (RLS) + at the route guard (RouteGuard) for Office-only screens.
   const pick = (k: EntityKey) => { setEntityCtx(k); setEntity(k); setMenu(false); };
+  // Scope-bound identity (task #61): logo, link and switcher colour follow
+  // the URL scope; the cookie only fills in on legacy paths.
+  const scopeNow = resolveScope(pathname, houseSlugForEntity(entity));
+  const brand = brandForScope(scopeNow, entity);
+  const hereEntity = scopeEntityFor(scopeNow, entity);
+  const hereAccent = (hereEntity ? ENTITY_ACCENT[hereEntity] : null) || "#3F4C28";
+  const hereShort = (hereEntity ? ENTITY_SHORT[hereEntity] : null) || brand.name || "House";
+  // House switch: navigate when the URL carries the house (/h/<slug>/…),
+  // otherwise swap the cookie and refresh the server components.
+  const pickHouse = (ent: SwitcherEntry) => {
+    setMenu(false);
+    if (ent.entityKey) { setEntityCtx(ent.entityKey); setEntity(ent.entityKey); }
+    const target = ent.slug ? hrefForHouseSwitch(pathname, ent.slug) : null;
+    if (target) router.push(target);
+    else if (ent.slug && !ent.entityKey) router.push(`/h/${ent.slug}`);
+    else router.refresh();
+  };
 
   // Per-pillar accent for the active chip's underline / dot.
   const activeAccent = activePillar ? PILLAR_ACCENT[activePillar] : null;
@@ -124,16 +152,8 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
             the mobile chrome in line so both surfaces resolve the same way.
             Studio → holdings; house/room → the house mark; fallback → cookie
             (only reachable when scope is null on legacy paths). */}
-        <Link href="/" data-testid="top-brand-mark" aria-label="Home" className="flex items-center">
-          <BrandMark
-            entity={(() => {
-              const s = scopeForUrl(pathname);
-              if (s?.level === "studio") return E_HOLDINGS;
-              if (s && (s.level === "house" || s.level === "room")) return HOUSE_SLUG_TO_ENTITY[s.houseSlug];
-              return entity;
-            })()}
-            tone="light"
-          />
+        <Link href={brand.href} data-testid="top-brand-mark" aria-label="Home" className="flex items-center">
+          <BrandMark entity={brand.entity} name={brand.name} tone="light" />
         </Link>
 
         <div className="flex items-center gap-3">
@@ -141,10 +161,17 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
           {/* entity context — top-right. Switcher for admins/preview, locked label for a scoped worker */}
           {loaded && hasMultipleEntities && canSwitch ? (
             <div className="relative">
-              <button onClick={() => setMenu((m) => !m)} className="flex items-center gap-1.5 rounded-full border border-black/15 px-3 py-1.5 font-sans text-[12px] text-ink-soft transition hover:border-ink/40">
-                <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[entity] }} />
-                {ENTITY_SHORT[entity]}
-                <span className="text-clay">▾</span>
+              {/* Task #27: loud switcher — filled in the house accent, bold. */}
+              <button
+                onClick={() => setMenu((m) => !m)}
+                data-testid="house-switcher-mobile"
+                className="flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-sans text-[13px] font-semibold text-white shadow-sm ring-1 ring-black/10 transition hover:brightness-110"
+                style={{ background: hereAccent }}
+                aria-haspopup="listbox"
+                aria-expanded={menu}
+              >
+                {hereShort}
+                <span className="opacity-80">▾</span>
               </button>
               {menu ? (
                 <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-line bg-card shadow-xl shadow-black/15">
@@ -157,9 +184,9 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
                   {switcher.operating.map((ent) => (
                     <button
                       key={ent.id}
-                      disabled={!ent.entityKey}
-                      onClick={() => { if (ent.entityKey) { pick(ent.entityKey); } }}
-                      className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition " + (ent.entityKey ? "hover:bg-paper " : "cursor-not-allowed opacity-50 ") + (ent.entityKey === entity ? "text-ink" : "text-ink-soft")}
+                      disabled={!ent.entityKey && !ent.slug}
+                      onClick={() => pickHouse(ent)}
+                      className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition " + (ent.entityKey || ent.slug ? "hover:bg-paper " : "cursor-not-allowed opacity-50 ") + (ent.entityKey && ent.entityKey === hereEntity ? "text-ink font-semibold" : "text-ink-soft")}
                     >
                       <span className="h-2 w-2 rounded-full" style={{ background: ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#7A7A75" }} />
                       {ent.name}
@@ -172,7 +199,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
                     <button
                       key={ent.id}
                       disabled={!ent.entityKey}
-                      onClick={() => { if (ent.entityKey) { pick(ent.entityKey); } }}
+                      onClick={() => { if (ent.entityKey) { pick(ent.entityKey); } router.push("/studio"); }}
                       className={"flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-[13px] transition " + (ent.entityKey ? "hover:bg-paper " : "cursor-not-allowed opacity-50 ") + (ent.entityKey === entity ? "text-ink" : "text-ink-soft")}
                     >
                       <span className="h-2 w-2 rounded-full" style={{ background: ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#7A7A75" }} />
@@ -202,9 +229,9 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
             </div>
           ) : null}
           {loaded && scoped && hasMultipleEntities ? (
-            <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-[12px] text-[#EFEEEB]" style={{ background: ENTITY_ACCENT[entity] }}>
+            <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-[12px] text-[#EFEEEB]" style={{ background: hereAccent }}>
               <span className="h-2 w-2 rounded-full bg-white/70" />
-              {ENTITY_SHORT[entity]}
+              {hereShort}
             </span>
           ) : null}
 

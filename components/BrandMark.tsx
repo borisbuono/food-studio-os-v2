@@ -14,10 +14,14 @@ import { EntityKey, ENTITY_WORDMARK, publicNameForEntity, E_BM, E_TALLER, E_HOLD
 // → black logo.
 export default function BrandMark({
   entity,
+  name,
   variant = "icon-text",
   tone = "light",
 }: {
-  entity: EntityKey;
+  // null = a house with no pinned artwork (new tenant) — renders `name` as a
+  // plain wordmark instead of nothing (task #61, 2026-09-21).
+  entity: EntityKey | null;
+  name?: string | null;
   variant?: "icon-text" | "icon-only" | "mark" | "full";
   tone?: "dark" | "light";
 }) {
@@ -46,7 +50,16 @@ export default function BrandMark({
     entity === E_TALLER       ? `/brand/taller-${color}.png` :
     entity === E_BM ? `/brand/bm-mark-${color}.png` :
     null;
-  if (!iconSrc) return null;
+  if (!iconSrc || !entity) {
+    // No artwork for this house (Utopia, any new tenant): wordmark only, in
+    // the neutral serif voice. Never an empty logo slot.
+    const text = name || (entity ? publicNameForEntity(entity) : "") || "Food Studios";
+    return (
+      <span className={"font-serif text-[17px] tracking-tight " + (tone === "dark" ? "text-white" : "text-ink")}>
+        {text}
+      </span>
+    );
+  }
 
   const iconAlt =
     entity === E_HOLDINGS     ? "Ibiza Food Studio" :

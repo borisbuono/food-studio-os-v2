@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { usePathname, useRouter } from "next/navigation";
+import { isPrimaryEntity, EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { setEntity as setEntityCtx, onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
 import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routing/pillar-map";
 import { getMyProfile, MyProfile } from "@/lib/profile";
@@ -17,7 +17,8 @@ import {
 import {
   houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY,
 } from "@/lib/houses";
-import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
+import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
+import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
 
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px).
 //
@@ -37,6 +38,7 @@ import { useSwitcherEntities } from "@/lib/useSwitcherEntities";
 
 export default function DesktopSidebar({ initialEntity, initialProfile }: { initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const pathname = usePathname() || "";
+  const router = useRouter();
   const activePillar = pillarForRoute(pathname);
 
   const [entity, setEntity] = useState<EntityKey>(() => {
@@ -72,6 +74,23 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     return resolveScope(pathname, houseSlugForEntity(entity));
   }, [pathname, entity]);
 
+  const brand = useMemo(() => brandForScope(scope, entity), [scope, entity]);
+  const hereEntity = scopeEntityFor(scope, entity);
+  const hereAccent = (hereEntity ? ENTITY_ACCENT[hereEntity] : null) || "#3F4C28";
+
+  // Picking a house in the switcher. On /h/<slug>/** the URL IS the scope,
+  // so swapping only the cookie changed nothing on screen — navigate to the
+  // same room in the other house. On legacy cookie-bound paths, swap the
+  // cookie and refresh so server components re-resolve.
+  const pickHouse = (ent: SwitcherEntry) => {
+    setEntMenu(false);
+    if (ent.entityKey) { setEntityCtx(ent.entityKey); setEntity(ent.entityKey); }
+    const target = ent.slug ? hrefForHouseSwitch(pathname, ent.slug) : null;
+    if (target) router.push(target);
+    else if (ent.slug && !ent.entityKey) router.push(`/h/${ent.slug}`);
+    else router.refresh();
+  };
+
   // Sidebar tree still keyed by entityType — a house shows the full
   // operating tree, a room shows just that room's section, studio shows
   // STUDIO. entityTypeForUrl handles the URL-first cases; the fallback is
@@ -98,7 +117,16 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
 
   useEffect(() => {
     const read = () => {
-      const e = (localStorage.getItem("fs_entity") as EntityKey | null) || (readEntityCookie() as EntityKey | null) || E_HOLDINGS;
+      // Cookie wins (task #27): the server forces it on sign-in, and a
+      // stale localStorage value from another user/device must not win
+      // and get written back over it.
+      // A self-serve tenant's entity is a UUID that isn't one of the pinned
+      // four, so accept any UUID-shaped value rather than only pinned ones.
+      const ok = (v: string | null) => !!v && (isPrimaryEntity(v) || /^[0-9a-f-]{36}$/i.test(v));
+      const ck = readEntityCookie();
+      const ls = localStorage.getItem("fs_entity");
+      const e = (ok(ck) ? ck : ok(ls) ? ls : E_HOLDINGS) as EntityKey;
+      try { if (ls !== e) localStorage.setItem("fs_entity", e); } catch {}
       setEntity(e); writeCookie(e);
     };
     read();
@@ -157,32 +185,33 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
             so navigating to /studio while the cookie still said BM left
             the Bistro Mondo mark visible at the top of a Studio-scoped
             page. Scope wins: Studio → Food Studios; house/room → house. */}
-        <Link href="/" className="flex items-center" aria-label="Home">
-          <BrandMark
-            entity={
-              scope?.level === "studio"
-                ? E_HOLDINGS
-                : scope && (scope.level === "house" || scope.level === "room")
-                  ? HOUSE_SLUG_TO_ENTITY[scope.houseSlug]
-                  : entity
-            }
-            tone="light"
-          />
+        {/* Logo AND its link bind to the current SCOPE (task #61) — never to
+            the fs_entity cookie. Studio -> Food Studios -> /studio; house/room
+            -> that house -> /h/<slug>; unknown house -> its name as wordmark. */}
+        <Link href={brand.href} className="flex items-center" aria-label="Home" data-testid="sidebar-brand-mark">
+          <BrandMark entity={brand.entity} name={brand.name} tone="light" />
         </Link>
 
         {hereLabel ? (
           showHouseSwitcher ? (
             <div className="relative">
+              {/* Task #27: the switcher is LOUD — filled in the house's accent,
+                  labelled, so nobody mistakes which house they're writing
+                  into. It used to be a hairline chip that read like a label. */}
               <button
                 onClick={() => setEntMenu((m) => !m)}
-                className="flex w-full items-center gap-2 rounded-md border border-black/10 px-2.5 py-1.5 font-sans text-[12px] text-ink hover:border-ink/40"
+                data-testid="house-switcher"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left shadow-sm ring-1 ring-black/10 transition hover:brightness-110"
+                style={{ background: hereAccent, color: "#FFFFFF" }}
                 aria-haspopup="listbox"
                 aria-expanded={entMenu}
                 title="Switch house"
               >
-                <span className="h-2 w-2 rounded-full" style={{ background: ENTITY_ACCENT[entity] }} />
-                <span className="flex-1 text-left truncate">{hereLabel}</span>
-                <span className="text-clay">▾</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-mono text-[9px] uppercase tracking-[0.14em] opacity-80">You are in</span>
+                  <span className="block truncate font-sans text-[14px] font-semibold leading-tight">{hereLabel}</span>
+                </span>
+                <span className="rounded-md bg-white/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide">Switch ▾</span>
               </button>
               {entMenu ? (
                 <div className="absolute left-0 right-0 mt-1 z-10 overflow-hidden rounded-md border border-line bg-card shadow-xl" role="listbox">
@@ -195,14 +224,9 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
                       key={ent.id}
                       label={ent.name}
                       accent={ent.entityKey ? ENTITY_ACCENT[ent.entityKey] : "#3F4C28"}
-                      selected={ent.entityKey === entity}
-                      disabled={!ent.entityKey}
-                      onClick={() => {
-                        if (!ent.entityKey) return;
-                        setEntityCtx(ent.entityKey);
-                        setEntity(ent.entityKey);
-                        setEntMenu(false);
-                      }}
+                      selected={ent.entityKey ? ent.entityKey === hereEntity : (!!scope && "houseSlug" in scope && scope.houseSlug === ent.slug)}
+                      disabled={!ent.entityKey && !ent.slug}
+                      onClick={() => pickHouse(ent)}
                     />
                   ))}
                   <SwitcherGroupHeader label="Studio" />
@@ -222,7 +246,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
               title={hereLabel}
             >
               <span className="h-2 w-2 rounded-full" style={{
-                background: scope && scope.level !== "studio" ? ENTITY_ACCENT[entity] : "#3F4C28",
+                background: hereAccent,
               }} />
               <span className="flex-1 text-left truncate">{hereLabel}</span>
             </span>
@@ -266,7 +290,12 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
               {opened ? (
                 <ul className="mt-1 space-y-0.5">
                   {section.items.map((it) => {
-                    const active = pathname === it.href || pathname.startsWith(it.href + "/");
+                    // Longest-prefix wins inside a section, so "Overview"
+                    // (/studio) isn't lit on every /studio/* page next to
+                    // the item the user actually opened (e.g. Houses).
+                    const matches = (h: string) => pathname === h || pathname.startsWith(h + "/");
+                    const best = section.items.filter((x) => matches(x.href)).sort((x, y) => y.href.length - x.href.length)[0];
+                    const active = !!best && best.href === it.href;
                     return (
                       <li key={it.href}>
                         <Link
@@ -305,6 +334,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
             </svg>
             Files
           </Link>
+          {scope?.level !== "studio" ? (
           <Link
             href="/command"
             className={
@@ -317,6 +347,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
             </svg>
             Command center
           </Link>
+          ) : null}
         </div>
       </nav>
 

@@ -9,7 +9,9 @@ import RoomSwitcher from "@/components/RoomSwitcher";
 import AuthStatus from "@/components/AuthStatus";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
-import { EntityKey, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { EntityKey, E_HOLDINGS } from "@/lib/entities";
+import { fetchMyAccess } from "@/lib/access/myAccess";
+import { brandForPath } from "@/lib/brandScope";
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
 // Boris asked (2026-08-19): "logging in on top of Bistro Mondo... it needs
@@ -58,22 +60,17 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch("/api/my-memberships", { cache: "no-store", credentials: "include" });
-        if (!r.ok) throw new Error("bad status");
-        const j = await r.json();
-        if (cancelled) return;
-        setShell({
-          loaded: true,
-          isOwner: !!j.isOwner,
-          isMulti: !!j.isMulti,
-          hasMemberships: Array.isArray(j.memberships) && j.memberships.length > 0,
-        });
-      } catch {
-        if (!cancelled) setShell((s) => ({ ...s, loaded: true }));
-      }
-    })();
+    // Shared with the switcher + command palette — one request per load.
+    fetchMyAccess().then((j) => {
+      if (cancelled) return;
+      if (!j) { setShell((s) => ({ ...s, loaded: true })); return; }
+      setShell({
+        loaded: true,
+        isOwner: j.isOwner,
+        isMulti: j.isMulti,
+        hasMemberships: j.memberships.length > 0,
+      });
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -87,7 +84,7 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
   if (slim) {
     return (
       <>
-        <SlimTopBar initialProfile={initialProfile ?? null} />
+        <SlimTopBar initialProfile={initialProfile ?? null} initialEntity={initialEntity ?? null} path={path} />
         <div>{children}</div>
       </>
     );
@@ -123,7 +120,7 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
 // Just the brand mark on the left, the user's name/avatar on the right. No
 // pillar row, no sidebar, no room switcher — this user has ONE room and
 // they're already in it.
-function SlimTopBar({ initialProfile }: { initialProfile?: ServerProfile | null }) {
+function SlimTopBar({ initialProfile, initialEntity, path }: { initialProfile?: ServerProfile | null; initialEntity: EntityKey | null; path: string }) {
   // Seed with the server-resolved profile (2026-09-10) so the first paint
   // shows the operator's name / initials, not the "Guest" fallback that
   // used to flash on every SSR paint and hydrate to Boris.
@@ -144,9 +141,16 @@ function SlimTopBar({ initialProfile }: { initialProfile?: ServerProfile | null 
       style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
-        <Link href="/" aria-label="Home" className="flex items-center">
-          <BrandMark entity={E_HOLDINGS} tone="light" />
-        </Link>
+        {/* Task #61: slim users live in ONE house — the logo is that house
+            (scope -> cookie -> profile), not a hardcoded Food Studios mark. */}
+        {(() => {
+          const b = brandForPath(path, initialEntity ?? (initialProfile?.entity ?? null) ?? E_HOLDINGS);
+          return (
+            <Link href={b.href} aria-label="Home" className="flex items-center" data-testid="slim-brand-mark">
+              <BrandMark entity={b.entity} name={b.name} tone="light" />
+            </Link>
+          );
+        })()}
         <div className="flex items-center gap-2">
           <span
             className="flex h-7 w-7 items-center justify-center rounded-full font-mono text-[10px] text-[#EFEEEB]"

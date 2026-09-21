@@ -21,6 +21,13 @@ import { supabaseServer } from "./supabaseServer";
 // an entities.id UUID. Old cookie values ("holdings", "bistro_mondo",
 // "taller") fail isPrimaryEntity() and fall through to the default —
 // users get a one-time re-pick on next visit. Auth stays.
+// Cookie only — null when missing/invalid, so callers can fall back to the
+// signed-in profile before the neutral default (app/layout.tsx does).
+export function serverEntityCookie(): EntityKey | null {
+  const c = cookies().get("fs_entity")?.value;
+  return isPrimaryEntity(c) ? c : null;
+}
+
 export function serverEntity(): EntityKey {
   const c = cookies().get("fs_entity")?.value;
   if (isPrimaryEntity(c)) return c;

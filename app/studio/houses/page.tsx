@@ -2,54 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
-import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
-import { GuestChip } from "../GuestChip";
-import { HourlySpark } from "../HourlySpark";
+import { isOperating } from "@/lib/access/tenantScope";
+import { getHouseSnapshots } from "@/lib/studio/houseSnapshots.server";
+import { todayInTz } from "@/lib/studio/closeStatus";
+import { HousePosBlock } from "../HousePosBlock";
 
 export const dynamic = "force-dynamic";
 
-// /studio/houses — Studio-scoped portfolio list.
+// /studio/houses — Studio-scoped portfolio list (task #60).
 //
-// Boris re-walk 2026-08-31 17:40 CET: the sidebar "Houses" link used to
-// send Boris into a house (BM), which re-scoped the sidebar to that
-// house's tree and swapped the logo to Bistro Mondo. Wrong — a link INSIDE
-// the Studio sidebar shouldn't leave the Studio scope. This page renders a
-// portfolio list at Studio level (sidebar stays STUDIO, logo stays Food
-// Studios). Only when the user clicks a house tile do they leave Studio
-// scope and land at /h/<slug>.
+// The Studio sidebar's "Houses" link lands HERE and stays in Studio scope:
+// sidebar stays STUDIO, logo stays Food Studios. Only clicking a house tile
+// crosses the boundary into /h/<slug> (that house's own chrome).
 //
-// Kept intentionally minimal: same tile grammar as /studio (name, badge,
-// last close + stale), but ONLY operating venues (Houses). Advisory /
-// partners / landlords have their own portfolio pages.
-
-const OPERATING_DEFAULT_ROOM = "/office";
-const ENTITY_TO_RID: Record<string, string> = {
-  "Bistro Mondo":    "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
-  "Taller Sa Penya": "ca83e06f-a24d-43d7-bce4-57ac341d190f",
-};
-
-function madridToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-}
-function eur(n: number): string {
-  return "€" + Math.round(n).toLocaleString("en-GB");
-}
-function humanDate(iso: string, today: string): string {
-  if (iso === today) return "today";
-  const yest = new Date(today + "T12:00:00Z");
-  yest.setUTCDate(yest.getUTCDate() - 1);
-  if (iso === yest.toISOString().slice(0, 10)) return "yesterday";
-  const d = new Date(iso + "T12:00:00Z");
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
-}
-function isStale(iso: string, today: string): boolean {
-  const now = new Date(today + "T12:00:00Z").getTime();
-  const rowT = new Date(iso + "T12:00:00Z").getTime();
-  return (now - rowT) / 36e5 > 48;
-}
+// 2026-09-21 polish: houses come from the tenant-filtered entity list
+// (ctx.entities — members see their own houses, owners see the houses they
+// own), hrefs use entities.slug (no name→UUID maps, so Utopia and any new
+// tenant resolve), and the tile's POS block is the shared HousePosBlock:
+// "Last close DD MMM" + STALE when > 48h (task #58).
 
 export default async function StudioHousesPage() {
   const sb = supabaseServer();
@@ -62,54 +32,10 @@ export default async function StudioHousesPage() {
     if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
   }
 
-  const { data: allEnts } = await sb
-    .from("entities")
-    .select("id, name, entity_type, is_active, status")
-    .eq("is_active", true)
-    .eq("entity_type", "operating_venue")
-    .order("name");
-  const ents = (allEnts || []).filter((e: any) => (e.status ?? "active") === "active");
-
-  const memberEntityIds = new Set(ctx.memberships.map((m) => m.entity_id));
-  const houses = ents.filter((e: any) => ctx.isOwner || memberEntityIds.has(e.id));
-
-  const today = madridToday();
-  const rids = houses.map((e: any) => ENTITY_TO_RID[e.name]).filter(Boolean);
-
-  type PosSnap = {
-    date: string; gross: number;
-    tickets: number | null; guests: number | null;
-    guests_daily: number | null;
-    guests_source: string | null; z_spans_days: boolean;
-    peak_hour: string | null; peak_hour_revenue: number | null;
-    hourly_revenue: Record<string, number> | null;
-  };
-  let posByRid = new Map<string, PosSnap>();
-  if (rids.length) {
-    const { data: posRows } = await sb
-      .from("eod_pos")
-      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_daily,guests_source,z_spans_days,peak_hour,peak_hour_revenue,hourly_revenue")
-      .in("restaurant_id", rids)
-      .order("date", { ascending: false })
-      .limit(60);
-    for (const r of posRows || []) {
-      const rid = r.restaurant_id as string;
-      if (!posByRid.has(rid)) {
-        posByRid.set(rid, {
-          date: String(r.date),
-          gross: Number(r.total_gross_eur || 0),
-          tickets: r.tickets == null ? null : Number(r.tickets),
-          guests: r.guests == null ? null : Number(r.guests),
-          guests_daily: (r as any).guests_daily == null ? null : Number((r as any).guests_daily),
-          guests_source: (r.guests_source as string | null) || null,
-          z_spans_days: !!r.z_spans_days,
-          peak_hour: ((r as any).peak_hour as string | null) || null,
-          peak_hour_revenue: (r as any).peak_hour_revenue == null ? null : Number((r as any).peak_hour_revenue),
-          hourly_revenue: ((r as any).hourly_revenue as Record<string, number> | null) || null,
-        });
-      }
-    }
-  }
+  const houses = ctx.entities
+    .filter((e) => isOperating(e.entity_type) && e.status === "active")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const snaps = await getHouseSnapshots(houses.map((h) => h.id));
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -127,13 +53,9 @@ export default async function StudioHousesPage() {
         </section>
       ) : (
         <ul className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {houses.map((e: any) => {
-            const rid = ENTITY_TO_RID[e.name];
-            const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;
-            const slug = houseSlugForEntity(ent);
-            const href = slug ? `/h/${slug}` : OPERATING_DEFAULT_ROOM;
-            const pos = rid ? posByRid.get(rid) : null;
-            const stale = pos ? isStale(pos.date, today) : false;
+          {houses.map((e) => {
+            const snap = snaps.get(e.id);
+            const href = e.slug ? `/h/${e.slug}` : "/studio/houses";
             return (
               <li key={e.id}>
                 <Link
@@ -141,63 +63,11 @@ export default async function StudioHousesPage() {
                   className="block rounded-lg border border-black/10 bg-paper/50 p-5 transition hover:border-ink/40 hover:bg-paper"
                 >
                   <p className="font-serif text-[20px] text-ink leading-tight">{e.name}</p>
-                  {pos ? (
-                    <>
-                      <p className="mt-3 font-sans text-[13px] text-ink-soft">
-                        {eur(pos.gross)}
-                        {pos.tickets != null ? <span> · {pos.tickets} tickets</span> : null}
-                        {(() => {
-                          const g = pos.guests_daily ?? pos.guests ?? null;
-                          return g != null ? <span> · {g} guests</span> : null;
-                        })()}
-                      </p>
-                      {pos.guests_daily == null ? (
-                        <div className="mt-2">
-                          {rid ? (
-                            <GuestChip
-                              restaurant_id={rid}
-                              date={pos.date}
-                              initialGuests={pos.guests ?? null}
-                              initialSource={pos.guests_source ?? null}
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
-                        <span>{pos.date === today ? "Today" : `Last close ${humanDate(pos.date, today)}`}</span>
-                        {pos.peak_hour ? (
-                          <span title="Peak revenue hour (Madrid)">
-                            · peak {pos.peak_hour}:00
-                            {pos.peak_hour_revenue ? ` (${eur(pos.peak_hour_revenue)})` : null}
-                          </span>
-                        ) : null}
-                        {pos.z_spans_days ? (
-                          <span
-                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
-                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
-                            title="Z-report spans multiple days; cash figures on this row are aggregated"
-                          >
-                            Span
-                          </span>
-                        ) : null}
-                        {stale ? (
-                          <span
-                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
-                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
-                          >
-                            Stale
-                          </span>
-                        ) : null}
-                      </p>
-                      {pos.hourly_revenue ? (
-                        <div className="mt-2 hidden sm:block" aria-hidden="true" title="Hourly revenue — 07..22, peak hour in ink">
-                          <HourlySpark hourly={pos.hourly_revenue} peakHour={pos.peak_hour} />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="mt-3 font-sans text-[13px] text-ink-soft">No closes yet</p>
-                  )}
+                  <HousePosBlock
+                    pos={snap?.pos ?? null}
+                    restaurantId={snap?.restaurant_id ?? null}
+                    today={todayInTz(e.timezone || "Europe/Madrid")}
+                  />
                 </Link>
               </li>
             );

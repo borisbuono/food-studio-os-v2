@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { authCookieOptions } from "@/lib/authCookies";
-import { E_HOLDINGS, isPrimaryEntity } from "@/lib/entities";
+import { E_HOLDINGS, isPrimaryEntity, RESTAURANT_TO_ENTITY } from "@/lib/entities";
 
 // Server-side OAuth / magic-link callback — standard Supabase Next.js
 // pattern (https://supabase.com/docs/guides/auth/server-side/nextjs).
@@ -127,6 +127,32 @@ export async function GET(request: NextRequest) {
             sameSite: "lax",
           });
           return studio;
+        }
+        // Task #27 (2026-09-21) — a SINGLE-house user's cookie is forced too.
+        // Until now only owners/multi-membership users had fs_entity
+        // rewritten on sign-in, so a shared device kept whatever house it
+        // last held: Taller's cook signing in on the pass iPad landed in
+        // Bistro Mondo's chrome. Their default membership wins; the profile's
+        // restaurant is the fallback. (The client no longer lets a stale
+        // localStorage value override this cookie — lib/ctx.)
+        const single = (raw.find((m: any) => m.is_default) || raw[0])?.entity_id as string | undefined;
+        let value: string | null = single && isPrimaryEntity(single) ? single : null;
+        if (!value && single) value = single;   // non-pinned tenant: its own UUID
+        if (!value) {
+          const { data: prof } = await supabase
+            .from("profiles").select("restaurant_id").eq("id", uid).maybeSingle();
+          const k = prof?.restaurant_id ? RESTAURANT_TO_ENTITY[prof.restaurant_id] : null;
+          value = k && isPrimaryEntity(k) ? k : null;
+        }
+        if (value) {
+          response.cookies.set({
+            ...cookieAttrs,
+            name: "fs_entity",
+            value,
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: "lax",
+          });
         }
       }
     }

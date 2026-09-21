@@ -2,8 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT } from "@/lib/entities";
-import { setEntity as setEntityCtx } from "@/lib/ctx";
+import { isPrimaryEntity } from "@/lib/entities";
+import { setEntity as setEntityCtx, readEntityCookie } from "@/lib/ctx";
+import { scopeForUrl } from "@/lib/scope";
+import { fetchMyAccess, type MyAccess } from "@/lib/access/myAccess";
+import {
+  paletteAccessFor, canSeeRoute, isOperating, NO_ACCESS,
+  type RouteGate, type PaletteAccess,
+} from "@/lib/access/tenantScope";
 import { PILLAR_LABEL, PILLAR_ACCENT, Pillar } from "@/lib/routing/pillar-map";
 import type { ServerProfile } from "@/lib/serverProfile";
 
@@ -18,9 +24,12 @@ import type { ServerProfile } from "@/lib/serverProfile";
 //      present. `initialProfile` is threaded from app/layout.tsx via
 //      serverProfile() so this decision holds on FIRST PAINT (per the SSR
 //      guest flicker precedent — #418/#423).
-// Membership-scoped filtering of the ROUTES list (per-tenant surfaces,
-// FOH_enabled flag) is logged as a follow-up — see
-// 06_PA/_INBOX/TO_BORIS_command_palette_leak_fix_2026-09-21.md.
+// 3. Membership gate (2026-09-21, Studio + House chrome polish) — even for a
+//    signed-in user, every route carries a RouteGate (room + optional entity
+//    feature). The palette shows only routes the user's memberships open for
+//    the house in scope AND the house has switched on (entities.foh_enabled /
+//    entities.bookings_enabled). Access loads from /api/my-memberships; until
+//    it resolves only universal routes show (fail closed).
 const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard"];
 function isPublic(path: string): boolean {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
@@ -37,61 +46,67 @@ function isPublic(path: string): boolean {
 const RECENT_KEY = "fs_cmdk_recent_v1";
 const RECENT_LIMIT = 8;
 
-type Route = { label: string; href: string; hint: string; pillar?: Pillar };
+type Route = { label: string; href: string; hint: string; pillar?: Pillar; gate?: RouteGate };
 
 const ROUTES: Route[] = [
   // FOH
-  { label: "FOH · dashboard",         href: "/foh",                    hint: "front of house today", pillar: "foh" },
-  { label: "FOH · bookings",          href: "/foh/bookings",           hint: "reservations covers", pillar: "foh" },
-  { label: "FOH · the pass",          href: "/foh/pass",               hint: "service pass", pillar: "foh" },
-  { label: "FOH · menu (consumer)",   href: "/foh/menu",               hint: "guest menu list", pillar: "foh" },
-  { label: "FOH · guests",            href: "/foh/guests",             hint: "guest arc profile", pillar: "foh" },
-  { label: "FOH · reviews",           href: "/foh/reviews",            hint: "reputation reviews", pillar: "foh" },
-  { label: "FOH · academy",           href: "/foh/academy",            hint: "service training", pillar: "foh" },
-  { label: "Guest surface",           href: "/m",                      hint: "public menu m/", pillar: "foh" },
-  { label: "Relationships",           href: "/grow/relationships",     hint: "CRM leads", pillar: "foh" },
-  { label: "Reputation",              href: "/grow/reputation",        hint: "ratings stars", pillar: "foh" },
-  { label: "Guest inbox",             href: "/grow/inbox",             hint: "inbound messages", pillar: "foh" },
+  { label: "FOH · dashboard",         href: "/foh",                    hint: "front of house today", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "FOH · bookings",          href: "/foh/bookings",           hint: "reservations covers", pillar: "foh", gate: { room: "dining", feature: "bookings" } },
+  { label: "FOH · the pass",          href: "/foh/pass",               hint: "service pass", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "FOH · menu (consumer)",   href: "/foh/menu",               hint: "guest menu list", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "FOH · guests",            href: "/foh/guests",             hint: "guest arc profile", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "FOH · reviews",           href: "/foh/reviews",            hint: "reputation reviews", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "FOH · academy",           href: "/foh/academy",            hint: "service training", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "Guest surface",           href: "/m",                      hint: "public menu m/", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "Relationships",           href: "/grow/relationships",     hint: "CRM leads", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "Reputation",              href: "/grow/reputation",        hint: "ratings stars", pillar: "foh", gate: { room: "dining", feature: "foh" } },
+  { label: "Guest inbox",             href: "/grow/inbox",             hint: "inbound messages", pillar: "foh", gate: { room: "dining", feature: "foh" } },
 
   // BOH
-  { label: "BOH · dashboard",         href: "/boh",                    hint: "kitchen today", pillar: "boh" },
-  { label: "BOH · cook mode",         href: "/boh/cook",               hint: "cook mode step-by-step", pillar: "boh" },
-  { label: "BOH · MEP",               href: "/boh/mep",                hint: "mise en place prep", pillar: "boh" },
-  { label: "BOH · menu",              href: "/boh/menu",               hint: "kitchen menu list", pillar: "boh" },
-  { label: "BOH · recipes",           href: "/boh/recipes",            hint: "recipe cards", pillar: "boh" },
-  { label: "BOH · receiving",         href: "/boh/receiving",          hint: "delivery-note intake", pillar: "boh" },
-  { label: "BOH · wine",              href: "/boh/wine",               hint: "wine list bottle bar", pillar: "boh" },
-  { label: "BOH · bar",               href: "/boh/bar",                hint: "cocktail bar", pillar: "boh" },
-  { label: "BOH · academy",           href: "/boh/academy",            hint: "kitchen training", pillar: "boh" },
-  { label: "Develop menu",            href: "/develop/menu",           hint: "recipes list r&d", pillar: "boh" },
-  { label: "Menu engineering",        href: "/develop/menu-engineering", hint: "star dog puzzle", pillar: "boh" },
-  { label: "Repricing",               href: "/develop/repricing",      hint: "menu prices update", pillar: "boh" },
-  { label: "Lexicon",                 href: "/develop/lexicon",        hint: "menu language taxonomy", pillar: "boh" },
-  { label: "Inventory",               href: "/execute/inventory",      hint: "stock count", pillar: "boh" },
-  { label: "Place an order",          href: "/execute/orders",         hint: "supplier order", pillar: "boh" },
-  { label: "Temps · HACCP",           href: "/execute/temp",           hint: "temperature log", pillar: "boh" },
-  { label: "Handover",                href: "/execute/handover",       hint: "shift handover", pillar: "boh" },
+  { label: "BOH · dashboard",         href: "/boh",                    hint: "kitchen today", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · cook mode",         href: "/boh/cook",               hint: "cook mode step-by-step", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · MEP",               href: "/boh/mep",                hint: "mise en place prep", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · menu",              href: "/boh/menu",               hint: "kitchen menu list", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · recipes",           href: "/boh/recipes",            hint: "recipe cards", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · receiving",         href: "/boh/receiving",          hint: "delivery-note intake", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · wine",              href: "/boh/wine",               hint: "wine list bottle bar", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · bar",               href: "/boh/bar",                hint: "cocktail bar", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "BOH · academy",           href: "/boh/academy",            hint: "kitchen training", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Develop menu",            href: "/develop/menu",           hint: "recipes list r&d", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Menu engineering",        href: "/develop/menu-engineering", hint: "star dog puzzle", pillar: "boh", gate: { room: "office" } },
+  { label: "Repricing",               href: "/develop/repricing",      hint: "menu prices update", pillar: "boh", gate: { room: "office" } },
+  { label: "Lexicon",                 href: "/develop/lexicon",        hint: "menu language taxonomy", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Inventory",               href: "/execute/inventory",      hint: "stock count", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Place an order",          href: "/execute/orders",         hint: "supplier order", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Temps · HACCP",           href: "/execute/temp",           hint: "temperature log", pillar: "boh", gate: { room: "kitchen" } },
+  { label: "Handover",                href: "/execute/handover",       hint: "shift handover", pillar: "boh", gate: { room: "kitchen" } },
 
   // Office
-  { label: "Office · dashboard",      href: "/office",                 hint: "operator ledger", pillar: "office" },
-  { label: "Finance",                 href: "/administrate/finance",   hint: "money", pillar: "office" },
-  { label: "Reconciliation",          href: "/administrate/finance/reconciliation", hint: "bank match unmatched", pillar: "office" },
-  { label: "Anomalies",               href: "/administrate/finance/anomalies", hint: "finance triage", pillar: "office" },
-  { label: "Scan queue",              href: "/administrate/finance/scans", hint: "Holded scan inbox", pillar: "office" },
-  { label: "EOD reports",             href: "/administrate/finance/eod", hint: "end of day close cash", pillar: "office" },
-  { label: "Missing invoices",        href: "/administrate/invoices",  hint: "supplier docs", pillar: "office" },
-  { label: "Suppliers",               href: "/administrate/suppliers", hint: "vendors", pillar: "office" },
-  { label: "Team",                    href: "/administrate/team",      hint: "people roster", pillar: "office" },
-  { label: "Schedule",                href: "/administrate/team/schedule", hint: "shifts rota", pillar: "office" },
-  { label: "Events",                  href: "/administrate/events",    hint: "private dining", pillar: "office" },
-  { label: "Decisions",               href: "/administrate/decisions", hint: "log rationale", pillar: "office" },
-  { label: "Holdings",                href: "/administrate/holdings",  hint: "group parent", pillar: "office" },
-  { label: "Reach",                   href: "/grow/reach",             hint: "ads channels", pillar: "office" },
-  { label: "Reach calendar",          href: "/grow/reach/calendar",    hint: "content calendar", pillar: "office" },
-  { label: "Commercials",             href: "/grow/commercials",       hint: "deals contracts", pillar: "office" },
-  { label: "Settings",                href: "/administrate/settings",  hint: "system settings" },
+  { label: "Office · dashboard",      href: "/office",                 hint: "operator ledger", pillar: "office", gate: { room: "office" } },
+  { label: "Finance",                 href: "/administrate/finance",   hint: "money", pillar: "office", gate: { room: "office" } },
+  { label: "Reconciliation",          href: "/administrate/finance/reconciliation", hint: "bank match unmatched", pillar: "office", gate: { room: "office" } },
+  { label: "Anomalies",               href: "/administrate/finance/anomalies", hint: "finance triage", pillar: "office", gate: { room: "office" } },
+  { label: "Scan queue",              href: "/administrate/finance/scans", hint: "Holded scan inbox", pillar: "office", gate: { room: "office" } },
+  { label: "EOD reports",             href: "/administrate/finance/eod", hint: "end of day close cash", pillar: "office", gate: { room: "office" } },
+  { label: "Missing invoices",        href: "/administrate/invoices",  hint: "supplier docs", pillar: "office", gate: { room: "office" } },
+  { label: "Suppliers",               href: "/administrate/suppliers", hint: "vendors", pillar: "office", gate: { room: "office" } },
+  { label: "Team",                    href: "/administrate/team",      hint: "people roster", pillar: "office", gate: { room: "office" } },
+  { label: "Schedule",                href: "/administrate/team/schedule", hint: "shifts rota", pillar: "office", gate: { room: "office" } },
+  { label: "Events",                  href: "/administrate/events",    hint: "private dining", pillar: "office", gate: { room: "office" } },
+  { label: "Decisions",               href: "/administrate/decisions", hint: "log rationale", pillar: "office", gate: { room: "office" } },
+  { label: "Holdings",                href: "/administrate/holdings",  hint: "group parent", pillar: "office", gate: { room: "studio" } },
+  { label: "Reach",                   href: "/grow/reach",             hint: "ads channels", pillar: "office", gate: { room: "studio" } },
+  { label: "Reach calendar",          href: "/grow/reach/calendar",    hint: "content calendar", pillar: "office", gate: { room: "studio" } },
+  { label: "Commercials",             href: "/grow/commercials",       hint: "deals contracts", pillar: "office", gate: { room: "studio" } },
+  { label: "Settings",                href: "/administrate/settings",  hint: "system settings", gate: { room: "office" } },
   { label: "Account",                 href: "/account",                hint: "profile me" },
-  { label: "Command center",          href: "/command",                hint: "admin ops" },
+  { label: "Command center",          href: "/command",                hint: "admin ops", gate: { room: "office" } },
+
+  // Studio (portfolio) — owner only
+  { label: "Studio · overview",       href: "/studio",                 hint: "food studios portfolio", gate: { room: "studio" } },
+  { label: "Studio · houses",         href: "/studio/houses",          hint: "venues portfolio list", gate: { room: "studio" } },
+  { label: "Studio · people",         href: "/studio/people",          hint: "team across houses", gate: { room: "studio" } },
+  { label: "Studio · money",          href: "/studio/money",           hint: "portfolio finance", gate: { room: "studio" } },
 
   // Universal
   { label: "Files",                   href: "/files",                  hint: "docs archive" },
@@ -135,14 +150,14 @@ const HELP_LINES: { cmd: string; desc: string }[] = [
 ];
 
 const NEW_ITEMS: Route[] = [
-  { label: "New · booking",       href: "/foh/bookings",                   hint: "reservation" },
-  { label: "New · event",         href: "/administrate/events/new",        hint: "private dining" },
-  { label: "New · commercial",    href: "/grow/commercials/new",           hint: "deal contract" },
-  { label: "New · relationship",  href: "/grow/relationships/new",         hint: "crm lead" },
-  { label: "New · recipe import", href: "/develop/recipes/import",         hint: "paste url" },
-  { label: "New · team invite",   href: "/administrate/team/invite",       hint: "invite whatsapp" },
-  { label: "New · order",         href: "/execute/orders",                 hint: "supplier order" },
-  { label: "New · campaign",      href: "/grow/reach/campaigns/new",       hint: "ad reach campaign" },
+  { label: "New · booking",       href: "/foh/bookings",                   hint: "reservation", gate: { room: "dining", feature: "bookings" } },
+  { label: "New · event",         href: "/administrate/events/new",        hint: "private dining", gate: { room: "office" } },
+  { label: "New · commercial",    href: "/grow/commercials/new",           hint: "deal contract", gate: { room: "studio" } },
+  { label: "New · relationship",  href: "/grow/relationships/new",         hint: "crm lead", gate: { room: "dining", feature: "foh" } },
+  { label: "New · recipe import", href: "/develop/recipes/import",         hint: "paste url", gate: { room: "kitchen" } },
+  { label: "New · team invite",   href: "/administrate/team/invite",       hint: "invite whatsapp", gate: { room: "office" } },
+  { label: "New · order",         href: "/execute/orders",                 hint: "supplier order", gate: { room: "kitchen" } },
+  { label: "New · campaign",      href: "/grow/reach/campaigns/new",       hint: "ad reach campaign", gate: { room: "studio" } },
 ];
 
 function parseMode(input: string): Mode {
@@ -186,6 +201,34 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
 
   const mode = useMemo(() => parseMode(q), [q]);
 
+  // Membership + tenant access (fail closed until loaded).
+  const [myAccess, setMyAccess] = useState<MyAccess | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    fetchMyAccess().then((a) => { if (live) setMyAccess(a); });
+    return () => { live = false; };
+  }, [enabled]);
+
+  // The house in scope: /h/<slug> → that house; /studio → none (portfolio);
+  // a legacy path → the fs_entity cookie. Recomputed when the palette opens
+  // so a cookie swap since the last open is honoured.
+  const access: PaletteAccess = useMemo(() => {
+    if (!myAccess) return NO_ACCESS;
+    const sc = scopeForUrl(path);
+    let ctxId: string | null = null;
+    if (sc && sc.level !== "studio") {
+      ctxId = myAccess.entities.find((e) => e.slug === sc.houseSlug)?.id ?? null;
+    } else if (!sc) {
+      ctxId = readEntityCookie();
+    }
+    return paletteAccessFor(myAccess.entities, myAccess.memberships, ctxId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myAccess, path, open]);
+
+  const allowedRoutes = useMemo(() => ROUTES.filter((r) => canSeeRoute(r.gate || {}, access)), [access]);
+  const allowedNew = useMemo(() => NEW_ITEMS.filter((r) => canSeeRoute(r.gate || {}, access)), [access]);
+
   // Keyboard opener + external dispatch. Voice / FAB integration invokes this.
   // The listener is only attached when `enabled` — an anonymous visitor
   // pressing ⌘K on /welcome hits nothing.
@@ -228,22 +271,31 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
       mode.kind === "search" ? mode.query :
       mode.kind === "goto"   ? mode.query :
       "";
-    if (!query) return ROUTES.slice(0, 15);
-    return ROUTES
+    if (!query) return allowedRoutes.slice(0, 15);
+    return allowedRoutes
       .map((r) => ({ r, s: score(query, r) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 12)
       .map((x) => x.r);
-  }, [mode]);
+  }, [mode, allowedRoutes]);
 
   const rows = useMemo<{ href?: string; label: string; hint?: string; onSelect?: () => void; pillar?: Pillar }[]>(() => {
     if (mode.kind === "entity") {
-      return ENTITY_ORDER.map((k) => ({
-        label: "Entity → " + ENTITY_SHORT[k],
-        hint: k,
-        onSelect: () => { setEntityCtx(k); setOpen(false); },
+      // Only houses this user belongs to (tenant filter), plus the Studio
+      // for owners. Picking one lands on that house's own URL scope.
+      const houses = (myAccess?.entities || [])
+        .filter((e) => isOperating(e.entity_type) && e.status === "active" && e.slug);
+      const out: { href?: string; label: string; hint?: string; onSelect?: () => void }[] = houses.map((e) => ({
+        label: "House → " + e.name,
+        hint: e.slug || "",
+        href: "/h/" + e.slug,
+        onSelect: () => { if (isPrimaryEntity(e.id)) setEntityCtx(e.id); },
       }));
+      if (access.rooms.has("studio")) {
+        out.unshift({ label: "Studio → Food Studios", hint: "portfolio", href: "/studio" });
+      }
+      return out;
     }
     if (mode.kind === "help") {
       return HELP_LINES.map((h) => ({ label: h.cmd + "  —  " + h.desc, onSelect: () => {} }));
@@ -251,21 +303,21 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
     if (mode.kind === "new") {
       const list = mode as any;
       const qq = (list.query || "").toLowerCase();
-      const filtered = NEW_ITEMS.filter((n) => n.label.toLowerCase().includes(qq));
-      return (filtered.length ? filtered : NEW_ITEMS).map((n) => ({ href: n.href, label: n.label, hint: n.hint }));
+      const filtered = allowedNew.filter((n) => n.label.toLowerCase().includes(qq));
+      return (filtered.length ? filtered : allowedNew).map((n) => ({ href: n.href, label: n.label, hint: n.hint }));
     }
     const base = searchResults.map((r) => ({ href: r.href, label: r.label, hint: r.hint, pillar: r.pillar }));
     // If no query, surface recents at top.
     if ((mode.kind === "search" && !mode.query) && recents.length) {
       const recentRows = recents
-        .map((h) => ROUTES.find((r) => r.href === h))
+        .map((h) => allowedRoutes.find((r) => r.href === h))
         .filter(Boolean)
         .slice(0, 5)
         .map((r: any) => ({ href: r.href, label: "Recent · " + r.label, hint: r.hint, pillar: r.pillar as Pillar }));
       return [...recentRows, ...base].slice(0, 18);
     }
     return base;
-  }, [mode, searchResults, recents]);
+  }, [mode, searchResults, recents, myAccess, access, allowedRoutes, allowedNew]);
 
   const clampedCursor = Math.min(cursor, Math.max(0, rows.length - 1));
 

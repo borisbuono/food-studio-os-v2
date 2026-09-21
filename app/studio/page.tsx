@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
-import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY, publicNameForEntity } from "@/lib/entities";
-import { GuestChip } from "./GuestChip";
-import { HourlySpark } from "./HourlySpark";
+import { publicNameForEntity } from "@/lib/entities";
+import { isOperating } from "@/lib/access/tenantScope";
+import { getHouseSnapshots, type PosSnap } from "@/lib/studio/houseSnapshots.server";
+import { todayInTz } from "@/lib/studio/closeStatus";
+import { HousePosBlock } from "./HousePosBlock";
 
 export const dynamic = "force-dynamic";
 
@@ -24,21 +25,9 @@ export const dynamic = "force-dynamic";
 //         └── ROOM   ← revealed when the owner clicks a tile (default: Office)
 //               └── STATION   ← Push 2
 
-const OPERATING_DEFAULT_ROOM = "/office"; // owner enters an operating venue via its Office
 const ADVISORY_DEFAULT_ROOM = "/administrate/advisor";
 const PARTNER_DEFAULT_ROOM = "/administrate/partner";
 const LANDLORD_DEFAULT_ROOM = "/administrate/landlord";
-const HOLDING_DEFAULT_ROOM = "/administrate/holdings";
-
-// Restaurant UUIDs — mirrors app/page.tsx. Small enough to inline (three rows
-// today, once); if the mapping grows we'll pull it into `lib/entities.ts`.
-// P0 fix 2026-09-21 (Utopia unblock): sandbox venue joined the pinned three
-// so the /studio tile links to /h/utopia and its POS snapshot renders.
-const ENTITY_TO_RID: Record<string, string> = {
-  "Bistro Mondo":      "fb4d008f-2d2a-4e0d-a525-6e0e36af0259",
-  "Taller Sa Penya":   "ca83e06f-a24d-43d7-bce4-57ac341d190f",
-  "Utopia":            "a0000000-0000-4000-8000-000000000001",
-};
 
 function madridDateLabel(): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -50,63 +39,23 @@ function madridClock(): string {
     timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(new Date());
 }
-function madridToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-}
-function eur(n: number): string {
-  return "€" + Math.round(n).toLocaleString("en-GB");
-}
 
-// Boris walk 2026-08-31 17:40 CET: the old single-string status ("€170 · 0
-// covers · last close") had no date, so a tile that hadn't updated in 10
-// days read like it was fresh. Tiles now carry a structured status —
-// primary (money+covers), secondary (date), and an optional stale badge
-// when the newest eod_pos row is > 48h old.
+// Task #58 (2026-09-21): operating tiles render the shared HousePosBlock —
+// "Last close DD MMM" always (never "today"/"yesterday"), orange STALE pill
+// when the newest eod_pos row is > 48h old. Houses and their restaurant rows
+// resolve from entities.slug + restaurants.entity_id (houseSnapshots), not
+// the old name->UUID map.
 type Tile = {
   id: string;
   name: string;
   type: string;
   href: string;
-  status: string;               // fallback for non-operating houses
-  // Boris rule 2026-08-31 18:15 CET — tickets and guests are two
-  // separate signals. tickets = item count (Fresto z.quantity), guests
-  // = physical people. Never conflate.
-  gross_eur?: number;
-  tickets?: number | null;
-  guests?: number | null;
-  guests_daily?: number | null;  // preferred over guests when set (bookings/daily.guests)
-  guests_source?: string | null; // 'manual' | 'email' | null
-  restaurant_id?: string;        // needed for the inline guest-key input
-  date?: string;                 // POS row date (for the guest-key POST)
-  z_spans_days?: boolean;        // SPAN pill trigger
-  secondary?: string;            // "Last close 21 Aug"
-  stale?: boolean;               // orange pill
-  peak_hour?: string | null;
-  peak_hour_revenue?: number | null;
-  hourly_revenue?: Record<string, number> | null;
+  status: string;               // non-operating houses: one-line state
+  operating: boolean;
+  pos: PosSnap | null;
+  restaurant_id: string | null;
+  today: string;
 };
-
-// Human date — "21 Aug" or "3 Sep". If the date is today, say "today"; if
-// yesterday, say "yesterday". Boris reads dates faster than ISO strings.
-function humanDate(iso: string, today: string): string {
-  if (iso === today) return "today";
-  const yest = new Date(today + "T12:00:00Z");
-  yest.setUTCDate(yest.getUTCDate() - 1);
-  if (iso === yest.toISOString().slice(0, 10)) return "yesterday";
-  const d = new Date(iso + "T12:00:00Z");
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
-}
-// "Stale" = > 48h old vs the Madrid business day. Boris runs the day-plus-1
-// check on the tile because that's when he starts to worry. A 2026-08-30
-// tile is not stale on 2026-08-31; only 2026-08-29 and older are.
-function isStale(iso: string, today: string): boolean {
-  const now = new Date(today + "T12:00:00Z").getTime();
-  const rowT = new Date(iso + "T12:00:00Z").getTime();
-  const diffH = (now - rowT) / 36e5;
-  return diffH > 48;
-}
 
 const TYPE_BADGE_ACCENT: Record<string, string> = {
   operating_venue: "#3F4C28", // olive
@@ -130,122 +79,49 @@ export default async function StudioPage() {
     if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
   }
 
-  // Owners see every operating venue + every advisory/partner/landlord + the
-  // holding. Non-owner multi-role users see only the entities they belong to.
-  //
-  // We fetch ALL entities and filter — this is a small table (< 20 rows).
-  const { data: allEnts } = await sb
-    .from("entities")
-    .select("id, name, entity_type, is_active, status")
-    .eq("is_active", true)
-    .order("entity_type")
-    .order("name");
-  const ents = (allEnts || []).filter((e: any) => (e.status ?? "active") === "active");
+  // Tenant filter (2026-09-21): the Studio lists ctx.entities — the houses
+  // this user holds a membership on, plus (for owners) their holding's
+  // advisory / partner / landlord children. "Owner -> every row in the
+  // table" leaked Bistro Mondo + Taller to Utopia's owner.
+  const ents = ctx.entities.filter((e) => e.status === "active");
+  const houses = ents.filter((e) => e.entity_type !== "holding_company");
+  const opIds = houses.filter((e) => isOperating(e.entity_type)).map((e) => e.id);
+  const snaps = await getHouseSnapshots(opIds);
 
-  // Membership-scope filter.
-  const memberEntityIds = new Set(ctx.memberships.map((m) => m.entity_id));
-  const houses = ents.filter((e: any) => {
-    if (ctx.isOwner) return e.entity_type !== "holding_company"; // holding lives in its own strip
-    return memberEntityIds.has(e.id);
-  });
-
-  // Live status per operating venue: today's POS gross (or yesterday's if no
-  // POS row exists yet for today — matches the compass semantics).
-  const today = madridToday();
-  const opRids = houses
-    .filter((e: any) => e.entity_type === "operating_venue")
-    .map((e: any) => ENTITY_TO_RID[e.name])
-    .filter(Boolean);
-
-  type PosSnap = {
-    date: string; gross: number;
-    tickets: number | null;
-    guests: number | null;
-    guests_daily: number | null;
-    guests_source: string | null;
-    z_spans_days: boolean;
-    peak_hour: string | null;
-    peak_hour_revenue: number | null;
-    hourly_revenue: Record<string, number> | null;
-  };
-  let posByRid = new Map<string, PosSnap>();
-  if (opRids.length) {
-    const { data: posRows } = await sb
-      .from("eod_pos")
-      .select("restaurant_id,date,total_gross_eur,tickets,guests,guests_daily,guests_source,z_spans_days,peak_hour,peak_hour_revenue,hourly_revenue")
-      .in("restaurant_id", opRids)
-      .order("date", { ascending: false })
-      .limit(60);
-    for (const r of posRows || []) {
-      const rid = r.restaurant_id as string;
-      if (!posByRid.has(rid)) {
-        posByRid.set(rid, {
-          date: String(r.date),
-          gross: Number(r.total_gross_eur || 0),
-          tickets: r.tickets == null ? null : Number(r.tickets),
-          guests: r.guests == null ? null : Number(r.guests),
-          guests_daily: (r as any).guests_daily == null ? null : Number((r as any).guests_daily),
-          guests_source: (r.guests_source as string | null) || null,
-          z_spans_days: !!r.z_spans_days,
-          peak_hour: ((r as any).peak_hour as string | null) || null,
-          peak_hour_revenue: (r as any).peak_hour_revenue == null ? null : Number((r as any).peak_hour_revenue),
-          hourly_revenue: ((r as any).hourly_revenue as Record<string, number> | null) || null,
-        });
-      }
-    }
-  }
-
-  const tiles: Tile[] = houses.map((e: any): Tile => {
-    let href = OPERATING_DEFAULT_ROOM;
-    let status = "—";
-    if (e.entity_type === "operating_venue") {
-      // 2026-08-31: operating tiles use /h/<slug> so the URL grammar
-      // reflects the three-level model. The house page sets fs_entity
-      // and drops the user on /office (the operator's canonical entry).
-      const rid = ENTITY_TO_RID[e.name];
-      const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;
-      const slug = houseSlugForEntity(ent);
-      href = slug ? `/h/${slug}` : OPERATING_DEFAULT_ROOM;
-      const pos = rid ? posByRid.get(rid) : null;
-      if (pos) {
-        const dateWord = humanDate(pos.date, today);
-        const secondary = pos.date === today ? "Today" : `Last close ${dateWord}`;
-        const stale = isStale(pos.date, today);
+  const tiles: Tile[] = houses
+    .slice()
+    .sort((a, b) => a.entity_type.localeCompare(b.entity_type) || a.name.localeCompare(b.name))
+    .map((e): Tile => {
+      const base = {
+        id: e.id, name: e.name, type: e.entity_type,
+        pos: null, restaurant_id: null,
+        today: todayInTz(e.timezone || "Europe/Madrid"),
+      };
+      if (isOperating(e.entity_type)) {
+        // /h/<slug> — the house landing; crossing into the house's chrome.
+        const snap = snaps.get(e.id);
         return {
-          id: e.id, name: e.name, type: e.entity_type, href,
-          status: `${eur(pos.gross)}`, // fallback text
-          gross_eur: pos.gross,
-          tickets: pos.tickets,
-          guests: pos.guests,
-          guests_daily: pos.guests_daily,
-          guests_source: pos.guests_source,
-          restaurant_id: rid,
-          date: pos.date,
-          z_spans_days: pos.z_spans_days,
-          peak_hour: pos.peak_hour,
-          peak_hour_revenue: pos.peak_hour_revenue,
-          hourly_revenue: pos.hourly_revenue,
-          secondary, stale,
+          ...base,
+          type: "operating_venue",
+          operating: true,
+          href: e.slug ? `/h/${e.slug}` : "/studio/houses",
+          status: snap?.pos ? "" : "No closes yet",
+          pos: snap?.pos ?? null,
+          restaurant_id: snap?.restaurant_id ?? null,
         };
-      } else {
-        status = "No closes yet";
       }
-    } else if (e.entity_type === "advisory_client") {
-      href = ADVISORY_DEFAULT_ROOM;
-      status = (e.status || "active").toLowerCase() === "dormant" ? "dormant" : "engagement active";
-    } else if (e.entity_type === "partner") {
-      href = PARTNER_DEFAULT_ROOM;
-      status = "licence active";
-    } else if (e.entity_type === "landlord") {
-      href = LANDLORD_DEFAULT_ROOM;
-      status = "lease live";
-    }
-    return { id: e.id, name: e.name, type: e.entity_type, href, status };
-  });
+      if (e.entity_type === "advisory_client") {
+        return { ...base, operating: false, href: ADVISORY_DEFAULT_ROOM,
+          status: (e.status || "active").toLowerCase() === "dormant" ? "dormant" : "engagement active" };
+      }
+      if (e.entity_type === "partner") return { ...base, operating: false, href: PARTNER_DEFAULT_ROOM, status: "licence active" };
+      if (e.entity_type === "landlord") return { ...base, operating: false, href: LANDLORD_DEFAULT_ROOM, status: "lease live" };
+      return { ...base, operating: false, href: "/studio", status: "—" };
+    });
 
   // The holding row (BBH) — surfaced as its own quiet chip in the top strip
   // (Food Studios is the STUDIO label; BBH is the legal roll-up).
-  const bbh = ents.find((e: any) => e.entity_type === "holding_company");
+  const bbh = ents.find((e) => e.entity_type === "holding_company");
   const studioName = "Food Studios";
   const dateLabel = madridDateLabel();
   const clock = madridClock();
@@ -333,70 +209,8 @@ export default async function StudioPage() {
                       {t.type.replace("_", " ")}
                     </span>
                   </div>
-                  {t.gross_eur != null ? (
-                    <>
-                      {/* Line 1: money · tickets · guests.
-                          - tickets  = Fresto z.quantity (dishes/wines/coffees), NOT people.
-                          - guests   = physical people count. Prefer guests_daily
-                                       (bookings/daily walk-ins included) over the
-                                       manual `guests` field when available. If both
-                                       null, we fall through to the GuestChip below
-                                       for the [key guests] input. */}
-                      <p className="mt-3 font-sans text-[13px] text-ink-soft">
-                        {eur(t.gross_eur)}
-                        {t.tickets != null ? <span> · {t.tickets} tickets</span> : null}
-                        {(() => {
-                          const g = t.guests_daily ?? t.guests ?? null;
-                          return g != null ? <span> · {g} guests</span> : null;
-                        })()}
-                      </p>
-                      {/* GuestChip only rendered when no bookings/daily.guests
-                          landed — otherwise the number lives inline above. */}
-                      {t.guests_daily == null ? (
-                        <div className="mt-2">
-                          {t.restaurant_id && t.date ? (
-                            <GuestChip
-                              restaurant_id={t.restaurant_id}
-                              date={t.date}
-                              initialGuests={t.guests ?? null}
-                              initialSource={t.guests_source ?? null}
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <p className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-clay">
-                        <span>{t.secondary}</span>
-                        {t.peak_hour ? (
-                          <span title="Peak revenue hour (Madrid)">
-                            · peak {t.peak_hour}:00
-                            {t.peak_hour_revenue ? ` (${eur(t.peak_hour_revenue)})` : null}
-                          </span>
-                        ) : null}
-                        {t.z_spans_days ? (
-                          <span
-                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
-                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
-                            title="Z-report spans multiple days; cash figures on this row are aggregated and unreliable"
-                          >
-                            Span
-                          </span>
-                        ) : null}
-                        {t.stale ? (
-                          <span
-                            className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
-                            style={{ borderColor: "#B85C1E66", color: "#B85C1E", background: "#B85C1E14" }}
-                            title="Newest POS row is more than 48h old"
-                          >
-                            Stale
-                          </span>
-                        ) : null}
-                      </p>
-                      {t.hourly_revenue ? (
-                        <div className="mt-2 hidden sm:block" aria-hidden="true" title="Hourly revenue — 07..22, peak hour in ink">
-                          <HourlySpark hourly={t.hourly_revenue} peakHour={t.peak_hour} />
-                        </div>
-                      ) : null}
-                    </>
+                  {t.operating ? (
+                    <HousePosBlock pos={t.pos} restaurantId={t.restaurant_id} today={t.today} />
                   ) : (
                     <p className="mt-3 font-sans text-[13px] text-ink-soft">{t.status}</p>
                   )}

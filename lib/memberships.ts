@@ -15,6 +15,10 @@
 // role AND area when picking the room.
 
 import { supabaseServer } from "@/lib/supabaseServer";
+import {
+  filterAccessibleEntities, defaultFlags,
+  type AccessibleEntity,
+} from "@/lib/access/tenantScope";
 
 export type Room = "kitchen" | "dining" | "office" | "studio";
 
@@ -73,7 +77,40 @@ export type MyMembershipContext = {
   isMulti: boolean;
   // The distinct rooms across all memberships (owner always sees studio+each room they can enter).
   availableRooms: Room[];
+  // Every entity this user may see (tenant filter — lib/access/tenantScope.ts),
+  // with its feature flags. Studio tiles, the switcher and the command
+  // palette all read THIS list instead of "owner → whole table".
+  entities: AccessibleEntity[];
 };
+
+// Load every active entity (small table, < 20 rows) with the feature flags.
+// Falls back to a flag-less select + defaults when the flags migration
+// (20260921_entity_feature_flags.sql) hasn't landed on this env yet.
+async function loadAllEntities(sb: ReturnType<typeof supabaseServer>): Promise<AccessibleEntity[]> {
+  const base = "id, name, slug, entity_type, status, parent_entity_id, timezone, is_active";
+  let rows: any[] = [];
+  const res = await sb.from("entities").select(base + ", foh_enabled, bookings_enabled").eq("is_active", true);
+  if (!res.error && Array.isArray(res.data)) {
+    rows = res.data as any[];
+  } else {
+    const res2 = await sb.from("entities").select(base).eq("is_active", true);
+    rows = (res2.data as any[]) || [];
+  }
+  return rows.map((r: any) => {
+    const d = defaultFlags(String(r.entity_type || ""));
+    return {
+      id: String(r.id),
+      name: String(r.name || ""),
+      slug: r.slug ?? null,
+      entity_type: String(r.entity_type || "unknown"),
+      status: String(r.status ?? "active"),
+      parent_entity_id: r.parent_entity_id ?? null,
+      timezone: r.timezone ?? null,
+      foh_enabled: typeof r.foh_enabled === "boolean" ? r.foh_enabled : d.foh_enabled,
+      bookings_enabled: typeof r.bookings_enabled === "boolean" ? r.bookings_enabled : d.bookings_enabled,
+    };
+  });
+}
 
 // Read the signed-in user's memberships. Owner-first resolution: if any active
 // membership is `owner`, primaryRoom = studio regardless of the others.
@@ -84,7 +121,7 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
   if (!user) {
     return {
       signedIn: false, personId: null, memberships: [],
-      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [],
+      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [], entities: [],
     };
   }
 
@@ -104,7 +141,7 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
   if (!personIds.length) {
     return {
       signedIn: true, personId: null, memberships: [],
-      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [],
+      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [], entities: [],
     };
   }
 
@@ -118,18 +155,15 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
   if (!raw.length) {
     return {
       signedIn: true, personId: personIds[0], memberships: [],
-      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [],
+      primaryRoom: "dining", isOwner: false, isMulti: false, availableRooms: [], entities: [],
     };
   }
 
-  // Hydrate entity names/types in one call.
-  const entityIds = Array.from(new Set(raw.map((r: any) => r.entity_id)));
-  const { data: ents } = await sb
-    .from("entities")
-    .select("id, name, entity_type")
-    .in("id", entityIds);
+  // Hydrate entity names/types + flags in one call (all active entities —
+  // the tenant filter below needs parents/children, not just member rows).
+  const allEntities = await loadAllEntities(sb);
   const eById = new Map<string, { name: string; entity_type: string }>();
-  for (const e of ents || []) eById.set(e.id, { name: e.name, entity_type: e.entity_type });
+  for (const e of allEntities) eById.set(e.id, { name: e.name, entity_type: e.entity_type });
 
   const memberships: ActiveMembership[] = raw.map((r: any) => {
     const e = eById.get(r.entity_id);
@@ -163,6 +197,8 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
   if (isOwner) { roomSet.add("kitchen"); roomSet.add("dining"); roomSet.add("office"); }
   const availableRooms = Array.from(roomSet);
 
+  const entities = filterAccessibleEntities(allEntities, memberships);
+
   return {
     signedIn: true,
     personId: personIds[0],
@@ -171,6 +207,7 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
     isOwner,
     isMulti,
     availableRooms,
+    entities,
   };
 }
 

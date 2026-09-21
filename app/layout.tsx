@@ -10,9 +10,9 @@ import CommandK from "@/components/CommandK";
 import FlowStrip from "@/components/FlowStrip";
 import PwaOfflineBadge from "@/components/PwaOfflineBadge";
 import InstallPrompt from "@/components/InstallPrompt";
-import { serverEntity } from "@/lib/serverVenue";
+import { serverEntityCookie } from "@/lib/serverVenue";
 import { serverProfile } from "@/lib/serverProfile";
-import { ENTITY_ACCENT } from "@/lib/entities";
+import { ENTITY_ACCENT, E_HOLDINGS } from "@/lib/entities";
 
 // PWA #1 (2026-07-28) — manifest + Apple meta so iOS Safari treats FS OS as an
 // installed web app. Once added to the Home Screen it launches in standalone
@@ -60,13 +60,15 @@ export const viewport: Viewport = {
 
 // Render with the right accent on FIRST PAINT (no flicker waiting for client hydration).
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const entity = serverEntity();
-  const accent = ENTITY_ACCENT[entity];
   // Seed profile server-side too (2026-09-10). Without it every SSR paint
   // rendered "Guest" and the client flipped on hydration — the same class
   // of hydration mismatch as initialEntity, but for the identity chip.
   // Regression of #418/#423 (memory: os_functions_check_2026-09-10_guest_flicker).
   const initialProfile = await serverProfile();
+  // Entity: cookie -> the signed-in profile's house -> neutral Studio (task
+  // #27). No cookie used to mean "Studio" even for a single-house cook.
+  const entity = serverEntityCookie() ?? initialProfile?.entity ?? E_HOLDINGS;
+  const accent = ENTITY_ACCENT[entity];
   return (
     <html lang="en" style={{ ["--accent" as any]: accent } as any}>
       <body>
