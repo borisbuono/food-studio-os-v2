@@ -301,7 +301,7 @@ Return ONLY JSON:
  "summary": "two plain sentences in English: who this person seems to be at work, from their own words",
  "team_note": "one or two sentences in English on how they would sit in a small kitchen or floor team, from their work-style choices: what they bring, what kind of colleague balances them, what to watch. Practical, not a label."}
 Rules: evidence only — quote them, never invent. "not shown" when the answers don't show it; short answers are not a red flag by themselves. craft_depth: how much care and taste the dish/table answer shows — 0 blank, 1 generic, 2 specific, 3 specific with a clear why. craft_note describes that answer in one line.
-Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No psychological diagnosis, no personality types or labels (no MBTI, no Big Five scores). Work-style choices are preferences, not traits: describe them, do not judge them. No hire/no-hire verdict — that is his call.`;
+Never infer or mention age, origin, nationality, religion, health, family situation, gender or sexuality. No clinical or health-adjacent words either (sensitivity, anxiety, stress disorder, neurodivergence, introvert/extrovert as a diagnosis): say "prefers calm, focused work", not what it might mean medically. If the written answers are blank, say so plainly and base nothing on it. No psychological diagnosis, no personality types or labels (no MBTI, no Big Five scores). Work-style choices are preferences, not traits: describe them, do not judge them. No hire/no-hire verdict — that is his call.`;
 
 export async function readPerson(
   area: "cocina" | "sala",
