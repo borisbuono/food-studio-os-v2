@@ -211,6 +211,10 @@ export async function refreshMenuMargin(
     if (fresh) {
       patch.missing_components = missingComponentsFrom(fresh);
       patch.component_count = fresh.ingredient_count;
+      // How old the prices behind this cost are — the page prints it next
+      // to the number so nobody reads a 2025 price as today's.
+      patch.price_asof = fresh.price_asof;
+      patch.price_tier = fresh.price_tier;
     }
     // .select() so an RLS-blocked update shows up as 0 rows, not success.
     const { data: upd, error: uErr } = await sb.from("menu_dish_costing").update(patch).eq("id", row.id).select("id");

@@ -37,6 +37,11 @@ export const ENTITY_ID_FOR_PL_CODE: Record<string, string> = Object.fromEntries(
 
 export type Confidence = "high" | "medium" | "low" | "missing";
 
+// Which window a price came from. 'stale' means the newest invoice we hold
+// for that ingredient is over 180 days old — a real price, but old enough
+// that the page must show its date next to the number.
+export type PriceTier = "fresh" | "recent" | "stale";
+
 export type IngredientBreakdown = {
   ingredient_name: string;
   quantity: number | null;
@@ -46,7 +51,9 @@ export type IngredientBreakdown = {
   unit_conversion: number;
   line_cost_eur: number | null;
   price_sample_count: number;
-  price_stale: boolean; // any purchase-line contributor >30d? (we already filter, but keep for future)
+  price_stale: boolean; // any purchase-line contributor >30d?
+  price_asof: string | null;   // newest invoice date behind this price
+  price_tier: PriceTier | null; // which window the price came from
   status: "priced" | "unpriced" | "no_alias";
   note?: string;
 };
@@ -60,6 +67,8 @@ export type CostResult = {
   ingredient_count: number;
   priced_count: number;
   missing_ingredients: string[];  // ingredient_name strings we couldn't price
+  price_asof: string | null;      // OLDEST of the per-ingredient newest dates
+  price_tier: PriceTier | null;   // weakest tier among priced ingredients
   breakdown: IngredientBreakdown[];
 };
 
@@ -178,7 +187,7 @@ export async function computeRecipeCost(
   });
 
   // Weighted average price per canonical name.
-  const priceMap: Record<string, { unitPrice: number; sampleCount: number; allStale: boolean; anyStale: boolean }> = {};
+  const priceMap: Record<string, { unitPrice: number; sampleCount: number; allStale: boolean; anyStale: boolean; asof: string | null; tier: PriceTier }> = {};
   if (entityCode && canonicalsWanted.size > 0) {
     // For each canonical name, gather the aliases that resolve to it, then
     // ilike-match purchase_lines.raw_product_text against those aliases.
@@ -190,14 +199,16 @@ export async function computeRecipeCost(
       list.push(aliasKey);
     }
 
-    // Window: prefer last 30 days (fresh), fall back to last 180 days so
-    // that seasonal shifts and stalled purchase capture (last row on file
-    // 2026-08-15 as of 2026-09-20 per the DB check) don't produce a wall
-    // of "missing" rows. Contributors older than 30d flip the recipe to
-    // 'medium' confidence.
+    // Three windows, best first: last 30 days (fresh) → last 180 days
+    // (recent) → whatever we hold, however old (stale). Checked 2026-09-21:
+    // item-level invoice lines stop in 2025 (2026 Holded docs carry no line
+    // detail), so a 180-day floor priced NOTHING and every dish read as
+    // "missing". An old price with its date on the card beats no number;
+    // a stale contributor caps the recipe at 'low' confidence and the page
+    // prints "prices to <date>".
     const now = Date.now();
-    const since = new Date(now - 180 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     const freshCutoffMs = now - 30 * 24 * 3600 * 1000;
+    const recentCutoffMs = now - 180 * 24 * 3600 * 1000;
 
     for (const canonical of canonicalsWanted) {
       const aliasStrings = aliasByCanonical[canonical] || [];
@@ -215,38 +226,51 @@ export async function computeRecipeCost(
         .from("purchase_lines")
         .select("qty, unit, line_total_eur, doc_date, raw_product_text")
         .eq("entity_code", entityCode)
-        .gte("doc_date", since)
         .or(patterns.join(","))
         .order("doc_date", { ascending: false })
         .limit(500);
 
+      const usable = ((plRows as any[]) || []).filter((row) => {
+        const qty = Number(row.qty);
+        const total = Number(row.line_total_eur);
+        return Number.isFinite(qty) && qty > 0 && Number.isFinite(total) && total > 0;
+      });
+      if (usable.length === 0) continue;
+
+      const timeOf = (row: any) => (row.doc_date ? Date.parse(row.doc_date as string) : 0);
+      let tier: PriceTier = "fresh";
+      let window = usable.filter((row) => timeOf(row) >= freshCutoffMs);
+      if (window.length === 0) {
+        tier = "recent";
+        window = usable.filter((row) => timeOf(row) >= recentCutoffMs);
+      }
+      if (window.length === 0) {
+        tier = "stale";
+        window = usable;
+      }
+
       let totalCost = 0;
       let totalQty = 0;
       let n = 0;
-      let anyStale = false;
-      let allStale = true;
-      for (const row of (plRows as any[]) || []) {
-        const qty = Number(row.qty);
-        const total = Number(row.line_total_eur);
-        if (!Number.isFinite(qty) || qty <= 0) continue;
-        if (!Number.isFinite(total) || total <= 0) continue;
+      let newest = 0;
+      for (const row of window) {
         // Look up the alias record that matched (best-effort by name)
         // to apply unit_conversion. Fallback conversion=1.
         const rawKey = normalizeName(String(row.raw_product_text || ""));
         const conv = aliases[rawKey]?.conversion || 1;
-        totalQty += qty * conv;
-        totalCost += total;
+        totalQty += Number(row.qty) * conv;
+        totalCost += Number(row.line_total_eur);
         n++;
-        const docTime = row.doc_date ? Date.parse(row.doc_date as string) : 0;
-        if (docTime < freshCutoffMs) anyStale = true;
-        else allStale = false;
+        newest = Math.max(newest, timeOf(row));
       }
       if (totalQty > 0 && n > 0) {
         priceMap[canonical] = {
           unitPrice: totalCost / totalQty,
           sampleCount: n,
-          allStale,
-          anyStale,
+          allStale: tier !== "fresh",
+          anyStale: tier !== "fresh",
+          asof: newest ? new Date(newest).toISOString().slice(0, 10) : null,
+          tier,
         };
       }
     }
@@ -274,6 +298,8 @@ export async function computeRecipeCost(
         line_cost_eur: null,
         price_sample_count: 0,
         price_stale: false,
+        price_asof: null,
+        price_tier: null,
         status: "no_alias",
         note: "no alias → link it in /kitchen/ingredients",
       };
@@ -289,8 +315,10 @@ export async function computeRecipeCost(
         line_cost_eur: null,
         price_sample_count: 0,
         price_stale: true,
+        price_asof: null,
+        price_tier: null,
         status: "unpriced",
-        note: "no purchase_lines in last 30d",
+        note: "no purchase line on file for this ingredient",
       };
     }
     const cost = qty == null ? null : qty * conv * priced.unitPrice;
@@ -303,14 +331,16 @@ export async function computeRecipeCost(
       unit_conversion: conv,
       line_cost_eur: cost,
       price_sample_count: priced.sampleCount,
-      price_stale: priced.allStale,
+      price_stale: priced.tier !== "fresh",
+      price_asof: priced.asof,
+      price_tier: priced.tier,
       status: cost == null ? "unpriced" : "priced",
       note: cost == null
         ? "quantity missing on recipe row"
-        : priced.allStale
-          ? "all samples >30d old"
-          : priced.anyStale
-            ? "some samples >30d"
+        : priced.tier === "stale"
+          ? `price from ${priced.asof ?? "an old invoice"} — over 180 days old`
+          : priced.tier === "recent"
+            ? `price from ${priced.asof ?? "the last 6 months"}`
             : undefined,
     };
   });
@@ -320,6 +350,18 @@ export async function computeRecipeCost(
   const costPerPortion = yieldQty > 0 ? totalRecipeCost / yieldQty : null;
   const pricedFraction = ings.length === 0 ? 0 : priced.length / ings.length;
   const anyStale = priced.some((b) => b.price_stale);
+
+  const anyStaleTier = priced.some((b) => b.price_tier === "stale");
+  const tierRank: Record<string, number> = { fresh: 0, recent: 1, stale: 2 };
+  const worstTier = priced.reduce<PriceTier | null>((worst, b) => {
+    if (!b.price_tier) return worst;
+    if (!worst) return b.price_tier;
+    return tierRank[b.price_tier] > tierRank[worst] ? b.price_tier : worst;
+  }, null);
+  // Oldest of the per-ingredient newest dates: the weakest link decides how
+  // old the dish's cost really is.
+  const asofDates = priced.map((b) => b.price_asof).filter(Boolean) as string[];
+  const priceAsof = asofDates.length ? asofDates.slice().sort()[0] : null;
 
   let confidence: Confidence = "missing";
   if (ings.length === 0) {
@@ -333,6 +375,9 @@ export async function computeRecipeCost(
   } else {
     confidence = "missing";
   }
+  // A price older than 180 days never reads better than 'low', whatever the
+  // coverage — the number is real but the market has moved.
+  if (anyStaleTier && (confidence === "high" || confidence === "medium")) confidence = "low";
 
   const missing = breakdown.filter((b) => b.status !== "priced").map((b) => b.ingredient_name);
 
@@ -345,6 +390,8 @@ export async function computeRecipeCost(
     ingredient_count: ings.length,
     priced_count: priced.length,
     missing_ingredients: missing,
+    price_asof: priceAsof,
+    price_tier: worstTier,
     breakdown,
   };
 }
