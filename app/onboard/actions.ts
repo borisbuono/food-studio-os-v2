@@ -126,50 +126,12 @@ export async function saveFiscalAndCreateEntityAction(formData: FormData) {
     redirect("/onboard/step-3?e=" + encodeURIComponent(error?.message || "insert_failed"));
   }
 
-  // Membership row so the operator can enter their new house.
-  // team_members has separate auth_user_id → id linkage; look for the row and
-  // create it if missing. Kept forgiving: if either write fails, the wizard
-  // still lets them continue — the operator can be granted access manually.
+  // Membership row so the operator can enter their new house. Done inside
+  // claim_entity_ownership() (SECURITY DEFINER, checks entities.onboarded_by)
+  // because after the Phase 3.5 RLS rollout the creator has no write rights on
+  // memberships yet. Best-effort: the wizard still continues if it fails.
   try {
-    let personId: string | null = null;
-    // .limit(1), not .maybeSingle(): a user can own several team_members
-    // rows and maybeSingle() errors on >1, which silently created a duplicate.
-    const { data: tmRows } = await sb
-      .from("team_members")
-      .select("id")
-      .eq("auth_user_id", uid)
-      .limit(1);
-    const existingTm = (tmRows || [])[0] as { id?: string } | undefined;
-    if (existingTm?.id) {
-      personId = existingTm.id as string;
-    } else {
-      const email = u.user?.email || null;
-      const displayName = (u.user?.user_metadata as any)?.full_name || email || "Owner";
-      const { data: newTm } = await sb
-        .from("team_members")
-        // default_role is NOT NULL with no default — omitting it made this
-        // insert fail silently inside the catch below, so the owner never got
-        // a membership (found 2026-09-21 replaying the wizard on live DB).
-        .insert({ auth_user_id: uid, name: displayName, email, status: "active", default_role: "owner" })
-        .select("id")
-        .single();
-      personId = newTm?.id ?? null;
-    }
-    if (personId && ent.id) {
-      await sb
-        .from("memberships")
-        .upsert(
-          {
-            person_id: personId,
-            entity_id: ent.id,
-            role: "owner",
-            area: "admin",
-            status: "active",
-            is_default: true,
-          },
-          { onConflict: "person_id,entity_id" },
-        );
-    }
+    await sb.rpc("claim_entity_ownership", { p_entity_id: ent.id });
   } catch { /* best-effort */ }
 
   // profiles.language defaults to 'en'; carry the country language over
