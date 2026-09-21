@@ -7,10 +7,6 @@
       "schedule": "17 3 * * *"
     },
     {
-      "path": "/api/cron/files-inbox",
-      "schedule": "0 9 * * *"
-    },
-    {
       "path": "/api/cron/pos-nightly",
       "schedule": "0 7 * * *"
     }

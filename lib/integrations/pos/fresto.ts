@@ -482,18 +482,26 @@ export async function pullBookingsDailyForDay(entity: EntityCode, date: string):
   }
 }
 
-// Salepoints KPI for the day — per salepoint revenue/orders/items.
-export async function pullSalepointsKpiForDay(entity: EntityCode, date: string): Promise<any[]> {
+// Salepoints.
+//
+// GET /sales/salepoints 404s on BOTH tenants (probed live 2026-09-21), which
+// is why fresto_salepoints_kpi_raw only ever collected 16 BM rows and nothing
+// for IFL. There is no per-salepoint KPI endpoint. What exists is
+// GET /salepoints — the master list — and it holds exactly two system entries
+// per venue (NONE, ONLINE). Real income centres therefore come from the
+// orderline's productGroupID: see writeIncomeCentres() below. This stays as a
+// no-op so older callers still compile.
+export async function pullSalepointsKpiForDay(_entity: EntityCode, _date: string): Promise<any[]> {
+  return [];
+}
+
+export async function pullSalepointsMaster(entity: EntityCode): Promise<any[]> {
   if (FRESTO_DRY_RUN()) return [];
   if (!getFrestoCredentials(entity)) return [];
   try {
-    const resp = await frestoGet<{ data: any[] }>(entity, "/sales/salepoints", {
-      startDate: date, endDate: date, businessDate: date,
-    });
+    const resp = await frestoGet<{ data: any[] }>(entity, "/salepoints", { getAll: 1, pagesize: 500 });
     return resp?.data || [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 // Master pulls — refresh whole-list on demand, upsert on (entity, fresto_id).
@@ -605,7 +613,7 @@ export async function persistPullToPos(params: {
   // bookings_daily / salepoints may 404 on tenants that don't expose the
   // endpoint — those come back empty and downstream drops the derived
   // slot rather than fabricating a value.
-  const [orderlines, orders, zRaw, bookings, bookingsDaily, salepointsKpi] = await Promise.all([
+  const [orderlines, orders, zRaw, bookings, bookingsDaily] = await Promise.all([
     pullOrderlinesForDay(params.entity, params.date),
     pullOrdersForDay(params.entity, params.date),
     (async (): Promise<FrestoZReport[]> => {
@@ -618,7 +626,6 @@ export async function persistPullToPos(params: {
     })(),
     pullBookingsForDay(params.entity, params.date),
     pullBookingsDailyForDay(params.entity, params.date),
-    pullSalepointsKpiForDay(params.entity, params.date),
   ]);
 
   if (!orderlines.length && !zRaw.length) return null;
@@ -640,7 +647,7 @@ export async function persistPullToPos(params: {
     writeZReportsRaw(sb, params.entity, params.date, zRaw, pulledAt).catch((e) => rawWriteErrors.push("z:" + (e?.message || e))),
     writeBookingsRaw(sb, params.entity, params.date, bookings, pulledAt).catch((e) => rawWriteErrors.push("bookings:" + (e?.message || e))),
     writeBookingsDailyRaw(sb, params.entity, params.date, bookingsDaily, pulledAt).catch((e) => rawWriteErrors.push("bookings_daily:" + (e?.message || e))),
-    writeSalepointsKpiRaw(sb, params.entity, params.date, salepointsKpi, pulledAt).catch((e) => rawWriteErrors.push("salepoints:" + (e?.message || e))),
+    writeIncomeCentres(sb, params.entity, params.date, orderlines, pulledAt).catch((e) => rawWriteErrors.push("income_centres:" + (e?.message || e))),
   ]);
 
   // --- Derive every metric via the single helper. ---------------------
@@ -668,7 +675,7 @@ export async function persistPullToPos(params: {
     z_spans_days: derived.z_spans_days,
     z_ids: zIds,
     bookings_count: bookings.length,
-    salepoints_kpi_count: salepointsKpi.length,
+    guests_daily: derived.guests_daily,
     raw_write_errors: rawWriteErrors.length ? rawWriteErrors : undefined,
   };
 
@@ -682,8 +689,21 @@ export async function persistPullToPos(params: {
     .eq("source", "fresto")
     .maybeSingle();
 
-  // Compose the patch. Note: `guests` (the manual-key column) is not in
-  // patch — untouched. `guests_daily`, `guests_booked`, `guests_walkins`
+  // Guest count. Order of truth:
+  //   1. a manual key by Boris        — never overwritten
+  //   2. GET /bookings/daily .guests  — physical people incl. walk-ins,
+  //      confirmed live on BOTH tenants 2026-09-21 (BM 09-19 = 20 guests,
+  //      IFL 09-19 = 8). This is why eod_pos.guests sat NULL for every row:
+  //      nothing wrote it except the closing-report email scan, and those
+  //      mails are unreliable (memory: fresto_eod_email_pipeline_dry).
+  //   3. the email scan               — backstop, runs after this
+  const manualGuests = found.data?.guests_source === "manual";
+  const guestsPatch = (!manualGuests && derived.guests_daily != null)
+    ? { guests: derived.guests_daily, guests_source: "bookings_daily", guests_keyed_at: pulledAt.toISOString() }
+    : {};
+
+  // Compose the patch. `guests` is only set from bookings/daily when no
+  // manual key exists. `guests_daily`, `guests_booked`, `guests_walkins`
   // are safe to overwrite because they come from the API surface every run.
   const patch: any = {
     restaurant_id: params.restaurant_id,
@@ -721,6 +741,7 @@ export async function persistPullToPos(params: {
     turnover_ratio: derived.turnover_ratio,
     imported_by: params.imported_by || null,
     raw_payload,
+    ...guestsPatch,
   };
 
   if (found.data?.id) {
@@ -730,11 +751,11 @@ export async function persistPullToPos(params: {
   }
 
   const ins = await sb.from("eod_pos").insert({
-    ...patch,
     guests: null,
     guests_source: null,
     guests_keyed_by: null,
     guests_keyed_at: null,
+    ...patch,
   }).select("id").single();
   if (ins.error) throw new Error("eod_pos insert failed: " + ins.error.message);
   return { id: ins.data.id, existed: false };
@@ -886,15 +907,16 @@ async function writeSalepointsKpiRaw(sb: any, entity: EntityCode, businessDate: 
 }
 
 // Master-table refresh — call from the nightly cron once per venue (not per day).
-export async function refreshFrestoMasters(entity: EntityCode): Promise<{ tables: number; staff: number; products: number; groups: number }> {
+export async function refreshFrestoMasters(entity: EntityCode): Promise<{ tables: number; staff: number; products: number; groups: number; salepoints: number }> {
   const { supabaseServer } = await import("@/lib/supabaseServer");
   const sb = supabaseServer();
   const pulledAt = new Date();
-  const [tables, staff, products, groups] = await Promise.all([
+  const [tables, staff, products, groups, salepoints] = await Promise.all([
     pullTablesMaster(entity),
     pullStaffMaster(entity),
     pullMenuProductsMaster(entity),
     pullMenuGroupsMaster(entity),
+    pullSalepointsMaster(entity),
   ]);
 
   if (tables.length) {
@@ -914,17 +936,32 @@ export async function refreshFrestoMasters(entity: EntityCode): Promise<{ tables
     })).filter((x) => x.fresto_id), { onConflict: "entity_code,fresto_id" });
   }
   if (products.length) {
-    await sb.from("fresto_menu_products_master").upsert(products.map((p: any) => ({
-      entity_code: entity, fresto_id: String(p.id || ""),
-      name: p.name || p.title || null,
-      product_group_id: p.productGroupID || null,
-      price_eur: Number(p.price || 0) || null,
-      cost_eur: Number(p.cost || 0) || null,
-      vat_pct: p.vatPct != null ? Number(p.vatPct) : null,
-      accounting_code: p.productAccountingCode || null,
-      active: p.active != null ? !!p.active : null,
-      raw: p as any, pulled_at: pulledAt.toISOString(),
-    })).filter((x) => x.fresto_id), { onConflict: "entity_code,fresto_id" });
+    // Field map verified against the live API 2026-09-21:
+    //   title, cost, isBarProduct, systemProduct, productGroupID,
+    //   vatPercentage (unreliable — 25 on a 10% dish),
+    //   reportingCodes: { vatPct, vatAccountingCode, productAccountingCode }
+    // There is NO price field. Selling price is observed from orderlines —
+    // see view v_menu_product_observed_price. The previous mapper read
+    // p.name / p.price / p.vatPct / p.productAccountingCode, none of which
+    // exist, which is why all 1,366 rows carried NULLs.
+    await sb.from("fresto_menu_products_master").upsert(products.map((p: any) => {
+      const rc = p.reportingCodes || {};
+      const vat = rc.vatPct != null ? Number(rc.vatPct) : (p.vatPct != null ? Number(p.vatPct) : null);
+      return {
+        entity_code: entity, fresto_id: String(p.id || ""),
+        name: p.title || p.name || null,
+        product_group_id: p.productGroupID || rc.productGroupId || null,
+        price_eur: null, // never present on the master — see observed-price view
+        cost_eur: p.cost != null ? Number(p.cost) : null,
+        vat_pct: Number.isFinite(vat as number) ? vat : null,
+        accounting_code: rc.productAccountingCode || p.accountingCode || null,
+        vat_accounting_code: rc.vatAccountingCode || null,
+        is_bar: p.isBarProduct != null ? !!Number(p.isBarProduct) : null,
+        system_product: p.systemProduct != null ? !!Number(p.systemProduct) : null,
+        active: p.active != null ? !!p.active : (p.systemProduct != null ? !Number(p.systemProduct) : null),
+        raw: p as any, pulled_at: pulledAt.toISOString(),
+      };
+    }).filter((x) => x.fresto_id), { onConflict: "entity_code,fresto_id" });
   }
   if (groups.length) {
     await sb.from("fresto_menu_groups_master").upsert(groups.map((g: any) => ({
@@ -935,7 +972,73 @@ export async function refreshFrestoMasters(entity: EntityCode): Promise<{ tables
     })).filter((x) => x.fresto_id), { onConflict: "entity_code,fresto_id" });
   }
 
-  return { tables: tables.length, staff: staff.length, products: products.length, groups: groups.length };
+  if (salepoints.length) {
+    await sb.from("fresto_salepoints_master").upsert(salepoints.map((sp: any) => ({
+      entity_code: entity,
+      sale_point_id: String(sp.salePointID || sp.id || ""),
+      title: sp.title || sp.name || null,
+      active: sp.active != null ? !!Number(sp.active) : null,
+      is_system: sp.isSystem != null ? !!Number(sp.isSystem) : null,
+      raw: sp as any, pulled_at: pulledAt.toISOString(),
+    })).filter((x) => x.sale_point_id), { onConflict: "entity_code,sale_point_id" });
+  }
+
+  return { tables: tables.length, staff: staff.length, products: products.length, groups: groups.length, salepoints: salepoints.length };
+}
+
+// ---------- Income centres (task #25) ----------
+//
+// One row per (entity, business date, product group, sale point), derived from
+// the day's orderlines. It needs no eod_pos row to exist and is queryable on
+// its own: v_income_centre_daily / v_income_centre_monthly.
+//
+// Product group is keyed on ID, never name — groups get renamed in Fresto
+// (memory: fresto_product_groups_renamed_key_on_id) and name-keying mapped a
+// whole group to EUR 0 silently in September.
+export async function writeIncomeCentres(
+  sb: any, entity: EntityCode, businessDate: string,
+  orderlines: FrestoOrderline[], pulledAt: Date,
+): Promise<number> {
+  const trading = resolveTradingDate(pulledAt, businessDate);
+  type Acc = { revenue: number; items: number; lines: number; vat: number; name: string | null };
+  const acc = new Map<string, Acc>();
+  for (const l of orderlines) {
+    if ((l.isRevenue ?? 1) !== 1 || (l.cancelled ?? 0) === 1) continue;
+    const group = String((l as any).productGroupID || "UNGROUPED");
+    const sp = String((l as any).salePointID || "NONE");
+    const key = group + "\u0000" + sp;
+    const price = Number(l.price || 0);            // EXTENDED, not unit
+    const qty = Number(l.quantity ?? 1) || 0;
+    const vatPct = Number((l as any).vatPct || 0);
+    const cur = acc.get(key) || { revenue: 0, items: 0, lines: 0, vat: 0, name: null };
+    cur.revenue += price;
+    cur.items += qty;
+    cur.lines += 1;
+    cur.vat += vatPct > 0 ? price - price / (1 + vatPct / 100) : 0;
+    if (!cur.name && (l as any).productAccountingCode) cur.name = String((l as any).productAccountingCode);
+    acc.set(key, cur);
+  }
+  if (!acc.size) return 0;
+  const payload = Array.from(acc.entries()).map(([key, v]) => {
+    const [product_group_id, sale_point_id] = key.split("\u0000");
+    return {
+      entity_code: entity,
+      business_date: businessDate,
+      trading_date: trading,
+      product_group_id,
+      product_group_name: v.name,
+      sale_point_id,
+      revenue_eur: Math.round(v.revenue * 100) / 100,
+      items: v.items,
+      orderlines_count: v.lines,
+      vat_eur: Math.round(v.vat * 100) / 100,
+      pulled_at: pulledAt.toISOString(),
+    };
+  });
+  const r = await sb.from("fresto_income_centres_daily")
+    .upsert(payload, { onConflict: "entity_code,business_date,product_group_id,sale_point_id" });
+  if (r.error) throw new Error(r.error.message);
+  return payload.length;
 }
 
 // ---------- Adapter surface (kept API-compatible with the existing registry) ----------

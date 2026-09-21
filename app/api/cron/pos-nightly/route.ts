@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN, refreshFrestoMasters } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
+import { cronAuthorized, startRun, finishRun } from "@/lib/cron/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,20 +65,14 @@ function eachDate(from: string, to: string): string[] {
   return out;
 }
 
-async function isAuthorized(req: NextRequest): Promise<boolean> {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  if (secret && auth === `Bearer ${secret}`) return true;
-  // Fall back to an authenticated Supabase session (Boris hitting the URL).
-  const sb = supabaseServer();
-  const { data: userRes } = await sb.auth.getUser();
-  return !!userRes?.user;
-}
-
 export async function GET(req: NextRequest) {
-  if (!(await isAuthorized(req))) {
+  const auth = await cronAuthorized(req);
+  if (!auth.ok) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
+  // Heartbeat first, work second — a run that dies mid-flight still leaves a
+  // row in cron_runs. See lib/cron/heartbeat.ts for why this exists.
+  const runId = await startRun("pos-nightly", auth.who);
 
   const sb = supabaseServer();
   const today = madridToday();
@@ -226,6 +221,16 @@ export async function GET(req: NextRequest) {
   } catch {
     // Audit failures are non-fatal — the sync itself already happened.
   }
+
+  await finishRun(runId, !perVenue.some((p) => p.failed || p.error), {
+    per_venue: perVenue.map((p) => ({
+      entity: p.entity, days: p.days, inserted: p.inserted, updated: p.updated,
+      empty: p.empty, failed: p.failed, error: p.error,
+      newest_before: p.newest_before, backfilled_through: p.backfilled_through,
+      masters: p.masters,
+    })),
+    email_scan_ok, email_scan_error,
+  });
 
   return NextResponse.json({
     ok: true,
