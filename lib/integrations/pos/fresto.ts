@@ -1004,6 +1004,7 @@ export async function writeIncomeCentres(
 ): Promise<number> {
   const trading = resolveTradingDate(pulledAt, businessDate);
   type Acc = { revenue: number; items: number; lines: number; vat: number; name: string | null };
+  // name stays null — see the comment in the loop below.
   const acc = new Map<string, Acc>();
   for (const l of orderlines) {
     if ((l.isRevenue ?? 1) !== 1 || (l.cancelled ?? 0) === 1) continue;
@@ -1018,7 +1019,10 @@ export async function writeIncomeCentres(
     cur.items += qty;
     cur.lines += 1;
     cur.vat += vatPct > 0 ? price - price / (1 + vatPct / 100) : 0;
-    if (!cur.name && (l as any).productAccountingCode) cur.name = String((l as any).productAccountingCode);
+    // Deliberately NOT productAccountingCode: on both tenants every line
+    // carries the literal "All products", which would mask the real group
+    // name. v_income_centre_daily resolves the name from
+    // fresto_menu_groups_master instead.
     acc.set(key, cur);
   }
   if (!acc.size) return 0;
