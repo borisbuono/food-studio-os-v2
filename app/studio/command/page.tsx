@@ -48,25 +48,27 @@ export default async function StudioCommandPage() {
     if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
   }
 
-  // ── Members across every Food Studios entity ──
-  // Read from `memberships` joined with team_members + entities. Kept small:
-  // pull the raw rows, group in memory. In prod this is < 100 rows.
-  const { data: ents } = await sb
-    .from("entities")
-    .select("id, name, entity_type, is_active, status")
-    .eq("is_active", true);
-  const activeEnts = (ents || []).filter((e: any) => (e.status ?? "active") === "active");
+  // ── Members across the entities this user may see ──
+  // Tenant-filtered (2026-09-21): this page read every entity row and every
+  // active membership in the table, so a second tenant's owner saw Boris's
+  // whole org chart. Entities now come from ctx.entities and the membership
+  // query is bounded to those ids.
+  const activeEnts = ctx.entities.filter((e) => e.status === "active");
   const entityNameById = new Map<string, string>();
   const entityTypeById = new Map<string, string>();
   for (const e of activeEnts) {
-    entityNameById.set(String(e.id), String(e.name));
-    entityTypeById.set(String(e.id), String(e.entity_type));
+    entityNameById.set(e.id, e.name);
+    entityTypeById.set(e.id, e.entity_type);
   }
+  const scopeIds = Array.from(entityNameById.keys());
 
-  const { data: mships } = await sb
-    .from("memberships")
-    .select("entity_id, person_id, role, area, status")
-    .eq("status", "active");
+  const { data: mships } = scopeIds.length
+    ? await sb
+        .from("memberships")
+        .select("entity_id, person_id, role, area, status")
+        .eq("status", "active")
+        .in("entity_id", scopeIds)
+    : { data: [] as any[] };
   const activeMships = (mships || []).filter((m: any) => entityNameById.has(String(m.entity_id)));
 
   // team_members: id → name (person_id joins on team_members.id).
@@ -95,7 +97,7 @@ export default async function StudioCommandPage() {
     .map(([pid, ms]) => ({
       pid,
       person: personById.get(pid),
-      houses: ms.filter((m) => entityTypeById.get(m.entity_id) === "operating_venue"),
+      houses: ms.filter((m) => ["operating_venue", "operating"].includes(entityTypeById.get(m.entity_id) || "")),
       holdings: ms.filter((m) => entityTypeById.get(m.entity_id) === "holding_company"),
       isOwner: ms.some((m) => (m.role || "").toLowerCase() === "owner"),
     }))

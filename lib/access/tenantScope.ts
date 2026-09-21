@@ -58,16 +58,25 @@ export function filterAccessibleEntities(
 ): AccessibleEntity[] {
   const byId = new Map(all.map((e) => [e.id, e]));
   const allowed = new Set<string>();
+  let ownsHolding = false;
   for (const m of memberships) {
     if (!byId.has(m.entity_id)) continue;
     allowed.add(m.entity_id);
     if ((m.role || "").toLowerCase() !== "owner") continue;
+    if (byId.get(m.entity_id)!.entity_type === "holding_company") ownsHolding = true;
     const parentId = byId.get(m.entity_id)!.parent_entity_id;
     if (!parentId || !byId.has(parentId)) continue;
     allowed.add(parentId);
     for (const e of all) {
       if (e.parent_entity_id === parentId && !isOperating(e.entity_type)) allowed.add(e.id);
     }
+  }
+  // The group owner (owner of a holding company) also sees the portfolio
+  // counterparties that hang off no parent — the landlord and partner rows
+  // that belong to the group rather than to one house. Mirrored in the DB by
+  // app_my_scope_entities() (20260921_rls_owner_scope_and_entities.sql).
+  if (ownsHolding) {
+    for (const e of all) if (!isOperating(e.entity_type)) allowed.add(e.id);
   }
   return all.filter((e) => allowed.has(e.id));
 }

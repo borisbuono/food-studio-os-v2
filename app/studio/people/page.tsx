@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY } from "@/lib/entities";
+import { isOperating } from "@/lib/access/tenantScope";
+import { getRestaurantIdsByEntity } from "@/lib/studio/houseSnapshots.server";
 
 export const dynamic = "force-dynamic";
 
@@ -50,38 +51,40 @@ export default async function StudioPeoplePage() {
     if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
   }
 
-  // Operating houses only — the tile grid below is per-house.
-  const { data: allEnts } = await sb
-    .from("entities")
-    .select("id, name, entity_type, is_active, status")
-    .eq("is_active", true)
-    .eq("entity_type", "operating_venue")
-    .order("name");
-  const houses = (allEnts || []).filter((e: any) => (e.status ?? "active") === "active");
+  // Houses + holding — tenant-filtered (2026-09-21). This page used to read
+  // every entity row and the FULL team_members table, so a second tenant's
+  // owner got Boris's roster (names, emails, roles). Both now come from the
+  // entities this user may see.
+  const accessible = ctx.entities.filter((e) => e.status === "active");
+  const houses = accessible
+    .filter((e) => isOperating(e.entity_type))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const holdingIds = new Set(accessible.filter((e) => e.entity_type === "holding_company").map((e) => e.id));
+  const accessibleIds = new Set(accessible.map((e) => e.id));
 
-  // Holding entity — for the "directly employed by Food Studios" section.
-  const { data: holdingEnts } = await sb
-    .from("entities")
-    .select("id, name")
-    .eq("is_active", true)
-    .eq("entity_type", "holding_company");
-  const holdingIds = new Set((holdingEnts || []).map((e: any) => e.id));
+  // Restaurants of MY houses — team_members.default_restaurant_id links here.
+  const ridByEntity = await getRestaurantIdsByEntity(houses.map((h) => h.id));
+  const entityByRid = new Map<string, string>();
+  for (const [eid, rid] of ridByEntity) entityByRid.set(rid, eid);
 
-  // Restaurants — team_members.default_restaurant_id links here.
-  const { data: venues } = await sb.from("restaurants").select("id,name");
-  const vname = new Map((venues || []).map((v: any) => [String(v.id), String(v.name)]));
-
-  // Full team_members roster — a single small table (< 100 rows in prod).
+  // Roster, scoped: a member counts when their default restaurant belongs to
+  // one of my houses, or their operator entity is one I can see.
   const { data: members } = await sb
     .from("team_members")
-    .select("id,name,email,default_role,default_restaurant_id,status,first_login_at,invited_at,archived_at")
+    .select("id,name,email,default_role,default_restaurant_id,operator_entity_id,status,first_login_at,invited_at,archived_at")
     .order("name");
-  const roster = (members || []).filter((m: any) => !m.archived_at);
+  const roster = (members || []).filter((m: any) => {
+    if (m.archived_at) return false;
+    const rid = m.default_restaurant_id ? String(m.default_restaurant_id) : null;
+    if (rid && entityByRid.has(rid)) return true;
+    const oe = m.operator_entity_id ? String(m.operator_entity_id) : null;
+    return !!oe && accessibleIds.has(oe);
+  });
 
   // Per-house counts (roster + pending invites), keyed by restaurant name.
   type Bucket = { total: number; pending: number; joinedThisWeek: number };
-  const houseBucketByName = new Map<string, Bucket>();
-  for (const h of houses) houseBucketByName.set(String(h.name), { total: 0, pending: 0, joinedThisWeek: 0 });
+  const houseBucketById = new Map<string, Bucket>();
+  for (const h of houses) houseBucketById.set(h.id, { total: 0, pending: 0, joinedThisWeek: 0 });
 
   // Boundary for "this week": last 7 days.
   const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -91,22 +94,19 @@ export default async function StudioPeoplePage() {
   // (owner, ops director) sit here.
   const portfolioMembers: any[] = [];
 
-  // Restaurant id → house name lookup (restaurants.id === team_members.default_restaurant_id).
-  // Houses use `entities.name` which must equal `restaurants.name` for the tile mapping.
-  const houseNames = new Set(houses.map((h: any) => String(h.name)));
-
   let joinedThisWeekTotal = 0;
   let pendingTotal = 0;
 
   for (const m of roster) {
-    const vn = vname.get(String(m.default_restaurant_id));
+    const rid = m.default_restaurant_id ? String(m.default_restaurant_id) : null;
+    const houseId = rid ? entityByRid.get(rid) : undefined;
     const isPending = (m.status || "invited") === "invited";
     const joinedThisWeek = !!m.first_login_at && new Date(m.first_login_at).getTime() >= weekAgoMs;
     if (isPending) pendingTotal += 1;
     if (joinedThisWeek) joinedThisWeekTotal += 1;
 
-    if (vn && houseNames.has(vn)) {
-      const b = houseBucketByName.get(vn)!;
+    if (houseId && houseBucketById.has(houseId)) {
+      const b = houseBucketById.get(houseId)!;
       b.total += 1;
       if (isPending) b.pending += 1;
       if (joinedThisWeek) b.joinedThisWeek += 1;
@@ -177,14 +177,9 @@ export default async function StudioPeoplePage() {
           Tap a house to open its own team page — schedules, invites, onboarding all live there.
         </p>
         <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {houses.map((e: any) => {
-            const bucket = houseBucketByName.get(String(e.name)) || { total: 0, pending: 0, joinedThisWeek: 0 };
-            // Find restaurant_id via entities.name match, then use existing house-slug lookup.
-            // entities.name is the same string as restaurants.name in prod for BM & Taller.
-            const rid = (venues || []).find((v: any) => v.name === e.name)?.id;
-            const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;
-            const slug = houseSlugForEntity(ent);
-            const href = slug ? `/h/${slug}/people` : `/administrate/team`;
+          {houses.map((e) => {
+            const bucket = houseBucketById.get(e.id) || { total: 0, pending: 0, joinedThisWeek: 0 };
+            const href = e.slug ? `/h/${e.slug}/people` : `/administrate/team`;
             return (
               <li key={e.id}>
                 <Link

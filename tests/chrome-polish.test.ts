@@ -27,12 +27,14 @@ const E = (
   });
 const all = [
   E("holdings", "holding_company", null, false, false),
+  E("landlord1", "landlord", null, false, false),   // group counterparty, no parent
   E("bm", "operating_venue", "holdings"),
   E("taller", "operating_venue", "holdings"),
   E("utopia", "operating_venue", null, true, false),
   E("canquince", "advisory_client", "holdings", false, false),
 ];
 const boris: MembershipLite[] = [
+  { entity_id: "holdings", role: "owner", room: "studio" },
   { entity_id: "bm", role: "owner", room: "studio" },
   { entity_id: "taller", role: "owner", room: "studio" },
   { entity_id: "utopia", role: "owner", room: "studio" },
@@ -42,8 +44,10 @@ const cook: MembershipLite[] = [{ entity_id: "taller", role: "worker", room: "ki
 const ids = (xs: AccessibleEntity[]) => xs.map((x) => x.id).sort();
 
 // Tenant filter
-eq("boris sees all his houses + holding + advisory", ids(filterAccessibleEntities(all, boris)), ["bm", "canquince", "holdings", "taller", "utopia"]);
-eq("utopia owner sees ONLY utopia", ids(filterAccessibleEntities(all, marco)), ["utopia"]);
+eq("boris (group owner) sees houses + holding + advisory + parentless counterparties",
+   ids(filterAccessibleEntities(all, boris)), ["bm", "canquince", "holdings", "landlord1", "taller", "utopia"]);
+eq("utopia owner sees ONLY utopia — not Boris's houses, holding or counterparties",
+   ids(filterAccessibleEntities(all, marco)), ["utopia"]);
 eq("taller cook sees only taller", ids(filterAccessibleEntities(all, cook)), ["taller"]);
 
 // Palette gating

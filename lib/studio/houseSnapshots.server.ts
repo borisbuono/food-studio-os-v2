@@ -24,12 +24,15 @@ export type PosSnap = {
 
 export type HouseSnapshot = { restaurant_id: string | null; pos: PosSnap | null };
 
-export async function getHouseSnapshots(entityIds: string[]): Promise<Map<string, HouseSnapshot>> {
-  const out = new Map<string, HouseSnapshot>();
-  if (!entityIds.length) return out;
-  const sb = supabaseServer();
-
+// entity id → restaurants.id, for the entities the caller may see. Shared by
+// every Studio surface that needs POS rows for a set of houses (/studio,
+// /studio/houses, /studio/money) — they each used to carry their own
+// entities.name → restaurant UUID map, which is what made Utopia and every
+// new tenant invisible.
+export async function getRestaurantIdsByEntity(entityIds: string[]): Promise<Map<string, string>> {
   const ridByEntity = new Map<string, string>();
+  if (!entityIds.length) return ridByEntity;
+  const sb = supabaseServer();
   try {
     const { data } = await sb.from("restaurants").select("id, entity_id").in("entity_id", entityIds);
     for (const r of (data as any[]) || []) {
@@ -42,6 +45,15 @@ export async function getHouseSnapshots(entityIds: string[]): Promise<Map<string
       if (pinned) ridByEntity.set(id, pinned);
     }
   }
+  return ridByEntity;
+}
+
+export async function getHouseSnapshots(entityIds: string[]): Promise<Map<string, HouseSnapshot>> {
+  const out = new Map<string, HouseSnapshot>();
+  if (!entityIds.length) return out;
+  const sb = supabaseServer();
+
+  const ridByEntity = await getRestaurantIdsByEntity(entityIds);
 
   const rids = Array.from(new Set(ridByEntity.values()));
   const posByRid = new Map<string, PosSnap>();

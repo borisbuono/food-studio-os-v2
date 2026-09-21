@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getMyMembershipContext } from "@/lib/memberships";
-import { houseSlugForEntity } from "@/lib/houses";
-import { RESTAURANT_TO_ENTITY, ENTITY_TO_RESTAURANT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+
+import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { isOperating } from "@/lib/access/tenantScope";
+import { getRestaurantIdsByEntity } from "@/lib/studio/houseSnapshots.server";
 export const dynamic = "force-dynamic";
 
 // /studio/money — Studio-scoped portfolio finance.
@@ -64,30 +66,22 @@ export default async function StudioMoneyPage() {
     if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
   }
 
-  // Houses (operating venues).
-  const { data: allEnts } = await sb
-    .from("entities")
-    .select("id, name, entity_type, is_active, status")
-    .eq("is_active", true)
-    .eq("entity_type", "operating_venue")
-    .order("name");
-  const houses = (allEnts || []).filter((e: any) => (e.status ?? "active") === "active");
+  // Houses (operating venues) — tenant-filtered (2026-09-21). This page used
+  // to read every active operating_venue row in the table and then match
+  // entities.name against a hardcoded Bistro Mondo / Taller map: a second
+  // tenant's owner saw Boris's houses, and Utopia (plus every new tenant)
+  // never appeared because its name wasn't in the map. Houses now come from
+  // ctx.entities and their tills from restaurants.entity_id.
+  const accessible = ctx.entities.filter((e) => e.status === "active");
+  const houses = accessible
+    .filter((e) => isOperating(e.entity_type))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const since = monthStartISO();
   const today = madridToday();
 
-  // ── BRUTO revenue MTD from eod_pos, keyed by restaurant_id ──
-  const rids = houses
-    .map((e: any) => {
-      const ent = RESTAURANT_TO_ENTITY;
-      const found = Object.entries(ent).find(([, v]) => {
-        if (v === E_BM && e.name === "Bistro Mondo") return true;
-        if (v === E_TALLER && e.name === "Taller Sa Penya") return true;
-        return false;
-      });
-      return found?.[0];
-    })
-    .filter(Boolean) as string[];
+  const ridByEntity = await getRestaurantIdsByEntity(houses.map((h) => h.id));
+  const rids = Array.from(new Set(Array.from(ridByEntity.values())));
 
   const posByRid = new Map<string, { gross: number; covers: number; latestDate: string | null }>();
   for (const r of rids) posByRid.set(r, { gross: 0, covers: 0, latestDate: null });
@@ -130,11 +124,16 @@ export default async function StudioMoneyPage() {
 
   // ── Cash across entities (bank_accounts if populated, else bank_movements) ──
   type EntityCash = { code: string; label: string; balance: number | null; source: "bank_accounts" | "bank_movements" | "empty" };
-  const cashRows: EntityCash[] = [
-    { code: "BM",  label: "Bistro Mondo",   balance: null, source: "empty" },
-    { code: "IFL", label: "Taller / Studio", balance: null, source: "empty" },
-    { code: "BBH", label: "Holding (BBH)",  balance: null, source: "empty" },
-  ];
+  // bank_movements / bank_accounts still key on the legacy text codes
+  // (BM / IFL / BBH). Build the rows from the entities this user can see
+  // rather than hardcoding Boris's three — a tenant with none of them gets
+  // an empty section instead of someone else's cash line.
+  const LEGACY_CODE: Record<string, string> = {
+    [E_BM]: "BM", [E_TALLER]: "IFL", [E_HOLDINGS]: "BBH",
+  };
+  const cashRows: EntityCash[] = accessible
+    .filter((e) => LEGACY_CODE[e.id])
+    .map((e) => ({ code: LEGACY_CODE[e.id], label: e.name, balance: null, source: "empty" as const }));
 
   const { data: bal } = await sb.from("bank_accounts").select("entity_id,balance_eur");
   if (bal && bal.length) {
@@ -198,13 +197,11 @@ export default async function StudioMoneyPage() {
       <section className="mt-10">
         <p className="font-mono text-[11px] uppercase tracking-wide text-clay">By house</p>
         <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {houses.map((e: any) => {
-            const rid = ENTITY_TO_RESTAURANT[e.name === "Bistro Mondo" ? E_BM : E_TALLER];
+          {houses.map((e) => {
+            const rid = ridByEntity.get(e.id) || null;
             const pos = rid ? posByRid.get(rid) : null;
             const accGross = rid ? accByRid.get(rid) || 0 : 0;
-            const ent = rid ? RESTAURANT_TO_ENTITY[rid] : null;
-            const slug = houseSlugForEntity(ent);
-            const href = slug ? `/h/${slug}/money` : `/administrate/finance`;
+            const href = e.slug ? `/h/${e.slug}/money` : `/administrate/finance`;
             return (
               <li key={e.id}>
                 <Link
