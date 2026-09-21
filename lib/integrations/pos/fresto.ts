@@ -606,8 +606,11 @@ export async function persistPullToPos(params: {
   date: string;
   imported_by?: string | null;
 }): Promise<{ id: string; existed: boolean } | null> {
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const sb = supabaseServer();
+  // Service role, not the cookie client: a CRON_SECRET request has no session,
+  // and every write below would be silently dropped by RLS. See lib/cron/
+  // heartbeat.ts for the full post-mortem.
+  const { cronDb } = await import("@/lib/cron/heartbeat");
+  const { sb } = cronDb();
 
   // Pull the whole day surface in parallel. Best-effort: bookings /
   // bookings_daily / salepoints may 404 on tenants that don't expose the
@@ -908,8 +911,8 @@ async function writeSalepointsKpiRaw(sb: any, entity: EntityCode, businessDate: 
 
 // Master-table refresh — call from the nightly cron once per venue (not per day).
 export async function refreshFrestoMasters(entity: EntityCode): Promise<{ tables: number; staff: number; products: number; groups: number; salepoints: number }> {
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const sb = supabaseServer();
+  const { cronDb } = await import("@/lib/cron/heartbeat");
+  const { sb } = cronDb();
   const pulledAt = new Date();
   const [tables, staff, products, groups, salepoints] = await Promise.all([
     pullTablesMaster(entity),

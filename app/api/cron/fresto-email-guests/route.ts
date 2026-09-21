@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { cronDb } from "@/lib/cron/heartbeat";
 import { gmailApiFetch } from "@/lib/assistant/channels/gmail";
 import { parseGuestsFromEmailBody } from "@/lib/integrations/pos/fresto";
 import type { AssistantChannelRow } from "@/types/db";
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const sb = supabaseServer();
+  const { sb } = cronDb();
 
   // Get every Gmail channel — usually just Boris's, but the loop is
   // channel-agnostic. If no channels are connected we exit cleanly.

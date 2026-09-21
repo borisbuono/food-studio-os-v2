@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
 import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN, refreshFrestoMasters } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
-import { cronAuthorized, startRun, finishRun } from "@/lib/cron/heartbeat";
+import { cronAuthorized, cronDb, startRun, finishRun } from "@/lib/cron/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,7 +73,10 @@ export async function GET(req: NextRequest) {
   // row in cron_runs. See lib/cron/heartbeat.ts for why this exists.
   const runId = await startRun("pos-nightly", auth.who);
 
-  const sb = supabaseServer();
+  // Service role — a CRON_SECRET request has no cookie, and the anon client
+  // reads zero rows under RLS, so "newest eod_pos date" came back empty and
+  // every write was dropped. See lib/cron/heartbeat.ts.
+  const { sb, mode: dbMode } = cronDb();
   const today = madridToday();
   // "Yesterday" is the last complete business day we back-fill up to. Boris
   // closes at ~03:00 sometimes; the cron runs at 07:00 UTC (09:00 CET) so
@@ -235,6 +237,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     at: new Date().toISOString(),
+    db: dbMode,
+    auth: auth.who,
     today_madrid: today,
     yesterday,
     dry_run: FRESTO_DRY_RUN(),

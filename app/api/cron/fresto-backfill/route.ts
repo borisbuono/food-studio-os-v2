@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { persistPullToPos, frestoStatus, refreshFrestoMasters, FRESTO_DRY_RUN } from "@/lib/integrations/pos/fresto";
-import { cronAuthorized, startRun, finishRun } from "@/lib/cron/heartbeat";
+import { cronAuthorized, cronDb, startRun, finishRun } from "@/lib/cron/heartbeat";
 import type { EntityCode } from "@/lib/integrations/types";
 
 export const runtime = "nodejs";
@@ -56,8 +56,7 @@ export async function GET(req: NextRequest) {
   }
 
   const runId = await startRun("fresto-backfill", auth.who, { from, to, entities, days: dates.length });
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const sb = supabaseServer();
+  const { sb, mode: dbMode } = cronDb();
   const perVenue: any[] = [];
 
   try {
@@ -97,7 +96,7 @@ export async function GET(req: NextRequest) {
       perVenue.push({ entity: code, label: v.label, days: dates.length, inserted, updated, empty, failed, skipped, errors, masters });
     }
 
-    const summary = { from, to, dry_run: FRESTO_DRY_RUN(), per_venue: perVenue };
+    const summary = { from, to, db: dbMode, auth: auth.who, dry_run: FRESTO_DRY_RUN(), per_venue: perVenue };
     await finishRun(runId, !perVenue.some((p) => p.failed), summary);
     return NextResponse.json({ ok: true, ...summary });
   } catch (e: any) {

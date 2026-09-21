@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cronAuthorized, startRun, finishRun } from "@/lib/cron/heartbeat";
+import { cronAuthorized, cronDb, startRun, finishRun } from "@/lib/cron/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,8 +46,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "from/to required as ISO dates, to >= from" }, { status: 400 });
   }
 
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const sb = supabaseServer();
+  const { sb, mode: dbMode } = cronDb();
   const runId = await startRun("eod-accounting-rebuild", auth.who, { from, to, entities, apply });
   const perVenue: any[] = [];
 
@@ -134,7 +133,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const out = { from, to, applied: apply, per_venue: perVenue };
+    const out = { from, to, db: dbMode, auth: auth.who, applied: apply, per_venue: perVenue };
     await finishRun(runId, !perVenue.some((p) => p.errors?.length), out);
     return NextResponse.json({ ok: true, ...out, note: apply ? "written" : "dry run — pass apply=1 to write" });
   } catch (e: any) {
