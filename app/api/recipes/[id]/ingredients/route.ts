@@ -38,20 +38,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!name) return NextResponse.json({ ok: false, error: "ingredient name required" }, { status: 400 });
   if (qty == null || qty <= 0) return NextResponse.json({ ok: false, error: "quantity must be a positive number" }, { status: 400 });
 
-  const { data: recipe, error: rErr } = await sb.from("recipes").select("id, entity_id").eq("id", params.id).maybeSingle();
+  const { data: recipe, error: rErr } = await sb.from("recipes").select("id, entity_id, origin_recipe_id").eq("id", params.id).maybeSingle();
   if (rErr) return NextResponse.json({ ok: false, error: rErr.message }, { status: 500 });
   if (!recipe) return NextResponse.json({ ok: false, error: "recipe not found" }, { status: 404 });
+
+  // Shared recipe (mirror): ingredients live on the origin row; the DB sync
+  // trigger copies them to every venue, so costing below still runs on
+  // this venue's row with this venue's prices.
+  const contentId: string = (recipe as any).origin_recipe_id || params.id;
 
   const { data: last } = await sb
     .from("recipe_ingredients")
     .select("sort_order")
-    .eq("recipe_id", params.id)
+    .eq("recipe_id", contentId)
     .order("sort_order", { ascending: false, nullsFirst: false })
     .limit(1);
   const nextSort = (Number((last as any[])?.[0]?.sort_order) || 0) + 1;
 
   const { error: iErr } = await sb.from("recipe_ingredients").insert({
-    recipe_id: params.id,
+    recipe_id: contentId,
     ingredient_name: name,
     name,
     quantity: qty,

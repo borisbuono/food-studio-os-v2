@@ -35,6 +35,8 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
       const { data: s } = await supabaseBrowser.auth.getSession();
       setAuthed(!!s.session);
       const { data: r } = await supabaseBrowser.from("recipes").select("*").eq("id", params.id).maybeSingle();
+      // Shared recipe mirror → edit the origin; the DB propagates to every venue.
+      if (r?.origin_recipe_id) { router.replace(`/develop/menu/${r.origin_recipe_id}/edit`); return; }
       if (r) {
         setName(r.name || ""); setSection(r.section || ""); setPortions(r.portions ? String(r.portions) : "");
         setPitch(r.voice_statement || ""); setMethod((r.description || "").trim());

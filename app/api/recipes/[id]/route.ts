@@ -65,20 +65,40 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (k in patch) patch[k] = num(patch[k]);
   }
 
-  if (Object.keys(patch).length) {
-    const { error } = await sb.from("recipes").update(patch).eq("id", params.id);
+  // Shared recipes (2026-09-21): a mirror's CONTENT lives on its origin
+  // (canonical) row; the DB refuses content edits on a mirror. Content
+  // fields + ingredients go to the origin and propagate to every venue;
+  // venue fields (station, price, menu link, active) stay on this row.
+  const { data: self } = await sb.from("recipes").select("id, origin_recipe_id").eq("id", params.id).maybeSingle();
+  const contentId: string = (self as any)?.origin_recipe_id || params.id;
+  const CONTENT = new Set(["name", "category", "yield_qty", "yield_unit", "portion_size", "portion_unit", "method", "notes"]);
+  const contentPatch: any = {};
+  const venuePatch: any = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (contentId !== params.id && CONTENT.has(k) && k !== "notes") contentPatch[k] = v;
+    else venuePatch[k] = v;
+  }
+
+  if (Object.keys(contentPatch).length) {
+    const { error } = await sb.from("recipes").update(contentPatch).eq("id", contentId);
+    if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  if (Object.keys(venuePatch).length) {
+    const { error } = await sb.from("recipes").update(venuePatch).eq("id", params.id);
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
   }
 
   if (Array.isArray(body?.ingredients)) {
     // Full-replace semantics — simplest, avoids per-row diff bugs.
-    const { error: dErr } = await sb.from("recipe_ingredients").delete().eq("recipe_id", params.id);
+    // On a mirror this replaces the ORIGIN's list; the DB sync trigger
+    // rebuilds every venue's copy.
+    const { error: dErr } = await sb.from("recipe_ingredients").delete().eq("recipe_id", contentId);
     if (dErr) return Response.json({ ok: false, error: dErr.message }, { status: 500 });
 
     const rows = body.ingredients
       .filter((i: any) => i && typeof i.ingredient_name === "string" && i.ingredient_name.trim().length)
       .map((i: any, idx: number) => ({
-        recipe_id:         params.id,
+        recipe_id:         contentId,
         ingredient_name:   String(i.ingredient_name).trim(),
         name:              String(i.ingredient_name).trim(),
         quantity:          num(i.quantity),
