@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 type Field = { value: any; confidence: number };
 export type SopCandidate = {
   id: string;
+  entity_id?: string;
   name: string;
   status: string;
   email?: string | null;
@@ -160,6 +161,34 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
           <button onClick={reread} disabled={busy} className="underline disabled:opacity-40">{busy ? "reading…" : "re-read"}</button>
         </div>
       </div>
+      {!c.cv_path && c.entity_id ? (
+        <label className="mt-1.5 block text-clay">
+          Attach CV (reads it and redrafts the questions):{" "}
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            disabled={busy}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setBusy(true);
+              try {
+                const fd = new FormData();
+                fd.set("entity_id", c.entity_id!);
+                fd.set("candidate_id", c.id);
+                fd.set("file", f);
+                const r = await fetch("/api/hiring/candidates/intake", { method: "POST", body: fd });
+                const j = await r.json();
+                if (!r.ok || !j.ok) return alert(j.error || "failed");
+                if (j.parse_error) alert("CV saved, not read: " + j.parse_error);
+                onUpdated(j.candidate);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </label>
+      ) : null}
       {c.summary ? <p className="mt-1.5">{c.summary}</p> : null}
       <div className="mt-1 text-clay">
         {c.phone || "—"} · {c.email || "—"}

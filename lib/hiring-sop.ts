@@ -213,7 +213,7 @@ export function buildQuestionSet(
     "",
     PRIVACY_EN,
   ].join("\n");
-  return { subject: `${houseName} — ${roleLabel}`, es, en };
+  return { subject: `${houseName} — ${roleLabel === "la cocina" ? "tu candidatura de cocina" : roleLabel}`, es, en };
 }
 
 // One short, specific opening line per candidate (ES + EN). Optional — the
