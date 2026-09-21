@@ -448,6 +448,9 @@ function CandidateDrawer({
                   {t.channel} {t.direction}
                 </span>
                 {t.notes ? <div>{t.notes}</div> : null}
+                {t.kind === "reply" && t.body ? (
+                  <pre className="mt-1 whitespace-pre-wrap font-sans text-[11px]">{t.body}</pre>
+                ) : null}
               </li>
             ))}
           </ul>

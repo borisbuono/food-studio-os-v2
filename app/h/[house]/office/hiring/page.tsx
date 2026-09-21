@@ -111,6 +111,14 @@ export default async function HiringPage({ params }: { params: { house: string }
         </div>
         <div className="flex items-center gap-2">
           <Link
+            href={`/apply/${slug}?src=preview`}
+            target="_blank"
+            className="rounded border border-black/15 px-3 py-1.5 text-xs"
+            title={`Public application link: https://foodstudio.ai/apply/${slug}?src=instagram`}
+          >
+            Application page ↗
+          </Link>
+          <Link
             href={`/h/${slug}/office/hiring/new`}
             className="rounded border border-black/15 bg-black px-3 py-1.5 text-xs text-white"
           >
@@ -162,6 +170,12 @@ export default async function HiringPage({ params }: { params: { house: string }
           </p>
         )}
       </section>
+
+      <p className="mt-4 text-xs text-clay">
+        Link for Instagram / WhatsApp:{" "}
+        <span className="select-all font-mono text-ink">https://foodstudio.ai/apply/{slug}?src=instagram</span>
+        {" "}— change <span className="font-mono">src=</span> to whatsapp, web… to see where people come from.
+      </p>
 
       {/* Candidate kanban */}
       <section className="mt-8">

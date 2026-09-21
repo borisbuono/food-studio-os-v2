@@ -216,7 +216,12 @@ export function ProfileBlock({ c, onUpdated }: { c: SopCandidate; onUpdated: (c:
       ) : null}
       {c.score != null ? (
         <div className="mt-3">
-          <div className="font-semibold">Screening score {c.score}/100</div>
+          <div className="font-semibold">
+            Screening score {c.score}/100
+            {c.score >= 60 && p.right_to_work?.value === "yes" && p.weekends?.value !== false ? (
+              <span className="ml-2 rounded bg-black px-1.5 py-0.5 text-[10px] font-normal text-white">ready for interview</span>
+            ) : null}
+          </div>
           <ul className="mt-1 space-y-0.5">
             {(c.score_reasons || []).map((r, i) => (
               <li key={i} className="flex justify-between gap-2">

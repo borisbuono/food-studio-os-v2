@@ -53,6 +53,9 @@ const PUBLIC_PAGE_PREFIXES = [
   // the get_invitation_by_token RPC to resolve the token; the finalize route
   // is called only after magic-link sign-in and is not public.
   "/team/join",
+  // Public job application page — candidates arrive from an Instagram /
+  // WhatsApp link with no account. Posts to /api/public/apply/<slug>.
+  "/apply/",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([
