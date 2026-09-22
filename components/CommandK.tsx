@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { isPrimaryEntity } from "@/lib/entities";
 import { setEntity as setEntityCtx, readEntityCookie } from "@/lib/ctx";
-import { scopeForUrl } from "@/lib/scope";
+import { scopeForUrl, itemsForHouse } from "@/lib/scope";
 import { fetchMyAccess, type MyAccess } from "@/lib/access/myAccess";
 import {
   paletteAccessFor, canSeeRoute, isOperating, NO_ACCESS,
@@ -91,8 +91,12 @@ const ROUTES: Route[] = [
   { label: "Missing invoices",        href: "/administrate/invoices",  hint: "supplier docs", pillar: "office", gate: { room: "office" } },
   { label: "Suppliers",               href: "/administrate/suppliers", hint: "vendors", pillar: "office", gate: { room: "office" } },
   { label: "Team",                    href: "/administrate/team",      hint: "people roster", pillar: "office", gate: { room: "office" } },
-  { label: "Hiring · pipeline",       href: "/administrate/hiring",    hint: "hr funnel candidates openings", pillar: "office", gate: { room: "office", feature: "hiring" } },
+  // "{house}" → the house in scope (lib/scope.ts itemsForHouse); the row is
+  // dropped when no house resolves. /administrate/hiring never existed as a
+  // page — the board lives at /h/<slug>/office/hiring (fixed 2026-09-22).
+  { label: "Hiring · pipeline",       href: "/h/{house}/office/hiring", hint: "hr funnel candidates openings", pillar: "office", gate: { room: "office", feature: "hiring" } },
   { label: "Schedule",                href: "/administrate/team/schedule", hint: "shifts rota", pillar: "office", gate: { room: "office" } },
+  { label: "Calendar",                href: "/h/{house}/calendar",     hint: "house calendar shifts bookings prep", pillar: "office", gate: { room: "office" } },
   { label: "Events",                  href: "/administrate/events",    hint: "private dining", pillar: "office", gate: { room: "office" } },
   { label: "Decisions",               href: "/administrate/decisions", hint: "log rationale", pillar: "office", gate: { room: "office" } },
   { label: "Holdings",                href: "/administrate/holdings",  hint: "group parent", pillar: "office", gate: { room: "studio" } },
@@ -157,7 +161,7 @@ const NEW_ITEMS: Route[] = [
   { label: "New · relationship",  href: "/grow/relationships/new",         hint: "crm lead", gate: { room: "dining", feature: "foh" } },
   { label: "New · recipe import", href: "/develop/recipes/import",         hint: "paste url", gate: { room: "kitchen" } },
   { label: "New · team invite",   href: "/administrate/team/invite",       hint: "invite whatsapp", gate: { room: "office" } },
-  { label: "New · hiring opening", href: "/administrate/hiring/new",       hint: "open role recruit", gate: { room: "office", feature: "hiring" } },
+  { label: "New · hiring opening", href: "/h/{house}/office/hiring/new",   hint: "open role recruit", gate: { room: "office", feature: "hiring" } },
   { label: "New · order",         href: "/execute/orders",                 hint: "supplier order", gate: { room: "kitchen" } },
   { label: "New · campaign",      href: "/grow/reach/campaigns/new",       hint: "ad reach campaign", gate: { room: "studio" } },
 ];
@@ -215,8 +219,8 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
   // The house in scope: /h/<slug> → that house; /studio → none (portfolio);
   // a legacy path → the fs_entity cookie. Recomputed when the palette opens
   // so a cookie swap since the last open is honoured.
-  const access: PaletteAccess = useMemo(() => {
-    if (!myAccess) return NO_ACCESS;
+  const { access, houseSlug } = useMemo<{ access: PaletteAccess; houseSlug: string | null }>(() => {
+    if (!myAccess) return { access: NO_ACCESS, houseSlug: null };
     const sc = scopeForUrl(path);
     let ctxId: string | null = null;
     if (sc && sc.level !== "studio") {
@@ -224,12 +228,20 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
     } else if (!sc) {
       ctxId = readEntityCookie();
     }
-    return paletteAccessFor(myAccess.entities, myAccess.memberships, ctxId);
+    // The slug of the house in scope — fills "{house}" in URL-scoped hrefs.
+    const houseSlug = ctxId ? (myAccess.entities.find((e) => e.id === ctxId)?.slug ?? null) : null;
+    return { access: paletteAccessFor(myAccess.entities, myAccess.memberships, ctxId), houseSlug };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myAccess, path, open]);
 
-  const allowedRoutes = useMemo(() => ROUTES.filter((r) => canSeeRoute(r.gate || {}, access)), [access]);
-  const allowedNew = useMemo(() => NEW_ITEMS.filter((r) => canSeeRoute(r.gate || {}, access)), [access]);
+  const allowedRoutes = useMemo(
+    () => itemsForHouse(ROUTES.filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
+    [access, houseSlug],
+  );
+  const allowedNew = useMemo(
+    () => itemsForHouse(NEW_ITEMS.filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
+    [access, houseSlug],
+  );
 
   // Keyboard opener + external dispatch. Voice / FAB integration invokes this.
   // The listener is only attached when `enabled` — an anonymous visitor

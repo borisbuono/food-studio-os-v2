@@ -31,7 +31,29 @@ export type EntityType =
   | "boh_room"
   | "foh_room";
 
+// An href may carry the HOUSE_HREF_TOKEN ("/h/{house}/calendar"): the chrome
+// substitutes the house in scope and DROPS the item when no house resolves
+// (Studio, or a legacy path with no house cookie). This is how a house tree
+// links to the URL-scoped /h/<slug>/** pages without a static slug.
 export type SidebarItem = { href: string; label: string; badge?: string };
+
+export const HOUSE_HREF_TOKEN = "{house}";
+
+export function resolveHouseHref(href: string, houseSlug: string | null | undefined): string | null {
+  if (!href.includes(HOUSE_HREF_TOKEN)) return href;
+  if (!houseSlug) return null;
+  return href.split(HOUSE_HREF_TOKEN).join(houseSlug);
+}
+
+export function itemsForHouse<T extends { href: string }>(items: T[], houseSlug: string | null | undefined): T[] {
+  const out: T[] = [];
+  for (const it of items) {
+    const href = resolveHouseHref(it.href, houseSlug);
+    if (href === null) continue;
+    out.push(href === it.href ? it : { ...it, href });
+  }
+  return out;
+}
 export type SidebarSection = {
   // A pillar-typed key so PillarTile / PillarAccent styling stays reusable
   // for FOH/BOH/OFFICE, and an arbitrary string for the new group/portfolio
@@ -115,8 +137,15 @@ const OPERATING_VENUE: SidebarSection[] = [
       { href: "/administrate/suppliers",              label: "Suppliers" },
       { href: "/administrate/team",                   label: "Team" },
       { href: "/administrate/team/schedule",          label: "Schedule" },
+      // 2026-09-22: the unified house calendar (/h/<slug>/calendar, live
+      // since 21-09) was reachable only from the house landing tile. Boris
+      // went looking for it in the sidebar and found "Reach calendar" —
+      // which is the Studio content calendar, on the Holdings tree he had
+      // been dropped into. URL-scoped: carries the house slug.
+      { href: "/h/{house}/calendar",                  label: "Calendar" },
       { href: "/administrate/events",                 label: "Events" },
-      { href: "/administrate/decisions",              label: "Decisions" },
+      // "Decisions" → /administrate/decisions dropped 2026-09-22: the page
+      // moved to /grow/inbox in ef0a39c and the link had 404'd since.
     ],
   },
 ];

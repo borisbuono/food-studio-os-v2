@@ -11,7 +11,7 @@ import type { ServerProfile } from "@/lib/serverProfile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
 import {
-  sidebarForScope, entityTypeFor, entityTypeForUrl, scopeForUrl, resolveScope,
+  sidebarForScope, entityTypeFor, entityTypeForUrl, scopeForUrl, resolveScope, itemsForHouse,
   EntityType, type Scope,
 } from "@/lib/scope";
 import {
@@ -98,7 +98,14 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   // from a legacy path).
   const urlScopeType = entityTypeForUrl(pathname);
   const scopeType: EntityType = urlScopeType ?? entityTypeFor(entity);
-  const sections = useMemo(() => sidebarForScope(scopeType), [scopeType]);
+  // Items whose href carries "{house}" get the house in scope substituted
+  // (URL-scoped /h/<slug>/** pages such as Calendar) and vanish when no
+  // house resolves.
+  const houseSlug = scope && scope.level !== "studio" ? scope.houseSlug : null;
+  const sections = useMemo(
+    () => sidebarForScope(scopeType).map((s) => ({ ...s, items: itemsForHouse(s.items, houseSlug) })),
+    [scopeType, houseSlug],
+  );
 
   // Sections open state.
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -131,7 +138,13 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     };
     read();
     return onCtx(read);
-  }, []);
+    // Re-read on every navigation (2026-09-22): middleware binds fs_entity
+    // when the user enters /h/<slug>, but this component lives in the root
+    // layout and never remounts, so without this `entity` kept the sign-in
+    // value (holdings) and the first legacy link in the house tree —
+    // Recipes → /develop/recipes — resolved against holdings: Studio brand,
+    // Holdings tree, "Reach calendar" where Kitchen should be.
+  }, [pathname]);
 
   const isAdmin = !!profile?.isAdmin;
   const canSwitch = isAdmin || !profile;

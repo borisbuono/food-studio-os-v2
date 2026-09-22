@@ -102,7 +102,11 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     };
     read();
     return onCtx(read);
-  }, []);
+    // Re-read on every navigation (2026-09-22): middleware binds fs_entity
+    // when the user enters /h/<slug>, but this component lives in the root
+    // layout and never remounts, so without this the state kept the
+    // sign-in value and the next legacy link resolved against it.
+  }, [pathname]);
 
   const isAdmin = !!profile?.isAdmin;
   const scoped = !!profile && !profile.isAdmin;          // a worker bound to one venue

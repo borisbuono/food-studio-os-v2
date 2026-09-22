@@ -142,6 +142,46 @@ function isApiPath(pathname: string): boolean {
   return pathname.startsWith("/api/");
 }
 
+// -----------------------------------------------------------------------------
+// House-scope binding — 2026-09-22 (Boris walk: Recipes / Reach calendar
+// dropped him from Bistro Mondo back into Studio).
+// -----------------------------------------------------------------------------
+// The three-level scope model (lib/scope.ts) makes /h/<slug>/** URL-scoped
+// and every legacy path (/develop/*, /boh, /office, /administrate/*, …)
+// COOKIE-scoped via fs_entity. The /h/<slug> pages were meant to bind that
+// cookie on entry, but they did it with cookies().set() inside a Server
+// Component render — which Next 14 refuses ("Cookies can only be modified
+// in a Server Action or Route Handler") — inside a try/catch that swallowed
+// the error. So entering a house never bound the cookie: it stayed on the
+// sign-in value (holdings for an owner), and the first legacy link in the
+// house sidebar resolved against holdings → Studio brand + Holdings tree.
+//
+// Middleware CAN set cookies, and it runs before the render, so this is the
+// one place the binding is reliable. On an authenticated, non-prefetch
+// request to /h/<slug>/** we resolve the slug against `entities` (RLS-
+// scoped — a user who is not a member sees no row and nothing is written),
+// forward the cookie to this request's server components, and persist it
+// on the response with the same attributes /auth/callback uses so there is
+// ONE fs_entity cookie on prod (task #27 — a host-only twin used to win).
+//
+// Prefetches are skipped on purpose: hovering a house tile on /studio/houses
+// fires a prefetch of /h/<slug>, and binding on that would silently move the
+// user into a house they never clicked.
+const HOUSE_PATH = /^\/h\/([a-z0-9][a-z0-9-]{0,62})(?:\/|$)/i;
+
+function houseSlugFromPath(pathname: string): string | null {
+  const m = HOUSE_PATH.exec(pathname);
+  return m ? m[1].toLowerCase() : null;
+}
+
+function isPrefetch(request: NextRequest): boolean {
+  const h = request.headers;
+  if (h.get("next-router-prefetch") === "1") return true;
+  if ((h.get("purpose") || "").toLowerCase() === "prefetch") return true;
+  if ((h.get("sec-purpose") || "").toLowerCase().includes("prefetch")) return true;
+  return false;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
@@ -151,8 +191,37 @@ export async function middleware(request: NextRequest) {
     return await withSupabaseSession(request, () => null);
   }
 
-  return await withSupabaseSession(request, (user) => {
-    if (user) return null; // authenticated → let it through
+  return await withSupabaseSession(request, async (user, supabase) => {
+    if (user) {
+      // Authenticated → let it through, binding the house cookie on /h/<slug>.
+      const slug = houseSlugFromPath(pathname);
+      if (!slug || isPrefetch(request)) return null;
+      let entityId: string | null = null;
+      try {
+        const { data } = await supabase
+          .from("entities")
+          .select("id")
+          .eq("slug", slug)
+          .eq("entity_type", "operating_venue")
+          .eq("status", "active")
+          .maybeSingle();
+        entityId = (data as { id?: string } | null)?.id ?? null;
+      } catch {
+        entityId = null;
+      }
+      if (!entityId) return null;
+      if (request.cookies.get("fs_entity")?.value === entityId) return null;
+      // Forward to THIS request's server components (layout.tsx seeds the
+      // sidebar's initialEntity from it) and persist for the next one.
+      request.cookies.set("fs_entity", entityId);
+      const bound = NextResponse.next({ request });
+      bound.cookies.set({
+        ...houseCookieAttrs(request.headers.get("host")),
+        name: "fs_entity",
+        value: entityId,
+      });
+      return bound;
+    }
 
     // Anon on `/` → /welcome (polite public landing, no ?next dump).
     if (pathname === "/") {
@@ -176,9 +245,19 @@ export async function middleware(request: NextRequest) {
   });
 }
 
+// fs_entity attributes: the auth cookie's domain/secure/sameSite (so prod
+// gets domain=.foodstudio.ai, previews stay host-only) + root path + 1 year,
+// matching /auth/callback and /invite/accept.
+function houseCookieAttrs(host: string | null) {
+  const { name: _n, ...attrs } = authCookieOptions(host);
+  return { ...attrs, path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" as const };
+}
+
+type SessionClient = ReturnType<typeof createServerClient>;
+
 async function withSupabaseSession(
   request: NextRequest,
-  decide: (user: { id: string } | null) => NextResponse | null,
+  decide: (user: { id: string } | null, supabase: SessionClient) => NextResponse | null | Promise<NextResponse | null>,
 ): Promise<NextResponse> {
   let supabaseResponse = NextResponse.next({ request });
   const cookieOpts = authCookieOptions(request.headers.get("host"));
@@ -212,7 +291,7 @@ async function withSupabaseSession(
     user = null;
   }
 
-  const decision = decide(user);
+  const decision = await decide(user, supabase);
   if (!decision) return supabaseResponse;
 
   // Copy any refreshed cookies from supabaseResponse onto the decision so

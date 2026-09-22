@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -84,14 +83,11 @@ export default async function HouseLandingPage({ params }: { params: { house: st
   if (!house) redirect("/studio");
   const entity = house.id;
 
-  // Bind the cookie so subsequent nav (legacy /office / /boh / /foh) still
-  // reads THIS house. The redirect to /office is gone — this page IS the
-  // house dashboard.
-  try {
-    cookies().set("fs_entity", entity, {
-      path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30,
-    });
-  } catch { /* read-only in some render paths — non-fatal */ }
+  // fs_entity is bound by middleware.ts on every /h/<slug>/** request
+  // (2026-09-22). It used to be set here with cookies().set(), which Next
+  // refuses inside a Server Component render — the try/catch hid the error
+  // and the cookie was never written, so the first legacy link in the
+  // house sidebar dropped the user back into Studio scope.
 
   const rid = house.restaurant_id ?? undefined;
   // Pinned entities (BM/Taller) still resolve to their pretty trading name
