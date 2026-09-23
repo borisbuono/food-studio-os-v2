@@ -3,6 +3,7 @@ import { hasServiceRole } from "@/lib/supabaseJob";
 import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN, refreshFrestoMasters } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
 import { cronAuthorized, cronDb, startRun, finishRun } from "@/lib/cron/heartbeat";
+import { syncAllConnected } from "@/lib/calendarGoogle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -225,6 +226,18 @@ export async function GET(req: NextRequest) {
     // Audit failures are non-fatal — the sync itself already happened.
   }
 
+  // Google Calendar overlay for /me/calendar and /book availability. It rides
+  // on this cron because Hobby allows only two cron entries; a failure here
+  // must never mark the POS run bad.
+  let google_calendar: any = { skipped: "no service role" };
+  if (hasServiceRole()) {
+    try {
+      google_calendar = await syncAllConnected(sb);
+    } catch (e: any) {
+      google_calendar = { ok: false, error: String(e?.message || e) };
+    }
+  }
+
   await finishRun(runId, !perVenue.some((p) => p.failed || p.error), {
     per_venue: perVenue.map((p) => ({
       entity: p.entity, days: p.days, inserted: p.inserted, updated: p.updated,
@@ -232,7 +245,7 @@ export async function GET(req: NextRequest) {
       newest_before: p.newest_before, backfilled_through: p.backfilled_through,
       masters: p.masters,
     })),
-    email_scan_ok, email_scan_error,
+    email_scan_ok, email_scan_error, google_calendar,
   });
 
   return NextResponse.json({
@@ -247,6 +260,7 @@ export async function GET(req: NextRequest) {
     email_scan_ok,
     email_scan_error,
     recipe_cost,
+    google_calendar,
     per_venue: perVenue,
   });
 }

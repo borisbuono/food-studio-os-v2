@@ -117,3 +117,18 @@ export async function syncPerson(sb: SupabaseClient, t: GcalTokens): Promise<{ o
     return { ok: false, count: 0, error: msg };
   }
 }
+
+// Every connected person, in one pass. Used by the nightly pull (which rides
+// on pos-nightly — Hobby plans allow only two cron entries) and by the
+// standalone /api/cron/calendar-google route.
+export async function syncAllConnected(sb: SupabaseClient) {
+  const { data, error } = await sb
+    .from("google_calendar_tokens")
+    .select("person_id, refresh_token, access_token, access_expires_at, last_synced_at");
+  if (error) return { ok: false, error: error.message, people: 0, results: [] as any[] };
+  const results: any[] = [];
+  for (const t of (data || []) as GcalTokens[]) {
+    results.push({ person: t.person_id, ...(await syncPerson(sb, t)) });
+  }
+  return { ok: results.every((r) => r.ok), people: results.length, results };
+}
