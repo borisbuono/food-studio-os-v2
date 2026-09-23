@@ -87,6 +87,10 @@ const PUBLIC_API_PREFIXES = [
   "/api/integrations/fresto/webhook/",
   // Public lead capture — rate-limited + honeypot-guarded in the route.
   "/api/leads/capture",
+  // Meta inbox drafter — called by the Postgres insert trigger (pg_net) and
+  // meta-inbox-pull with the Vault-minted x-inbox-secret; the route checks
+  // it through social_inbox_secret_ok(). Writes drafts only, never sends.
+  "/api/inbox/draft",
   // Nightly recipe-cost refresh, called by /api/cron/pos-nightly with the
   // CRON_SECRET bearer. The route itself rejects anything without the
   // secret or a signed-in session.
