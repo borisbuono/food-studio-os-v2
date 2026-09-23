@@ -143,6 +143,9 @@ const OPERATING_VENUE: SidebarSection[] = [
       // which is the Studio content calendar, on the Holdings tree he had
       // been dropped into. URL-scoped: carries the house slug.
       { href: "/h/{house}/calendar",                  label: "Calendar" },
+      // 2026-09-23: Meta comment + DM inbox. URL-scoped; the waiting count
+      // badge is filled in by DesktopSidebar from social_inbox_waiting.
+      { href: "/h/{house}/office/inbox",              label: "Inbox" },
       { href: "/administrate/events",                 label: "Events" },
       // "Decisions" → /administrate/decisions dropped 2026-09-22: the page
       // moved to /grow/inbox in ef0a39c and the link had 404'd since.

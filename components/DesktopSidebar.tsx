@@ -102,9 +102,31 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   // (URL-scoped /h/<slug>/** pages such as Calendar) and vanish when no
   // house resolves.
   const houseSlug = scope && scope.level !== "studio" ? scope.houseSlug : null;
+  // Meta inbox waiting count (2026-09-23) — badge on the house Inbox item.
+  // Read through RLS (social_inbox_waiting is security_invoker), keyed on the
+  // house slug in scope, refreshed on every route change and every 2 min.
+  const [inboxWaiting, setInboxWaiting] = useState<number>(0);
+  useEffect(() => {
+    let dead = false;
+    if (!houseSlug) { setInboxWaiting(0); return; }
+    const load = async () => {
+      const { data: ent } = await sbBrowser.from("entities").select("id").eq("slug", houseSlug).maybeSingle();
+      if (!ent?.id || dead) return;
+      const { data } = await sbBrowser.from("social_inbox_waiting").select("waiting").eq("entity_id", ent.id).maybeSingle();
+      if (!dead) setInboxWaiting(Number((data as any)?.waiting ?? 0));
+    };
+    load().catch(() => {});
+    const t = setInterval(() => { load().catch(() => {}); }, 120_000);
+    return () => { dead = true; clearInterval(t); };
+  }, [houseSlug, pathname]);
+
   const sections = useMemo(
-    () => sidebarForScope(scopeType).map((s) => ({ ...s, items: itemsForHouse(s.items, houseSlug) })),
-    [scopeType, houseSlug],
+    () => sidebarForScope(scopeType).map((s) => ({
+      ...s,
+      items: itemsForHouse(s.items, houseSlug).map((it) =>
+        inboxWaiting && it.href.endsWith("/office/inbox") ? { ...it, badge: String(inboxWaiting) } : it),
+    })),
+    [scopeType, houseSlug, inboxWaiting],
   );
 
   // Sections open state.
