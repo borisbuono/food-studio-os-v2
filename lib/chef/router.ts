@@ -302,8 +302,8 @@ async function readRecipes(q: string, ctx: ReadCtx): Promise<{ card: ChefCard; s
   const r: any = ranked[0];
   const href = ctx.house ? "/h/" + ctx.house + "/kitchen/recipes/" + r.id : "/develop/menu/" + r.id;
   const { data: steps } = await sb.from("recipe_steps").select("order_idx, body").eq("recipe_id", r.id).order("order_idx").limit(3);
-  const stepLines = (steps || []).map((s: any) => clip(s.body, 120));
-  const methodLines = stepLines.length ? stepLines : String(r.method || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 3).map((x) => clip(x, 120));
+  const stepLines = (steps || []).map((s: any) => clip(s.body, 80));
+  const methodLines = stepLines.length ? stepLines : String(r.method || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 3).map((x) => clip(x, 80));
   const yieldStr = r.yield_qty ? r.yield_qty + " " + (r.yield_unit || "") : r.portions ? r.portions + (ctx.lang === "es" ? " raciones" : " portions") : "";
   const lines = [yieldStr, ...methodLines].filter(Boolean).slice(0, 4);
   const say = ranked.length > 1 ? t.recipes_found(ranked.length) + ", " + r.name : r.name + (yieldStr ? ", " + yieldStr : "");
@@ -398,7 +398,7 @@ async function readInbox(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }>
   const waiting = Number((w as any)?.waiting || 0);
   if (!waiting) return { say: t.none_waiting, card: { title: t.none_waiting, lines: [], kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
   const lines = [t.waiting(waiting)];
-  if (top) lines.push(clip(((top as any).author_handle || (top as any).author_name || (top as any).platform || "") + ": " + ((top as any).text || ""), 140));
+  if (top) lines.push(clip(((top as any).author_handle || (top as any).author_name || (top as any).platform || "") + ": " + ((top as any).text || ""), 100));
   return { say: t.waiting(waiting), card: { title: t.waiting(waiting), lines, kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
 }
 

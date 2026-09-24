@@ -533,7 +533,7 @@ export default function ChefRoot() {
           width: desktop ? "var(--chef-sidebar, 15rem)" : undefined,
         }}
       >
-        <div className="pointer-events-auto -mb-2">
+        <div className="pointer-events-auto">
           <ChefControl state={state} level={level} onTap={onTap} onHold={onHold} onDragUp={openType} />
         </div>
       </div>
