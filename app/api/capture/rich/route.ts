@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { recomputeAfterIngest } from "@/lib/recipes/recompute";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
-import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
+import { ENTITY_TO_RESTAURANT, EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS, isPrimaryEntity } from "@/lib/entities";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,15 @@ export const dynamic = "force-dynamic";
 //
 // The old /api/capture route is preserved so the legacy Chef camera path
 // keeps working; this endpoint lives alongside it.
+//
+// Chef v3 Phase 2 (2026-09-24): the Chef control posts here directly with
+//   entity=<uuid>             scope override (the control knows its house;
+//                             the cookie may lag)
+//   via=chef                  → a chef_undo row (op 'capture') is created and
+//                             its token returned, so the card can offer Undo
+//   parent_capture_id=<uuid>  multi-shot: this photo is another PAGE of an
+//                             existing capture — lines are appended to the
+//                             parent invoice_inbox row, no new row.
 
 const ENTITY_CODE: Record<EntityKey, string> = {
   [E_TALLER]: "IFL",  [E_BM]: "BM",  [E_HOLDINGS]: "BBH",  [E_UTOPIA]: "UTOPIA",
@@ -183,11 +192,13 @@ function d(v: any): string | null {
 export async function POST(req: NextRequest) {
   try {
     const sb = supabaseServer();
-    const entKey = serverEntity();
+    const form = await req.formData();
+    const entOverride = String(form.get("entity") || "");
+    const entKey: EntityKey = isPrimaryEntity(entOverride) ? entOverride : serverEntity();
     const entCode = ENTITY_CODE[entKey] || "BM";
     const restaurantId = ENTITY_TO_RESTAURANT[entKey] || null;
-
-    const form = await req.formData();
+    const viaChef = String(form.get("via") || "") === "chef";
+    const parentId = String(form.get("parent_capture_id") || "");
     const file = form.get("file");
     const requestedType = String(form.get("type") || "auto");
     if (!(file instanceof Blob)) {
@@ -232,6 +243,58 @@ export async function POST(req: NextRequest) {
     }
     const signed = await sb.storage.from("captures").createSignedUrl(storagePath, 60 * 60 * 24 * 30);
     const doc_url = signed.data?.signedUrl || null;
+
+    // 2b) Another page of an existing capture (Chef multi-shot): append the
+    //     lines to the parent row, keep the parent's header, record the page.
+    if (parentId) {
+      const { data: parent } = await sb.from("invoice_inbox")
+        .select("id, doc_type, supplier_name, invoice_number, document_date, grand_total_eur, raw_ocr_text, ocr_extracted, storage_path")
+        .eq("id", parentId).maybeSingle();
+      if (!parent) return NextResponse.json({ ok: false, error: "parent capture not found" }, { status: 404 });
+      const { data: existing } = await sb.from("purchase_lines").select("line_number").eq("invoice_inbox_id", parentId).order("line_number", { ascending: false }).limit(1);
+      const offset = Number((existing && existing[0]?.line_number) || 0);
+      const rawLines = Array.isArray(extracted.lines) ? extracted.lines : [];
+      const pType = String(parent.doc_type || type);
+      let linesInserted = 0;
+      if (rawLines.length && (pType === "invoice" || pType === "albaran")) {
+        const rows = rawLines.map((ln, idx) => ({
+          invoice_inbox_id: parentId, entity_code: entCode, restaurant_id: restaurantId,
+          doc_date: d(parent.document_date) || d(extracted.document_date), doc_ref: s(parent.invoice_number) || s(extracted.invoice_number),
+          line_number: offset + idx + 1, product_code: s(ln.product_code), raw_product_text: s(ln.product_name),
+          qty: n(ln.quantity), unit: s(ln.unit), unit_price_eur: n(ln.unit_price_eur), discount_pct: n(ln.discount_pct),
+          line_subtotal_eur: n(ln.line_subtotal_eur), vat_rate: n(ln.vat_rate), vat_amount_eur: n(ln.vat_amount_eur),
+          line_total_eur: n(ln.line_total_eur), confidence: n(ln.confidence), source: "capture_rich", imported_at: new Date().toISOString(),
+        }));
+        const { error: linesErr, count } = await sb.from("purchase_lines").insert(rows, { count: "exact" });
+        if (!linesErr) linesInserted = count || rows.length;
+      }
+      const prevOcr = (parent.ocr_extracted && typeof parent.ocr_extracted === "object") ? parent.ocr_extracted as any : {};
+      const pages = Array.isArray(prevOcr.pages) ? prevOcr.pages : [];
+      pages.push({ storage_path: storagePath, doc_url, extracted, at: new Date().toISOString() });
+      const patch: Record<string, any> = {
+        ocr_extracted: { ...prevOcr, pages },
+        raw_ocr_text: [parent.raw_ocr_text, s(extracted.raw_ocr_text)].filter(Boolean).join("\n\n--- page " + (pages.length + 1) + " ---\n\n"),
+        notes: `captured via Chef · ${pages.length + 1} pages · lines appended`,
+      };
+      // A later page often carries the totals the first page lacked.
+      if (parent.grand_total_eur == null && n(extracted.grand_total_eur) != null) { patch.grand_total_eur = n(extracted.grand_total_eur); patch.amount_eur = n(extracted.grand_total_eur); }
+      if (!parent.supplier_name && s(extracted.supplier_name)) patch.supplier_name = s(extracted.supplier_name);
+      await sb.from("invoice_inbox").update(patch).eq("id", parentId);
+      if (viaChef) {
+        // Extend the parent's undo so one Undo removes every page.
+        const { data: und } = await sb.from("chef_undo").select("token, storage_path").eq("row_id", parentId).eq("op", "capture").is("used_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (und) await sb.from("chef_undo").update({ storage_path: [und.storage_path, storagePath].filter(Boolean).join(",") }).eq("token", und.token);
+      }
+      const { data: allLines } = await sb.from("purchase_lines").select("line_number, raw_product_text, qty, unit, line_total_eur, confidence").eq("invoice_inbox_id", parentId).order("line_number");
+      return NextResponse.json({
+        ok: true, capture_id: parentId, type: pType, pages: pages.length + 1,
+        supplier_name: patch.supplier_name || parent.supplier_name || null, invoice_number: parent.invoice_number || null,
+        document_date: d(parent.document_date), grand_total_eur: patch.grand_total_eur ?? parent.grand_total_eur ?? null,
+        lines: (allLines || []).map((l: any) => ({ line_number: l.line_number, product_name: l.raw_product_text, quantity: l.qty, unit: l.unit, line_total_eur: l.line_total_eur, confidence: l.confidence })),
+        lines_stored: (allLines || []).length, lines_added: linesInserted,
+        doc_url, storage_path: storagePath, extraction_error: extractionError,
+      });
+    }
 
     // 3) invoice_inbox row (upsert on storage_path so re-extraction is safe)
     const arrivedAt =
@@ -327,9 +390,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Chef v3: register an undo (deletes lines + row + storage), 24 h.
+    let undo_token: string | null = null;
+    if (viaChef && inboxId) {
+      const { data: und } = await sb.from("chef_undo").insert({
+        user_id: (await sb.auth.getUser()).data.user?.id, table_name: "invoice_inbox", row_id: inboxId, op: "capture",
+        storage_path: storagePath, expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+      }).select("token").maybeSingle();
+      undo_token = (und as any)?.token || null;
+    }
+
     return NextResponse.json({
       ok: true,
       capture_id: inboxId,
+      undo_token,
+      pages: 1,
       type,
       supplier_name: extracted.supplier_name || null,
       supplier_vat_id: extracted.supplier_vat_id || null,

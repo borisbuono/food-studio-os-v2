@@ -32,7 +32,7 @@ const T = {
   },
 } as const;
 
-const UNDO_TABLES = new Set(["assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters"]);
+const UNDO_TABLES = new Set(["assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments"]);
 const AGENT_TAG: Record<string, string> = { research: "RESEARCH", build: "OS", write: "MARKETING", pa: "PA" };
 
 function madridToday() {
@@ -67,10 +67,34 @@ export async function POST(req: Request) {
   if (action.type === "undo") {
     const token = String(action.undo_token || "");
     if (!token) return fail("undo_token required");
-    const { data: row } = await sb.from("chef_undo").select("token, user_id, table_name, row_id, used_at, expires_at")
+    const { data: row } = await sb.from("chef_undo").select("token, user_id, table_name, row_id, used_at, expires_at, op, before, storage_path")
       .eq("token", token).eq("user_id", uid).maybeSingle();
     if (!row || (row as any).used_at || Date.parse((row as any).expires_at) < Date.now() || !UNDO_TABLES.has((row as any).table_name))
       return fail(t.undo_bad, 410);
+    const op = String((row as any).op || "delete");
+    // Phase 2: an UPDATE undo restores the row's previous values; a CAPTURE
+    // undo removes the lines, the inbox row and the photo(s).
+    if (op === "update") {
+      const before = (row as any).before && typeof (row as any).before === "object" ? (row as any).before : null;
+      if (!before) return fail(t.undo_bad, 410);
+      const { data: back, error } = await sb.from((row as any).table_name).update(before).eq("id", (row as any).row_id).select("id");
+      if (error) return fail(error.message, 500);
+      if (!back || !back.length) return fail(t.nothing_deleted, 403);
+      await sb.from("chef_undo").update({ used_at: new Date().toISOString() }).eq("token", token);
+      const r: ChefActResult = { ok: true, card: card(t.undone, [], undefined, "write") };
+      return Response.json(r);
+    }
+    if (op === "capture") {
+      await sb.from("purchase_lines").delete().eq("invoice_inbox_id", (row as any).row_id);
+      const { data: gone, error } = await sb.from("invoice_inbox").delete().eq("id", (row as any).row_id).select("id");
+      if (error) return fail(error.message, 500);
+      if (!gone || !gone.length) return fail(t.nothing_deleted, 403);
+      const paths = String((row as any).storage_path || "").split(",").map((x) => x.trim()).filter(Boolean);
+      if (paths.length) { try { await sb.storage.from("captures").remove(paths); } catch {} }
+      await sb.from("chef_undo").update({ used_at: new Date().toISOString() }).eq("token", token);
+      const r: ChefActResult = { ok: true, card: card(t.undone, [], undefined, "write") };
+      return Response.json(r);
+    }
     const { data: gone, error } = await sb.from((row as any).table_name).delete().eq("id", (row as any).row_id).select("id");
     if (error) return fail(error.message, 500);
     // Undoing a charter must also pull its queued _INBOX note, or the PA

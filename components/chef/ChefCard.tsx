@@ -96,7 +96,7 @@ export default function ChefCard(p: ChefCardProps) {
             {p.busy ? "…" : t("chef.yes")}
           </button>
         </div>
-      ) : (card.primary && card.primary.kind !== "none") || card.chip || (p.undoLeftMs && p.undoLeftMs > 0) ? (
+      ) : card.primary || card.chip || card.secondary || (p.undoLeftMs && p.undoLeftMs > 0) ? (
         <div className="flex items-center gap-2 border-t border-line p-3">
           {p.undoLeftMs && p.undoLeftMs > 0 ? (
             <button
@@ -116,8 +116,17 @@ export default function ChefCard(p: ChefCardProps) {
               {card.chip.label}
             </button>
           ) : null}
+          {card.secondary ? (
+            <button
+              type="button"
+              onClick={() => p.onChip?.(card.secondary!)}
+              className="h-12 rounded-full border border-line px-4 font-sans text-[15px] text-ink-soft active:bg-paper-deep"
+            >
+              {card.secondary.label}
+            </button>
+          ) : null}
           <span className="flex-1" />
-          {card.primary && card.primary.kind !== "none" ? (
+          {card.primary ? (
             <button
               type="button"
               onClick={() => p.onPrimary?.(card.primary!)}

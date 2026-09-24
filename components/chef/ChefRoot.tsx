@@ -45,6 +45,24 @@ const SILENCE_MS = 8_000;
 
 type Pending = { turn: ChefTurn; voice: boolean };
 
+// Spoken replies can be switched off by voice ("silencio" / "mute") — the iOS
+// silent switch does NOT mute <audio> elements, so this is the kitchen's mute.
+const SPEECH_KEY = "fs_chef_speech";
+export function speechOn(): boolean {
+  try { return typeof localStorage === "undefined" || localStorage.getItem(SPEECH_KEY) !== "off"; } catch { return true; }
+}
+export function setSpeechOn(on: boolean) {
+  try { if (on) localStorage.removeItem(SPEECH_KEY); else localStorage.setItem(SPEECH_KEY, "off"); } catch {}
+}
+
+// The turn log carries how each turn ended (chef-log page, wrong-action rate).
+async function logResolution(turnId: string | null | undefined, resolution: string, result?: string | null) {
+  if (!turnId) return;
+  try {
+    await fetch("/api/chef/turn", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ turn_id: turnId, resolution, result: result || null }), keepalive: true });
+  } catch {}
+}
+
 export default function ChefRoot() {
   const pathname = usePathname() || "";
   const router = useRouter();
@@ -76,7 +94,10 @@ export default function ChefRoot() {
   const workingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const captureParent = useRef<string | null>(null); // multi-shot: the invoice_inbox row the next photo appends to
   const turnSeq = useRef(0);
+  const lastTurnId = useRef<string | null>(null);
 
   const lang = (getLang() === "es" ? "es" : "en") as "es" | "en";
 
@@ -163,17 +184,22 @@ export default function ChefRoot() {
   const showResult = useCallback((c: CardT, opts?: { undo?: string | null; keep?: boolean }) => {
     clearTimers();
     setCard(c); setState(c.kind === "error" ? "error" : "result"); setBusy(false); setStillWorking(false);
+    const persist = !!c.persist;
     if (opts?.undo) {
       setUndoToken(opts.undo); setUndoLeft(UNDO_MS);
       const t0 = Date.now();
       undoTimer.current = setInterval(() => {
         const left = UNDO_MS - (Date.now() - t0);
         setUndoLeft(left > 0 ? left : 0);
-        if (left <= 0) { if (undoTimer.current) clearInterval(undoTimer.current); undoTimer.current = null; setUndoToken(null); toIdle(); }
+        if (left <= 0) {
+          if (undoTimer.current) clearInterval(undoTimer.current); undoTimer.current = null; setUndoToken(null);
+          // A persistent card (capture result) stays until "Looks right" / "Fix"; only the Undo goes.
+          if (!persist) toIdle();
+        }
       }, 250);
       return;
     }
-    if (!opts?.keep) scheduleDissolve(READ_DISSOLVE_MS);
+    if (!opts?.keep && !persist) scheduleDissolve(READ_DISSOLVE_MS);
   }, [clearTimers, scheduleDissolve, toIdle]);
 
   // --- TTS (voice turns only) ------------------------------------------------
@@ -223,6 +249,7 @@ export default function ChefRoot() {
     }
     if (res.navigate) { toIdle(); router.push(res.navigate); return; }
     const c: CardT = res.card || { title: t("chef.done"), lines: [], kind: "write" };
+    void logResolution(lastTurnId.current, "done", c.title);
     showResult(c, { undo: res.undo_token || null, keep: !res.undo_token });
     if (voice) void speak(c.title);
     if (!res.undo_token) scheduleDissolve(READ_DISSOLVE_MS);
@@ -231,6 +258,7 @@ export default function ChefRoot() {
   const onUndo = useCallback(async () => {
     if (!undoToken) return;
     const tok = undoToken;
+    void logResolution(lastTurnId.current, "undone");
     setUndoToken(null); setUndoLeft(0);
     if (undoTimer.current) { clearInterval(undoTimer.current); undoTimer.current = null; }
     setBusy(true);
@@ -241,6 +269,7 @@ export default function ChefRoot() {
   // --- the turn ---------------------------------------------------------------
   const applyTurn = useCallback(async (turn: ChefTurn, voice: boolean) => {
     setTranscript(turn.transcript || null);
+    lastTurnId.current = turn.turn_id || null;
     if (turn.navigate && turn.intent.kind !== "capture") {
       toIdle();
       if (voice && turn.say) void speak(turn.say);
@@ -248,8 +277,12 @@ export default function ChefRoot() {
       return;
     }
     if (turn.intent.kind === "capture") {
-      toIdle();
-      startCapture();
+      // A file input only opens inside a user gesture; a voice turn ends
+      // long after the tap. Offer the shutter as the card's one button.
+      clearTimers();
+      setCard({ title: turn.say, lines: [t("chef.tap_to_talk").split("·")[1]?.trim() || ""], kind: "read", primary: { label: "📷 " + t("capture.title"), kind: "capture_page", capture_id: "" } });
+      setState("result"); setBusy(false);
+      if (voice && speechOn()) void speak(turn.say);
       return;
     }
     if (turn.needs_confirm && turn.action) {
@@ -367,12 +400,87 @@ export default function ChefRoot() {
   }, [startListening, state, stopListening]);
 
   const houses = useMemo(() => listHouses(), []);
-  const startCapture = useCallback(() => {
+  const captureEntity = useRef<string | null>(null);
+
+  // Phase 2: hold = the camera itself (a capture-enabled file input → the
+  // iOS camera sheet), not a trip to /capture. The photo posts to the
+  // existing /api/capture/rich pipeline (Sonnet vision → invoice_inbox +
+  // purchase_lines) and comes back as a card with the parsed lines,
+  // "Looks right" / "Fix" / "Add page", and Undo (24 h server-side).
+  const openCamera = useCallback((entity: string, parent: string | null) => {
+    captureEntity.current = entity;
+    captureParent.current = parent;
+    const el = fileRef.current;
+    if (!el) return;
+    el.value = "";
+    el.click();
+  }, []);
+
+  const startCapture = useCallback((parent: string | null = null) => {
     const ent = scope.entityId;
-    if (ent && ent !== E_HOLDINGS) { router.push(`/capture?type=auto&entity=${encodeURIComponent(ent)}`); return; }
-    if (houses.length === 1) { router.push(`/capture?type=auto&entity=${encodeURIComponent(houses[0].entity)}`); return; }
+    if (ent && ent !== E_HOLDINGS) { openCamera(ent, parent); return; }
+    if (houses.length === 1) { openCamera(houses[0].entity, parent); return; }
     setHousePick(true);
-  }, [houses, router, scope.entityId]);
+  }, [houses, openCamera, scope.entityId]);
+
+  const captureCard = useCallback((j: any, entityLabel: string | undefined): CardT => {
+    const typeLabel = j.type === "albaran" ? (lang === "es" ? "Albarán" : "Delivery note")
+      : j.type === "invoice" ? (lang === "es" ? "Factura" : "Invoice")
+      : j.type === "eod" ? (lang === "es" ? "Cierre" : "EOD report") : (lang === "es" ? "Documento" : "Document");
+    const lines: string[] = [];
+    const n = Number(j.lines_stored ?? (j.lines || []).length);
+    const total = j.grand_total_eur != null ? "€" + Number(j.grand_total_eur).toFixed(2) : null;
+    lines.push([typeLabel, j.document_date, n + " " + t("chef.lines"), total, j.pages > 1 ? j.pages + " " + t("chef.pages") : null].filter(Boolean).join(" · "));
+    for (const ln of (j.lines || []).slice(0, 3)) {
+      const q = [ln.quantity, ln.unit, ln.product_name].filter((x: any) => x != null && x !== "").join(" ");
+      const lt = ln.line_total_eur != null ? " · €" + Number(ln.line_total_eur).toFixed(2) : "";
+      lines.push((q || "—") + lt);
+    }
+    const id = String(j.capture_id || "");
+    return {
+      title: j.supplier_name || typeLabel,
+      lines: lines.slice(0, 4),
+      kind: "write",
+      entity_label: entityLabel,
+      persist: true,
+      primary: { label: t("chef.looks_right"), kind: "none" },
+      chip: { label: t("chef.fix"), kind: "navigate", href: "/administrate/finance/scans?id=" + encodeURIComponent(id) },
+      secondary: id ? { label: t("chef.add_page"), kind: "capture_page", capture_id: id } : undefined,
+    };
+  }, [lang]);
+
+  const onFilePicked = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const entity = captureEntity.current;
+    const parent = captureParent.current;
+    if (!file || !entity) return;
+    const seq = ++turnSeq.current;
+    clearTimers();
+    setState("thinking"); setTranscript("📷 " + t("chef.photo")); setPartial(""); setCard(null); setPending(null);
+    workingTimer.current = setTimeout(() => setStillWorking(true), STILL_WORKING_MS);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name || "capture.jpg");
+      fd.append("type", "auto");
+      fd.append("entity", entity);
+      fd.append("via", "chef");
+      if (parent) fd.append("parent_capture_id", parent);
+      const r = await fetch("/api/capture/rich", { method: "POST", body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (seq !== turnSeq.current) return;
+      if (!r.ok || !j?.ok) { showResult({ title: t("chef.capture_failed"), lines: [j?.error || ("HTTP " + r.status)], kind: "error" }); return; }
+      const label = houses.find((h) => h.entity === entity)?.name;
+      const c = captureCard(j, label);
+      // The parent's undo (first page) already covers later pages.
+      showResult(c, { undo: parent ? (undoToken || null) : (j.undo_token || null), keep: true });
+      if (speechOn()) void speak(c.title + (j.lines_stored ? ", " + j.lines_stored + " " + t("chef.lines") : ""));
+      void logResolution(null, "done", c.title);
+    } catch (err: any) {
+      if (seq !== turnSeq.current) return;
+      showResult({ title: t("chef.capture_failed"), lines: [err?.message || "network"], kind: "error" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureCard, clearTimers, houses, showResult, speak, undoToken]);
 
   const onHold = useCallback(() => {
     if (state === "listening") return;
@@ -415,17 +523,23 @@ export default function ChefRoot() {
   // --- card handlers -----------------------------------------------------------------
   const onCardAction = useCallback((a: ChefCardAction) => {
     if (a.kind === "navigate") { toIdle(); router.push(a.href); return; }
+    if (a.kind === "none") { toIdle(); return; }
+    if (a.kind === "capture_page") { startCapture(a.capture_id || null); return; }
     if (a.kind === "act") { void runAction(a.action, false); }
-  }, [router, runAction, toIdle]);
+  }, [router, runAction, startCapture, toIdle]);
 
   const onYes = useCallback(() => {
     if (!pending?.turn.action) return;
     const { turn, voice } = pending;
     setPending(null);
+    void logResolution(turn.turn_id, "confirmed_tap");
     void runAction(turn.action!, voice);
   }, [pending, runAction]);
 
-  const onNo = useCallback(() => { toIdle(); }, [toIdle]);
+  const onNo = useCallback(() => {
+    void logResolution(pending?.turn.turn_id, "declined");
+    toIdle();
+  }, [pending, toIdle]);
 
   const onBody = useCallback(() => {
     if (card?.href) { const h = card.href; toIdle(); router.push(h); }
@@ -440,6 +554,8 @@ export default function ChefRoot() {
   return (
     <>
       <audio ref={audioRef} playsInline preload="none" className="hidden" />
+      {/* Hold → camera. `capture` opens the rear camera directly on iOS/Android; desktop gets a file picker. */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFilePicked} />
 
       {/* Page-dim while listening (phone + desktop). Tap = cancel. */}
       {state === "listening" ? (
@@ -550,7 +666,7 @@ export default function ChefRoot() {
               {houses.map((h) => (
                 <li key={h.slug}>
                   <button
-                    onClick={() => { setHousePick(false); router.push(`/capture?type=auto&entity=${encodeURIComponent(h.entity)}`); }}
+                    onClick={() => { setHousePick(false); openCamera(h.entity, null); }}
                     className="flex h-14 w-full items-center justify-between rounded-xl px-3 text-left font-sans text-[17px] text-ink active:bg-paper-deep"
                   >
                     <span>{h.name}</span>

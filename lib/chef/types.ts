@@ -32,16 +32,19 @@ export type ChefIntentKind = ChefIntent["kind"];
 export type ChefCardAction =
   | { label: string; kind: "navigate"; href: string }
   | { label: string; kind: "act"; action: ChefAction }   // posts to /api/chef/act
-  | { label: string; kind: "none" };
+  | { label: string; kind: "capture_page"; capture_id: string }  // Phase 2: photograph another page of this capture
+  | { label: string; kind: "none" };                      // dismiss (e.g. "Looks right")
 
 export type ChefCard = {
   title: string;                 // ≤ 60 chars
   lines: string[];               // ≤ 4 short lines
   primary?: ChefCardAction;
   chip?: ChefCardAction;         // the ONE alternative chip (confidence 0.6–0.85 on writes)
+  secondary?: ChefCardAction;    // Phase 2, capture cards only: "Add page" (multi-shot) — nowhere else
   entity_label?: string;         // "Bistro Mondo" — rendered as the entity chip
   href?: string;                 // tapping the card body navigates here (reads never auto-navigate)
   kind?: "read" | "write" | "confirm" | "error";
+  persist?: boolean;             // stays until acted on (capture result) — no 6 s dissolve
 };
 
 // What the client posts to /api/chef/act. Every write goes through here so
