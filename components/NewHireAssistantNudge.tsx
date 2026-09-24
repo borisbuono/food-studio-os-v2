@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { getMyProfile } from "@/lib/profile";
+import { Z } from "@/lib/ui/z";
 
 // Companion piece to the Assistant FAB.
 //
@@ -77,7 +78,7 @@ export default function NewHireAssistantNudge() {
   if (state !== "showing" || fabHidden || !userId) return null;
 
   return (
-    <div className="fixed bottom-24 right-5 z-[59] max-w-[280px] rounded-2xl border border-line bg-card p-4 shadow-lg shadow-black/10 animate-in fade-in slide-in-from-bottom-2">
+    <div className="fixed bottom-24 right-5 max-w-[280px] rounded-2xl border border-line bg-card p-4 shadow-lg shadow-black/10 animate-in fade-in slide-in-from-bottom-2" style={{ zIndex: Z.drawer }}>
       <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Chef</p>
       <p className="mt-1 font-serif text-[15px] leading-snug text-ink">Would you like me to walk you through the OS?</p>
       <div className="mt-3 flex items-center gap-2">

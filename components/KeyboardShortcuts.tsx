@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GO_TARGETS, isTypingTarget } from "@/lib/keyboard/shortcuts";
+import { Z } from "@/lib/ui/z";
 
 // Global shortcut installer. Sits in the layout.
 //
@@ -93,7 +94,8 @@ export default function KeyboardShortcuts() {
   if (!helpOpen) return null;
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/30 p-6"
+      className="fixed inset-0 flex items-center justify-center bg-black/30 p-6"
+      style={{ zIndex: Z.modal }}
       onClick={() => setHelpOpen(false)}
       role="dialog"
       aria-modal="true"

@@ -13,6 +13,7 @@ import { scopeForUrl, resolveScope } from "@/lib/scope";
 import { HOUSE_SLUG_TO_ENTITY, houseSlugForEntity } from "@/lib/houses";
 import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
 import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
+import { Z } from "@/lib/ui/z";
 
 // Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
 // The old Develop/Execute/Administrate/Grow labels are gone from the nav;
@@ -145,8 +146,8 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     //  2) the inner row gets min-h-[44px] (iOS tap-target min) so the flex
     //     children can't collapse below what the notch demands.
     <header
-      className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur"
-      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
+      className="sticky top-0 border-b border-black/10 bg-paper/90 backdrop-blur"
+      style={{ zIndex: Z.sticky, paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
         {/* Logo binds to the current SCOPE, not the fs_entity cookie. Boris walk

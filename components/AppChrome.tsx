@@ -12,6 +12,8 @@ import type { ServerProfile } from "@/lib/serverProfile";
 import { EntityKey, E_HOLDINGS } from "@/lib/entities";
 import { fetchMyAccess } from "@/lib/access/myAccess";
 import { brandForPath } from "@/lib/brandScope";
+import { isPublicRoute } from "@/lib/routing/public-routes";
+import { Z } from "@/lib/ui/z";
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
 // Boris asked (2026-08-19): "logging in on top of Bistro Mondo... it needs
@@ -33,11 +35,9 @@ import { brandForPath } from "@/lib/brandScope";
 
 // /onboard/* also renders as a clean shell (no sidebar/topbar) — the wizard
 // is a first-time surface, chrome would drown out the flow.
-const PUBLIC_PREFIXES = ["/welcome", "/login", "/auth/", "/m/", "/booking-terms", "/onboard", "/apply/", "/book/"];
-
-function isPublic(path: string): boolean {
-  return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
-}
+// The prefix list lives in lib/routing/public-routes (shared with ChefSwitch
+// since 2026-09-24 so the Chef FAB and the chrome agree on what is public).
+const isPublic = isPublicRoute;
 
 type ShellState = {
   loaded: boolean;
@@ -137,8 +137,8 @@ function SlimTopBar({ initialProfile, initialEntity, path }: { initialProfile?: 
   })();
   return (
     <header
-      className="sticky top-0 z-40 border-b border-black/10 bg-paper/90 backdrop-blur"
-      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
+      className="sticky top-0 border-b border-black/10 bg-paper/90 backdrop-blur"
+      style={{ zIndex: Z.sticky, paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
     >
       <div className="mx-auto flex min-h-[44px] max-w-3xl items-center justify-between px-6 py-3">
         {/* Task #61: slim users live in ONE house — the logo is that house

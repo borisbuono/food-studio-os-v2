@@ -12,6 +12,7 @@ import {
 } from "@/lib/access/tenantScope";
 import { PILLAR_LABEL, PILLAR_ACCENT, Pillar } from "@/lib/routing/pillar-map";
 import type { ServerProfile } from "@/lib/serverProfile";
+import { Z } from "@/lib/ui/z";
 
 // P0 fix (2026-09-21) — Boris caught the palette rendering for anonymous
 // visitors on /welcome, exposing every internal route (FOH, dashboard,
@@ -400,7 +401,8 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
 
       {open ? (
         <div
-          className="fixed inset-0 z-[70] flex items-start justify-center bg-black/25 px-4 pt-24"
+          className="fixed inset-0 flex items-start justify-center bg-black/25 px-4 pt-24"
+          style={{ zIndex: Z.modal }}
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"

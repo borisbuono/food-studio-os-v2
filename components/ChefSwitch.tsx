@@ -11,11 +11,22 @@
 //
 // Ships zero-risk: navigate to any page with ?slim=0 to revert. Same file
 // path as the original switch so the layout.tsx import doesn't change.
+//
+// Option A (2026-09-24):
+//   • Route gate now shares lib/routing/public-routes with AppChrome, so the
+//     FAB never renders on /welcome, /onboard/*, /book/*, /apply/*,
+//     /recipes/*, /login, /auth/*, /m/*. Before, only /apply/* was excluded
+//     and signed-out visitors on /welcome got a Chef button.
+//   • AssistantFab is loaded with next/dynamic so the 1,400-line retired
+//     component is NOT in the default bundle — only fetched when ?slim=0.
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import AssistantFab from "@/components/AssistantFab";
 import ChefSlim from "@/components/ChefSlim";
+import { isChefHiddenRoute } from "@/lib/routing/public-routes";
+
+const AssistantFab = dynamic(() => import("@/components/AssistantFab"), { ssr: false });
 
 export default function ChefSwitch() {
   const [useLegacy, setUseLegacy] = useState(false);
@@ -42,7 +53,7 @@ export default function ChefSwitch() {
   }, []);
 
   if (!ready) return null; // avoid double-mount flash
-  // Public candidate pages: no staff assistant floating over the form.
-  if (pathname.startsWith("/apply/")) return null;
+  // Public / signed-out surfaces: no staff assistant floating over them.
+  if (isChefHiddenRoute(pathname)) return null;
   return useLegacy ? <AssistantFab /> : <ChefSlim />;
 }

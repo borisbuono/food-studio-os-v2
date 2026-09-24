@@ -19,6 +19,7 @@ import {
 } from "@/lib/houses";
 import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
 import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
+import { Z } from "@/lib/ui/z";
 
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px).
 //
@@ -209,7 +210,8 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   return (
     <aside
       data-desktop-sidebar
-      className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-60 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
+      className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
+      style={{ zIndex: Z.sticky }}
       aria-label="Desktop navigation"
     >
       {/* Wordmark + "you are here" label. Static text on Studio scope,

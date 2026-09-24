@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Z } from "@/lib/ui/z";
 
 // PWA #3 (2026-07-28) — persistent "you're offline" badge for standalone
 // mode. In the browser we already surface network errors inline; in
@@ -22,7 +23,8 @@ export default function PwaOfflineBadge() {
   }, []);
   if (!offline) return null;
   return (
-    <div className="sticky top-0 z-[70] w-full border-b border-tomato/40 bg-tomato/95 py-1 text-center font-mono text-[10px] uppercase tracking-wide text-paper"
+    <div className="sticky top-0 w-full border-b border-tomato/40 bg-tomato/95 py-1 text-center font-mono text-[10px] uppercase tracking-wide text-paper"
+      style={{ zIndex: Z.toast }}
       role="status" aria-live="polite">
       Offline · changes won't save until you're back on Wi-Fi
     </div>

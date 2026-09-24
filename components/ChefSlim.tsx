@@ -38,6 +38,19 @@
 //     everywhere).
 //   - Language selector chip (still passes fs_lang cookie).
 //   - Snap-point drag handle (single fixed size per breakpoint).
+//
+// Option A (Boris 2026-09-24, chef button audit):
+//   - The FAB IS the close control. When the drawer is open it stays in
+//     its slot (right 20 / bottom safe+20, 56 px) and shows ×. The header
+//     × is gone — one close affordance, plus Escape and swipe-down.
+//   - The composer row keeps a right gutter equal to the FAB slot
+//     (pr-[76px] mobile / pr-[72px] desktop) so camera · textarea · mic ·
+//     Send are fully visible beside the FAB, never under it. Before, the
+//     FAB (z-60) sat on top of Send (z-50) in the same corner.
+//   - z-index comes from lib/ui/z (drawer < fab < modal), not magic numbers.
+//   - Colours are theme tokens only: text-paper on accent, text-tomato for
+//     the voice error, border-line hairlines. var(--accent) is the venue
+//     accent (ENTITY_ACCENT mirrors entities.accent_color).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -47,6 +60,7 @@ import { pillarForRoute } from "@/lib/routing/pillar-map";
 import { scopeForUrl } from "@/lib/scope";
 import { listHouses, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
 import { t } from "@/lib/i18n";
+import { Z } from "@/lib/ui/z";
 
 type Msg = { role: "you" | "chef" | "sys"; text: string };
 
@@ -323,16 +337,16 @@ export default function ChefSlim() {
           role="dialog"
           aria-label="Chef"
           className={
-            "fixed z-50 flex flex-col bg-paper shadow-2xl shadow-black/20 " +
-            "inset-x-0 bottom-0 h-[85vh] rounded-t-2xl border-t border-black/10 " +
+            "fixed flex flex-col bg-paper shadow-2xl shadow-black/20 " +
+            "inset-x-0 bottom-0 h-[85vh] rounded-t-2xl border-t border-line " +
             "lg:inset-x-auto lg:top-0 lg:bottom-0 lg:right-0 lg:h-full lg:w-[420px] " +
-            "lg:rounded-none lg:border-t-0 lg:border-l lg:border-black/10 lg:shadow-xl"
+            "lg:rounded-none lg:border-t-0 lg:border-l lg:border-line lg:shadow-xl"
           }
-          style={{ transition: "transform 200ms ease" }}
+          style={{ zIndex: Z.drawer, transition: "transform 200ms ease" }}
         >
           {/* Header */}
           <div
-            className="flex items-center justify-between border-b border-black/10 px-4 py-3 lg:px-5 lg:py-4"
+            className="relative flex items-center justify-between border-b border-line px-4 py-3 lg:px-5 lg:py-4"
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
@@ -342,23 +356,15 @@ export default function ChefSlim() {
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-mono text-[#F7F7F4]"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-mono text-paper"
                 style={{ background: "var(--accent)" }}
               >
                 C
               </span>
               <span className="font-serif text-[15px] text-ink">Chef</span>
             </div>
-            <button
-              type="button"
-              aria-label="Close Chef"
-              className="rounded-full p-2 text-ink-soft transition hover:bg-black/5 hover:text-ink"
-              onClick={() => setOpen(false)}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
+            {/* No header ×: the FAB in the corner is the close control
+                (Option A, 2026-09-24). Escape and swipe-down still close. */}
           </div>
 
           {/* Message stream */}
@@ -376,7 +382,7 @@ export default function ChefSlim() {
                   <li key={i}>
                     {m.role === "you" ? (
                       <div className="flex justify-end">
-                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2 font-sans text-[14px] leading-snug text-[#F7F7F4]">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink px-3.5 py-2 font-sans text-[14px] leading-snug text-paper">
                           {m.text}
                         </div>
                       </div>
@@ -403,13 +409,17 @@ export default function ChefSlim() {
           {/* Composer */}
           <form
             onSubmit={onSubmit}
-            className="border-t border-black/10 bg-paper px-3 py-3 lg:px-4"
+            className="border-t border-line bg-paper px-3 py-3 lg:px-4"
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
           >
             {voiceErr ? (
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-wide" style={{ color: "#9A3122" }}>{voiceErr}</p>
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-tomato">{voiceErr}</p>
             ) : null}
-            <div className="flex items-end gap-2">
+            {/* Right gutter = FAB slot. FAB occupies 20–76 px from the
+                right edge; with form padding 12 (mobile) / 16 (desktop)
+                these values put Send's right edge at 88 px, 12 px clear
+                of the FAB. Verified geometry in the Option A ship note. */}
+            <div className="flex items-end gap-2 pr-[76px] lg:pr-[72px]">
               {/* Capture — the ONE capture affordance in the shell (Boris
                   re-walk 2026-08-31 17:40 CET). Small icon button next to
                   the mic; type=auto because OCR classifies. */}
@@ -419,7 +429,7 @@ export default function ChefSlim() {
                 title="Capture invoice / delivery note / statement"
                 onClick={startCapture}
                 disabled={listening || sending}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 text-ink transition hover:bg-black/5 disabled:opacity-40"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink transition hover:bg-paper-deep disabled:opacity-40"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h2.2l1.5-2h5.6l1.5 2h2.2A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -434,7 +444,7 @@ export default function ChefSlim() {
                 placeholder={listening ? t("chef.listening") : t("chef.placeholder")}
                 rows={1}
                 disabled={listening}
-                className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-2xl border border-black/10 bg-paper px-3 py-2 font-sans text-[14px] leading-snug text-ink outline-none focus:border-ink/40"
+                className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-2xl border border-line bg-paper px-3 py-2 font-sans text-[14px] leading-snug text-ink outline-none focus:border-ink/40"
               />
               {/* Mic — press-and-hold */}
               <button
@@ -447,8 +457,8 @@ export default function ChefSlim() {
                 className={
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition " +
                   (listening
-                    ? "border-transparent text-[#F7F7F4] animate-pulse"
-                    : "border-black/10 text-ink hover:bg-black/5")
+                    ? "border-transparent text-paper animate-pulse"
+                    : "border-line text-ink hover:bg-paper-deep")
                 }
                 style={listening ? { background: "var(--accent)" } : undefined}
               >
@@ -463,8 +473,7 @@ export default function ChefSlim() {
                 aria-label={t("chef.send")}
                 disabled={!input.trim() || sending || listening}
                 className={
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#F7F7F4] transition disabled:opacity-40 " +
-                  (sending ? "" : "")
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-paper transition disabled:opacity-40"
                 }
                 style={{ background: "var(--accent)" }}
               >
@@ -479,20 +488,21 @@ export default function ChefSlim() {
 
       {/* House picker — only shown when Chef is on Studio scope and the
           user hits +Capture without a house context. Renders above the
-          FAB and drawer (z-[70]) so it's reachable even with Chef open. */}
+          FAB and drawer (Z.modal) so it's reachable even with Chef open. */}
       {captureOpen ? (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Capture for which house"
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/40 p-4"
+          className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4"
+          style={{ zIndex: Z.modal }}
           onClick={() => setCaptureOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-xl border border-black/10 bg-paper shadow-xl"
+            className="w-full max-w-sm rounded-xl border border-line bg-paper shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-black/10 px-5 py-3">
+            <div className="border-b border-line px-5 py-3">
               <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Capture</p>
               <h2 className="mt-1 font-serif text-[20px] text-ink">Capture for which house?</h2>
             </div>
@@ -509,7 +519,7 @@ export default function ChefSlim() {
                 </li>
               ))}
             </ul>
-            <div className="flex justify-end border-t border-black/10 px-3 py-2">
+            <div className="flex justify-end border-t border-line px-3 py-2">
               <button
                 onClick={() => setCaptureOpen(false)}
                 className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
@@ -521,13 +531,16 @@ export default function ChefSlim() {
         </div>
       ) : null}
 
-      {/* FAB — single circle, one glyph, no long-press, no badge. */}
+      {/* FAB — single circle, one glyph, no long-press, no badge. Same slot
+          open or closed; when open it is the Close control (×) and sits
+          beside the composer row, which keeps a gutter for it. */}
       <button
         type="button"
         aria-label={open ? "Close Chef" : "Open Chef"}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="fs-fab-safe fixed right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full text-[#F7F7F4] shadow-lg shadow-black/25 transition active:scale-95"
-        style={{ background: "var(--accent)", touchAction: "manipulation" }}
+        className="fs-fab-safe fixed right-5 flex h-14 w-14 items-center justify-center rounded-full text-paper shadow-lg shadow-black/25 transition active:scale-95"
+        style={{ zIndex: Z.fab, background: "var(--accent)", touchAction: "manipulation" }}
       >
         {open ? (
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
