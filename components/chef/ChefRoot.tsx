@@ -320,8 +320,18 @@ export default function ChefRoot() {
   // says confirm_voice (outbound reply, agent). Money / publish / delete
   // never get the window: tap Yes only. Anything not clearly a yes is not a
   // yes; silence → idle, nothing done. Any tap closes the window.
-  const YES = /^(?:s[ií]|yes|yeah|yep|ok(?:ay)?|vale|dale|hazlo|env[ií]a(?:lo)?|m[aá]ndalo|send(?: it)?|go(?: ahead)?|confirm(?:o|ar)?|claro|adelante)\b/i;
-  const NO = /^(?:no|nope|cancel(?:a|ar)?|para|stop|nada|d[eé]jalo|olv[ií]dalo|never ?mind)\b/i;
+  // Closed grammar: the whole utterance must be yes-words (fillers allowed);
+  // any no-word anywhere = no; anything else = not a yes. Accent-insensitive
+  // (JS \b is ASCII-only, so "Sí." would otherwise miss).
+  const YES_WORDS = new Set(["si", "yes", "yeah", "yep", "ok", "okay", "vale", "dale", "hazlo", "envia", "envialo", "mandalo", "send", "go", "ahead", "confirmo", "confirmar", "confirm", "claro", "adelante", "sip", "correcto", "right", "sure"]);
+  const NO_WORDS = new Set(["no", "nope", "cancel", "cancela", "cancelar", "para", "stop", "nada", "dejalo", "olvidalo", "never", "nevermind", "espera", "wait"]);
+  const FILLER = new Set(["por", "favor", "please", "chef", "it", "lo", "la", "eso", "that", "one", "y", "and", "ya", "ahora", "now"]);
+  const classifyYesNo = (heard: string): "yes" | "no" | "miss" => {
+    const toks = heard.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).filter((w) => !FILLER.has(w));
+    if (!toks.length) return "miss";
+    if (toks.some((w) => NO_WORDS.has(w))) return "no";
+    return toks.every((w) => YES_WORDS.has(w)) ? "yes" : "miss";
+  };
 
   const closeVoiceWindow = useCallback((how: "closed" | "missed" | null) => {
     if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; }
@@ -467,6 +477,16 @@ export default function ChefRoot() {
   }, [applyTurn, clearTimers, editReply, entityId, lang, openConfirm, pathname, scope.house, showResult, toIdle]);
 
   // --- voice loop ---------------------------------------------------------------
+  // The ChefVoice instance is created once and kept for the session, so its
+  // event handlers must not close over a stale render: route them through
+  // refs (P1 sent the first route/entity for every later voice turn, and
+  // edit-by-voice needs the live editReply).
+  const submitRef = useRef(submit);
+  const toIdleRef = useRef(toIdle);
+  const showResultRef = useRef(showResult);
+  useEffect(() => { submitRef.current = submit; toIdleRef.current = toIdle; showResultRef.current = showResult; });
+  useEffect(() => { voiceRef.current?.setContext({ lang, entityId, route: pathname }); }, [entityId, lang, pathname]);
+
   const getVoice = useCallback(() => {
     if (voiceRef.current) return voiceRef.current;
     const v = new ChefVoice({
@@ -483,23 +503,25 @@ export default function ChefRoot() {
             if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; }
             const heard = (text || "").trim();
             setTranscript(heard || null);
-            if (heard && YES.test(heard)) { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-yes")); return; }
-            if (heard && NO.test(heard)) { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-no")); return; }
+            const verdict = classifyYesNo(heard);
+            if (verdict === "yes") { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-yes")); return; }
+            if (verdict === "no") { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-no")); return; }
             setVoiceWindow("missed");
             return;
           }
-          if (!text) { toIdle(); return; }
-          void submit(text, true);
+          if (!text) { toIdleRef.current(); return; }
+          void submitRef.current(text, true);
         },
         onError: (msg) => {
           setLevel(0);
-          showResult({ title: t("chef.mic_needed"), lines: [msg], kind: "error" });
+          showResultRef.current({ title: t("chef.mic_needed"), lines: [msg], kind: "error" });
         },
       },
     });
     voiceRef.current = v;
     return v;
-  }, [entityId, lang, pathname, showResult, submit, toIdle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => { voiceRef.current?.dispose(); voiceRef.current = null; }, []);
 

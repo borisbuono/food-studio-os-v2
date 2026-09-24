@@ -217,6 +217,11 @@ export class ChefVoice {
     }
   }
 
+  // The instance lives for the session; the control updates scope/route here.
+  setContext(next: Partial<Pick<ChefVoiceOpts, "lang" | "entityId" | "route">>): void {
+    this.opts = { ...this.opts, ...next };
+  }
+
   get listening(): boolean { return this._listening; }
   get backend(): VoiceBackend { return this._backend; }
 
