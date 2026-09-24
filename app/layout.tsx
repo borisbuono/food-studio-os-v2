@@ -12,6 +12,7 @@ import PwaOfflineBadge from "@/components/PwaOfflineBadge";
 import InstallPrompt from "@/components/InstallPrompt";
 import { serverEntityCookie } from "@/lib/serverVenue";
 import { serverProfile } from "@/lib/serverProfile";
+import { serverLang } from "@/lib/i18nServer";
 import { ENTITY_ACCENT, E_HOLDINGS } from "@/lib/entities";
 
 // PWA #1 (2026-07-28) — manifest + Apple meta so iOS Safari treats FS OS as an
@@ -69,6 +70,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // #27). No cookie used to mean "Studio" even for a single-house cook.
   const entity = serverEntityCookie() ?? initialProfile?.entity ?? E_HOLDINGS;
   const accent = ENTITY_ACCENT[entity];
+  // Language for the chrome's translated strings (RoomSwitcher chips) so the
+  // server and the first client render agree — see RoomSwitcher.tsx.
+  const initialLang = serverLang();
   return (
     <html lang="en" style={{ ["--accent" as any]: accent } as any}>
       <body>
@@ -76,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* AppChrome hides the sidebar + topbar on public routes (/welcome,
             /login, /auth/*, /m/*) so signed-out visitors get a marketing
             surface, not the entity-scoped app shell. */}
-        <AppChrome initialEntity={entity} initialProfile={initialProfile}>
+        <AppChrome initialEntity={entity} initialProfile={initialProfile} initialLang={initialLang}>
           <RouteGuard>{children}</RouteGuard>
           <FlowStrip />
         </AppChrome>

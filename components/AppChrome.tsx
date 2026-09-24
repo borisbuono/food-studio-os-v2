@@ -14,6 +14,7 @@ import { fetchMyAccess } from "@/lib/access/myAccess";
 import { brandForPath } from "@/lib/brandScope";
 import { isPublicRoute, isChromelessRoute } from "@/lib/routing/public-routes";
 import { Z } from "@/lib/ui/z";
+import type { Lang } from "@/lib/i18n";
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
 // Boris asked (2026-08-19): "logging in on top of Bistro Mondo... it needs
@@ -52,7 +53,10 @@ type ShellState = {
 // readEntityCookie(), which reads document.cookie and returns null during
 // SSR, so the server always painted bistro_mondo and the client flipped on
 // hydration — the "profile swaps when switching apps" report.
-export default function AppChrome({ children, initialEntity, initialProfile }: { children: React.ReactNode; initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
+// initialLang (2026-09-24) — serverLang() from layout.tsx, threaded to
+// RoomSwitcher so its t() chips render the same language on the server and
+// the first client render (see the hydration note in RoomSwitcher).
+export default function AppChrome({ children, initialEntity, initialProfile, initialLang }: { children: React.ReactNode; initialEntity?: EntityKey; initialProfile?: ServerProfile | null; initialLang?: Lang }) {
   const path = usePathname() || "/";
   const [shell, setShell] = useState<ShellState>({
     loaded: false, isOwner: false, isMulti: false, hasMemberships: false,
@@ -117,10 +121,10 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
             live here was removed 2026-08-31 — the bottom-left chip in the
             sidebar is the canonical identity affordance. */}
         <div className="hidden lg:flex items-center justify-end gap-3 px-6 pt-3">
-          <RoomSwitcher compact />
+          <RoomSwitcher compact initialEntity={initialEntity ?? null} lang={initialLang} />
         </div>
         <div className="flex lg:hidden justify-end px-6 pt-3">
-          <RoomSwitcher compact />
+          <RoomSwitcher compact initialEntity={initialEntity ?? null} lang={initialLang} />
         </div>
         {children}
       </div>

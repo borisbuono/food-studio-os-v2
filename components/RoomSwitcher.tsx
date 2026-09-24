@@ -1,14 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { scopeForUrl, resolveScope, type Scope } from "@/lib/scope";
 import {
   HOUSE_ROOMS, HOUSE_ROOM_LABEL, HOUSE_ROOM_LEGACY_PATH,
   houseNameForSlug, type HouseSlug,
 } from "@/lib/houses";
-import { E_BM, E_TALLER } from "@/lib/entities";
-import { t } from "@/lib/i18n";
+import { E_BM, E_TALLER, type EntityKey } from "@/lib/entities";
+import { onCtx } from "@/lib/ctx";
+import { t, type Lang } from "@/lib/i18n";
 
 // RoomSwitcher — Push 1 (2026-08-23), rebuilt for the three-level scope
 // (2026-08-31 Boris walk).
@@ -48,14 +49,35 @@ function entityCookieToHouseSlug(entity: string | null): HouseSlug | null {
   return null;
 }
 
-export default function RoomSwitcher({ compact = false }: { compact?: boolean }) {
+export default function RoomSwitcher({
+  compact = false,
+  initialEntity = null,
+  lang,
+}: { compact?: boolean; initialEntity?: EntityKey | null; lang?: Lang }) {
   const path = usePathname() || "";
+
+  // HYDRATION (2026-09-24, React #418/#423 on /boh, /office, /execute/*):
+  // on legacy cookie-scoped paths scopeForUrl() is null and the scope came
+  // from readEntityCookieClient(), which reads document.cookie — null on the
+  // server, so SSR rendered NOTHING here while the first client render (cookie
+  // present) rendered the chip strip. Two instances per page (desktop + mobile
+  // rows in AppChrome) → #418 x2-3 + one #423 recovery per hard load; on a
+  // slow mobile load the recovery escalated to #329 and the shell (incl. Chef)
+  // never mounted. /h/<slug>/** never warned because the URL alone resolves.
+  // Fix: seed from the SERVER-resolved entity (layout.tsx → AppChrome) so both
+  // renders agree; re-read the cookie only after mount (switcher changes).
+  const [entity, setEntity] = useState<string | null>(initialEntity);
+  useEffect(() => {
+    const read = () => { const c = readEntityCookieClient(); if (c) setEntity(c); };
+    read();
+    return onCtx(read);
+  }, []);
 
   const scope: Scope | null = useMemo(() => {
     const s = scopeForUrl(path);
     if (s) return s;
-    return resolveScope(path, entityCookieToHouseSlug(readEntityCookieClient()));
-  }, [path]);
+    return resolveScope(path, entityCookieToHouseSlug(entity));
+  }, [path, entity]);
 
   // Persist current room for legacy readers. Hook runs on every render;
   // no-ops when the scope isn't room-level.
@@ -72,16 +94,20 @@ export default function RoomSwitcher({ compact = false }: { compact?: boolean })
   // Runway d2 (2026-09-20): chip labels run through t() so the Amsterdam
   // launch can flip to Dutch (Overzicht / Keuken / Restaurant / Kantoor)
   // via the fs_lang cookie. Falls back to English when there's no key.
+  // `lang` is threaded from the server (serverLang() in layout.tsx): the bare
+  // t() reads the cookie from document, which SSR cannot see, so an es/nl
+  // user got English chips from the server and Spanish/Dutch on the client —
+  // a text mismatch on every legacy page. Same-language on both sides now.
   const roomKey: Record<string, string> = {
     kitchen: "rooms.kitchen",
     dining: "rooms.dining",
     office: "rooms.office",
   };
   const chips: Array<{ key: string; label: string; href: string }> = [
-    { key: "overview", label: t("rooms.overview"), href: `/h/${houseSlug}` },
+    { key: "overview", label: t("rooms.overview", lang), href: `/h/${houseSlug}` },
     ...HOUSE_ROOMS.map((r) => ({
       key: r,
-      label: t(roomKey[r] || "") || HOUSE_ROOM_LABEL[r],
+      label: t(roomKey[r] || "", lang) || HOUSE_ROOM_LABEL[r],
       href: `/h/${houseSlug}/${r}`,
     })),
   ];
