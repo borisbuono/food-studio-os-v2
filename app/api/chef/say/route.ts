@@ -12,7 +12,7 @@ export const maxDuration = 20;
 // gpt-4o-mini-tts, otherwise 204 and the client stays silent. Never an
 // error the UI has to render: a kitchen that can't hear still gets the card.
 
-const MAX_CHARS = 200;
+const MAX_CHARS = 480; // Phase 2: a read-back carries the whole draft reply
 
 const AURA_VOICE: Record<"es" | "en", string> = {
   en: "aura-2-thalia-en",

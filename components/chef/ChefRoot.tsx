@@ -105,6 +105,7 @@ export default function ChefRoot() {
   const captureParent = useRef<string | null>(null); // multi-shot: the invoice_inbox row the next photo appends to
   const turnSeq = useRef(0);
   const lastTurnId = useRef<string | null>(null);
+  const lastVoice = useRef(false);   // was the last turn spoken? (say-back follows the turn's modality)
 
   const lang = (getLang() === "es" ? "es" : "en") as "es" | "en";
 
@@ -223,9 +224,16 @@ export default function ChefRoot() {
     } catch {}
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, full = false) => {
+    if (!speechOn()) return;
+    // One short sentence, numbers first — never a list (brief §3). A
+    // read-back is the exception: the whole draft must be heard before a yes.
+    const one = full
+      ? String(text || "").replace(/\s+/g, " ").split(/\s+/).slice(0, 80).join(" ")
+      : String(text || "").split(/\n/)[0].split(/(?<=[.!?])\s+/)[0].split(/\s+/).slice(0, 14).join(" ");
+    if (!one) return;
     try {
-      const r = await fetch("/api/chef/say", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, lang }) });
+      const r = await fetch("/api/chef/say", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: one, lang }) });
       if (r.status !== 200) return;
       const blob = await r.blob();
       const a = audioRef.current; if (!a) return;
@@ -255,6 +263,7 @@ export default function ChefRoot() {
     const res = await act(action);
     if (!res.ok) {
       showResult({ title: t("chef.error"), lines: [res.error || t("chef.offline")], kind: "error" }, { keep: false });
+      if (voice) void speak(t("chef.error") + ". " + (res.error || ""));
       return;
     }
     if (res.navigate) { toIdle(); router.push(res.navigate); return; }
@@ -283,7 +292,9 @@ export default function ChefRoot() {
     if (undoTimer.current) { clearInterval(undoTimer.current); undoTimer.current = null; }
     setBusy(true);
     const res = await act({ type: "undo", undo_token: tok });
-    showResult(res.ok ? (res.card || { title: t("chef.undone"), lines: [], kind: "write" }) : { title: t("chef.error"), lines: [res.error || ""], kind: "error" });
+    const c: CardT = res.ok ? (res.card || { title: t("chef.undone"), lines: [], kind: "write" }) : { title: t("chef.error"), lines: [res.error || ""], kind: "error" };
+    showResult(c);
+    if (lastVoice.current) void speak(c.title);
   }, [act, showResult, undoToken]);
 
   // --- confirm gate + the closed-grammar voice window (Phase 2 / brief §2) ------
@@ -325,7 +336,7 @@ export default function ChefRoot() {
     setBusy(false);
     setVoiceWindow(null);
     if (voice && speechOn()) {
-      void speak(turn.readback || turn.say).then(() => {
+      void speak(turn.readback || turn.say, true).then(() => {
         // Wait for the read-back to finish playing (Gemini lesson), then listen.
         const a = audioRef.current;
         const after = () => { if (turn.confirm_voice) openVoiceWindow(); };
@@ -403,6 +414,7 @@ export default function ChefRoot() {
       return;
     }
     const seq = ++turnSeq.current;
+    lastVoice.current = voice;
     clearTimers();
     setState("thinking"); setTranscript(trimmed); setPartial(""); setCard(null); setPending(null);
     workingTimer.current = setTimeout(() => setStillWorking(true), STILL_WORKING_MS);
@@ -427,6 +439,7 @@ export default function ChefRoot() {
       if (seq !== turnSeq.current) return; // a newer turn superseded this one
       if (!r.ok || !d || !d.intent) {
         showResult({ title: t("chef.error"), lines: [(d as any)?.reply || t("chef.offline")], kind: "error" });
+        if (voice) void speak(t("chef.error"));
         return;
       }
       await applyTurn(d, voice);
