@@ -26,6 +26,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import ChefControl, { type ChefState } from "@/components/chef/ChefControl";
 import ChefCard from "@/components/chef/ChefCard";
+import ChefChips, { type ChefChip } from "@/components/chef/ChefChips";
+import { useHeadsetPTT } from "@/lib/chef/headset";
 import { ChefVoice, type VoiceBackend } from "@/lib/chef/voice";
 import type { ChefTurn, ChefAction, ChefActResult, ChefCard as CardT, ChefCardAction } from "@/lib/chef/types";
 import { getMyProfile, type MyProfile } from "@/lib/profile";
@@ -85,6 +87,7 @@ export default function ChefRoot() {
   const [housePick, setHousePick] = useState(false);
   const [entitySel, setEntitySel] = useState<string | null>(null);
   const [desktop, setDesktop] = useState(false);
+  const [passMode, setPassMode] = useState(false); // /h/[house]/pass wall screen: body[data-chef-mode="pass"]
   // Phase 2
   const [editReply, setEditReply] = useState<{ id: string; author: string; draft: string } | null>(null); // next utterance = the new reply
   const [voiceWindow, setVoiceWindow] = useState<"open" | "closed" | "missed" | null>(null); // closed-grammar yes/no window on a confirm
@@ -128,6 +131,8 @@ export default function ChefRoot() {
     return () => mq.removeEventListener("change", upd);
   }, []);
 
+  const layoutDesktop = desktop && !passMode;
+
   const scope = useMemo(() => {
     const s = scopeForUrl(pathname);
     if (s && (s.level === "house" || s.level === "room")) {
@@ -148,6 +153,17 @@ export default function ChefRoot() {
     check();
     const mo = new MutationObserver(check);
     mo.observe(document.body, { attributes: true, attributeFilter: ["data-fab"] });
+    return () => mo.disconnect();
+  }, [pathname]);
+
+  // Pass mode: the wall-screen page sets body[data-chef-mode="pass"]; the
+  // control then lays out phone-style (bottom-centre, sheet) at wall size.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const check = () => setPassMode(document.body.getAttribute("data-chef-mode") === "pass");
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { attributes: true, attributeFilter: ["data-chef-mode"] });
     return () => mo.disconnect();
   }, [pathname]);
 
@@ -697,6 +713,14 @@ export default function ChefRoot() {
     return () => { window.removeEventListener("fs:chef:voice-yes", yes); window.removeEventListener("fs:chef:voice-no", no); };
   }, [onNo, onYes]);
 
+  // Predictive idle chip (S4): tap = run the utterance as a typed turn, logged as source "chip".
+  const onChip = useCallback((c: ChefChip) => {
+    void submit(c.utterance, false, "chip", c.key);
+  }, [submit]);
+
+  // Headset / media-key PTT (S5): the same toggle as a tap on the control.
+  useHeadsetPTT(passMode && visible, onTap);
+
   const onBody = useCallback(() => {
     if (card?.href) { const h = card.href; toIdle(); router.push(h); }
   }, [card, router, toIdle]);
@@ -729,13 +753,13 @@ export default function ChefRoot() {
           data-chef-surface
           className={
             "fixed inset-x-0 flex flex-col justify-end px-3 pointer-events-none " +
-            "lg:inset-x-auto lg:top-0 lg:bottom-0 lg:justify-start lg:border-r lg:border-line lg:bg-paper lg:px-4 lg:pt-6 lg:pointer-events-auto"
+            (passMode ? "" : "lg:inset-x-auto lg:top-0 lg:bottom-0 lg:justify-start lg:border-r lg:border-line lg:bg-paper lg:px-4 lg:pt-6 lg:pointer-events-auto")
           }
           style={{
             zIndex: Z.chefCard,
             bottom: "var(--chef-dock)",
             // On lg the column starts right of the sidebar and has the fixed width.
-            ...(desktop ? { left: "var(--chef-sidebar, 15rem)", width: "var(--chef-panel, 380px)", bottom: 0 } : {}),
+            ...(layoutDesktop ? { left: "var(--chef-sidebar, 15rem)", width: "var(--chef-panel, 380px)", bottom: 0 } : {}),
           }}
         >
           <div className="pointer-events-auto flex flex-col gap-2 pb-2 lg:pb-0">
@@ -800,14 +824,22 @@ export default function ChefRoot() {
       {/* The control — the only fixed element in the bottom 96 px. */}
       <div
         data-chef-dock
-        className="fixed inset-x-0 bottom-0 flex items-end justify-center pointer-events-none lg:inset-x-auto lg:left-0"
+        className={"fixed inset-x-0 bottom-0 flex items-end justify-center pointer-events-none " + (passMode ? "" : "lg:inset-x-auto lg:left-0")}
         style={{
           zIndex: Z.chefDock,
           height: "var(--chef-dock)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          width: desktop ? "var(--chef-sidebar, 15rem)" : undefined,
+          width: layoutDesktop ? "var(--chef-sidebar, 15rem)" : undefined,
         }}
       >
+        <ChefChips
+          entityId={entityId}
+          route={pathname}
+          lang={lang}
+          desktop={layoutDesktop}
+          visible={state === "idle" && !typing}
+          onPick={onChip}
+        />
         <div className="pointer-events-auto">
           <ChefControl state={state} level={level} onTap={onTap} onHold={onHold} onDragUp={openType} />
         </div>
