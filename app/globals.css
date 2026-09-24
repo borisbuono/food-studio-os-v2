@@ -27,6 +27,10 @@ body[data-chef="on"] { --chef-dock: calc(96px + env(safe-area-inset-bottom, 0px)
 body[data-fab="hidden"] { --chef-dock: 0px; padding-bottom: 0; }
 @media (min-width: 1024px) {
   body[data-chef="on"] { padding-bottom: 0; }
+  /* Chef v3 P2 S4: idle chips sit ABOVE the control in the sidebar column.
+   * The identity block rests on the reserve, so the reserve itself grows
+   * (96 → 140 px) while chips are shown; FabHidden still zeroes it. */
+  body[data-chef="on"][data-chef-chips="on"]:not([data-fab="hidden"]) { --chef-dock: calc(140px + env(safe-area-inset-bottom, 0px)); }
   body[data-chef-panel="open"] .fs-main { padding-left: calc(var(--chef-sidebar) + var(--chef-panel)); }
   body[data-chef-panel="open"][data-shell="slim"] .fs-main { padding-left: var(--chef-panel); }
   body[data-chef-panel="open"][data-shell="slim"] { --chef-sidebar: 0px; }
