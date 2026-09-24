@@ -4,7 +4,7 @@ import { E_BM, E_HOLDINGS, type EntityKey } from "@/lib/entities";
 import { houseSlugForEntity } from "@/lib/houses";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { runChefTurn } from "@/lib/chef/router";
-import type { ChefLang, ChefTurn } from "@/lib/chef/types";
+import type { ChefClientState, ChefLang, ChefTurn } from "@/lib/chef/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +47,12 @@ export async function POST(req: Request) {
   const language = (body?.language === "es" ? "es" : "en") as ChefLang;
   const voice = body?.voice === true;
   const houseIn = typeof body?.house === "string" && body.house ? String(body.house).toLowerCase() : null;
+  // Phase 2: stateless inbox walk + source of the turn (voice / typed / chip / headset).
+  const clientState: ChefClientState = body?.chef_state && typeof body.chef_state === "object" ? {
+    inbox_seen: Array.isArray(body.chef_state.inbox_seen) ? body.chef_state.inbox_seen.map(String).slice(0, 200) : [],
+    source: ["voice", "typed", "chip", "headset"].includes(body.chef_state.source) ? body.chef_state.source : (voice ? "voice" : "typed"),
+    chip_key: body.chef_state.chip_key ? String(body.chef_state.chip_key).slice(0, 60) : undefined,
+  } : { inbox_seen: [], source: voice ? "voice" : "typed" };
 
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
@@ -75,7 +81,7 @@ export async function POST(req: Request) {
     : (houseIn || scope.entity.slug || houseSlugForEntity(scope.entity.id as EntityKey) || null);
 
   const turn = await runChefTurn({
-    message, route, sessionId, entityId: scopeDefaulted ? "" : scope.entity.id, language, pageContext, uid, voice, scope, houseSlug,
+    message, route, sessionId, entityId: scopeDefaulted ? "" : scope.entity.id, language, pageContext, uid, voice, scope, houseSlug, clientState,
   });
 
   // Deterministic turns (navigate, capture, pending writes) never needed the

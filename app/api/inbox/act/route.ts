@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseService } from "@/lib/supabaseService";
 import { draftItem, type DraftKind } from "@/lib/social/inboxDraft";
+import { approveAndSend, callMetaReply } from "@/lib/social/inboxAct";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,18 +24,6 @@ export const maxDuration = 60;
 type Kind = DraftKind;
 const TABLE: Record<Kind, string> = { comment: "social_comments", dm: "social_dm_messages" };
 
-async function callMetaReply(payload: Record<string, unknown>) {
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/meta-reply`;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify(payload),
-  });
-  const body = await r.json().catch(() => ({}));
-  return { http: r.status, body };
-}
-
 export async function POST(req: NextRequest) {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
@@ -52,23 +41,12 @@ export async function POST(req: NextRequest) {
   const { data: row } = await sb.from(table).select("id, status, draft_reply, entity_id").eq("id", id).maybeSingle();
   if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
 
-  const now = new Date().toISOString();
 
   if (action === "approve") {
-    const text = String(p.text ?? "").trim();
-    if (!text) return NextResponse.json({ ok: false, error: "empty reply" }, { status: 422 });
-    if (row.status === "replied") return NextResponse.json({ ok: false, error: "already replied" }, { status: 409 });
-    const { error } = await sb.from(table).update({
-      reply_text: text, approved_by_boris: true, approved_at: now, approved_by_user: u.user.id, status: "approved", error: null,
-    }).eq("id", id);
-    if (error) return NextResponse.json({ ok: false, error: `approve: ${error.message}` }, { status: 403 });
-    const r = await callMetaReply({ kind, id });
-    const ok = r.http === 200 && r.body?.ok !== false;
-    return NextResponse.json({
-      ok, status: ok ? "replied" : "failed",
-      error: ok ? null : (r.body?.detail || r.body?.error || `meta-reply ${r.http}`),
-      reply_remote_id: r.body?.reply_remote_id ?? null,
-    }, { status: ok ? 200 : 502 });
+    // Shared with Chef (lib/social/inboxAct) — one approve path, one gate.
+    const r = await approveAndSend(sb, kind, id, String(p.text ?? ""), u.user.id);
+    if (r.status === "error") return NextResponse.json({ ok: false, error: r.error }, { status: r.http });
+    return NextResponse.json({ ok: r.ok, status: r.status, error: r.error, reply_remote_id: r.reply_remote_id }, { status: r.http });
   }
 
   if (action === "skip" || action === "restore") {

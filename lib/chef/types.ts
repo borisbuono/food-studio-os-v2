@@ -33,6 +33,9 @@ export type ChefCardAction =
   | { label: string; kind: "navigate"; href: string }
   | { label: string; kind: "act"; action: ChefAction }   // posts to /api/chef/act
   | { label: string; kind: "capture_page"; capture_id: string }  // Phase 2: photograph another page of this capture
+  | { label: string; kind: "confirm"; action: ChefAction; readback: string; voice_ok?: boolean }  // Phase 2: opens the read-back gate, then acts
+  | { label: string; kind: "turn"; message: string }      // Phase 2: runs another turn ("#inbox_next")
+  | { label: string; kind: "edit_reply"; id: string; author: string; draft: string }  // Phase 2: next utterance = the new reply text
   | { label: string; kind: "none" };                      // dismiss (e.g. "Looks right")
 
 export type ChefCard = {
@@ -40,7 +43,7 @@ export type ChefCard = {
   lines: string[];               // ≤ 4 short lines
   primary?: ChefCardAction;
   chip?: ChefCardAction;         // the ONE alternative chip (confidence 0.6–0.85 on writes)
-  secondary?: ChefCardAction;    // Phase 2, capture cards only: "Add page" (multi-shot) — nowhere else
+  secondary?: ChefCardAction;    // Phase 2, capture ("Add page") and inbox ("Edit") cards only — nowhere else
   entity_label?: string;         // "Bistro Mondo" — rendered as the entity chip
   href?: string;                 // tapping the card body navigates here (reads never auto-navigate)
   kind?: "read" | "write" | "confirm" | "error";
@@ -55,6 +58,11 @@ export type ChefAction =
   | { type: "prep_add"; entity_id: string; name: string; quantity?: number | null; unit?: string | null; station?: string | null; service_date?: string }
   | { type: "todo_add"; entity_id: string; title: string }
   | { type: "run_agent"; entity_id: string; agent_type: "research" | "build" | "write" | "pa"; objective: string; deliverables?: string[]; route?: string }
+  // Phase 2
+  | { type: "approve_reply"; entity_id: string; kind: "comment" | "dm"; id: string; text: string; author?: string }  // outbound: read-back + Yes (voice yes allowed)
+  | { type: "skip_comment"; entity_id: string; id: string; author?: string }                                          // undoable (status back)
+  | { type: "booking_update"; entity_id: string; id: string; patch: { service_time?: string; party_size?: number; service_date?: string; notes?: string }; label?: string }  // undoable
+  | { type: "prep_update"; entity_id: string; id: string; patch: { quantity?: number | null; unit?: string | null; status?: string; name?: string }; label?: string }         // undoable
   | { type: "undo"; undo_token: string };
 
 export type ChefActResult = {
@@ -80,6 +88,13 @@ export type ChefTurn = {
   action?: ChefAction | null;
   undoable?: boolean;
   navigate?: string | null;      // only set for intent.kind === "navigate" (or "open …")
+  // Phase 2 — the gate table (brief §2): a spoken "sí / yes" may resolve the
+  // confirm ONLY when this is true (outbound reply, agent). Money / publish /
+  // delete keep it false: tap Yes only, voice "no" still cancels.
+  confirm_voice?: boolean;
+  // Phase 2 — batch approve: after this confirm resolves, the client runs
+  // this many more "#approve_next" turns, each with its own read-back + Yes.
+  batch_remaining?: number;
   turn_id?: string | null;       // chef_turns.id
   latency_ms?: number;
   // Compat for legacy /api/ask callers (reputation draft, AssistantContext):
@@ -89,6 +104,10 @@ export type ChefTurn = {
 
 export const CONFIDENCE_ACT = 0.85;
 export const CONFIDENCE_READ_ONLY = 0.6;
+
+// What the client sends alongside the utterance so the server can keep the
+// inbox walk stateless: ids already shown this session.
+export type ChefClientState = { inbox_seen?: string[]; source?: "voice" | "typed" | "chip" | "headset"; chip_key?: string };
 
 export function isWriteIntent(i: ChefIntent): boolean {
   return i.kind === "create" || i.kind === "update" || i.kind === "approve"

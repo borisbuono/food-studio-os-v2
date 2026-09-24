@@ -17,6 +17,8 @@ export type ChefCardProps = {
   transcript?: string | null;
   readback?: string | null;
   mode: "result" | "confirm" | "error";
+  hint?: string | null;            // Phase 2: "Say yes or no, or tap" / "Tap Yes to confirm"
+  listening?: boolean;             // Phase 2: the yes/no voice window is open
   undoLeftMs?: number | null;      // > 0 while Undo is offered
   busy?: boolean;
   onPrimary?: (a: ChefCardAction) => void;
@@ -65,6 +67,12 @@ export default function ChefCard(p: ChefCardProps) {
         </div>
         {p.mode === "confirm" && p.readback ? (
           <p className="mt-2 font-sans text-[17px] leading-snug text-ink">{p.readback}</p>
+        ) : null}
+        {p.mode === "confirm" && p.hint ? (
+          <p className="mt-2 flex items-center gap-2 font-mono text-[12px] uppercase tracking-wide text-clay">
+            {p.listening ? <span aria-hidden className="inline-block h-2.5 w-2.5 animate-pulse rounded-full" style={{ background: "var(--accent)" }} /> : null}
+            {p.hint}
+          </p>
         ) : null}
         {lines.length ? (
           <ul className="mt-2 space-y-1">

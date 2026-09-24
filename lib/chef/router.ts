@@ -16,8 +16,9 @@ import { E_HOLDINGS } from "@/lib/entities";
 import { getFrestoAdapter } from "@/lib/integrations/fresto";
 import {
   CONFIDENCE_ACT, CONFIDENCE_READ_ONLY, isWriteIntent,
-  type ChefAction, type ChefCard, type ChefIntent, type ChefLang, type ChefTurn,
+  type ChefAction, type ChefCard, type ChefClientState, type ChefIntent, type ChefLang, type ChefTurn,
 } from "@/lib/chef/types";
+import { listWaiting, itemCard, emptyCard, whoCard } from "@/lib/chef/inbox";
 
 export type ChefTurnInput = {
   message: string;
@@ -30,6 +31,7 @@ export type ChefTurnInput = {
   voice: boolean;
   scope: AssistantEntityScope;
   houseSlug: string | null;
+  clientState?: ChefClientState;
 };
 
 const CLASSIFIER_MODEL = "claude-haiku-4-5-20251001";
@@ -83,6 +85,12 @@ const T = {
     navigate_say: "Abriendo",
     capture_say: "Abro la cámara",
     or_ask: "Preguntar a Chef",
+    booking_moved: "Reserva movida", booking_updated: "Reserva actualizada", no_booking: (w: string) => "No encuentro la reserva de " + w,
+    many_bookings: (w: string, n: number) => n + " reservas de " + w + " hoy — ¿cuál?",
+    prep_updated: "Mise actualizada", prep_done: "Marcado como hecho", no_prep_item: (w: string) => "No encuentro " + w + " en la mise de hoy",
+    many_prep: (w: string, n: number) => n + " líneas de " + w + " — ¿cuál?",
+    approve_batch_say: (n: number) => "Te leo " + n + " respuestas, una a una",
+    not_p2: "Eso aún no lo hago desde Chef. Ábrelo desde la página.",
   },
   en: {
     which_house: "Which house? Pick one in the switcher.",
@@ -118,6 +126,12 @@ const T = {
     navigate_say: "Opening",
     capture_say: "Opening the camera",
     or_ask: "Ask Chef",
+    booking_moved: "Booking moved", booking_updated: "Booking updated", no_booking: (w: string) => "No booking found for " + w,
+    many_bookings: (w: string, n: number) => n + " bookings for " + w + " today — which one?",
+    prep_updated: "Prep updated", prep_done: "Marked done", no_prep_item: (w: string) => "Can't find " + w + " on today's prep",
+    many_prep: (w: string, n: number) => n + " prep lines for " + w + " — which one?",
+    approve_batch_say: (n: number) => "Reading " + n + " replies, one at a time",
+    not_p2: "Chef can't do that one yet. Open it from the page.",
   },
 } as const;
 
@@ -179,6 +193,13 @@ function clarifyTurn(transcript: string, language: ChefLang, question: string, s
 function preRoute(message: string, language: ChefLang): Classified | null {
   const m = message.trim().toLowerCase();
   if (!m || m.length > 160) return null;
+  // Internal continuation tokens the client sends from card buttons.
+  if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
+  if (m === "#approve_next") return { intent: "approve", confidence: 1, language, args: { target: "reply", count: 1, next: true } };
+  if (/^(?:siguiente|next|otro|otra|el siguiente|la siguiente)(?:\s+(?:comentario|comment|respuesta|reply))?$/.test(m)) return { intent: "inbox_open", confidence: 0.95, language, args: {} };
+  if (/^(?:abre|abrir|open|mira|lee|léeme|read)\s+(?:la |el |the |my |mi )?(?:bandeja|inbox|comentarios|comments)(?:\s+(?:uno a uno|one by one|one at a time))?$/.test(m)) return { intent: "inbox_open", confidence: 0.96, language, args: {} };
+  if (/^(?:silencio|mute|cállate|calla|voz off|speech off|voice off)$/.test(m)) return { intent: "speech", confidence: 1, language, args: { on: false } };
+  if (/^(?:habla|unmute|voz on|speech on|voice on)$/.test(m)) return { intent: "speech", confidence: 1, language, args: { on: true } };
   const nav = m.match(/^(?:abre|abrir|ir a|ve a|vamos a|open|go to|show me|enséñame|muéstrame)\s+(?:la |el |los |las |the |my |mi )?([a-záéíóúñ ]{3,30})$/);
   if (nav) {
     const word = nav[1].trim();
@@ -213,6 +234,10 @@ Intents (exact strings) and their args:
 - "remember"        {text}                                   — store a fact
 - "feedback"        {text, feedback_kind: "love"|"idea"|"bug"|"confusing"} — something is wrong / an idea about the OS
 - "run_agent"       {agent_type: "research"|"build"|"write"|"pa", objective} — delegate work to an agent
+- "inbox_open"      {}                                       — walk the waiting comments one at a time ("abre la bandeja", "siguiente", "read me the comments")
+- "approve"         {target: "reply", who?: author name/handle, count?: integer} — send/approve a drafted reply: "send the reply to Marta", "approve the first three comments", "aprueba la respuesta a @luis"
+- "update bookings" {who: guest name, time?: "HH:MM" 24h, party_size?: integer, date?: "today"|"tomorrow"|"YYYY-MM-DD"} — move/change a booking ("mueve la mesa de García a las nueve" → time "21:00": restaurant hours, a bare small number in the evening is PM unless morning is stated)
+- "update prep"     {name: item, quantity?: number, unit?: string, status?: "done"|"todo"} — change a prep quantity or mark it done ("cambia la cebolla a 3 kg", "el caldo está hecho", "mark the stock done")
 - "query ask"       {q}                                      — any other question about the venue or the OS
 - "clarify"         {question}                               — cannot tell
 
@@ -233,8 +258,15 @@ Examples:
 "que alguien investigue proveedores de ostras en Galicia" → {"intent":"run_agent","confidence":0.9,"language":"es","args":{"agent_type":"research","objective":"Investigar proveedores de ostras en Galicia"}}
 "why is the margin on the sea bass low" → {"intent":"query ask","confidence":0.8,"language":"en","args":{"q":"why is the margin on the sea bass low"}}
 "eso" → {"intent":"clarify","confidence":0.2,"language":"es","args":{"question":"¿Qué quieres hacer?"}}
+"envía la respuesta a Marta" → {"intent":"approve","confidence":0.92,"language":"es","args":{"target":"reply","who":"Marta"}}
+"approve the first three comments" → {"intent":"approve","confidence":0.9,"language":"en","args":{"target":"reply","count":3}}
+"lee los comentarios" → {"intent":"inbox_open","confidence":0.9,"language":"es","args":{}}
+"mueve la mesa de García a las nueve" → {"intent":"update bookings","confidence":0.9,"language":"es","args":{"who":"García","time":"21:00"}}
+"la reserva de Smith son seis ahora" → {"intent":"update bookings","confidence":0.85,"language":"es","args":{"who":"Smith","party_size":6}}
+"cambia la cebolla a 3 kilos" → {"intent":"update prep","confidence":0.9,"language":"es","args":{"name":"cebolla","quantity":3,"unit":"kg"}}
+"the stock is done" → {"intent":"update prep","confidence":0.88,"language":"en","args":{"name":"stock","status":"done"}}
 
-Rules: never invent a dish or a number. If a request edits or approves something, use "clarify". Confidence below 0.6 means you are guessing.`;
+Rules: never invent a dish or a number. Paying, publishing, deleting a shift or rejecting a candidate are NOT supported: use "clarify" with a question saying to open it from the page. Confidence below 0.6 means you are guessing.`;
 
 async function classify(message: string, language: ChefLang, route: string): Promise<{ c: Classified; cost_cents: number }> {
   const key = process.env.ANTHROPIC_API_KEY;
@@ -448,6 +480,8 @@ async function logTurn(input: ChefTurnInput, turn: ChefTurn, outcome: Outcome, t
       voice: !!input.voice,
       language: input.language,
       session_id: input.sessionId,
+      source: input.clientState?.source || (input.voice ? "voice" : "typed"),
+      chip_key: input.clientState?.chip_key || null,
     }).select("id").maybeSingle();
     return (data as any)?.id || null;
   } catch {
@@ -490,7 +524,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
   // Low confidence: one question, no guessing.
   if (c.intent !== "clarify" && conf < CONFIDENCE_READ_ONLY) return clarify(tl.not_sure, tl.not_sure_say);
 
-  const isWrite = ["create prep", "create team", "remember", "feedback", "run_agent"].includes(c.intent);
+  const isWrite = ["create prep", "create team", "remember", "feedback", "run_agent", "approve", "update bookings", "update prep", "inbox_open"].includes(c.intent);
   // Writes need a real house. Holdings is not a kitchen; never default to BM.
   if (isWrite && (!entityId || entityId === E_HOLDINGS)) return clarify(tl.which_house, tl.which_house_say);
 
@@ -605,11 +639,111 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
           card: { title: tl.agent, lines: [clip(objective, 140), label || ""].filter(Boolean), kind: "confirm", entity_label: label, primary: { label: lang === "es" ? "Sí, lanzar" : "Yes, run it", kind: "act", action }, chip: alt ? { label: tl.or_ask, kind: "none" } : undefined },
         }, "pending_confirm");
       }
+      // ---------------------------------------------------------------- Phase 2
+      case "speech": {
+        // Client-side toggle; the turn just acknowledges. (The iOS silent
+        // switch does not mute <audio>, so this is the kitchen's mute.)
+        const on = !!args.on;
+        const title = on ? (lang === "es" ? "Voz activada" : "Voice replies on") : (lang === "es" ? "Voz desactivada" : "Voice replies off");
+        return finish({ transcript: message, language: lang, intent: { kind: "navigate", to: "#speech:" + (on ? "on" : "off") }, confidence: 1, say: title, needs_confirm: false, card: { title, lines: [], kind: "read" } }, "card");
+      }
+      case "inbox_open": {
+        const seen = input.clientState?.inbox_seen || [];
+        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen });
+        const href = pageHref("inbox", houseSlug) || "/office";
+        const piece = items.length ? itemCard(items[0], entityId, lang, label, Math.max(0, total - seen.length - 1), "walk") : emptyCard(lang, label, href);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "walk", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
+      }
+      case "approve": {
+        // Only drafted social replies are approvable from Chef. Each item is
+        // its own read-back + Yes; "the first three" = three gates, never one.
+        const who = args.who ? clip(String(args.who), 60) : "";
+        const count = Math.max(1, Math.min(10, Number(args.count) || 1));
+        const seen = args.next ? (input.clientState?.inbox_seen || []) : [];
+        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen, who: who || undefined });
+        const href = pageHref("inbox", houseSlug) || "/office";
+        if (!items.length) {
+          const piece = who ? whoCard(lang, who, 0, label) : emptyCard(lang, label, href);
+          return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "approve", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
+        }
+        const withDraft = items.filter((i) => i.draft && !i.flagged);
+        if (who && withDraft.length > 1 && !args.next) {
+          const piece = whoCard(lang, who, withDraft.length, label);
+          return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "approve", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "clarify");
+        }
+        const first = withDraft[0] || items[0];
+        const remaining = Math.max(0, Math.min(count - 1, withDraft.length - 1));
+        const piece = itemCard(first, entityId, lang, label, Math.max(0, total - seen.length - 1), first.draft && !first.flagged ? "approve" : "walk");
+        return finish({
+          transcript: message, language: lang,
+          intent: { kind: "approve", surface: "social", id: first.id, action: "send" }, confidence: conf,
+          say: count > 1 && !args.next ? tl.approve_batch_say(Math.min(count, withDraft.length)) : piece.say,
+          card: piece.card, needs_confirm: piece.needs_confirm, readback: piece.readback, action: piece.action,
+          confirm_voice: true, batch_remaining: remaining,
+        }, piece.needs_confirm ? "pending_confirm" : "card");
+      }
+      case "update bookings": {
+        const who = clip(String(args.who || ""), 60);
+        if (!who) return clarify(tl.not_sure, tl.not_sure_say);
+        const rid = scope.restaurant_id;
+        const tz = scope.entity.timezone;
+        const dateArg = String(args.date || "today");
+        const date = dateArg === "tomorrow" ? tzDate(tz, 1) : /^\d{4}-\d{2}-\d{2}$/.test(dateArg) ? dateArg : tzDate(tz);
+        const sb = supabaseServer();
+        const { data: rows } = rid
+          ? await sb.from("bookings").select("id, guest_name, party_size, service_time, service_date, status").eq("restaurant_id", rid).eq("service_date", date).ilike("guest_name", "%" + who + "%").limit(5)
+          : { data: [] as any[] };
+        const live = (rows || []).filter((b: any) => !["cancelled", "no_show"].includes(String(b.status || "").toLowerCase()));
+        if (!live.length) return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "bookings", q: who, scope: chefScope }, confidence: conf, say: tl.no_booking(who), needs_confirm: false, card: { title: tl.no_booking(who), lines: [date], kind: "read", entity_label: label, href: "/execute/bookings" } }, "card");
+        if (live.length > 1) return clarify(tl.many_bookings(who, live.length), tl.many_bookings(who, live.length));
+        const b: any = live[0];
+        const patch: Record<string, unknown> = {};
+        const time = String(args.time || "");
+        if (/^\d{1,2}:\d{2}$/.test(time)) patch.service_time = time.padStart(5, "0") + ":00";
+        if (args.party_size != null && Number(args.party_size) > 0) patch.party_size = Math.round(Number(args.party_size));
+        if (!Object.keys(patch).length) return clarify(tl.not_sure, tl.not_sure_say);
+        const desc = [patch.service_time ? clockShort(String(patch.service_time)) : null, patch.party_size ? patch.party_size + (lang === "es" ? " pax" : " pax") : null].filter(Boolean).join(" · ");
+        const line = (b.guest_name || who) + " · " + clockShort(b.service_time) + " · " + b.party_size + " → " + desc;
+        const action: ChefAction = { type: "booking_update", entity_id: entityId, id: b.id, patch: patch as any, label: line };
+        return finish({
+          transcript: message, language: lang,
+          intent: { kind: "update", surface: "bookings", id: b.id, patch, undoable: true }, confidence: conf,
+          say: (patch.service_time ? tl.booking_moved : tl.booking_updated) + ": " + desc, needs_confirm: false, undoable: true, action, alternatives: alt,
+          card: { title: patch.service_time ? tl.booking_moved : tl.booking_updated, lines: [line, date], kind: "write", entity_label: label, href: "/execute/bookings" },
+        }, "pending_undo");
+      }
+      case "update prep": {
+        const name = clip(String(args.name || ""), 80);
+        if (!name) return clarify(tl.not_sure, tl.not_sure_say);
+        const sb = supabaseServer();
+        const date = tzDate(scope.entity.timezone);
+        const { data: rows } = await sb.from("prep_lists").select("id, name, quantity, unit, status").eq("entity_id", entityId).eq("service_date", date).ilike("name", "%" + name.replace(/\s+/g, "%") + "%").limit(5);
+        const items = rows || [];
+        if (!items.length) return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "prep", q: name, scope: chefScope }, confidence: conf, say: tl.no_prep_item(name), needs_confirm: false, card: { title: tl.no_prep_item(name), lines: [date], kind: "read", entity_label: label, href: pageHref("prep", houseSlug) || "/boh" } }, "card");
+        // Exact name first, else the single match; two or more → ask.
+        const exact = items.filter((i: any) => String(i.name || "").toLowerCase() === name.toLowerCase());
+        const pick: any = exact.length === 1 ? exact[0] : items.length === 1 ? items[0] : null;
+        if (!pick) return clarify(tl.many_prep(name, items.length), tl.many_prep(name, items.length));
+        const patch: Record<string, unknown> = {};
+        if (args.status === "done" || args.status === "todo") patch.status = args.status;
+        if (args.quantity != null && !isNaN(Number(args.quantity))) patch.quantity = Number(args.quantity);
+        if (args.unit) patch.unit = clip(String(args.unit), 20);
+        if (!Object.keys(patch).length) return clarify(tl.not_sure, tl.not_sure_say);
+        const after = [patch.quantity ?? pick.quantity, patch.unit ?? pick.unit, pick.name].filter((x) => x != null && x !== "").join(" ") + (patch.status ? " · " + patch.status : "");
+        const action: ChefAction = { type: "prep_update", entity_id: entityId, id: pick.id, patch: patch as any, label: after };
+        const title = patch.status === "done" ? tl.prep_done : tl.prep_updated;
+        return finish({
+          transcript: message, language: lang,
+          intent: { kind: "update", surface: "prep", id: pick.id, patch, undoable: true }, confidence: conf,
+          say: title + ": " + after, needs_confirm: false, undoable: true, action, alternatives: alt,
+          card: { title, lines: [after, date], kind: "write", entity_label: label, href: pageHref("prep", houseSlug) || "/boh" },
+        }, "pending_undo");
+      }
       case "clarify": {
         const q = String(args.question || tl.not_sure);
         // Approve / update phrasings land here in Phase 1 — say so.
-        const notYet = /aprob|aprueb|approve|edita|cambia|update|modif|change/i.test(message);
-        return clarify(notYet ? tl.not_phase1 : q, notYet ? tl.not_phase1_say : clip(q, 60));
+        const notYet = /paga|pay|publica|publish|borra|delete|elimina|rechaza|reject|retira|retire/i.test(message);
+        return clarify(notYet ? tl.not_p2 : q, notYet ? tl.not_phase1_say : clip(q, 60));
       }
       default:
         return clarify(tl.not_sure, tl.not_sure_say);

@@ -3,6 +3,7 @@ import { codeForEntityId, resolveEntityScope } from "@/lib/assistant/orchestrato
 import { ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 import { getMyMembershipContext } from "@/lib/memberships";
 import type { ChefAction, ChefActResult, ChefCard, ChefLang } from "@/lib/chef/types";
+import { approveAndSend } from "@/lib/social/inboxAct";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ const T = {
     undo_bad: "Ese deshacer ya no vale", not_member: "No eres miembro de esa casa",
     no_entity: "No encuentro esa casa", nothing_deleted: "No se pudo deshacer (sin permiso)",
     note_queued: "Nota para la PA en cola",
+    sent: (a: string) => "Enviado a " + a, send_failed: "No se ha enviado", skipped: (a: string) => "Saltado " + a,
+    booking: "Reserva actualizada", prep_upd: "Mise actualizada", not_found: "No encuentro esa fila",
   },
   en: {
     remember: "Noted", feedback: "Feedback saved", prep: "Added to today's prep",
@@ -29,6 +32,8 @@ const T = {
     undo_bad: "That undo is no longer valid", not_member: "You're not a member of that house",
     no_entity: "I can't find that house", nothing_deleted: "Could not undo (no permission)",
     note_queued: "PA inbox note queued",
+    sent: (a: string) => "Sent to " + a, send_failed: "Not sent", skipped: (a: string) => "Skipped " + a,
+    booking: "Booking updated", prep_upd: "Prep updated", not_found: "Can't find that row",
   },
 } as const;
 
@@ -119,12 +124,33 @@ export async function POST(req: Request) {
   const label = scope.entity.name;
   const code = codeForEntityId(scope.entity.id);
 
-  const undoFor = async (table: string, rowId: string): Promise<string | null> => {
+  const undoFor = async (table: string, rowId: string, before?: Record<string, unknown>): Promise<string | null> => {
     const { data } = await sb.from("chef_undo").insert({
       user_id: uid, table_name: table, row_id: rowId,
+      op: before ? "update" : "delete", before: before || null,
       expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
     }).select("token").maybeSingle();
     return (data as any)?.token || null;
+  };
+  // Phase 2: an UPDATE write — read the columns we touch first so Undo can
+  // put them back exactly.
+  const patchRow = async (table: string, rowId: string, patch: Record<string, unknown>, extraFilter?: Record<string, string>) => {
+    const cols = Object.keys(patch);
+    let q = sb.from(table).select(["id", ...cols].join(", ")).eq("id", rowId);
+    for (const [k, v] of Object.entries(extraFilter || {})) q = q.eq(k, v);
+    const { data: prev } = await q.maybeSingle();
+    if (!prev) return { ok: false as const, error: t.not_found, status: 404 };
+    const before: Record<string, unknown> = {};
+    for (const c of cols) before[c] = (prev as any)[c] ?? null;
+    const { data: upd, error } = await sb.from(table).update(patch).eq("id", rowId).select("id");
+    if (error) return { ok: false as const, error: error.message, status: 500 };
+    if (!upd || !upd.length) return { ok: false as const, error: t.nothing_deleted, status: 403 };
+    return { ok: true as const, before };
+  };
+  const doneUpdate = async (table: string, rowId: string, before: Record<string, unknown>, c: ChefCard) => {
+    const undo_token = await undoFor(table, rowId, before);
+    const r: ChefActResult = { ok: true, card: c, undo_token, navigate: null };
+    return Response.json(r);
   };
   const done = async (table: string, rowId: string, c: ChefCard, navigate?: string | null) => {
     const undo_token = await undoFor(table, rowId);
@@ -226,6 +252,47 @@ export async function POST(req: Request) {
       // The note is best-effort: the charter is the record, the note is the courier.
       await sb.from("pa_inbox_notes").insert({ filename, body_md, status: "pending", charter_id: charterId, entity_id: scope.entity.id, created_by: uid });
       return done("agent_charters", charterId, card(t.agent, [clip(objective, 140), filename, t.note_queued], label, "confirm"));
+    }
+    // ---------------------------------------------------------------- Phase 2
+    case "approve_reply": {
+      // Outbound. The client only reaches here after the read-back + Yes
+      // (tap, or a spoken yes inside the closed-grammar window). The gate
+      // itself is inside meta-reply (approved_by_boris) — same as the page.
+      const kind = action.kind === "dm" ? "dm" : "comment";
+      const r = await approveAndSend(sb, kind, String(action.id || ""), String(action.text || ""), uid);
+      if (!r.ok) return fail(r.error || t.send_failed, r.http === 200 ? 502 : r.http);
+      const who = action.author || "";
+      const res: ChefActResult = { ok: true, card: { ...card(t.sent(who), [clip(action.text, 140)], label, "write"), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } }, undo_token: null };
+      return Response.json(res);
+    }
+    case "skip_comment": {
+      const r = await patchRow("social_comments", String(action.id || ""), { status: "skipped" }, { entity_id: scope.entity.id });
+      if (!r.ok) return fail(r.error, r.status);
+      const c: ChefCard = { ...card(t.skipped(action.author || ""), [], label), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } };
+      return doneUpdate("social_comments", String(action.id), r.before, c);
+    }
+    case "booking_update": {
+      const patch: Record<string, unknown> = {};
+      if (action.patch?.service_time) patch.service_time = String(action.patch.service_time);
+      if (action.patch?.party_size) patch.party_size = Number(action.patch.party_size);
+      if (action.patch?.service_date) patch.service_date = String(action.patch.service_date);
+      if (action.patch?.notes != null) patch.notes = String(action.patch.notes);
+      if (!Object.keys(patch).length) return fail("empty patch");
+      const rid = ENTITY_TO_RESTAURANT[scope.entity.id as EntityKey];
+      const r = await patchRow("bookings", String(action.id || ""), patch, rid ? { restaurant_id: rid } : undefined);
+      if (!r.ok) return fail(r.error, r.status);
+      return doneUpdate("bookings", String(action.id), r.before, card(t.booking, [clip(action.label || "", 140)], label));
+    }
+    case "prep_update": {
+      const patch: Record<string, unknown> = {};
+      if (action.patch?.status) { patch.status = String(action.patch.status); if (patch.status === "done") { patch.completed_at = new Date().toISOString(); patch.completed_by = uid; } else { patch.completed_at = null; patch.completed_by = null; } }
+      if (action.patch?.quantity !== undefined) patch.quantity = action.patch.quantity;
+      if (action.patch?.unit !== undefined) patch.unit = action.patch.unit;
+      if (action.patch?.name) patch.name = clip(String(action.patch.name), 120);
+      if (!Object.keys(patch).length) return fail("empty patch");
+      const r = await patchRow("prep_lists", String(action.id || ""), patch, { entity_id: scope.entity.id });
+      if (!r.ok) return fail(r.error, r.status);
+      return doneUpdate("prep_lists", String(action.id), r.before, card(t.prep_upd, [clip(action.label || "", 140)], label));
     }
     default:
       return fail("unknown action type");

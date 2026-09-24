@@ -85,6 +85,13 @@ export default function ChefRoot() {
   const [housePick, setHousePick] = useState(false);
   const [entitySel, setEntitySel] = useState<string | null>(null);
   const [desktop, setDesktop] = useState(false);
+  // Phase 2
+  const [editReply, setEditReply] = useState<{ id: string; author: string; draft: string } | null>(null); // next utterance = the new reply
+  const [voiceWindow, setVoiceWindow] = useState<"open" | "closed" | "missed" | null>(null); // closed-grammar yes/no window on a confirm
+  const inboxSeen = useRef<string[]>([]);
+  const batchRemaining = useRef(0);
+  const grammarRef = useRef<"free" | "yesno">("free");
+  const voiceWindowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const voiceRef = useRef<ChefVoice | null>(null);
   const sessionRef = useRef("");
@@ -168,12 +175,15 @@ export default function ChefRoot() {
     if (undoTimer.current) { clearInterval(undoTimer.current); undoTimer.current = null; }
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
     if (workingTimer.current) { clearTimeout(workingTimer.current); workingTimer.current = null; }
+    if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; }
   }, []);
 
   const toIdle = useCallback(() => {
     clearTimers();
+    if (grammarRef.current === "yesno") { grammarRef.current = "free"; voiceRef.current?.cancel(); }
     setState("idle"); setCard(null); setPending(null); setTranscript(null); setPartial("");
     setUndoToken(null); setUndoLeft(0); setStillWorking(false); setSlow(false); setBusy(false);
+    setEditReply(null); setVoiceWindow(null); batchRemaining.current = 0;
   }, [clearTimers]);
 
   const scheduleDissolve = useCallback((ms: number) => {
@@ -250,9 +260,19 @@ export default function ChefRoot() {
     if (res.navigate) { toIdle(); router.push(res.navigate); return; }
     const c: CardT = res.card || { title: t("chef.done"), lines: [], kind: "write" };
     void logResolution(lastTurnId.current, "done", c.title);
-    showResult(c, { undo: res.undo_token || null, keep: !res.undo_token });
-    if (voice) void speak(c.title);
-    if (!res.undo_token) scheduleDissolve(READ_DISSOLVE_MS);
+    // Batch approve ("the first three"): the next item gets its OWN read-back.
+    if (action.type === "approve_reply" && batchRemaining.current > 0) {
+      batchRemaining.current -= 1;
+      const left = batchRemaining.current;
+      showResult(c, { keep: true });
+      if (voice && speechOn()) void speak(c.title);
+      setTimeout(() => { batchRemaining.current = left; void submit("#approve_next", voice); }, 900);
+      return;
+    }
+    showResult(c, { undo: res.undo_token || null, keep: !res.undo_token || !!c.persist });
+    if (voice && speechOn()) void speak(c.title);
+    if (!res.undo_token && !c.primary && !c.persist) scheduleDissolve(READ_DISSOLVE_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [act, router, scheduleDissolve, showResult, speak, toIdle]);
 
   const onUndo = useCallback(async () => {
@@ -266,10 +286,70 @@ export default function ChefRoot() {
     showResult(res.ok ? (res.card || { title: t("chef.undone"), lines: [], kind: "write" }) : { title: t("chef.error"), lines: [res.error || ""], kind: "error" });
   }, [act, showResult, undoToken]);
 
+  // --- confirm gate + the closed-grammar voice window (Phase 2 / brief §2) ------
+  //
+  // After the read-back has been SPOKEN (voice turns only), a 6 s window
+  // accepts "sí / yes / send it" or "no / cancel" — and only when the turn
+  // says confirm_voice (outbound reply, agent). Money / publish / delete
+  // never get the window: tap Yes only. Anything not clearly a yes is not a
+  // yes; silence → idle, nothing done. Any tap closes the window.
+  const YES = /^(?:s[ií]|yes|yeah|yep|ok(?:ay)?|vale|dale|hazlo|env[ií]a(?:lo)?|m[aá]ndalo|send(?: it)?|go(?: ahead)?|confirm(?:o|ar)?|claro|adelante)\b/i;
+  const NO = /^(?:no|nope|cancel(?:a|ar)?|para|stop|nada|d[eé]jalo|olv[ií]dalo|never ?mind)\b/i;
+
+  const closeVoiceWindow = useCallback((how: "closed" | "missed" | null) => {
+    if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; }
+    if (grammarRef.current === "yesno") { grammarRef.current = "free"; voiceRef.current?.cancel(); setLevel(0); }
+    setVoiceWindow(how);
+  }, []);
+
+  const openVoiceWindow = useCallback(() => {
+    const v = voiceRef.current;
+    if (!v || v.listening) return;
+    grammarRef.current = "yesno";
+    setVoiceWindow("open");
+    void v.start();
+    voiceWindowTimer.current = setTimeout(() => {
+      // 6 s of nothing: the row stays untouched, Chef goes quiet.
+      if (grammarRef.current !== "yesno") return;
+      closeVoiceWindow(null);
+      void logResolution(lastTurnId.current, "timeout");
+      toIdle();
+    }, 6_000);
+  }, [closeVoiceWindow, toIdle]);
+
+  const openConfirm = useCallback((turn: ChefTurn, voice: boolean) => {
+    clearTimers();
+    setPending({ turn, voice });
+    setCard(turn.card || { title: turn.say, lines: [], kind: "confirm", entity_label: undefined });
+    setState("confirm");
+    setBusy(false);
+    setVoiceWindow(null);
+    if (voice && speechOn()) {
+      void speak(turn.readback || turn.say).then(() => {
+        // Wait for the read-back to finish playing (Gemini lesson), then listen.
+        const a = audioRef.current;
+        const after = () => { if (turn.confirm_voice) openVoiceWindow(); };
+        if (a && !a.paused && !a.ended) { a.addEventListener("ended", after, { once: true }); a.addEventListener("pause", after, { once: true }); }
+        else after();
+      });
+    } else if (voice && turn.confirm_voice) {
+      openVoiceWindow();
+    }
+  }, [clearTimers, openVoiceWindow, speak]);
+
   // --- the turn ---------------------------------------------------------------
   const applyTurn = useCallback(async (turn: ChefTurn, voice: boolean) => {
     setTranscript(turn.transcript || null);
     lastTurnId.current = turn.turn_id || null;
+    if (turn.navigate && turn.navigate.startsWith("#speech:")) {
+      setSpeechOn(turn.navigate.endsWith(":on"));
+      showResult(turn.card || { title: turn.say, lines: [], kind: "read" });
+      return;
+    }
+    // Inbox walk: remember what was shown so "next" moves on.
+    const sec = turn.card?.secondary;
+    if (sec && sec.kind === "edit_reply" && !inboxSeen.current.includes(sec.id)) inboxSeen.current.push(sec.id);
+    if (typeof turn.batch_remaining === "number" && turn.needs_confirm) batchRemaining.current = Math.max(batchRemaining.current, turn.batch_remaining);
     if (turn.navigate && turn.intent.kind !== "capture") {
       toIdle();
       if (voice && turn.say) void speak(turn.say);
@@ -286,12 +366,7 @@ export default function ChefRoot() {
       return;
     }
     if (turn.needs_confirm && turn.action) {
-      clearTimers();
-      setPending({ turn, voice });
-      setCard(turn.card || { title: turn.say, lines: [], kind: "confirm", entity_label: undefined });
-      setState("confirm");
-      setBusy(false);
-      if (voice) void speak(turn.readback || turn.say);
+      openConfirm(turn, voice);
       return;
     }
     if (turn.action && turn.undoable) {
@@ -304,11 +379,29 @@ export default function ChefRoot() {
     showResult(c, { keep: turn.intent.kind === "clarify" || c.kind === "error" });
     if (voice && turn.say) void speak(turn.say);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearTimers, router, runAction, showResult, speak, toIdle]);
+  }, [clearTimers, openConfirm, router, runAction, showResult, speak, toIdle]);
 
-  const submit = useCallback(async (text: string, voice: boolean) => {
+  const submit = useCallback(async (text: string, voice: boolean, source?: "chip" | "headset", chipKey?: string) => {
     const trimmed = text.trim();
     if (!trimmed) { toIdle(); return; }
+    // Edit mode (inbox "Edit"): this utterance IS the reply. No model call —
+    // straight to the read-back gate with the new text.
+    if (editReply) {
+      const er = editReply;
+      setEditReply(null);
+      const readback = lang === "es" ? "Respondo a " + er.author + ": «" + trimmed + "». ¿Envío?" : "Reply to " + er.author + ": “" + trimmed + "”. Send it?";
+      const turn: ChefTurn = {
+        transcript: trimmed, language: lang,
+        intent: { kind: "approve", surface: "social", id: er.id, action: "send" }, confidence: 1,
+        say: readback, readback, needs_confirm: true, confirm_voice: true, turn_id: lastTurnId.current,
+        action: { type: "approve_reply", entity_id: entityId, kind: "comment", id: er.id, text: trimmed, author: er.author },
+        card: { title: (lang === "es" ? "Responder a " : "Reply to ") + er.author, lines: [trimmed], kind: "confirm" },
+      };
+      void logResolution(lastTurnId.current, "edited");
+      setTranscript(trimmed);
+      openConfirm(turn, voice);
+      return;
+    }
     const seq = ++turnSeq.current;
     clearTimers();
     setState("thinking"); setTranscript(trimmed); setPartial(""); setCard(null); setPending(null);
@@ -327,6 +420,7 @@ export default function ChefRoot() {
           language: lang,
           voice,
           page_context: { ...basePageCtx, active_pillar: pillarForRoute(pathname) },
+          chef_state: { inbox_seen: inboxSeen.current, source: source || (voice ? "voice" : "typed"), chip_key: chipKey },
         }),
       });
       const d = (await r.json().catch(() => ({}))) as ChefTurn;
@@ -340,7 +434,8 @@ export default function ChefRoot() {
       if (seq !== turnSeq.current) return;
       showResult({ title: t("chef.offline"), lines: [e?.message || "network"], kind: "error" });
     }
-  }, [applyTurn, clearTimers, entityId, lang, pathname, scope.house, showResult, toIdle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyTurn, clearTimers, editReply, entityId, lang, openConfirm, pathname, scope.house, showResult, toIdle]);
 
   // --- voice loop ---------------------------------------------------------------
   const getVoice = useCallback(() => {
@@ -353,6 +448,17 @@ export default function ChefRoot() {
         onFinal: (text, meta) => {
           setLevel(0);
           setSlow(!!meta.slow && meta.backend === "whisper" && meta.ms > 1200);
+          if (grammarRef.current === "yesno") {
+            // Closed grammar: yes → act, no → nothing, anything else → not a yes (tap only).
+            grammarRef.current = "free";
+            if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; }
+            const heard = (text || "").trim();
+            setTranscript(heard || null);
+            if (heard && YES.test(heard)) { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-yes")); return; }
+            if (heard && NO.test(heard)) { setVoiceWindow("closed"); window.dispatchEvent(new CustomEvent("fs:chef:voice-no")); return; }
+            setVoiceWindow("missed");
+            return;
+          }
           if (!text) { toIdle(); return; }
           void submit(text, true);
         },
@@ -395,9 +501,16 @@ export default function ChefRoot() {
   // --- gestures -------------------------------------------------------------------
   const onTap = useCallback(() => {
     if (state === "listening") { stopListening(); return; }
-    if (state === "confirm") return; // Yes / No are on the card; a tap on the control does nothing
+    if (state === "confirm") {
+      // Yes / No live on the card. A tap on the control closes the voice
+      // window (any tap cancels it — brief §2) and, in the window, sends
+      // what was heard so far.
+      if (grammarRef.current === "yesno" && voiceRef.current?.listening) { if (voiceWindowTimer.current) { clearTimeout(voiceWindowTimer.current); voiceWindowTimer.current = null; } voiceRef.current.stop(); return; }
+      closeVoiceWindow("closed");
+      return;
+    }
     startListening();
-  }, [startListening, state, stopListening]);
+  }, [closeVoiceWindow, startListening, state, stopListening]);
 
   const houses = useMemo(() => listHouses(), []);
   const captureEntity = useRef<string | null>(null);
@@ -501,7 +614,7 @@ export default function ChefRoot() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") { e.preventDefault(); if (visible) openType(); return; }
       if (e.key === "Escape") {
-        if (typing) { setTyping(false); setTyped(""); return; }
+        if (typing) { setTyping(false); setTyped(""); setEditReply(null); return; }
         if (state === "listening") { voiceRef.current?.cancel(); toIdle(); return; }
         if (state === "confirm") { toIdle(); return; }
       }
@@ -525,21 +638,51 @@ export default function ChefRoot() {
     if (a.kind === "navigate") { toIdle(); router.push(a.href); return; }
     if (a.kind === "none") { toIdle(); return; }
     if (a.kind === "capture_page") { startCapture(a.capture_id || null); return; }
+    if (a.kind === "turn") { void submit(a.message, false); return; }
+    if (a.kind === "confirm") {
+      // A card button that opens the gate (inbox "Send"): tap-only from a
+      // button — the voice window is for spoken turns.
+      const turn: ChefTurn = {
+        transcript: transcript || "", language: lang, intent: { kind: "approve", surface: "social", id: "", action: "send" }, confidence: 1,
+        say: a.readback, readback: a.readback, needs_confirm: true, confirm_voice: !!a.voice_ok, action: a.action, turn_id: lastTurnId.current,
+        card: { ...(card || { title: a.label, lines: [] }), kind: "confirm", primary: undefined, chip: undefined, secondary: undefined },
+      };
+      openConfirm(turn, false);
+      return;
+    }
+    if (a.kind === "edit_reply") {
+      setEditReply({ id: a.id, author: a.author, draft: a.draft });
+      clearTimers();
+      setState("idle"); setCard(null); setPending(null);
+      setTyping(true); setTyped(a.draft || "");
+      setTimeout(() => inputRef.current?.focus(), 30);
+      return;
+    }
     if (a.kind === "act") { void runAction(a.action, false); }
-  }, [router, runAction, startCapture, toIdle]);
+  }, [card, clearTimers, lang, openConfirm, router, runAction, startCapture, submit, toIdle, transcript]);
 
-  const onYes = useCallback(() => {
+  const onYes = useCallback((how: "tap" | "voice" = "tap") => {
     if (!pending?.turn.action) return;
     const { turn, voice } = pending;
+    closeVoiceWindow("closed");
     setPending(null);
-    void logResolution(turn.turn_id, "confirmed_tap");
+    void logResolution(turn.turn_id, how === "voice" ? "confirmed_voice" : "confirmed_tap");
     void runAction(turn.action!, voice);
-  }, [pending, runAction]);
+  }, [closeVoiceWindow, pending, runAction]);
 
   const onNo = useCallback(() => {
     void logResolution(pending?.turn.turn_id, "declined");
     toIdle();
   }, [pending, toIdle]);
+
+  // The closed-grammar window resolves through the same two handlers.
+  useEffect(() => {
+    const yes = () => onYes("voice");
+    const no = () => onNo();
+    window.addEventListener("fs:chef:voice-yes", yes);
+    window.addEventListener("fs:chef:voice-no", no);
+    return () => { window.removeEventListener("fs:chef:voice-yes", yes); window.removeEventListener("fs:chef:voice-no", no); };
+  }, [onNo, onYes]);
 
   const onBody = useCallback(() => {
     if (card?.href) { const h = card.href; toIdle(); router.push(h); }
@@ -585,6 +728,7 @@ export default function ChefRoot() {
           <div className="pointer-events-auto flex flex-col gap-2 pb-2 lg:pb-0">
             {state === "listening" ? (
               <p className="rounded-xl bg-paper px-4 py-3 font-sans text-[17px] leading-snug text-ink shadow-lg">
+                {editReply ? <span className="mr-2 font-mono text-[11px] uppercase tracking-wide text-clay">{t("chef.edit")} · {editReply.author}</span> : null}
                 {partial || t("chef.listening")}
               </p>
             ) : null}
@@ -608,12 +752,14 @@ export default function ChefRoot() {
                 transcript={transcript}
                 readback={pending?.turn.readback || null}
                 mode={state === "confirm" ? "confirm" : state === "error" ? "error" : "result"}
+                hint={state === "confirm" ? (voiceWindow === "open" ? t("chef.say_yes_or_tap") : voiceWindow === "missed" ? t("chef.not_a_yes") : pending?.turn.confirm_voice ? undefined : t("chef.tap_only")) : undefined}
+                listening={voiceWindow === "open"}
                 undoLeftMs={undoLeft}
                 busy={busy}
                 onPrimary={onCardAction}
                 onChip={onCardAction}
                 onBody={onBody}
-                onYes={onYes}
+                onYes={() => onYes("tap")}
                 onNo={onNo}
                 onUndo={onUndo}
               />
@@ -624,7 +770,7 @@ export default function ChefRoot() {
                   ref={inputRef}
                   value={typed}
                   onChange={(e) => setTyped(e.target.value)}
-                  placeholder={t("chef.type_placeholder")}
+                  placeholder={editReply ? t("chef.edit_reply_hint") : t("chef.type_placeholder")}
                   enterKeyHint="send"
                   autoComplete="off"
                   className="h-11 flex-1 bg-transparent font-sans text-[17px] text-ink outline-none placeholder:text-clay"
