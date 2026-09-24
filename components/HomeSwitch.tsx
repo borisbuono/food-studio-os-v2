@@ -1,7 +1,7 @@
 "use client";
 
-// Home switch — same pattern as ChefSwitch. Reads ?slim=1 or
-// localStorage.fs_chef_slim=1 and renders HomeSlim, otherwise HomeCompass.
+// Home switch — reads the `slim` URL param (1/0) or
+// the fs_chef_slim flag and renders HomeSlim, otherwise HomeCompass.
 // Both consume the same CompassData contract from the server component.
 
 import { useEffect, useState } from "react";

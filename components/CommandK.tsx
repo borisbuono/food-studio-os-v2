@@ -348,7 +348,7 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
   };
 
   // Voice input — uses Web Speech API directly with the same-mic guarantees as
-  // AssistantFab. Landing on a route works when the utterance matches a routes
+  // the old Chef FAB. Landing on a route works when the utterance matches a routes
   // label/hint; otherwise the transcript is filled into the query field so the
   // fuzzy match takes over.
   const recRef = useRef<any>(null);

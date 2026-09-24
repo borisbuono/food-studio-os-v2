@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { resolveVenueScope } from "@/lib/serverVenue";
 import { PillarTile, PillarHeader } from "@/components/PillarTile";
@@ -59,22 +58,7 @@ export default async function OfficeHome() {
           action="Open finance →"
           flowChip="admin"
         />
-        {/* Capture Station shortcut — visible on Office so paper docs never
-            queue behind an unrelated screen (Boris ask 2026-08-24). */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Link
-            href="/capture?type=invoice"
-            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
-          >
-            + Capture invoice
-          </Link>
-          <Link
-            href="/capture?type=albaran"
-            className="rounded-full border border-black/15 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-ink transition hover:border-ink/40"
-          >
-            + Capture delivery note
-          </Link>
-        </div>
+        {/* Capture has ONE entry: hold the Chef control (v3, 2026-09-24). */}
         <PillarTile
           href="/administrate/finance/scans"
           kicker="Invoices · to approve"

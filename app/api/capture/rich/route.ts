@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 //   - purchase_lines:     one row per line item (idempotent on
 //                         (invoice_inbox_id, line_number))
 //
-// The old /api/capture route is preserved so the AssistantFab camera path
+// The old /api/capture route is preserved so the legacy Chef camera path
 // keeps working; this endpoint lives alongside it.
 
 const ENTITY_CODE: Record<EntityKey, string> = {

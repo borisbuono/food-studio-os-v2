@@ -1,6 +1,6 @@
 // Public (signed-out) route prefixes — shared by AppChrome (hides the
-// sidebar / top bar) and ChefSwitch (hides the Chef FAB). One list so the
-// two can't drift: before 2026-09-24 ChefSwitch only excluded /apply/*, so
+// sidebar / top bar) and ChefRoot (hides the Chef control). One list so the
+// two can't drift: before 2026-09-24 the Chef switch only excluded /apply/*, so
 // a signed-out visitor on /welcome or /book/* got a Chef button that could
 // only answer "I can't find that venue".
 //

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // underlying Whisper cap is 25MB so mirror it here.
 export const maxDuration = 60;
 
-// PWA #2 (2026-07-28) — the endpoint the AssistantFab hits when Web Speech
+// PWA #2 (2026-07-28) — the endpoint Chef hits when Web Speech
 // isn't available (iOS Safari, Firefox, PWA mode). Accepts a multipart audio
 // blob + language hint, forwards to OpenAI Whisper, returns the text and
 // logs cost to assistant_actions so billing metering picks it up.

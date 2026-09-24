@@ -1,7 +1,7 @@
 "use client";
 
 // HomeSlim — the "compression is the brand" home. Ships alongside HomeCompass,
-// activated by ?slim=1 or localStorage.fs_chef_slim=1. Same data contract
+// activated by the `slim` URL param or the fs_chef_slim flag. Same data contract
 // (CompassData) — just a slimmer view. Zero risk to daily ops.
 //
 // Layout (Fable slim spec §7 + Boris's walk feedback):

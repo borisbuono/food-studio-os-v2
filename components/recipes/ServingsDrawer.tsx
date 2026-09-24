@@ -5,7 +5,7 @@ import ServingsScaler from "./ServingsScaler";
 
 // Floating "Scale" affordance on the recipe detail page. Clicking opens a
 // bottom drawer with the ServingsScaler inside. Chef-craft ergonomics: the
-// FAB sits above the AssistantFab (bottom-right), matched hairline styling.
+// Pill sits bottom-left, clear of the Chef control (bottom-centre), matched hairline styling.
 type Ing = { name: string; quantity?: string | number | null; unit?: string | null };
 
 export default function ServingsDrawer({

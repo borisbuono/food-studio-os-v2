@@ -12,7 +12,7 @@ import { Z } from "@/lib/ui/z";
 // above the FAB — "Chef here. Walk you through it?" — that hands off to the
 // person's training path.
 //
-// Kept out of AssistantFab itself so the FAB's complex speech/session
+// Kept out of the Chef control itself so the FAB's complex speech/session
 // lifecycle stays untouched. The pill sits above the FAB at the same
 // bottom-right anchor; dismissing it stashes a same-day flag so it does not
 // re-appear until tomorrow.

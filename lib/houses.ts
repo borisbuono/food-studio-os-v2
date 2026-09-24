@@ -23,7 +23,7 @@
 // DB-driven resolvers live in `lib/houses.server.ts` (getHouseBySlug,
 // getMyHouses, entityForHouseSlug). This file keeps the client-safe
 // primitives — types, sync helpers, pinned maps — that get bundled into
-// client components (DesktopSidebar, RoomSwitcher, ChefSlim etc). Server
+// client components (DesktopSidebar, RoomSwitcher, ChefRoot etc). Server
 // pages import BOTH: types from here, DB lookups from the .server file.
 
 import { E_BM, E_TALLER, E_UTOPIA, ENTITY_LABEL, ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
