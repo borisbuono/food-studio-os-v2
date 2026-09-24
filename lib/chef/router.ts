@@ -13,6 +13,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
 import { E_HOLDINGS } from "@/lib/entities";
+import { getFrestoAdapter } from "@/lib/integrations/fresto";
 import {
   CONFIDENCE_ACT, CONFIDENCE_READ_ONLY, isWriteIntent,
   type ChefAction, type ChefCard, type ChefIntent, type ChefLang, type ChefTurn,
@@ -308,12 +309,25 @@ async function readBookings(dateArg: string, ctx: ReadCtx): Promise<{ card: Chef
   const date = dateArg === "tomorrow" ? tzDate(tz, 1) : /^\d{4}-\d{2}-\d{2}$/.test(dateArg) ? dateArg : tzDate(tz);
   const rid = ctx.scope.restaurant_id;
   const href = "/execute/bookings";
-  const rows = rid ? ((await sb.from("bookings").select("party_size, service_time, status, notes").eq("restaurant_id", rid).eq("service_date", date)).data || []) : [];
+  let rows: any[] = rid ? ((await sb.from("bookings").select("party_size, service_time, status, notes").eq("restaurant_id", rid).eq("service_date", date)).data || []) : [];
+  let frestoOffline = false;
+  // No rows in the DB → the venue's book lives in Fresto. Same read-only
+  // seam the floor plan uses, but ONLY when the adapter is live: a spoken
+  // "23 covers" from the mock would be an invented number (brief §7).
+  if (!rows.length && rid) {
+    try {
+      const fresto = await getFrestoAdapter(rid);
+      if (fresto.mode === "live") {
+        const fb = await fresto.getBookings(date);
+        rows = fb.map((b) => ({ party_size: b.partySize, service_time: b.time, status: b.status, notes: null }));
+      } else frestoOffline = true;
+    } catch { frestoOffline = true; }
+  }
   const live = rows.filter((b: any) => !["cancelled", "no_show"].includes(String(b.status || "").toLowerCase()));
   const covers = live.reduce((a: number, b: any) => a + Number(b.party_size || 0), 0);
   const times = live.map((b: any) => clockShort(b.service_time)).filter(Boolean).sort();
   const notes = live.filter((b: any) => String(b.notes || "").trim()).length;
-  if (!live.length) return { say: t.no_bookings + " " + date, card: { title: t.no_bookings, lines: [date], kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
+  if (!live.length) return { say: t.no_bookings + " " + date, card: { title: t.no_bookings, lines: [date + (frestoOffline ? (ctx.lang === "es" ? " · Fresto sin conectar" : " · Fresto not connected") : "")], kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
   const lines = [date, t.bookings(live.length, covers)];
   if (times.length) lines.push(t.first_last(times[0], times[times.length - 1]));
   if (notes) lines.push(t.notes(notes));
