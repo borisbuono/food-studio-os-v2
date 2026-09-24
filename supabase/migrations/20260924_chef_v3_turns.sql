@@ -77,3 +77,8 @@ create policy pa_inbox_notes_own_insert on public.pa_inbox_notes for insert to a
 create policy pa_inbox_notes_own_update on public.pa_inbox_notes for update to authenticated using (created_by = auth.uid()) with check (created_by = auth.uid());
 
 grant select, insert, update on public.chef_turns, public.chef_undo, public.pa_inbox_notes to authenticated;
+
+-- Undoing a charter pulls its queued _INBOX note (applied separately as
+-- chef_v3_pa_inbox_notes_own_delete).
+drop policy if exists pa_inbox_notes_own_delete on public.pa_inbox_notes;
+create policy pa_inbox_notes_own_delete on public.pa_inbox_notes for delete to authenticated using (created_by = auth.uid() and status = 'pending');

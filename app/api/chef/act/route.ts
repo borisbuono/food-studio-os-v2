@@ -73,6 +73,11 @@ export async function POST(req: Request) {
       return fail(t.undo_bad, 410);
     const { data: gone, error } = await sb.from((row as any).table_name).delete().eq("id", (row as any).row_id).select("id");
     if (error) return fail(error.message, 500);
+    // Undoing a charter must also pull its queued _INBOX note, or the PA
+    // would brief an agent for a job that no longer exists.
+    if ((row as any).table_name === "agent_charters") {
+      await sb.from("pa_inbox_notes").delete().eq("charter_id", (row as any).row_id).eq("status", "pending");
+    }
     // RLS can silently delete nothing (e.g. a non-manager on prep_lists) —
     // say so instead of pretending.
     if (!gone || !gone.length) return fail(t.nothing_deleted, 403);
