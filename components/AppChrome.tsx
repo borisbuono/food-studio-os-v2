@@ -12,7 +12,7 @@ import type { ServerProfile } from "@/lib/serverProfile";
 import { EntityKey, E_HOLDINGS } from "@/lib/entities";
 import { fetchMyAccess } from "@/lib/access/myAccess";
 import { brandForPath } from "@/lib/brandScope";
-import { isPublicRoute } from "@/lib/routing/public-routes";
+import { isPublicRoute, isChromelessRoute } from "@/lib/routing/public-routes";
 import { Z } from "@/lib/ui/z";
 // Chrome (sidebar + topbar) that hides on public/unauth routes so /welcome
 // and /login render as a marketing shell, not the entity-scoped app shell.
@@ -80,10 +80,14 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
     if (typeof document === "undefined") return;
     const pub = isPublic(path);
     const slimNow = shell.loaded && shell.hasMemberships && !shell.isOwner && !shell.isMulti;
-    document.body.setAttribute("data-shell", pub ? "public" : slimNow ? "slim" : "full");
+    document.body.setAttribute("data-shell", pub ? "public" : isChromelessRoute(path) ? "pass" : slimNow ? "slim" : "full");
   }, [path, shell]);
 
   if (isPublic(path)) return <>{children}</>;
+  // Chromeless but authenticated (Chef v3 P2 S5): the wall screen at the
+  // pass. No sidebar, no top bar; Chef stays mounted (it is not a
+  // CHEF_HIDDEN route) and lays out phone-style via body[data-chef-mode].
+  if (isChromelessRoute(path)) return <>{children}</>;
 
   // Until membership context resolves we render the FULL shell so we don't
   // flash-collapse the sidebar for admins on a slow API call. Slim mode is

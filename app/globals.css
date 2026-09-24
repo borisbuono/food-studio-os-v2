@@ -36,3 +36,22 @@ body[data-fab="hidden"] { --chef-dock: 0px; padding-bottom: 0; }
   body[data-chef-panel="open"][data-shell="slim"] { --chef-sidebar: 0px; }
 }
 @keyframes fs-chef-spin { to { transform: rotate(360deg); } }
+/* Chef v3 P2 S5 — pass mode (the wall screen at /h/<slug>/pass). PassScreen
+ * sets body[data-chef-mode="pass"]; ChefRoot then lays the control out
+ * phone-style (bottom-centre, sheet) on any width and this block scales the
+ * surface for a screen read from 3 m. The reserve stays 96 px on the page;
+ * the control wrapper is scaled visually (transform, not layout) so nothing
+ * else moves. Chips are a sibling of the wrapper and are not scaled. */
+body[data-chef-mode="pass"] { padding-bottom: var(--chef-dock); }
+body[data-chef-mode="pass"] [data-chef-dock] { --chef-dock-scale: 1.4; }
+body[data-chef-mode="pass"] [data-chef-dock] > div:not([data-chef-chips]) { transform: scale(var(--chef-dock-scale)); transform-origin: bottom center; }
+body[data-chef-mode="pass"] [data-chef-surface] > div { max-width: 720px; margin: 0 auto; width: 100%; }
+body[data-chef-mode="pass"] [data-chef-card] h3 { font-size: 32px; }
+body[data-chef-mode="pass"] [data-chef-card] li { font-size: 24px; line-height: 1.25; }
+body[data-chef-mode="pass"] [data-chef-card] button { height: 72px; font-size: 24px; }
+/* the "listening…" line and the "heard: …" block (not the card's own kicker/hint) */
+body[data-chef-mode="pass"] [data-chef-surface] > div > p,
+body[data-chef-mode="pass"] [data-chef-surface] > div > div:not([data-chef-card]):not(form) > p { font-size: 20px; }
+body[data-chef-mode="pass"] [data-chef-surface] form input { font-size: 24px; height: 60px; }
+body[data-chef-mode="pass"] [data-chef-surface] form button { font-size: 24px; height: 60px; }
+

@@ -26,3 +26,15 @@ export const CHEF_HIDDEN_PREFIXES = [...PUBLIC_PREFIXES, "/recipes/"];
 export function isChefHiddenRoute(path: string): boolean {
   return CHEF_HIDDEN_PREFIXES.some((p) => path === p || path.startsWith(p));
 }
+
+// Chromeless but AUTHENTICATED (Chef v3 P2 S5): the wall screen at the pass
+// (/h/<slug>/pass) renders without sidebar / top bar, but the user must be
+// signed in (the page redirects to /login otherwise) and Chef stays mounted
+// — it is the whole point of the screen. So it is NOT in PUBLIC_PREFIXES
+// (that would skip auth and hide Chef); AppChrome checks this instead and
+// sets body[data-shell="pass"].
+const CHROMELESS_RE = /^\/h\/[^/]+\/pass$/;
+
+export function isChromelessRoute(path: string): boolean {
+  return CHROMELESS_RE.test(path);
+}
