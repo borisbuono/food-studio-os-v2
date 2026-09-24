@@ -13,14 +13,22 @@ body { color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 3
     /* extend paper background under notch/gesture-bar so no white flash */
     background-color: #EFEEEB;
   }
-  /* Chef FAB anchors above the iOS gesture bar */
-  .fs-fab-safe { bottom: calc(env(safe-area-inset-bottom, 0px) + 20px) !important; }
 }
 
-
-/* Assistant FAB — on lg+ the bottom-sheet becomes a right-docked panel.
- * The inline snap-height style wins the cascade; we force it back to 100vh
- * via a data attribute so the Tailwind lg:h-full survives. */
+/* Chef v3 — the layout reserve (brief §1). The control is the ONLY fixed
+ * element allowed in the bottom 96 px of any authenticated page; the rule is
+ * enforced by this reserve, not by z-index. body[data-chef="on"] is set by
+ * ChefRoot while it is mounted; FabHidden zeroes the reserve (live camera).
+ * Page-local bottom bars (PrepList) dock ABOVE it with bottom: var(--chef-dock).
+ * On lg+ the control lives in the sidebar column and cards open in a 380 px
+ * panel right of it that PUSHES the page (.fs-main), never overlays it. */
+:root { --chef-dock: 0px; --chef-sidebar: 15rem; --chef-panel: 380px; }
+body[data-chef="on"] { --chef-dock: calc(96px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--chef-dock); }
+body[data-fab="hidden"] { --chef-dock: 0px; padding-bottom: 0; }
 @media (min-width: 1024px) {
-  [data-fs-fab-sheet] { height: 100vh !important; }
+  body[data-chef="on"] { padding-bottom: 0; }
+  body[data-chef-panel="open"] .fs-main { padding-left: calc(var(--chef-sidebar) + var(--chef-panel)); }
+  body[data-chef-panel="open"][data-shell="slim"] .fs-main { padding-left: var(--chef-panel); }
+  body[data-chef-panel="open"][data-shell="slim"] { --chef-sidebar: 0px; }
 }
+@keyframes fs-chef-spin { to { transform: rotate(360deg); } }

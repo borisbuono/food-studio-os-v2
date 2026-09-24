@@ -1,7 +1,7 @@
 import "./globals.css";
 import AppChrome from "@/components/AppChrome";
 import type { Metadata, Viewport } from "next";
-import ChefSwitch from "@/components/ChefSwitch";
+import ChefRoot from "@/components/chef/ChefRoot";
 import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
 import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
@@ -87,7 +87,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Amsterdam's owner never sees Boris's internal route list before
             signing in (p0 leak fixed 2026-09-21). */}
         <CommandK initialProfile={initialProfile} />
-        <ChefSwitch />
+        {/* Chef v3 — the OS front door. One control, layout reserve, cards. */}
+        <ChefRoot />
         <NewHireAssistantNudge />
         <InstallPrompt />
       </body>

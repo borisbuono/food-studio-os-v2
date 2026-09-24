@@ -35,7 +35,7 @@ import { Z } from "@/lib/ui/z";
 
 // /onboard/* also renders as a clean shell (no sidebar/topbar) — the wizard
 // is a first-time surface, chrome would drown out the flow.
-// The prefix list lives in lib/routing/public-routes (shared with ChefSwitch
+// The prefix list lives in lib/routing/public-routes (shared with ChefRoot
 // since 2026-09-24 so the Chef FAB and the chrome agree on what is public).
 const isPublic = isPublicRoute;
 
@@ -74,6 +74,15 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
     return () => { cancelled = true; };
   }, []);
 
+  // Chef v3 reads the shell mode to place its control (sidebar column vs.
+  // bottom-centre) — see globals.css body[data-shell].
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const pub = isPublic(path);
+    const slimNow = shell.loaded && shell.hasMemberships && !shell.isOwner && !shell.isMulti;
+    document.body.setAttribute("data-shell", pub ? "public" : slimNow ? "slim" : "full");
+  }, [path, shell]);
+
   if (isPublic(path)) return <>{children}</>;
 
   // Until membership context resolves we render the FULL shell so we don't
@@ -85,7 +94,7 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
     return (
       <>
         <SlimTopBar initialProfile={initialProfile ?? null} initialEntity={initialEntity ?? null} path={path} />
-        <div>{children}</div>
+        <div className="fs-main">{children}</div>
       </>
     );
   }
@@ -99,7 +108,7 @@ export default function AppChrome({ children, initialEntity, initialProfile }: {
       <div className="lg:hidden">
         <TopBar initialEntity={initialEntity} initialProfile={initialProfile ?? null} />
       </div>
-      <div className="lg:pl-60">
+      <div className="fs-main lg:pl-60">
         {/* Desktop-only room switcher row. The identity chip that used to
             live here was removed 2026-08-31 — the bottom-left chip in the
             sidebar is the canonical identity affordance. */}

@@ -137,6 +137,22 @@ export const dict: Record<string, Record<Lang, string>> = {
   "chef.listening": { en: "Listening…", es: "Escuchando…", nl: "Luistert…" },
   "chef.send": { en: "Send", es: "Enviar", nl: "Verstuur" },
   "chef.thinking": { en: "Thinking…", es: "Pensando…", nl: "Bezig…" },
+  // — chef v3 (one control, cards, confirm gate)
+  "chef.heard": { en: "heard:", es: "oído:", nl: "gehoord:" },
+  "chef.slow": { en: "slow mode", es: "modo lento", nl: "trage modus" },
+  "chef.still_working": { en: "Still working…", es: "Sigo en ello…", nl: "Nog bezig…" },
+  "chef.tap_to_talk": { en: "Tap to talk · hold for camera", es: "Toca para hablar · mantén para cámara", nl: "Tik om te praten · houd vast voor camera" },
+  "chef.confirm_hint": { en: "Waiting for Yes or No", es: "Esperando Sí o No", nl: "Wacht op Ja of Nee" },
+  "chef.yes": { en: "Yes", es: "Sí", nl: "Ja" },
+  "chef.no": { en: "No", es: "No", nl: "Nee" },
+  "chef.undo": { en: "Undo", es: "Deshacer", nl: "Ongedaan" },
+  "chef.undone": { en: "Undone", es: "Deshecho", nl: "Ongedaan gemaakt" },
+  "chef.done": { en: "Done", es: "Hecho", nl: "Klaar" },
+  "chef.error": { en: "Chef couldn't do that", es: "Chef no ha podido", nl: "Chef kon dat niet" },
+  "chef.offline": { en: "No signal — try again", es: "Sin señal — inténtalo otra vez", nl: "Geen verbinding — probeer opnieuw" },
+  "chef.mic_needed": { en: "Microphone needed", es: "Hace falta el micrófono", nl: "Microfoon nodig" },
+  "chef.type_placeholder": { en: "Ask or tell Chef…", es: "Pregunta o dile al Chef…", nl: "Vraag of zeg het Chef…" },
+  "chef.which_house": { en: "Which house?", es: "¿Qué casa?", nl: "Welke zaak?" },
 
   // — capture (invoice / delivery-note camera)
   "capture.title": { en: "Capture", es: "Capturar", nl: "Vastleggen" },

@@ -17,10 +17,18 @@
 //
 // Page-local overlays (calendar, inbox, prep bar…) may keep their own
 // values as long as they stay below `drawer`.
+//
+// Chef v3 (2026-09-24): the control is no longer a FAB above a drawer. It
+// sits in a layout RESERVE (--chef-dock, 96 px) so nothing can overlap it —
+// z only orders what deliberately shares the screen: the page-dim while
+// listening (chefDock − 1), the control (chefDock), the card / desktop
+// panel (chefCard), modals above, toasts above everything.
 export const Z = {
   base: 0,
   sticky: 30,
   drawer: 50,
+  chefDock: 50,
+  chefCard: 55,
   fab: 60,
   modal: 70,
   toast: 80,

@@ -211,7 +211,9 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     <aside
       data-desktop-sidebar
       className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
-      style={{ zIndex: Z.sticky }}
+      // Chef v3: the control docks at the bottom of this column, inside the
+      // reserve — the identity block sits above it, never under it.
+      style={{ zIndex: Z.sticky, paddingBottom: "var(--chef-dock)" }}
       aria-label="Desktop navigation"
     >
       {/* Wordmark + "you are here" label. Static text on Studio scope,

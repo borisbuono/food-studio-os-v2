@@ -370,7 +370,7 @@ export default function PrepList({
       )}
 
       {selected.size > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+        <div className="fixed inset-x-0 z-20 border-t border-line bg-white/95 px-4 py-3 shadow-lg backdrop-blur" style={{ bottom: "var(--chef-dock)" }}>
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
             <p className="font-mono text-[11px] uppercase tracking-wide text-clay">
               {selected.size} selected
