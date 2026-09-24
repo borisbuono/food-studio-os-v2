@@ -291,14 +291,22 @@ async function readRecipes(q: string, ctx: ReadCtx): Promise<{ card: ChefCard; s
   if (!rows.length) {
     return { say: t.no_recipe + ": " + clip(q, 30), card: { title: t.no_recipe, lines: [clip(q, 80)], kind: "read", entity_label: label, href: listHref } };
   }
-  const r: any = rows[0];
+  // "romesco" should land on Romesco, not on "Cauliflower Steak, Romesco and
+  // Almonds": exact name first, then the shortest name containing the words.
+  const ql = q.trim().toLowerCase();
+  const ranked = [...rows].sort((a: any, b: any) => {
+    const an = String(a.name || "").toLowerCase(), bn = String(b.name || "").toLowerCase();
+    const ae = an === ql ? 0 : an.startsWith(ql) ? 1 : 2, be = bn === ql ? 0 : bn.startsWith(ql) ? 1 : 2;
+    return ae - be || an.length - bn.length;
+  });
+  const r: any = ranked[0];
   const href = ctx.house ? "/h/" + ctx.house + "/kitchen/recipes/" + r.id : "/develop/menu/" + r.id;
   const { data: steps } = await sb.from("recipe_steps").select("order_idx, body").eq("recipe_id", r.id).order("order_idx").limit(3);
   const stepLines = (steps || []).map((s: any) => clip(s.body, 120));
   const methodLines = stepLines.length ? stepLines : String(r.method || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 3).map((x) => clip(x, 120));
   const yieldStr = r.yield_qty ? r.yield_qty + " " + (r.yield_unit || "") : r.portions ? r.portions + (ctx.lang === "es" ? " raciones" : " portions") : "";
   const lines = [yieldStr, ...methodLines].filter(Boolean).slice(0, 4);
-  const say = rows.length > 1 ? t.recipes_found(rows.length) + ", " + r.name : r.name + (yieldStr ? ", " + yieldStr : "");
+  const say = ranked.length > 1 ? t.recipes_found(ranked.length) + ", " + r.name : r.name + (yieldStr ? ", " + yieldStr : "");
   return { say: clip(say, 80), card: { title: clip(r.name, 60), lines, kind: "read", entity_label: label, href, primary: { label: t.open, kind: "navigate", href } } };
 }
 
@@ -411,7 +419,9 @@ async function readAsk(input: ChefTurnInput): Promise<{ card: ChefCard; say: str
     const entity = codeForEntityId(scope.entity.id) || scope.entity.id;
     try { await orchestrator.logInteraction({ userId: uid, entity, route, sessionId, userPrompt: message, result, mode: "chat" }); } catch {}
   }
-  const reply = result.ok ? result.text : t.ask_failed;
+  // The orchestrator prepends a "[Chef flag: …]" grounding warning when the
+  // reply names something not in context. It must not become the card title.
+  const reply = result.ok ? result.text.replace(/\[Chef flag:[\s\S]*?\]\s*/g, "").trim() : t.ask_failed;
   const lines = toLines(reply);
   return {
     ok: result.ok, reply,
