@@ -38,3 +38,17 @@ alter table public.pa_inbox_notes add column if not exists error text;
 drop policy if exists chef_turns_entity_managers_select on public.chef_turns;
 create policy chef_turns_entity_managers_select on public.chef_turns for select to authenticated
   using (entity_id is not null and entity_id in (select app_my_managed_entities()));
+
+-- S7 (applied to prod as migration chef_v3_pa_inbox_bucket) — pa_inbox bucket:
+-- pending pa_inbox_notes rows are materialised there as <filename>; the PA
+-- session syncs them into 06_PA/_INBOX/ (Vercel cannot write to the workspace).
+insert into storage.buckets (id, name, public) values ('pa_inbox', 'pa_inbox', false) on conflict (id) do nothing;
+drop policy if exists pa_inbox_authenticated_insert on storage.objects;
+drop policy if exists pa_inbox_authenticated_select on storage.objects;
+drop policy if exists pa_inbox_authenticated_update on storage.objects;
+create policy pa_inbox_authenticated_insert on storage.objects for insert to authenticated with check (bucket_id = 'pa_inbox');
+create policy pa_inbox_authenticated_select on storage.objects for select to authenticated using (bucket_id = 'pa_inbox');
+create policy pa_inbox_authenticated_update on storage.objects for update to authenticated using (bucket_id = 'pa_inbox') with check (bucket_id = 'pa_inbox');
+alter table public.pa_inbox_notes add column if not exists synced_at timestamptz;
+alter table public.pa_inbox_notes drop constraint if exists pa_inbox_notes_status_check;
+alter table public.pa_inbox_notes add constraint pa_inbox_notes_status_check check (status in ('pending','written','failed'));

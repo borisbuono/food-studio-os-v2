@@ -4,6 +4,7 @@ import { ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 import { getMyMembershipContext } from "@/lib/memberships";
 import type { ChefAction, ChefActResult, ChefCard, ChefLang } from "@/lib/chef/types";
 import { approveAndSend } from "@/lib/social/inboxAct";
+import { materialiseNotes } from "@/lib/chef/paInbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ const T = {
     todo: "Tarea creada", agent: "Agente encargado", undone: "Deshecho",
     undo_bad: "Ese deshacer ya no vale", not_member: "No eres miembro de esa casa",
     no_entity: "No encuentro esa casa", nothing_deleted: "No se pudo deshacer (sin permiso)",
-    note_queued: "Nota para la PA en cola",
+    note_queued: "Nota para la PA en cola", note_written: "Nota para la PA lista (pa_inbox)",
     sent: (a: string) => "Enviado a " + a, send_failed: "No se ha enviado", skipped: (a: string) => "Saltado " + a,
     booking: "Reserva actualizada", prep_upd: "Mise actualizada", not_found: "No encuentro esa fila",
   },
@@ -31,7 +32,7 @@ const T = {
     todo: "Task created", agent: "Agent briefed", undone: "Undone",
     undo_bad: "That undo is no longer valid", not_member: "You're not a member of that house",
     no_entity: "I can't find that house", nothing_deleted: "Could not undo (no permission)",
-    note_queued: "PA inbox note queued",
+    note_queued: "PA inbox note queued", note_written: "PA inbox note written (pa_inbox)",
     sent: (a: string) => "Sent to " + a, send_failed: "Not sent", skipped: (a: string) => "Skipped " + a,
     booking: "Booking updated", prep_upd: "Prep updated", not_found: "Can't find that row",
   },
@@ -106,6 +107,8 @@ export async function POST(req: Request) {
     // would brief an agent for a job that no longer exists.
     if ((row as any).table_name === "agent_charters") {
       await sb.from("pa_inbox_notes").delete().eq("charter_id", (row as any).row_id).eq("status", "pending");
+      // A note already materialised stays on disk for the PA but is flagged.
+      await sb.from("pa_inbox_notes").update({ error: "RETRACTED: charter undone by the requester" }).eq("charter_id", (row as any).row_id).eq("status", "written");
     }
     // RLS can silently delete nothing (e.g. a non-manager on prep_lists) —
     // say so instead of pretending.
@@ -250,8 +253,15 @@ export async function POST(req: Request) {
         "",
       ].join("\n");
       // The note is best-effort: the charter is the record, the note is the courier.
-      await sb.from("pa_inbox_notes").insert({ filename, body_md, status: "pending", charter_id: charterId, entity_id: scope.entity.id, created_by: uid });
-      return done("agent_charters", charterId, card(t.agent, [clip(objective, 140), filename, t.note_queued], label, "confirm"));
+      const { data: note } = await sb.from("pa_inbox_notes").insert({ filename, body_md, status: "pending", charter_id: charterId, entity_id: scope.entity.id, created_by: uid }).select("id").maybeSingle();
+      // Phase 2 S7: materialise it into the pa_inbox bucket now (best-effort;
+      // /api/cron/pa-inbox sweeps anything that failed). Undo still pulls a
+      // pending row; a written one is left for the PA to see the retraction.
+      let noteState: string = t.note_queued;
+      if ((note as any)?.id) {
+        try { const m = await materialiseNotes(sb, { ids: [(note as any).id] }); if (m.written) noteState = t.note_written; } catch {}
+      }
+      return done("agent_charters", charterId, card(t.agent, [clip(objective, 140), filename, noteState], label, "confirm"));
     }
     // ---------------------------------------------------------------- Phase 2
     case "approve_reply": {
