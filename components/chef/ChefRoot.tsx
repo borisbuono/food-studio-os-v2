@@ -35,6 +35,7 @@ import { E_HOLDINGS, type EntityKey, isPrimaryEntity } from "@/lib/entities";
 import { readEntityCookie } from "@/lib/ctx";
 import { pillarForRoute } from "@/lib/routing/pillar-map";
 import { scopeForUrl } from "@/lib/scope";
+import Dock from "@/components/nav/Dock";
 import { HOUSE_SLUG_TO_ENTITY, houseSlugForEntity, listHouses } from "@/lib/houses";
 import { isChefHiddenRoute } from "@/lib/routing/public-routes";
 import { t, getLang } from "@/lib/i18n";
@@ -802,7 +803,7 @@ export default function ChefRoot() {
             zIndex: Z.chefCard,
             bottom: "var(--chef-dock)",
             // On lg the column starts right of the sidebar and has the fixed width.
-            ...(layoutDesktop ? { left: "var(--chef-sidebar, 15rem)", width: "var(--chef-panel, 380px)", bottom: 0 } : {}),
+            ...(layoutDesktop ? { left: "var(--chef-sidebar, 13rem)", width: "var(--chef-panel, 380px)", bottom: 0 } : {}),
           }}
         >
           <div className="pointer-events-auto flex flex-col gap-2 pb-2 lg:pb-0">
@@ -864,7 +865,7 @@ export default function ChefRoot() {
         </div>
       ) : null}
 
-      {/* The control — the only fixed element in the bottom 96 px. */}
+      {/* The band — the only fixed element at the bottom: control + chips + dock grip (+ verb row when open). */}
       <div
         data-chef-dock
         className={"fixed inset-x-0 bottom-0 flex items-end justify-center pointer-events-none " + (passMode ? "" : "lg:inset-x-auto lg:left-0")}
@@ -872,7 +873,7 @@ export default function ChefRoot() {
           zIndex: Z.chefDock,
           height: "var(--chef-dock)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          width: layoutDesktop ? "var(--chef-sidebar, 15rem)" : undefined,
+          width: layoutDesktop ? "var(--chef-sidebar, 13rem)" : undefined,
         }}
       >
         <ChefChips
@@ -882,6 +883,13 @@ export default function ChefRoot() {
           desktop={layoutDesktop}
           visible={state === "idle" && !typing}
           onPick={onChip}
+        />
+        {/* Phone nav lives in this band (slim OS, 2026-09-26): grip + six verbs. */}
+        <Dock
+          pathname={pathname}
+          houseSlug={scope.house}
+          studioScope={pathname === "/studio" || pathname.startsWith("/studio/") || (!scope.house && entityId === E_HOLDINGS)}
+          enabled={!layoutDesktop && !passMode && state === "idle" && !typing}
         />
         <div className="pointer-events-auto">
           <ChefControl state={state} level={level} onTap={onTap} onHold={onHold} onDragUp={openType} />

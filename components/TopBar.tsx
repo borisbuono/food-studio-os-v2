@@ -3,32 +3,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isPrimaryEntity, EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
-import { ROLES, RoleKey } from "@/lib/roles";
 import BrandMark from "@/components/BrandMark";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
-import { setEntity as setEntityCtx, setRole as setRoleCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
-import { pillarForRoute, PILLAR_ACCENT, PILLAR_LABEL, Pillar } from "@/lib/routing/pillar-map";
+import { setEntity as setEntityCtx, onCtx, writeCookie, readEntityCookie } from "@/lib/ctx";
 import { scopeForUrl, resolveScope } from "@/lib/scope";
 import { HOUSE_SLUG_TO_ENTITY, houseSlugForEntity } from "@/lib/houses";
 import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
 import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
 import { Z } from "@/lib/ui/z";
 
-// Architecture v3 — top nav is the THREE pillars: FOH · BOH · Office.
-// The old Develop/Execute/Administrate/Grow labels are gone from the nav;
-// their temporal semantics live on tile-level "flow" chips.
-//
-// A small Files icon sits far-left of the pillar row (universal, above the
-// pillars in the information hierarchy). The pillar the current route
-// belongs to is highlighted with the pillar's accent line.
-
-// The 3 top-level pillar entries.
-const PILLARS: { key: Pillar; href: string; label: string }[] = [
-  { key: "foh",    href: "/foh",    label: PILLAR_LABEL.foh },
-  { key: "boh",    href: "/boh",    label: PILLAR_LABEL.boh },
-  { key: "office", href: "/office", label: PILLAR_LABEL.office },
-];
+// Phone top bar: brand mark (scope-bound) + house switcher. Nothing else —
+// the verbs are in the dock (slim OS, 2026-09-26).
 
 export default function TopBar({ initialEntity, initialProfile }: { initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const [entity, setEntity] = useState<EntityKey>(() => {
@@ -43,7 +29,6 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     const c = readEntityCookie() as EntityKey | null;
     return c && (ENTITY_ORDER as string[]).includes(c) ? (c as EntityKey) : E_HOLDINGS;
   });
-  const [role, setRole] = useState<RoleKey>("office");
   // Seed from the server-resolved profile so the top bar chip paints
   // the operator on first render instead of flashing "Guest".
   const [profile, setProfile] = useState<MyProfile | null>(
@@ -52,7 +37,6 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   const [loaded, setLoaded] = useState(false);
   const pathname = usePathname() || "";
   const router = useRouter();
-  const activePillar = pillarForRoute(pathname);
   const [menu, setMenu] = useState(false);
   const switcher = useSwitcherEntities();
   // Switcher visibility (2026-08-30): hide the entity switcher entirely for
@@ -60,28 +44,8 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
   // even know the concept exists.
   const totalEntities = switcher.operating.length + switcher.holding.length + switcher.portfolio.length;
   const hasMultipleEntities = !switcher.loading && totalEntities > 1;
-  const [inboxCount, setInboxCount] = useState<number>(0);
-
   // load profile once
   useEffect(() => { getMyProfile().then((p) => { if (p) setProfile(p); setLoaded(true); }); }, []);
-
-  // Poll the Files inbox needs-triage counter. Cheap: one indexed count, and
-  // only when the user is signed in. Refreshes when the entity changes.
-  useEffect(() => {
-    if (!loaded) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const r = await fetch("/api/files/inbox?status=needs_triage&limit=250", { cache: "no-store" });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (!cancelled) setInboxCount(Array.isArray(j?.rows) ? j.rows.length : 0);
-      } catch { /* silent — the chip just stays at 0 */ }
-    };
-    load();
-    const t = setInterval(load, 60_000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, [loaded, entity]);
 
   // keep entity/role + accent in sync with localStorage / other components
   useEffect(() => {
@@ -96,8 +60,7 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
       const ls = localStorage.getItem("fs_entity");
       const e = (ok(ck) ? ck : ok(ls) ? ls : E_HOLDINGS) as EntityKey;
       try { if (ls !== e) localStorage.setItem("fs_entity", e); } catch {}
-      const r = (localStorage.getItem("fs_role") as RoleKey | null) || "office";
-      setEntity(e); setRole(r); writeCookie(e);
+      setEntity(e); writeCookie(e);
       const ua = localStorage.getItem("fs_user_accent");
       document.documentElement.style.setProperty("--accent", ua || ENTITY_ACCENT[e] || "#B8552E");
     };
@@ -132,9 +95,6 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
     else if (ent.slug && !ent.entityKey) router.push(`/h/${ent.slug}`);
     else router.refresh();
   };
-
-  // Per-pillar accent for the active chip's underline / dot.
-  const activeAccent = activePillar ? PILLAR_ACCENT[activePillar] : null;
 
   return (
     // Safe-area belt-and-braces (Boris walk 2026-08-07): the earlier fix
@@ -249,73 +209,10 @@ export default function TopBar({ initialEntity, initialProfile }: { initialEntit
         </div>
       </div>
 
-      {/* Pillars — the THREE pillars of the OS. Files icon sits far-left as a
-         universal escape hatch. The active pillar is underlined with its
-         accent colour.
-         Boris walk 2026-09-11: the gate flipped from `scopeForUrl === null`
-         to `resolveScope === null`. The old gate was URL-only, so legacy
-         paths (/office, /boh, /foh) always rendered the pillar row even
-         though the RoomSwitcher was ALSO rendering there (via the
-         resolveScope fallback that lifts an fs_entity=bistro_mondo cookie
-         into a house/room scope). That stacked THREE nav systems on /office
-         — pillars, "View as" role toggle, and RoomSwitcher. Now: whenever
-         RoomSwitcher renders (any resolved scope), suppress the pillars.
-         The row is still useful on truly-portfolio paths where no scope
-         resolves at all (unauthenticated, /account without a house cookie,
-         etc.). */}
-      {loaded && resolveScope(pathname, houseSlugForEntity(entity)) === null ? (
-        <nav className="mx-auto flex max-w-3xl items-center gap-4 border-t border-black/5 px-6 py-1.5 font-mono text-[10px] uppercase tracking-wide">
-          <Link
-            href={inboxCount > 0 ? "/files/inbox" : "/files"}
-            title={inboxCount > 0 ? `Files inbox — ${inboxCount} awaiting triage` : "Files — HACCP, contracts, brand, gestoría"}
-            className={"flex items-center " + (pathname.startsWith("/files") ? "text-ink" : "text-clay hover:text-ink")}
-            aria-label={inboxCount > 0 ? `Files inbox, ${inboxCount} awaiting triage` : "Files"}
-          >
-            {/* Simple folder glyph. Kept as inline SVG so the nav stays a single
-                render with no image request. */}
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M2.5 5.75c0-.69.56-1.25 1.25-1.25h4l1.5 1.75h6.5c.69 0 1.25.56 1.25 1.25v7.75c0 .69-.56 1.25-1.25 1.25H3.75c-.69 0-1.25-.56-1.25-1.25V5.75z" stroke="currentColor" strokeWidth="1.2"/>
-            </svg>
-            {inboxCount > 0 ? (
-              <span
-                className="ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-tomato px-1 font-mono text-[9px] leading-none text-paper"
-                aria-hidden="true"
-                title={`${inboxCount} awaiting triage`}
-              >
-                {inboxCount > 99 ? "99+" : inboxCount}
-              </span>
-            ) : null}
-          </Link>
-          {PILLARS.map((p) => {
-            const isActive = activePillar === p.key;
-            return (
-              <Link
-                key={p.key}
-                href={p.href}
-                className={(isActive ? "text-ink font-semibold" : "text-clay") + " hover:text-ink"}
-                style={isActive && activeAccent ? { borderBottom: "1.5px solid", borderColor: activeAccent, paddingBottom: 1 } : undefined}
-              >
-                {p.label}
-              </Link>
-            );
-          })}
-        </nav>
-      ) : null}
-
-      {/* admin "view as" role line — admins preview each world; workers don't see this.
-         Boris walk 2026-09-11: also suppressed on any resolved scope, same
-         reason as the pillar row above — the RoomSwitcher is the canonical
-         inter-room nav and this legacy toggle stacked on top of it on
-         /office and every other legacy-path-with-house-cookie. Kept on
-         truly-legacy portfolio paths so admin preview still works there. */}
-      {loaded && isAdmin && resolveScope(pathname, houseSlugForEntity(entity)) === null ? (
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-6 pb-2">
-          <span className="font-mono text-[10px] uppercase tracking-wide text-clay">View as</span>
-          {(Object.keys(ROLES) as RoleKey[]).map((k) => (
-            <button key={k} onClick={() => { setRoleCtx(k); setRole(k); }} className={"rounded-full px-2.5 py-0.5 font-sans text-[11px] transition " + (k === role ? "text-[#EFEEEB]" : "text-ink-soft hover:text-ink")} style={k === role ? { background: "var(--accent)" } : undefined}>{ROLES[k].label}</button>
-          ))}
-        </div>
-      ) : null}
+      {/* The pillar row (FOH · BOH · Office) and the admin "View as" toggle
+          left 2026-09-26 (slim OS, slice 1): on the phone the six verbs live
+          in the dock inside the Chef band (components/nav/Dock.tsx); rooms
+          are no longer a nav level. */}
     </header>
   );
 }

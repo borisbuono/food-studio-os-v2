@@ -5,7 +5,6 @@ import Link from "next/link";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import TopBar from "@/components/TopBar";
 import BrandMark from "@/components/BrandMark";
-import RoomSwitcher from "@/components/RoomSwitcher";
 import AuthStatus from "@/components/AuthStatus";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
@@ -107,25 +106,17 @@ export default function AppChrome({ children, initialEntity, initialProfile, ini
     );
   }
 
-  // Owner / multi-role / unresolved → full shell. RoomSwitcher decides
-  // itself whether to render (hidden on /studio, visible on /h/* + legacy
-  // house-scoped paths).
+  // Owner / multi-role / unresolved → full shell.
   return (
     <>
       <DesktopSidebar initialEntity={initialEntity} initialProfile={initialProfile ?? null} />
       <div className="lg:hidden">
         <TopBar initialEntity={initialEntity} initialProfile={initialProfile ?? null} />
       </div>
-      <div className="fs-main lg:pl-60">
-        {/* Desktop-only room switcher row. The identity chip that used to
-            live here was removed 2026-08-31 — the bottom-left chip in the
-            sidebar is the canonical identity affordance. */}
-        <div className="hidden lg:flex items-center justify-end gap-3 px-6 pt-3">
-          <RoomSwitcher compact initialEntity={initialEntity ?? null} lang={initialLang} />
-        </div>
-        <div className="flex lg:hidden justify-end px-6 pt-3">
-          <RoomSwitcher compact initialEntity={initialEntity ?? null} lang={initialLang} />
-        </div>
+      <div className="fs-main lg:pl-52">
+        {/* The RoomSwitcher row (Overview · Kitchen · Dining · Office) left
+            2026-09-26 (slim OS, slice 1): rooms are not a nav level any more.
+            The verbs are the rail (lg+) or the dock in the Chef band (phone). */}
         {children}
       </div>
     </>

@@ -22,8 +22,16 @@ body { color: #171511; font-family: Inter, system-ui, sans-serif; font-weight: 3
  * Page-local bottom bars (PrepList) dock ABOVE it with bottom: var(--chef-dock).
  * On lg+ the control lives in the sidebar column and cards open in a 380 px
  * panel right of it that PUSHES the page (.fs-main), never overlays it. */
-:root { --chef-dock: 0px; --chef-sidebar: 15rem; --chef-panel: 380px; }
+:root { --chef-dock: 0px; --chef-sidebar: 13rem; --chef-panel: 380px; }
 body[data-chef="on"] { --chef-dock: calc(96px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--chef-dock); }
+/* Slim OS slice 1 (2026-09-26, Boris's ruling on the critic's flag 1): on the
+ * phone the band is control + chips + the dock GRIP (120 px), and grows to
+ * hold the six-verb row while the dock is open (164 px). One reserve; nothing
+ * else is fixed down there. Pass mode keeps the bare 96 px (no dock). */
+@media (max-width: 1023.98px) {
+  body[data-chef="on"]:not([data-chef-mode="pass"]) { --chef-dock: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  body[data-chef="on"][data-dock="open"]:not([data-chef-mode="pass"]) { --chef-dock: calc(164px + env(safe-area-inset-bottom, 0px)); }
+}
 body[data-fab="hidden"] { --chef-dock: 0px; padding-bottom: 0; }
 @media (min-width: 1024px) {
   body[data-chef="on"] { padding-bottom: 0; }

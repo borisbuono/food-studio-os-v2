@@ -5,23 +5,31 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { isPrimaryEntity, EntityKey, ENTITY_ORDER, ENTITY_SHORT, ENTITY_ACCENT, ENTITY_LABEL, E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 import { setEntity as setEntityCtx, onCtx, readEntityCookie, writeCookie } from "@/lib/ctx";
-import { PILLAR_ACCENT, PILLAR_LABEL, Pillar, pillarForRoute } from "@/lib/routing/pillar-map";
 import { getMyProfile, MyProfile } from "@/lib/profile";
 import type { ServerProfile } from "@/lib/serverProfile";
 import { supabaseBrowser as sbBrowser } from "@/lib/supabaseBrowser";
 import BrandMark from "@/components/BrandMark";
 import {
-  sidebarForScope, entityTypeFor, entityTypeForUrl, scopeForUrl, resolveScope, itemsForHouse,
+  entityTypeFor, entityTypeForUrl, scopeForUrl, resolveScope, resolveHouseHref,
   EntityType, type Scope,
 } from "@/lib/scope";
-import {
-  houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity, HOUSE_SLUG_TO_ENTITY,
-} from "@/lib/houses";
+import { houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity } from "@/lib/houses";
+import { treeForPath, verbsFor, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { readRecent, touchRecent, orderByRecent, type RecentMap } from "@/lib/nav/recent";
 import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
 import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
 import { Z } from "@/lib/ui/z";
 
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px).
+//
+// Slim OS, slice 1 (2026-09-26, critic Direction A "Dock"): the rail is the
+// six House verbs — Serve · Cook · Buy · Close · People · Reach — as plain
+// words in one typeface; the active verb is heavier, not coloured; its
+// leaves (≤ 5, recent-first for this person, rest under "more") sit under
+// it. Studio shows Houses · Money · People · Reach · System; /me shows
+// Today · Calendar · Learn · Account. The Chef control docks at the foot
+// (padding-bottom: --chef-dock). No room trees, no section dots, no Files /
+// Command-center escape hatches — those are leaves now.
 //
 // Push (2026-08-31, Boris walk 09:50 CET) — three-level scope model:
 //   • Studio scope → static "Food Studios" label at top (no venue picker),
@@ -40,7 +48,6 @@ import { Z } from "@/lib/ui/z";
 export default function DesktopSidebar({ initialEntity, initialProfile }: { initialEntity?: EntityKey; initialProfile?: ServerProfile | null }) {
   const pathname = usePathname() || "";
   const router = useRouter();
-  const activePillar = pillarForRoute(pathname);
 
   const [entity, setEntity] = useState<EntityKey>(() => {
     // Seed from the SERVER-resolved entity (threaded from layout.tsx) so the
@@ -92,18 +99,17 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     else router.refresh();
   };
 
-  // Sidebar tree still keyed by entityType — a house shows the full
-  // operating tree, a room shows just that room's section, studio shows
-  // STUDIO. entityTypeForUrl handles the URL-first cases; the fallback is
-  // the cookie-derived entityType (used when scope is a house/room derived
-  // from a legacy path).
+  // Which tree: /studio/* (or a holding-company cookie on a legacy path) →
+  // Studio; /me, /account, /install → me; everything else → the six verbs.
   const urlScopeType = entityTypeForUrl(pathname);
   const scopeType: EntityType = urlScopeType ?? entityTypeFor(entity);
-  // Items whose href carries "{house}" get the house in scope substituted
-  // (URL-scoped /h/<slug>/** pages such as Calendar) and vanish when no
-  // house resolves.
+  const studioScope = scopeType === "studio" || scopeType === "holding_company";
+  const tree = treeForPath(pathname, studioScope);
+  const verbs = verbsFor(tree);
+  // "{house}" hrefs resolve against the house in scope and vanish without one.
   const houseSlug = scope && scope.level !== "studio" ? scope.houseSlug : null;
-  // Meta inbox waiting count (2026-09-23) — badge on the house Inbox item.
+
+  // Meta inbox waiting count (2026-09-23) — the number under Reach.
   // Read through RLS (social_inbox_waiting is security_invoker), keyed on the
   // house slug in scope, refreshed on every route change and every 2 min.
   const [inboxWaiting, setInboxWaiting] = useState<number>(0);
@@ -121,27 +127,15 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     return () => { dead = true; clearInterval(t); };
   }, [houseSlug, pathname]);
 
-  const sections = useMemo(
-    () => sidebarForScope(scopeType).map((s) => ({
-      ...s,
-      items: itemsForHouse(s.items, houseSlug).map((it) =>
-        inboxWaiting && it.href.endsWith("/office/inbox") ? { ...it, badge: String(inboxWaiting) } : it),
-    })),
-    [scopeType, houseSlug, inboxWaiting],
-  );
+  // Personal leaf order: every route change stamps the path; leaves you have
+  // opened rise above the "more" line (lib/nav/recent.ts).
+  const [recent, setRecent] = useState<RecentMap>({});
+  useEffect(() => { setRecent(touchRecent(pathname)); }, [pathname]);
+  useEffect(() => { setRecent(readRecent()); }, []);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => { setMoreOpen(false); }, [pathname]);
 
-  // Sections open state.
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    setOpen((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const s of sections) {
-        next[s.key] = prev[s.key] ?? true;
-      }
-      if (activePillar) next[activePillar] = true;
-      return next;
-    });
-  }, [sections, activePillar]);
+  const active = useMemo(() => activeVerb(verbs, pathname, houseSlug), [verbs, pathname, houseSlug]);
 
   useEffect(() => { getMyProfile().then((p) => { if (p) setProfile(p); }); }, []);
 
@@ -184,11 +178,6 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
     if (typeof window !== "undefined") window.location.href = "/login";
   }
 
-  const sectionAccent = (key: string): string => {
-    if (key === "foh" || key === "boh" || key === "office") return PILLAR_ACCENT[key as Pillar];
-    return "#3F4C28";
-  };
-
   // "You are here" label — what the top of the sidebar reads. Studio scope
   // uses the studio brand as a static label; house scope names the house;
   // room scope names the house AND the room (breadcrumb). None of these
@@ -210,7 +199,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   return (
     <aside
       data-desktop-sidebar
-      className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
+      className="hidden lg:flex fixed inset-y-0 left-0 w-52 flex-col border-r border-black/10 bg-paper/95 backdrop-blur"
       // Chef v3: the control docks at the bottom of this column, inside the
       // reserve — the identity block sits above it, never under it.
       style={{ zIndex: Z.sticky, paddingBottom: "var(--chef-dock)" }}
@@ -308,88 +297,72 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
         </button>
       </div>
 
-      {/* Scope-aware sections. */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {sections.map((section) => {
-          const opened = open[section.key] ?? true;
-          const accent = sectionAccent(section.key);
-          return (
-            <div key={section.key} className="mb-3">
-              <button
-                onClick={() => setOpen((s) => ({ ...s, [section.key]: !(s[section.key] ?? true) }))}
-                className="flex w-full items-center justify-between rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
-                aria-expanded={opened}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
-                  {section.label}
-                </span>
-                <span aria-hidden>{opened ? "−" : "+"}</span>
-              </button>
-              {opened ? (
-                <ul className="mt-1 space-y-0.5">
-                  {section.items.map((it) => {
-                    // Longest-prefix wins inside a section, so "Overview"
-                    // (/studio) isn't lit on every /studio/* page next to
-                    // the item the user actually opened (e.g. Houses).
-                    // Hrefs may carry a query (Reach → ?house=<slug>); match on the path only.
-                    const pathOf = (h: string) => h.split("?")[0];
-                    const matches = (h: string) => pathname === pathOf(h) || pathname.startsWith(pathOf(h) + "/");
-                    const best = section.items.filter((x) => matches(x.href)).sort((x, y) => pathOf(y.href).length - pathOf(x.href).length)[0];
-                    const active = !!best && best.href === it.href;
-                    return (
-                      <li key={it.href}>
-                        <Link
-                          href={it.href}
-                          className={
-                            "group flex items-center justify-between rounded-md px-2 py-1 font-sans text-[13px] transition " +
-                            (active
-                              ? "bg-paper-deep text-ink font-medium"
-                              : "text-ink-soft hover:bg-paper-deep hover:text-ink")
-                          }
-                          style={active ? { borderLeft: "2px solid " + accent, paddingLeft: "6px" } : undefined}
-                        >
-                          <span className="truncate">{it.label}</span>
-                          {it.badge ? <span className="font-mono text-[9px] text-clay">{it.badge}</span> : null}
-                        </Link>
+      {/* The verbs. One typeface; the active verb is heavier, not coloured. */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Verbs">
+        <ul className="space-y-0.5">
+          {verbs.map((v: NavVerb) => {
+            const href = resolveHouseHref(v.href, houseSlug);
+            if (!href) return null;
+            const isActive = active?.key === v.key;
+            const waiting = v.key === "reach" && tree === "house" && inboxWaiting > 0 ? inboxWaiting : 0;
+            const leaves = orderByRecent(
+              v.leaves.map((l) => ({ ...l, href: resolveHouseHref(l.href, houseSlug) || "" })).filter((l) => l.href),
+              recent,
+            );
+            const shown = moreOpen ? leaves : leaves.slice(0, LEAVES_VISIBLE);
+            const hidden = leaves.length - shown.length;
+            const pathOf = (h: string) => h.split("?")[0];
+            return (
+              <li key={v.key}>
+                <Link
+                  href={href}
+                  data-verb={v.key}
+                  aria-current={isActive ? "page" : undefined}
+                  className={
+                    "flex items-baseline justify-between rounded-md px-2 py-1.5 font-sans text-[15px] transition " +
+                    (isActive ? "text-ink font-semibold" : "text-ink-soft hover:text-ink")
+                  }
+                >
+                  <span>{v.label}</span>
+                  {waiting ? <span className="font-mono text-[11px] text-ink-soft">{waiting}</span> : null}
+                </Link>
+                {isActive && leaves.length ? (
+                  <ul className="mb-2 mt-0.5 space-y-0.5 pl-2" data-leaves={v.key}>
+                    {shown.map((l) => {
+                      const on = pathname === pathOf(l.href) || pathname.startsWith(pathOf(l.href) + "/");
+                      return (
+                        <li key={l.href}>
+                          <Link
+                            href={l.href}
+                            className={
+                              "block truncate rounded-md px-2 py-1 font-sans text-[13px] transition " +
+                              (on ? "text-ink font-medium" : "text-ink-soft hover:text-ink")
+                            }
+                          >
+                            {l.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                    {hidden > 0 ? (
+                      <li>
+                        <button type="button" onClick={() => setMoreOpen(true)} className="px-2 py-1 font-sans text-[13px] text-clay hover:text-ink">
+                          more · {hidden}
+                        </button>
                       </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </div>
-          );
-        })}
-
-        {/* Files — universal escape hatch. */}
-        <div className="mt-3 border-t border-black/10 pt-3">
-          <Link
-            href="/files"
-            className={
-              "flex items-center gap-2 rounded-md px-2 py-1.5 font-sans text-[13px] transition " +
-              (pathname.startsWith("/files") ? "bg-paper-deep text-ink font-medium" : "text-ink-soft hover:bg-paper-deep hover:text-ink")
-            }
-          >
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M2.5 5.75c0-.69.56-1.25 1.25-1.25h4l1.5 1.75h6.5c.69 0 1.25.56 1.25 1.25v7.75c0 .69-.56 1.25-1.25 1.25H3.75c-.69 0-1.25-.56-1.25-1.25V5.75z" stroke="currentColor" strokeWidth="1.2"/>
-            </svg>
-            Files
-          </Link>
-          {scope?.level !== "studio" ? (
-          <Link
-            href="/command"
-            className={
-              "mt-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 font-sans text-[13px] transition " +
-              (pathname.startsWith("/command") ? "bg-paper-deep text-ink font-medium" : "text-ink-soft hover:bg-paper-deep hover:text-ink")
-            }
-          >
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            Command center
-          </Link>
-          ) : null}
-        </div>
+                    ) : moreOpen && leaves.length > LEAVES_VISIBLE ? (
+                      <li>
+                        <button type="button" onClick={() => setMoreOpen(false)} className="px-2 py-1 font-sans text-[13px] text-clay hover:text-ink">
+                          less
+                        </button>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* Bottom: avatar / settings / sign-out. This is the canonical identity
@@ -410,16 +383,16 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
         </div>
         <div className="mt-1 flex items-center justify-between px-1">
           <Link
+            href="/me/today"
+            className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
+          >
+            Today
+          </Link>
+          <Link
             href="/account"
             className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
           >
             Account
-          </Link>
-          <Link
-            href="/administrate/settings"
-            className="font-mono text-[10px] uppercase tracking-wide text-clay hover:text-ink"
-          >
-            Settings
           </Link>
           {profile ? (
             <button

@@ -75,253 +75,41 @@ export type Scope =
   | { level: "house"; houseSlug: HouseSlug }
   | { level: "room"; houseSlug: HouseSlug; room: HouseRoom };
 
-// Reach — a top-level House verb (Boris ruling 2026-09-26: social is what he
-// will use most, and each venue has its own accounts). Three items, all
-// scoped to the house in the URL: the posting calendar and the accounts page
-// are the Holdings-tree pages accepting `?house=<slug>`; the inbox is the
-// URL-scoped Meta comments + DMs page. Lives in every house tree (full and
-// per-room) and is NOT repeated under Office.
-const HOUSE_REACH: SidebarSection = {
-  key: "growth",
-  label: "Reach",
-  items: [
-    { href: "/grow/reach/calendar?house={house}", label: "Posting calendar" },
-    // Waiting-count badge is filled in by DesktopSidebar from social_inbox_waiting.
-    { href: "/h/{house}/office/inbox",            label: "Inbox" },
-    { href: "/grow/reach?house={house}",          label: "Accounts" },
-  ],
-};
+// -----------------------------------------------------------------------------
+// Sidebar trees — slim OS, slice 1 (2026-09-26).
+//
+// The room trees (Dining 11 · Kitchen 12 · Office 13), the Holding /
+// Portfolio / Partner / Landlord trees and the nine-item Studio list are GONE.
+// The model is lib/nav.ts: House = six verbs, Studio = five, /me = four.
+// sidebarForScope() is kept as an adapter for callers that still think in
+// sections — it returns ONE section holding the verbs of the tree the scope
+// belongs to. DesktopSidebar / Dock / CommandK read lib/nav.ts directly.
+// -----------------------------------------------------------------------------
+import { HOUSE_VERBS, STUDIO_VERBS, type NavVerb } from "@/lib/nav";
 
-// Operating venue (BM, Taller) — the operator's day-to-day surface.
-// REMOVED vs the old universal tree: Holdings link, Commercials,
-// Settings-that-belong-to-holdings, /develop/menu-engineering. Those live on
-// the Holdings scope now. Reach came back 2026-09-26 as its own section.
-const OPERATING_VENUE: SidebarSection[] = [
-  HOUSE_REACH,
-  {
-    key: "foh",
-    label: "Dining Room",
-    items: [
-      { href: "/foh",                    label: "Dining Room" },
-      { href: "/foh/bookings",           label: "Bookings" },
-      { href: "/foh/pass",               label: "The Pass" },
-      { href: "/foh/menu",               label: "Menu (consumer)" },
-      { href: "/foh/guests",             label: "Guest arc" },
-      { href: "/foh/reviews",            label: "Reviews" },
-      { href: "/foh/academy",            label: "Service academy" },
-      { href: "/grow/relationships",     label: "Relationships" },
-      { href: "/grow/reputation",        label: "Reputation" },
-      { href: "/grow/inbox",             label: "Guest inbox" },
-      { href: "/m",                      label: "Guest surface" },
-    ],
-  },
-  {
-    key: "boh",
-    label: "Kitchen",
-    // Consolidated 2026-08-23 (Boris walkthrough): dropped Cook mode (dead
-    // link — /execute/cook is per-recipe only, no landing), collapsed the
-    // Menu (BOH) / Menu develop duplicate into a single Menu entry, dropped
-    // the Place-an-order / Receiving duplicate (both target /execute/orders,
-    // Receiving is the operator-familiar label), and moved Kitchen academy
-    // off the sidebar (low-frequency, still reachable from the dashboard).
-    // Order: dashboard → daily flow (MEP) → develop (Recipes, Menu, Wine,
-    // Bar, Lexicon) → ops (Receiving, Inventory, Temps, Repricing, Handover).
-    items: [
-      { href: "/boh",                    label: "Kitchen" },
-      { href: "/boh/mep",                label: "MEP" },
-      { href: "/develop/recipes",        label: "Recipes" },
-      { href: "/develop/menu",           label: "Menu" },
-      { href: "/develop/wine",           label: "Wine" },
-      { href: "/develop/bar",            label: "Bar" },
-      { href: "/develop/lexicon",        label: "Lexicon" },
-      { href: "/execute/orders",         label: "Receiving" },
-      { href: "/execute/inventory",      label: "Inventory" },
-      { href: "/execute/temp",           label: "Temps" },
-      { href: "/develop/repricing",      label: "Repricing" },
-      { href: "/execute/handover",       label: "Handover" },
-    ],
-  },
-  {
-    key: "office",
-    label: "Office",
-    items: [
-      { href: "/office",                              label: "Office" },
-      { href: "/administrate/finance",                label: "Finance" },
-      { href: "/administrate/finance/reconciliation", label: "Reconciliation" },
-      { href: "/administrate/finance/anomalies",      label: "Anomalies" },
-      { href: "/administrate/finance/scans",          label: "Scan queue" },
-      { href: "/administrate/finance/eod",            label: "EOD reports" },
-      { href: "/administrate/invoices",               label: "Missing invoices" },
-      { href: "/administrate/suppliers",              label: "Suppliers" },
-      { href: "/administrate/team",                   label: "Team" },
-      { href: "/administrate/team/schedule",          label: "Schedule" },
-      // 2026-09-22: the unified house calendar (/h/<slug>/calendar, live
-      // since 21-09) was reachable only from the house landing tile. Boris
-      // went looking for it in the sidebar and found "Reach calendar" —
-      // which is the Studio content calendar, on the Holdings tree he had
-      // been dropped into. URL-scoped: carries the house slug.
-      { href: "/h/{house}/calendar",                  label: "Calendar" },
-      // Inbox (/h/{house}/office/inbox) moved to the Reach section 2026-09-26.
-      { href: "/administrate/events",                 label: "Events" },
-      // "Decisions" → /administrate/decisions dropped 2026-09-22: the page
-      // moved to /grow/inbox in ef0a39c and the link had 404'd since.
-    ],
-  },
-];
+function verbsToSection(key: SidebarSection["key"], label: string, verbs: NavVerb[]): SidebarSection {
+  return { key, label, items: verbs.map((v) => ({ href: v.href, label: v.label })) };
+}
 
-// Holding company (BBH) — the slim group-level surface. NO operating pages
-// (no cook mode, no reservations, no scan queue). The operator opens a venue
-// to touch those; this scope is for group-wide oversight only.
-const HOLDING_COMPANY: SidebarSection[] = [
-  {
-    key: "group",
-    label: "Group",
-    items: [
-      { href: "/administrate/holdings/console",       label: "Group console" },
-      { href: "/administrate/finance",                label: "Consolidated finance" },
-      // "Intercompany" → /administrate/holdings/intercompany dropped 2026-09-26:
-      // no page exists; the flows render inside the Group console.
-      { href: "/administrate/holdings",               label: "The Structure" },
-    ],
-  },
-  {
-    key: "portfolio",
-    label: "Portfolio",
-    // 2026-09-26: /administrate/portfolio never existed (404). The three
-    // Studio-scoped destination pages from task #34 are the real ones.
-    items: [
-      { href: "/studio/advisory",                     label: "Advisory" },
-      { href: "/studio/partners",                     label: "Partners" },
-      { href: "/studio/landlords",                    label: "Landlords" },
-    ],
-  },
-  {
-    key: "growth",
-    label: "Reach",
-    items: [
-      { href: "/grow/reach",                          label: "Reach" },
-      { href: "/grow/reach/calendar",                 label: "Reach calendar" },
-      { href: "/grow/commercials",                    label: "Commercials" },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    items: [
-      { href: "/administrate/settings",               label: "Settings" },
-    ],
-  },
-];
+const HOUSE_TREE: SidebarSection[]  = [verbsToSection("office", "House", HOUSE_VERBS)];
+const STUDIO_TREE: SidebarSection[] = [verbsToSection("group", "Studio", STUDIO_VERBS)];
 
-// Advisory client (e.g. Michael's Santa Gertrudis restaurants) — even slimmer.
-// The user IS the client; the OS surfaces the small set of screens that concern
-// the engagement, not the operating substrate.
-const ADVISORY_CLIENT: SidebarSection[] = [
-  {
-    key: "client",
-    label: "Advisory",
-    items: [
-      { href: "/administrate/advisor",                label: "Client dashboard" },
-      // "Project P&L" (/administrate/advisor/pnl) and "Invoices out"
-      // (/administrate/advisor/invoices) dropped 2026-09-26: neither page
-      // exists — both fell into the [client_id] dynamic route and rendered a
-      // client page for a client called "pnl" / "invoices". P&L and invoices
-      // are reached from the dashboard per client.
-    ],
-  },
-];
-
-// Partner (licencees, revenue-share operators). Mirrors the advisory shape but
-// with partner-specific artefacts (the licence agreement + the running ledger).
-const PARTNER: SidebarSection[] = [
-  {
-    key: "partner",
-    label: "Partner",
-    items: [
-      // 2026-09-26: /administrate/partner, /licence and /revshare never
-      // existed (3 × 404). Until partner-facing pages are built the tree
-      // points at the one partners page that does exist.
-      { href: "/studio/partners",                     label: "Partners" },
-    ],
-  },
-];
-
-// Landlord (e.g. Alberto for Mondo, Thyrring for Taller). Two-way relationship —
-// invoices IN (the rent) and side-consulting billing OUT.
-const LANDLORD: SidebarSection[] = [
-  {
-    key: "landlord",
-    label: "Landlord",
-    items: [
-      // 2026-09-26: /administrate/landlord, /invoices-in and /consulting
-      // never existed (3 × 404). Until landlord-facing pages are built the
-      // tree points at the one landlords page that does exist.
-      { href: "/studio/landlords",                    label: "Landlords" },
-    ],
-  },
-];
-
-
-// Studio (portfolio / executive scope). When Boris — or any owner-tier user —
-// is on /studio/*, the sidebar is deliberately not an operating tree: no MEP,
-// no Menu, no Recipes, no Kitchen or Dining links. Those live INSIDE a house.
-// Studio is oversight: pick a house, look at the people, look at the money,
-// tune the system.
-const STUDIO: SidebarSection[] = [
-  {
-    key: "group",
-    label: "Studio",
-    items: [
-      { href: "/studio",                              label: "Overview" },
-      { href: "/studio/overview",                     label: "3-Company" },
-      // Boris re-walk 2026-08-31 17:45 CET: EVERY Studio sidebar link must
-      // stay in Studio scope. The old wiring teleported into a house — the
-      // Houses tile pointed at /administrate/holdings (BM chrome), People
-      // dropped into /administrate/team (BM's team page), Money dropped
-      // into /administrate/finance (BM Office + Taller mixed in), and
-      // Command dropped into /command (the "12 entities / 29 accounts"
-      // jumble). Every one of those routes is HOUSE-scoped. The four
-      // /studio/* siblings below are the portfolio-scoped equivalents;
-      // clicking a card inside them is the boundary crossing into a
-      // house's own tree.
-      { href: "/studio/houses",                       label: "Houses" },
-      { href: "/studio/people",                       label: "People" },
-      // Task #34 (2026-09-21): portfolio destinations for the non-operating
-      // relationships. Studio-scoped; ?demo=1 shows the Utopia demo set.
-      { href: "/studio/advisory",                     label: "Advisory" },
-      { href: "/studio/partners",                     label: "Partners" },
-      { href: "/studio/landlords",                    label: "Landlords" },
-      { href: "/studio/money",                        label: "Money" },
-      { href: "/studio/command",                      label: "Command" },
-    ],
-  },
-];
-
-// Office-room scope — when the user is on /office/*, show only the Office
-// section from the operating tree. Extracted from OPERATING_VENUE so we don't
-// duplicate the item list.
-// Looked up by key (not index) since Reach sits first in the house tree.
-// Reach is a house verb, not a room, so every room tree carries it too —
-// otherwise Boris standing in /office would lose the section he uses most.
-const houseSection = (key: SidebarSection["key"]): SidebarSection => OPERATING_VENUE.find((s) => s.key === key)!;
-const OFFICE_ROOM: SidebarSection[] = [houseSection("office"), HOUSE_REACH];
-const BOH_ROOM:    SidebarSection[] = [houseSection("boh"),    HOUSE_REACH];
-const FOH_ROOM:    SidebarSection[] = [houseSection("foh"),    HOUSE_REACH];
-
-// The public function the sidebar renders. Missing scope → operating venue
-// (safest for an unauthenticated preview, matches the current default cookie).
+// The public function. Every house-level type (venue and the three legacy
+// room shells) gets the six verbs; Studio and the holding company get the
+// five Studio verbs. Advisory / partner / landlord users (none exist yet)
+// get Studio until they have screens of their own (critic, open question 5).
 export function sidebarForScope(scope: EntityType | null | undefined): SidebarSection[] {
   switch (scope) {
-    case "holding_company":  return HOLDING_COMPANY;
-    case "advisory_client":  return ADVISORY_CLIENT;
-    case "partner":          return PARTNER;
-    case "landlord":         return LANDLORD;
-    case "studio":           return STUDIO;
-    case "office_room":      return OFFICE_ROOM;
-    case "boh_room":         return BOH_ROOM;
-    case "foh_room":         return FOH_ROOM;
+    case "holding_company":
+    case "advisory_client":
+    case "partner":
+    case "landlord":
+    case "studio":           return STUDIO_TREE;
+    case "office_room":
+    case "boh_room":
+    case "foh_room":
     case "operating_venue":
-    default:                 return OPERATING_VENUE;
+    default:                 return HOUSE_TREE;
   }
 }
 
@@ -381,20 +169,11 @@ export function scopeForUrl(pathname: string): Scope | null {
 export function resolveScope(pathname: string, fallbackHouseSlug: HouseSlug | null): Scope | null {
   const s = scopeForUrl(pathname);
   if (s) return s;
-  // Legacy path bindings — if the user is inside /office|/boh|/foh|/administrate/*
-  // and their cookie points at a house, lift that into a room/house scope so
-  // the room switcher + sidebar label say "Bistro Mondo · Kitchen" instead of
-  // just "Kitchen".
+  // Legacy cookie-bound paths (/develop/*, /execute/*, /administrate/*, /grow/*,
+  // /files, /academy, /capture …) lift into the cookie's house. The room
+  // dashboards (/boh, /foh, /office) were deleted 2026-09-26 — rooms are no
+  // longer a nav level, only a URL segment under /h/<slug>/.
   if (!fallbackHouseSlug) return null;
-  if (!pathname) return { level: "house", houseSlug: fallbackHouseSlug };
-  if (pathname.startsWith("/boh")) return { level: "room", houseSlug: fallbackHouseSlug, room: "kitchen" };
-  if (pathname.startsWith("/foh")) return { level: "room", houseSlug: fallbackHouseSlug, room: "dining" };
-  if (pathname.startsWith("/office") || pathname.startsWith("/administrate")) {
-    return { level: "room", houseSlug: fallbackHouseSlug, room: "office" };
-  }
-  // Any other legacy path (/develop/*, /execute/*, /grow/*, /command, /files,
-  // /academy, /schedule, /team, /messages, /order, /recipes, /menu, etc.) —
-  // still house-bound; land on the house dashboard.
   return { level: "house", houseSlug: fallbackHouseSlug };
 }
 

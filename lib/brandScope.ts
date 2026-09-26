@@ -11,7 +11,7 @@
 // wordmark — BrandMark used to render nothing for it.
 
 import { E_HOLDINGS, type EntityKey } from "@/lib/entities";
-import { HOUSE_SLUG_TO_ENTITY, houseNameForSlug, houseSlugForEntity, HOUSE_ROOMS } from "@/lib/houses";
+import { HOUSE_SLUG_TO_ENTITY, houseNameForSlug, houseSlugForEntity } from "@/lib/houses";
 import { resolveScope, type Scope } from "@/lib/scope";
 
 export type ScopeBrand = { entity: EntityKey | null; name: string | null; href: string };
@@ -41,14 +41,16 @@ export function scopeEntity(scope: Scope | null, cookieEntity: EntityKey): Entit
 }
 
 // Where picking another house in the switcher should take the user.
-//   on /h/<a>/<room>/… → /h/<b>/<room>   (keep the room they were in)
-//   on /h/<a>          → /h/<b>
+//   on /h/<a>/…        → /h/<b>/…   (same screen, the other house — the room
+//                        landings are gone, so keep the whole tail)
 //   anywhere else      → null (caller just swaps the cookie + refreshes,
 //                        legacy paths are cookie-bound)
 export function hrefForHouseSwitch(pathname: string, targetSlug: string): string | null {
   if (!pathname.startsWith("/h/")) return null;
-  const parts = pathname.split("/").filter(Boolean); // ["h", slug, room?, ...]
-  const room = parts[2];
-  if (room && (HOUSE_ROOMS as string[]).includes(room)) return `/h/${targetSlug}/${room}`;
-  return `/h/${targetSlug}`;
+  const parts = pathname.split("/").filter(Boolean); // ["h", slug, ...tail]
+  const tail = parts.slice(2);
+  // Dynamic ids (a recipe, an opening) belong to ONE house — drop to the verb.
+  const safeTail: string[] = [];
+  for (const seg of tail) { if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(seg)) break; safeTail.push(seg); }
+  return `/h/${targetSlug}` + (safeTail.length ? "/" + safeTail.join("/") : "");
 }

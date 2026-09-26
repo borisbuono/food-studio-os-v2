@@ -176,14 +176,9 @@ export const HOUSE_ROOM_LABEL: Record<HouseRoom, string> = {
   office:  "Office",
 };
 
-// The legacy route each room lives on. /h/<slug>/<room> resolves to the
-// same page as the legacy path — we don't rewrite URLs, we set the entity
-// cookie and redirect. Keeps every existing page working.
-export const HOUSE_ROOM_LEGACY_PATH: Record<HouseRoom, string> = {
-  kitchen: "/boh",
-  dining:  "/foh",
-  office:  "/office",
-};
+// HOUSE_ROOM_LEGACY_PATH (kitchen → /boh, dining → /foh, office → /office)
+// was deleted 2026-09-26 with those three dashboards. Rooms are data scope
+// and a URL segment under /h/<slug>/ now, not a destination.
 
 export function isHouseRoom(x: string): x is HouseRoom {
   return x === "kitchen" || x === "dining" || x === "office";

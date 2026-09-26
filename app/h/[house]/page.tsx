@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { houseNameForSlug, HOUSE_ROOMS, HOUSE_ROOM_LABEL, houseLocale, houseMoney, type House } from "@/lib/houses";
+import { houseNameForSlug, houseLocale, houseMoney, type House } from "@/lib/houses";
+import { HOUSE_VERBS } from "@/lib/nav";
+import { resolveHouseHref } from "@/lib/scope";
 import { getHouseBySlug } from "@/lib/houses.server";
 import { ENTITY_H1, publicNameForEntity, type EntityKey } from "@/lib/entities";
 import { HourlySpark } from "@/app/studio/HourlySpark";
@@ -12,8 +14,8 @@ import { HourlySpark } from "@/app/studio/HourlySpark";
 // /office, which meant tapping a house tile on /studio dropped the user on
 // a generic operating surface with no house identity. The landing now
 // mirrors the Studio landing structure but house-scoped: house name,
-// bespoke subtitle, room switcher (via chrome), yesterday's numbers, and
-// three room tiles.
+// bespoke subtitle, yesterday's numbers, and the six verbs (rooms left the
+// nav 2026-09-26).
 //
 // fs_entity is still set so subsequent nav (legacy /office / /boh / /foh)
 // stays bound to this house.
@@ -153,9 +155,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      {/* Top strip — house identity + date + venue-local clock. Room switcher
-          lives in the chrome (top-right) — RoomSwitcher renders on
-          house/room scope automatically. */}
+      {/* Top strip — house identity + date + venue-local clock. */}
       <section className="border-b border-black/10 pb-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <div>
@@ -268,22 +268,20 @@ export default async function HouseLandingPage({ params }: { params: { house: st
         )}
       </section>
 
-      {/* Rooms — three large tappable tiles. Kitchen · Dining Room · Office.
-          Each navigates to /h/<slug>/<room>, which sets the fs_entity
-          cookie and drops into the room's canonical page. */}
+      {/* The six verbs (slim OS slice 1, 2026-09-26). Rooms are no longer a
+          destination; each verb lands on the screen that IS the job. Slice 2
+          replaces this page with the idle screen (now strip + control). */}
       <section className="mt-10">
-        <h2 className="font-mono text-[10px] uppercase tracking-wide text-clay">Rooms</h2>
-        <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {HOUSE_ROOMS.map((r) => (
-            <li key={r}>
+        <h2 className="font-mono text-[10px] uppercase tracking-wide text-clay">Verbs</h2>
+        <ul className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {HOUSE_VERBS.map((v) => (
+            <li key={v.key}>
               <Link
-                href={`/h/${slug}/${r}`}
-                className="block rounded-lg border border-black/10 bg-paper/50 p-6 transition hover:border-ink/40 hover:bg-paper"
+                href={resolveHouseHref(v.href, slug) || `/h/${slug}`}
+                className="block rounded-lg border border-black/10 bg-paper/50 p-5 transition hover:border-ink/40 hover:bg-paper"
               >
-                <p className="font-serif text-[20px] text-ink">{HOUSE_ROOM_LABEL[r]}</p>
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-clay">
-                  Enter the {HOUSE_ROOM_LABEL[r].toLowerCase()}
-                </p>
+                <p className="font-serif text-[20px] text-ink">{v.label}</p>
+                <p className="mt-1 font-sans text-[12px] text-clay">{v.hint}</p>
               </Link>
             </li>
           ))}
