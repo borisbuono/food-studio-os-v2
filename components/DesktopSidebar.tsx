@@ -15,6 +15,8 @@ import {
 } from "@/lib/scope";
 import { houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity } from "@/lib/houses";
 import { treeForPath, verbsFor, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { verbLabel } from "@/lib/nav/labels";
+import { getLang, t, type Lang } from "@/lib/i18n";
 import { readRecent, touchRecent, orderByRecent, type RecentMap } from "@/lib/nav/recent";
 import { useSwitcherEntities, type SwitcherEntry } from "@/lib/useSwitcherEntities";
 import { brandForScope, scopeEntity as scopeEntityFor, hrefForHouseSwitch } from "@/lib/brandScope";
@@ -23,10 +25,11 @@ import { Z } from "@/lib/ui/z";
 // Desktop-first vertical navigation rail. Rendered on lg+ (>= 1024px).
 //
 // Slim OS, slice 1 (2026-09-26, critic Direction A "Dock"): the rail is the
-// six House verbs — Serve · Cook · Buy · Close · People · Reach — as plain
+// six House verbs — Service · Menu · Supplies · Money · Team · Comms (Boris's
+// nouns, 2026-09-26; keys stay serve/cook/buy/close/people/reach) — as plain
 // words in one typeface; the active verb is heavier, not coloured; its
 // leaves (≤ 5, recent-first for this person, rest under "more") sit under
-// it. Studio shows Houses · Money · People · Reach · System; /me shows
+// it. Studio shows Houses · Money · Team · Comms · System; /me shows
 // Today · Calendar · Learn · Account. The Chef control docks at the foot
 // (padding-bottom: --chef-dock). No room trees, no section dots, no Files /
 // Command-center escape hatches — those are leaves now.
@@ -134,6 +137,10 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   useEffect(() => { setRecent(readRecent()); }, []);
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => { setMoreOpen(false); }, [pathname]);
+  // Verb words follow the fs_lang cookie; read after mount so SSR (always EN)
+  // and the first client render agree.
+  const [lang, setLangState] = useState<Lang>("en");
+  useEffect(() => { setLangState(getLang()); }, []);
 
   const active = useMemo(() => activeVerb(verbs, pathname, houseSlug), [verbs, pathname, houseSlug]);
 
@@ -323,7 +330,7 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
                     (isActive ? "text-ink font-semibold" : "text-ink-soft hover:text-ink")
                   }
                 >
-                  <span>{v.label}</span>
+                  <span>{verbLabel(v, lang)}</span>
                   {waiting ? <span className="font-mono text-[11px] text-ink-soft">{waiting}</span> : null}
                 </Link>
                 {isActive && leaves.length ? (
@@ -347,13 +354,13 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
                     {hidden > 0 ? (
                       <li>
                         <button type="button" onClick={() => setMoreOpen(true)} className="px-2 py-1 font-sans text-[13px] text-clay hover:text-ink">
-                          more · {hidden}
+                          {t("nav.more", lang)} · {hidden}
                         </button>
                       </li>
                     ) : moreOpen && leaves.length > LEAVES_VISIBLE ? (
                       <li>
                         <button type="button" onClick={() => setMoreOpen(false)} className="px-2 py-1 font-sans text-[13px] text-clay hover:text-ink">
-                          less
+                          {t("nav.less", lang)}
                         </button>
                       </li>
                     ) : null}

@@ -165,18 +165,24 @@ function toLines(s: string, max = 4, width = 140): string[] {
 // /develop/menu and the room landings are gone. Without a house in scope we
 // fall back to a house-agnostic survivor rather than guessing a slug:
 // `/` picks the house, `/studio/recipes/review` is the Studio recipe list.
+//
+// Vocabulary (2026-09-26, Boris renamed the six verbs to nouns): the NEW words
+// — Service/Servicio · Menu/Carta · Supplies/Compras · Money/Caja ·
+// Team/Equipo · Comms/Comunicación — and the OLD ones — Serve/Servir ·
+// Cook/Cocinar · Buy/Comprar · Close/Cerrar · People/Gente · Reach/Alcance —
+// both land. "abre compras", "open supplies" and "open buy" are all Supplies.
 function pageHref(word: string, house: string | null): string | null {
   const h = house ? "/h/" + house : null;
   const w = word.toLowerCase();
   if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
-  if (/reserva|booking|servir|\bserve\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
+  if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/calendar";
-  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social/.test(w)) return h ? h + "/office/inbox" : "/";
+  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/office/inbox" : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
   if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/office/eod" : "/administrate/finance/eod";
   if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : "/administrate/finance";
   if (/equipo|team|gente|people|personal|plantilla/.test(w)) return "/administrate/team";
-  if (/pedido|order|compra|\bbuy\b|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
+  if (/pedido|order|compra|\bbuy\b|suppl|suministro|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
   if (/oficina|office/.test(w)) return h ? h + "/office/eod" : "/administrate/finance";
   if (/cocina|kitchen/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
   if (/estudio|studio/.test(w)) return "/studio";
@@ -240,7 +246,7 @@ Intents (exact strings) and their args:
 - "query calendar"  {}                                       — what's on today
 - "query inbox"     {}                                       — waiting comments / messages
 - "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
-- "navigate"        {to: page word}                          — open/go to a page (recipes, bookings, calendar, inbox, prep, eod/caja, team, office, kitchen, dining, home)
+- "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
 - "create prep"     {name, quantity?, unit?, station?}       — add an item to the prep list
 - "create team"     {title}                                  — a task / to-do for someone (not a prep item)

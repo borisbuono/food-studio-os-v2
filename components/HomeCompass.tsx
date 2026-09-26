@@ -69,10 +69,10 @@ export type CompassData = Record<EntityKey, {
 const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
-  { href: "/execute/bookings", label: "Serve", blurb: "Bookings, pass, prep" },
-  { href: "/studio/recipes/review", label: "Cook", blurb: "Recipes, menu, wine" },
-  { href: "/execute/orders", label: "Buy", blurb: "Orders, deliveries, suppliers" },
-  { href: "/administrate/finance", label: "Close", blurb: "Till, money, paper" },
+  { href: "/execute/bookings", label: "Service", blurb: "Bookings, pass, prep" },
+  { href: "/studio/recipes/review", label: "Menu", blurb: "Recipes, menu, wine" },
+  { href: "/execute/orders", label: "Supplies", blurb: "Orders, deliveries, suppliers" },
+  { href: "/administrate/finance", label: "Money", blurb: "Till, money, paper" },
 ];
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");

@@ -19,11 +19,11 @@ export const GO_TARGETS: Record<string, ShortcutTarget> = {
   // /command are gone. Cookie-scoped survivors only — the house-scoped Cook
   // screen needs a slug the shortcut table has no access to, so `m`/`r`
   // land on the Studio recipe review list.
-  m: { href: "/execute/bookings",          label: "Serve" },
+  m: { href: "/execute/bookings",          label: "Service" },
   r: { href: "/studio/recipes/review",     label: "Recipes (review)" },
-  t: { href: "/administrate/team",         label: "People" },
-  o: { href: "/execute/orders",            label: "Buy" },
-  b: { href: "/administrate/finance/eod",  label: "Close" },
+  t: { href: "/administrate/team",         label: "Team" },
+  o: { href: "/execute/orders",            label: "Supplies" },
+  b: { href: "/administrate/finance/eod",  label: "Money" },
   s: { href: "/administrate/settings",     label: "Settings" },
   c: { href: "/studio",                    label: "Studio" },
   i: { href: "/files/inbox",               label: "Files inbox" },

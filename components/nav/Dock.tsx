@@ -20,6 +20,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveHouseHref } from "@/lib/scope";
 import { treeForPath, verbsFor, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { verbLabel } from "@/lib/nav/labels";
+import { getLang, t, type Lang } from "@/lib/i18n";
 import { readRecent, touchRecent, orderByRecent, type RecentMap } from "@/lib/nav/recent";
 
 type Props = { pathname: string; houseSlug: string | null; studioScope: boolean; enabled: boolean };
@@ -41,6 +43,10 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
   const [recent, setRecent] = useState<RecentMap>({});
   useEffect(() => { setRecent(touchRecent(pathname)); }, [pathname]);
   useEffect(() => { setRecent(readRecent()); }, []);
+  // Verb words follow the fs_lang cookie (Service · Menu · Supplies · Money ·
+  // Team · Comms / Servicio · Carta · Compras · Caja · Equipo · Comunicación).
+  const [lang, setLangState] = useState<Lang>("en");
+  useEffect(() => { setLangState(getLang()); }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -76,7 +82,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
       style={{ bottom: "calc(112px + env(safe-area-inset-bottom, 0px))" }}
     >
       {leavesVerb && leaves.length ? (
-        <div className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-line bg-paper px-2 py-2 shadow-lg" role="menu" aria-label={leavesVerb.label}>
+        <div className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-line bg-paper px-2 py-2 shadow-lg" role="menu" aria-label={verbLabel(leavesVerb, lang)}>
           <ul className="max-h-[40vh] overflow-y-auto">
             {shown.map((l) => (
               <li key={l.href}>
@@ -88,7 +94,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
             {leaves.length > LEAVES_VISIBLE && !moreOpen ? (
               <li>
                 <button type="button" onClick={() => setMoreOpen(true)} className="block w-full rounded-xl px-3 py-2.5 text-left font-sans text-[15px] text-clay active:bg-paper-deep">
-                  more · {leaves.length - LEAVES_VISIBLE}
+                  {t("nav.more", lang)} · {leaves.length - LEAVES_VISIBLE}
                 </button>
               </li>
             ) : null}
@@ -120,7 +126,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
                   (isActive ? "text-ink font-semibold" : "text-ink-soft")
                 }
               >
-                {v.label}
+                {verbLabel(v, lang)}
               </button>
             );
           })}

@@ -105,7 +105,7 @@ export default async function GrowReach({ searchParams }: { searchParams: { enti
       <Link href="/grow" className="font-sans text-sm text-ink-soft">← Grow</Link>
       <div className="mt-6 flex items-baseline justify-between gap-6">
         <div>
-          <p className="font-sans text-xs font-medium text-tomato">Grow · reach</p>
+          <p className="font-sans text-xs font-medium text-tomato">Comms</p>
           <h1 className="mt-2 font-serif text-3xl text-ink">Campaigns</h1>
           <p className="mt-2 font-sans text-[13px] leading-relaxed text-ink-soft">
             Newsletter goes through Wix — same list your Wix site already writes to. Paid social is the Meta ad account, read-only for now.

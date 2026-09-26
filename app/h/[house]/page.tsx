@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { houseNameForSlug, houseLocale, houseMoney, type House } from "@/lib/houses";
 import { HOUSE_VERBS } from "@/lib/nav";
+import { verbLabel } from "@/lib/nav/labels";
+import { serverLang } from "@/lib/i18nServer";
 import { resolveHouseHref } from "@/lib/scope";
 import { getHouseBySlug } from "@/lib/houses.server";
 import { ENTITY_H1, publicNameForEntity, type EntityKey } from "@/lib/entities";
@@ -81,6 +83,7 @@ type EodRow = {
 
 export default async function HouseLandingPage({ params }: { params: { house: string } }) {
   const slug = params.house;
+  const lang = serverLang();
   const house = await getHouseBySlug(slug);
   if (!house) redirect("/studio");
   const entity = house.id;
@@ -280,7 +283,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
                 href={resolveHouseHref(v.href, slug) || `/h/${slug}`}
                 className="block rounded-lg border border-black/10 bg-paper/50 p-5 transition hover:border-ink/40 hover:bg-paper"
               >
-                <p className="font-serif text-[20px] text-ink">{v.label}</p>
+                <p className="font-serif text-[20px] text-ink">{verbLabel(v, lang)}</p>
                 <p className="mt-1 font-sans text-[12px] text-clay">{v.hint}</p>
               </Link>
             </li>

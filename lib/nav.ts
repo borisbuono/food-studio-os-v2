@@ -7,8 +7,16 @@
 // renders all trees and fails on a miss.
 //
 // Structure is FIXED (Boris ruling 1: no usage data, slim on structure):
-//   House  = idle (/h/<slug>) + six verbs  Serve · Cook · Buy · Close · People · Reach
-//   Studio = Houses · Money · People · Reach · System
+//   House  = idle (/h/<slug>) + six verbs  Service · Menu · Supplies · Money · Team · Comms
+//   Studio = Houses · Money · Team · Comms · System
+//
+// Labels (2026-09-26, Boris): the six verbs read as NOUNS — Service · Menu ·
+// Supplies · Money · Team · Comms (ES Servicio · Carta · Compras · Caja ·
+// Equipo · Comunicación). The KEYS keep the original verb words
+// (serve/cook/buy/close/people/reach) — they are in data-verb attributes,
+// localStorage and the Chef router, and renaming them buys nothing the chef
+// can see. `label` below is the EN word; renderers call verbLabel()
+// (lib/nav/labels.ts) so the rail, dock and ⌘K follow the fs_lang cookie.
 //   /me    = Today · Calendar · Learn · Account
 // Only the ORDER of a verb's leaves is personal — recent-first from
 // localStorage (lib/nav/recent.ts); at most LEAVES_VISIBLE show before "more".
@@ -42,7 +50,7 @@ const H = "/h/{house}";
 // ---------------------------------------------------------------- House
 export const HOUSE_VERBS: NavVerb[] = [
   {
-    key: "serve", label: "Serve", href: "/execute/bookings", hint: "who is coming, what is on the pass",
+    key: "serve", label: "Service", href: "/execute/bookings", hint: "who is coming, what is on the pass",
     gate: { room: "dining" },
     leaves: [
       { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep", gate: { room: "kitchen" } },
@@ -58,7 +66,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "cook", label: "Cook", href: `${H}/kitchen/recipes`, hint: "the recipes and the menu",
+    key: "cook", label: "Menu", href: `${H}/kitchen/recipes`, hint: "the recipes and the menu",
     gate: { room: "kitchen" },
     leaves: [
       { href: "/develop/recipes/import",    label: "Import recipe",  hint: "paste url import", gate: { room: "kitchen" } },
@@ -73,7 +81,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "buy", label: "Buy", href: "/execute/orders", hint: "what came in, what to order",
+    key: "buy", label: "Supplies", href: "/execute/orders", hint: "what came in, what to order",
     gate: { room: "kitchen" },
     leaves: [
       { href: "/execute/receiving",         label: "Receiving",      hint: "log a delivery", gate: { room: "kitchen" } },
@@ -87,7 +95,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "close", label: "Close", href: `${H}/office/eod`, hint: "the till and the money",
+    key: "close", label: "Money", href: `${H}/office/eod`, hint: "the till and the money",
     gate: { room: "office" },
     leaves: [
       { href: "/administrate/finance",      label: "Finance",        hint: "money dashboard", gate: { room: "office" } },
@@ -104,7 +112,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "people", label: "People", href: "/administrate/team", hint: "who is here, who is coming",
+    key: "people", label: "Team", href: "/administrate/team", hint: "who is here, who is coming",
     gate: { room: "office" },
     leaves: [
       { href: "/administrate/team/schedule", label: "Rota",          hint: "shifts schedule", gate: { room: "office" } },
@@ -116,7 +124,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "reach", label: "Reach", href: `${H}/office/inbox`, hint: "what we say, what they say back",
+    key: "reach", label: "Comms", href: `${H}/office/inbox`, hint: "what we say, what they say back",
     gate: { room: "office" },
     leaves: [
       { href: "/grow/reach/calendar?house={house}", label: "Posting calendar", hint: "content calendar social posts", gate: { room: "office" } },
@@ -148,13 +156,13 @@ export const STUDIO_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "people", label: "People", href: "/studio/people", hint: "people across houses", gate: { room: "studio" },
+    key: "people", label: "Team", href: "/studio/people", hint: "people across houses", gate: { room: "studio" },
     leaves: [
       { href: "/administrate/team/invite",  label: "Invite",         hint: "invite teammate", gate: { room: "studio" } },
     ],
   },
   {
-    key: "reach", label: "Reach", href: "/grow/reach", hint: "campaigns across houses", gate: { room: "studio" },
+    key: "reach", label: "Comms", href: "/grow/reach", hint: "campaigns across houses", gate: { room: "studio" },
     leaves: [
       { href: "/grow/reach/calendar",       label: "Posting calendar", hint: "content calendar", gate: { room: "studio" } },
       { href: "/grow/reach/ads",            label: "Ads",            hint: "meta ads", gate: { room: "studio" } },
@@ -233,11 +241,15 @@ export function activeVerb(verbs: NavVerb[], pathname: string, houseSlug: string
 }
 
 // Every navigable row, flattened and labelled "Verb · Leaf" — the ⌘K list.
-export function flattenNav(tree: NavTreeKey): Array<NavLeaf & { verb: string }> {
+// `word` picks the verb's display word (lib/nav/labels.ts verbLabel, per
+// language); default is the EN label. This module stays free of i18n imports
+// so scripts/verify_nav.mjs can compile and run it standalone.
+export function flattenNav(tree: NavTreeKey, word: (v: NavVerb) => string = (v) => v.label): Array<NavLeaf & { verb: string }> {
   const out: Array<NavLeaf & { verb: string }> = [];
   for (const v of verbsFor(tree)) {
-    out.push({ href: v.href, label: v.label, hint: v.hint, gate: v.gate, verb: v.key });
-    for (const l of v.leaves) out.push({ ...l, label: `${v.label} · ${l.label}`, verb: v.key });
+    const word_ = word(v);
+    out.push({ href: v.href, label: word_, hint: v.hint, gate: v.gate, verb: v.key });
+    for (const l of v.leaves) out.push({ ...l, label: `${word_} · ${l.label}`, verb: v.key });
   }
   return out;
 }

@@ -201,6 +201,27 @@ export const dict: Record<string, Record<Lang, string>> = {
   "loop.eod": { en: "End of day", es: "Cierre", nl: "Einde van de dag" },
   "loop.prep": { en: "Prep list", es: "Mise", nl: "Miselijst" },
 
+  // — nav verbs (slim OS dock, 2026-09-26). Boris renamed the six House verbs
+  // to nouns the same day: Service · Menu · Supplies · Money · Team · Comms.
+  // Keys in lib/nav.ts stay serve/cook/buy/close/people/reach — the label is
+  // what the chef sees, the key is what the code and localStorage know.
+  // Rail, dock and ⌘K all resolve labels through nav.verb.<key>.
+  "nav.verb.serve": { en: "Service", es: "Servicio", nl: "[NL:REVIEW] Service" },
+  "nav.verb.cook": { en: "Menu", es: "Carta", nl: "[NL:REVIEW] Menu" },
+  "nav.verb.buy": { en: "Supplies", es: "Compras", nl: "[NL:REVIEW] Inkoop" },
+  "nav.verb.close": { en: "Money", es: "Caja", nl: "[NL:REVIEW] Kas" },
+  "nav.verb.people": { en: "Team", es: "Equipo", nl: "Team" },
+  "nav.verb.reach": { en: "Comms", es: "Comunicación", nl: "[NL:REVIEW] Comms" },
+  "nav.verb.houses": { en: "Houses", es: "Casas", nl: "[NL:REVIEW] Huizen" },
+  "nav.verb.money": { en: "Money", es: "Caja", nl: "[NL:REVIEW] Kas" },
+  "nav.verb.system": { en: "System", es: "Sistema", nl: "Systeem" },
+  "nav.verb.today": { en: "Today", es: "Hoy", nl: "Vandaag" },
+  "nav.verb.calendar": { en: "Calendar", es: "Calendario", nl: "Kalender" },
+  "nav.verb.learn": { en: "Learn", es: "Aprender", nl: "Leren" },
+  "nav.verb.account": { en: "Account", es: "Cuenta", nl: "Account" },
+  "nav.more": { en: "more", es: "más", nl: "meer" },
+  "nav.less": { en: "less", es: "menos", nl: "minder" },
+
   // — settings / language page
   "settings.language.title": { en: "Language", es: "Idioma", nl: "Taal" },
   "settings.language.sub": { en: "Pick your language. Menus, briefs and messages follow you.", es: "Elige tu idioma. Menús, pases y mensajes te siguen.", nl: "Kies je taal. Kaarten, briefings en berichten volgen je." },

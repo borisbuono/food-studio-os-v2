@@ -125,7 +125,7 @@ export default async function StudioPeoplePage() {
       <div className="mb-4">
         <Link href="/studio" className="font-mono text-[10px] uppercase tracking-wide text-clay">← Food Studios</Link>
       </div>
-      <h1 className="font-serif text-[34px] leading-[1.05] text-ink">People</h1>
+      <h1 className="font-serif text-[34px] leading-[1.05] text-ink">Team</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">
         Everyone across the portfolio. Click a house to leave the Studio and enter that house's team.
       </p>

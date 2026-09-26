@@ -6,6 +6,8 @@ import { isPrimaryEntity } from "@/lib/entities";
 import { setEntity as setEntityCtx, readEntityCookie } from "@/lib/ctx";
 import { scopeForUrl, itemsForHouse } from "@/lib/scope";
 import { flattenNav } from "@/lib/nav";
+import { verbLabel } from "@/lib/nav/labels";
+import { getLang, type Lang } from "@/lib/i18n";
 import { fetchMyAccess, type MyAccess } from "@/lib/access/myAccess";
 import {
   paletteAccessFor, canSeeRoute, isOperating, NO_ACCESS,
@@ -54,21 +56,26 @@ type Route = { label: string; href: string; hint: string; pillar?: Pillar; gate?
 // grouped by verb — the same model the rail and the dock render (lib/nav.ts).
 // House verbs first, then Studio, then /me. Rows are "Verb · Leaf"; the verb
 // screen itself is the bare verb. Nothing here may point at a retired route
-// (scripts/verify_nav.mjs checks).
-const ROUTES: Route[] = ([
-  ...flattenNav("house").map((r) => ({ label: r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
-  ...flattenNav("studio").map((r) => ({ label: "Studio · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
-  ...flattenNav("me").map((r) => ({ label: "Me · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
-  { label: "Home", href: "/", hint: "root landing", verb: "home" },
-  { label: "Studio", href: "/studio", hint: "food studios portfolio group", gate: { room: "studio" }, verb: "studio" },
-] as Route[]).filter((r, i, all) => all.findIndex((x) => x.href === r.href) === i);
+// (scripts/verify_nav.mjs checks). Verb words follow the fs_lang cookie
+// (Service · Menu · Supplies · Money · Team · Comms / Servicio · Carta · …),
+// so the list is built per language, not once at module load.
+function routesFor(lang: Lang): Route[] {
+  return ([
+    ...flattenNav("house", (v) => verbLabel(v, lang)).map((r) => ({ label: r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    ...flattenNav("studio", (v) => verbLabel(v, lang)).map((r) => ({ label: "Studio · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    ...flattenNav("me", (v) => verbLabel(v, lang)).map((r) => ({ label: "Me · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    { label: "Home", href: "/", hint: "root landing", verb: "home" },
+    { label: "Studio", href: "/studio", hint: "food studios portfolio group", gate: { room: "studio" }, verb: "studio" },
+  ] as Route[]).filter((r, i, all) => all.findIndex((x) => x.href === r.href) === i);
+}
+const ROUTES: Route[] = routesFor("en");
 
 // Fuzzy scoring — cheap: token overlap + prefix boost. Not perfect but
 // enough for a ~90-row palette.
 function score(query: string, r: Route): number {
   if (!query) return 0;
   const q = query.toLowerCase();
-  const hay = (r.label + " " + r.hint + " " + r.href).toLowerCase();
+  const hay = (r.label + " " + r.hint + " " + r.href + " " + (r.verb || "")).toLowerCase();
   if (hay.startsWith(q)) return 100;
   if (hay.includes(q)) return 60;
   const tokens = q.split(/\s+/).filter(Boolean);
@@ -179,9 +186,11 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myAccess, path, open]);
 
+  const [lang, setLangState] = useState<Lang>("en");
+  useEffect(() => { setLangState(getLang()); }, [open]);
   const allowedRoutes = useMemo(
-    () => itemsForHouse(ROUTES.filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
-    [access, houseSlug],
+    () => itemsForHouse((lang === "en" ? ROUTES : routesFor(lang)).filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
+    [access, houseSlug, lang],
   );
   const allowedNew = useMemo(
     () => itemsForHouse(NEW_ITEMS.filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),

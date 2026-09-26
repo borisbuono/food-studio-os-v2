@@ -55,7 +55,7 @@ export default async function ManualEodPage({ params }: { params: { house: strin
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
             <Link href={`/h/${slug}`} className="hover:text-ink">← {houseNameForSlug(slug)}</Link>
             <span className="mx-2 text-clay">/</span>
-            <Link href={`/h/${slug}/office`} className="hover:text-ink">Office</Link>
+            <span>Money</span>
           </p>
           <h1 className="mt-2 font-serif text-3xl text-ink leading-tight">Enter yesterday's close</h1>
           <p className="mt-2 font-serif italic text-[14px] text-ink-soft">
