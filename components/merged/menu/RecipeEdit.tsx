@@ -8,7 +8,11 @@ type Ing = { id?: string; name: string; quantity: string; unit: string };
 type Comp = { id?: string; recipeId: string; name: string; portions: number };
 type RecOpt = { id: string; name: string; cost: number };
 
-export default function EditRecipe({ params }: { params: { id: string } }) {
+// Folded into the recipe page as the Edit tab (slim OS slice 2): the route
+// /develop/menu/[id]/edit is retired; this renders under
+// /h/<slug>/menu/recipes/<id>?tab=edit. Mirrors bounce to their origin.
+export default function EditRecipe({ params, houseSlug }: { params: { id: string }; houseSlug: string }) {
+  const base = `/h/${houseSlug}/menu/recipes`;
   const router = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +40,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
       setAuthed(!!s.session);
       const { data: r } = await supabaseBrowser.from("recipes").select("*").eq("id", params.id).maybeSingle();
       // Shared recipe mirror → edit the origin; the DB propagates to every venue.
-      if (r?.origin_recipe_id) { router.replace(`/develop/menu/${r.origin_recipe_id}/edit`); return; }
+      if (r?.origin_recipe_id) { router.replace(`${base}/${r.origin_recipe_id}?tab=edit`); return; }
       if (r) {
         setName(r.name || ""); setSection(r.section || ""); setPortions(r.portions ? String(r.portions) : "");
         setPitch(r.voice_statement || ""); setMethod((r.description || "").trim());
@@ -107,19 +111,18 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     const results = await Promise.all(ops);
     const bad: any = results.find((r: any) => r && r.error);
     if (bad) { setErr("Recipe saved; ingredients hit an error — " + bad.error.message); setSaving(false); return; }
-    router.push("/develop/menu/" + params.id);
+    router.push(`${base}/${params.id}`); router.refresh();
   };
 
-  if (loading) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading…</p></main>;
+  if (loading) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6"><p className="font-serif text-2xl text-ink">Loading…</p></main>;
 
   const field = "w-full rounded-xl border border-black/15 bg-paper px-4 py-3 font-sans text-[15px] text-ink outline-none focus:border-tomato/50";
   const label = "mt-5 mb-1 font-mono text-[10.5px] uppercase tracking-[0.2em] text-clay";
   const mini = "w-16 rounded-xl border border-black/15 bg-paper px-2 py-3 text-center font-sans text-[15px] text-ink outline-none";
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href={"/develop/menu/" + params.id} className="font-sans text-sm text-ink-soft">← cancel</Link>
-      <h1 className="mt-6 font-serif text-3xl text-ink">Edit recipe</h1>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
+      <Link href={`${base}/${params.id}`} className="font-sans text-sm text-ink-soft">← cancel</Link>
       {authed === false && <p className="mt-3 rounded-xl bg-paper-deep px-4 py-3 font-sans text-[13px] text-tomato">Sign in to save changes — you can still review the fields.</p>}
 
       <p className={label}>Name</p>

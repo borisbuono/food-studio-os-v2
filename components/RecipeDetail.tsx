@@ -216,7 +216,7 @@ export default function RecipeDetail({
     const res = await fetch(`/api/recipes/${recipeId}`, { method: "DELETE" });
     const j = await res.json();
     if (!j?.ok) { setError(j?.error || "delete failed"); return; }
-    window.location.href = `/h/${houseSlug}/kitchen/recipes`;
+    window.location.href = `/h/${houseSlug}/menu/recipes`;
   }, [recipeId, houseSlug]);
 
   const explode = useCallback(async () => {
@@ -247,7 +247,7 @@ export default function RecipeDetail({
     return (
       <main className="min-h-screen bg-white p-6">
         <p className="font-serif italic text-ink-soft">Recipe not found.</p>
-        <Link href={`/h/${houseSlug}/kitchen/recipes`} className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide underline">
+        <Link href={`/h/${houseSlug}/menu/recipes`} className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wide underline">
           Back to recipes
         </Link>
       </main>
@@ -274,7 +274,7 @@ export default function RecipeDetail({
           </div>
           <div className="flex flex-col gap-2 shrink-0">
             <Link
-              href={`/h/${houseSlug}/kitchen/recipes`}
+              href={`/h/${houseSlug}/menu/recipes`}
               className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5"
             >
               Back
@@ -301,7 +301,7 @@ export default function RecipeDetail({
       {isMirror ? (
         <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-black/5 px-3 py-2 text-[12px]">
           <span>🔗 Shared recipe — mirrored from the Food Studio library. Name, ingredients and method are read-only here; station and price stay yours.</span>
-          <Link href={`/h/${houseSlug}/kitchen/recipes/${recipe.origin_recipe_id}`} className="font-mono text-[11px] uppercase tracking-wide underline">
+          <Link href={`/h/${houseSlug}/menu/recipes/${recipe.origin_recipe_id}`} className="font-mono text-[11px] uppercase tracking-wide underline">
             Edit origin →
           </Link>
         </div>
@@ -555,7 +555,7 @@ function CostSection({
                     ) : null}
                     {b.status === "no_alias" ? (
                       <Link
-                        href={`/h/${houseSlug}/kitchen/ingredients?prefill=${encodeURIComponent(b.ingredient_name)}`}
+                        href={`/h/${houseSlug}/menu/ingredients?prefill=${encodeURIComponent(b.ingredient_name)}`}
                         className="ml-2 rounded-md border border-amber-500 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-800 hover:bg-amber-100"
                       >
                         + add alias

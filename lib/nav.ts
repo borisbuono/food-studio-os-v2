@@ -66,18 +66,18 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "cook", label: "Menu", href: `${H}/kitchen/recipes`, hint: "the recipes and the menu",
+    // Slice 2 (2026-09-26): one recipe list, one recipe page (edit + costing
+    // as tabs), one costing screen. Wine / bar / lexicon are leaves.
+    key: "cook", label: "Menu", href: `${H}/menu/recipes`, hint: "the recipes and the menu",
     gate: { room: "kitchen" },
     leaves: [
+      { href: `${H}/menu/costing`,          label: "Costing",        hint: "menu engineering repricing price margin", gate: { room: "office" } },
       { href: "/develop/recipes/import",    label: "Import recipe",  hint: "paste url import", gate: { room: "kitchen" } },
-      { href: "/develop/menu/publish",      label: "Publish menu",   hint: "publish guest menu", gate: { room: "kitchen" } },
-      { href: "/develop/menu/engineering",  label: "Menu engineering", hint: "stars dogs matrix", gate: { room: "office" } },
-      { href: "/develop/repricing",         label: "Repricing",      hint: "reprice target margin", gate: { room: "office" } },
-      { href: "/develop/wine",              label: "Wine",           hint: "wine list bottles", gate: { room: "kitchen" } },
-      { href: "/develop/wine/prices",       label: "Wine prices",    hint: "update wine costs", gate: { room: "office" } },
+      { href: "/develop/menu/publish",      label: "Publish menu",   hint: "publish guest menu 86", gate: { room: "kitchen" } },
+      { href: "/develop/wine",              label: "Wine",           hint: "wine list bottles prices", gate: { room: "kitchen" } },
       { href: "/develop/bar",               label: "Bar",            hint: "cocktails bar list", gate: { room: "kitchen" } },
       { href: "/develop/lexicon",           label: "Lexicon",        hint: "culinary lexicon taxonomy", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/ingredients`,   label: "Ingredients",    hint: "ingredient aliases", gate: { room: "kitchen" } },
+      { href: `${H}/menu/ingredients`,      label: "Ingredients",    hint: "ingredient aliases", gate: { room: "kitchen" } },
     ],
   },
   {

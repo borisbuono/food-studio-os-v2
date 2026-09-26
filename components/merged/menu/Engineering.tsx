@@ -17,7 +17,11 @@ const QUAD = {
   dog:    { label: "Dogs",        note: "Low margin and slow — rework the dish, or retire it for something that earns.", tone: "text-clay" },
 } as const;
 
-export default async function MenuEngineeringMatrix() {
+// Folded into /h/<slug>/menu/costing (slim OS slice 2); the route
+// /develop/menu/engineering is retired. Rows drill into the recipe page's
+// Costing tab.
+export default async function MenuEngineeringMatrix({ houseSlug }: { houseSlug: string }) {
+  const base = `/h/${houseSlug}/menu`;
   const supabase = supabaseServer();
 
   // Read menu_items with a recipe_id + price + units_sold. We prefer the
@@ -53,10 +57,8 @@ export default async function MenuEngineeringMatrix() {
   const nameById = new Map(items.map((i) => [i.id, i.name] as const));
 
   return (
-    <main className="mx-auto max-w-4xl lg:max-w-6xl px-7 py-14 bg-paper">
-      <Link href="/develop/recipes" className="font-sans text-[13px] text-ink-soft">← The corpus</Link>
-      <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.28em] text-tomato">Menu engineering</p>
-      <h1 className="mt-2 font-serif text-5xl font-light leading-tight text-ink">What earns its place</h1>
+    <main className="mx-auto max-w-4xl lg:max-w-6xl px-7 py-6 bg-paper">
+      <h2 className="font-serif text-2xl text-ink">What earns its place</h2>
       <p className="mt-3 max-w-xl lg:max-w-4xl font-serif text-[18px] font-light italic leading-snug text-ink-soft">
         Every dish placed by contribution margin against popularity. Stars carry the menu; plowhorses sell but barely pay; puzzles are worth promoting; dogs are candidates to rework or cut.
       </p>
@@ -85,7 +87,7 @@ export default async function MenuEngineeringMatrix() {
                   <ul className="mt-4 divide-y divide-line-soft">
                     {byQuad[k].map((r) => (
                       <li key={r.id}>
-                        <Link href={`/develop/menu/${(items.find((i) => i.id === r.id) || {}).recipe_id || r.id}/calculation`} className="flex items-baseline justify-between gap-3 py-2 transition hover:opacity-70">
+                        <Link href={`${base}/recipes/${(items.find((i) => i.id === r.id) || {}).recipe_id || r.id}?tab=cost`} className="flex items-baseline justify-between gap-3 py-2 transition hover:opacity-70">
                           <span className="font-serif text-[16px] text-ink">{noEmoji(r.name)}</span>
                           <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-clay tabular-nums">
                             {eur(r.margin)} · {r.units_sold}×
@@ -117,7 +119,7 @@ export default async function MenuEngineeringMatrix() {
               <tbody>
                 {classified.map((r) => {
                   const item = items.find((i) => i.id === r.id);
-                  const link = item?.recipe_id ? `/develop/menu/${item.recipe_id}/calculation` : `/menu/${r.id}`;
+                  const link = item?.recipe_id ? `${base}/recipes/${item.recipe_id}?tab=cost` : `/develop/menu/publish`;
                   return (
                     <tr key={r.id} className="border-b border-line-soft">
                       <td className="py-2 pr-3 text-ink">

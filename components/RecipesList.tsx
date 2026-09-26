@@ -241,7 +241,7 @@ export default function RecipesList({ entityId, houseSlug }: { entityId: string;
                   return (
                     <li key={r.id}>
                       <Link
-                        href={`/h/${houseSlug}/kitchen/recipes/${r.id}`}
+                        href={`/h/${houseSlug}/menu/recipes/${r.id}`}
                         className="flex items-center gap-3 px-3 py-3 hover:bg-black/5"
                       >
                         <div className="min-w-0 flex-1">

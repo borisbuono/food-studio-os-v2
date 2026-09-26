@@ -10,7 +10,11 @@ export const dynamic = "force-dynamic";
 
 // Precision face — the calculation view. Uses CalculationBreakdown. No serif
 // prose here, just tabular-nums, hairlines, and a sticky summary card.
-export default async function CalculationPage({ params }: { params: { id: string } }) {
+// Folded into the recipe page as the Costing tab (slim OS slice 2): the route
+// /develop/menu/[id]/calculation is retired; renders under
+// /h/<slug>/menu/recipes/<id>?tab=cost.
+export default async function CalculationPage({ params, houseSlug }: { params: { id: string }; houseSlug: string }) {
+  const base = `/h/${houseSlug}/menu/recipes`;
   const supabase = supabaseServer();
   const entity = serverEntity();
   const accent = ENTITY_ACCENT[entity];
@@ -19,7 +23,7 @@ export default async function CalculationPage({ params }: { params: { id: string
   if (!r) {
     return (
       <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-        <Link href="/develop/menu" className="font-sans text-sm text-ink-soft">← the repertoire</Link>
+        <Link href={base} className="font-sans text-sm text-ink-soft">← recipes</Link>
         <p className="mt-8 font-serif text-2xl text-ink">Recipe not found.</p>
       </main>
     );
@@ -51,12 +55,8 @@ export default async function CalculationPage({ params }: { params: { id: string
   const dietary: string[] = (r.dietary as string[]) || [];
 
   return (
-    <main className="mx-auto max-w-[1400px] bg-paper px-8 py-10" style={{ ["--fs-accent" as any]: accent }}>
+    <main className="mx-auto max-w-[1400px] bg-paper px-0 py-6" style={{ ["--fs-accent" as any]: accent }}>
       <AssistantContext context={{ kind: "calculation", id: r.id, name: r.name, entity, totalCost, menuPrice }} />
-      <div className="mb-6 flex items-baseline justify-between">
-        <Link href={`/develop/menu/${r.id}`} className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay hover:text-ink">← back to the recipe</Link>
-        <Link href={`/develop/menu/${r.id}/edit`} className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay hover:text-ink">Edit →</Link>
-      </div>
       <CalculationBreakdown
         title={noEmoji(r.name)}
         subtitle={portions ? `per portion, at ${portions} pax` : null}

@@ -17,17 +17,17 @@ export type Retired = { from: string; to: string; why: string };
 export const RETIRED: Retired[] = [
   // ---- 33 pure-redirect stubs (the "muscle-memory" aliases) ----
   { from: "/boh/bar",                 to: "/develop/bar",                     why: "alias" },
-  { from: "/boh/cook",                to: "/h/:house/kitchen/recipes",        why: "alias (pointed at /boh)" },
-  { from: "/boh/menu",                to: "/h/:house/kitchen/recipes",        why: "alias" },
+  { from: "/boh/cook",                to: "/h/:house/menu/recipes",        why: "alias (pointed at /boh)" },
+  { from: "/boh/menu",                to: "/h/:house/menu/recipes",        why: "alias" },
   { from: "/boh/mep", to: "/execute/pass",                    why: "alias" },
   { from: "/boh/receiving",           to: "/execute/orders",                  why: "alias" },
-  { from: "/boh/recipes",             to: "/h/:house/kitchen/recipes",        why: "alias" },
+  { from: "/boh/recipes",             to: "/h/:house/menu/recipes",        why: "alias" },
   { from: "/boh/wine",                to: "/develop/wine",                    why: "alias" },
-  { from: "/develop/menu-engineering", to: "/develop/menu/engineering",       why: "alias" },
+  { from: "/develop/menu-engineering", to: "/h/:house/menu/costing",          why: "alias" },
   { from: "/execute/handover", to: "/execute/pass",                    why: "alias" },
   { from: "/foh/bookings", to: "/execute/bookings",                why: "alias" },
   { from: "/foh/guests",              to: "/grow/relationships",              why: "alias" },
-  { from: "/foh/menu",                to: "/h/:house/kitchen/recipes",        why: "alias" },
+  { from: "/foh/menu",                to: "/h/:house/menu/recipes",        why: "alias" },
   { from: "/foh/pass", to: "/execute/pass",                    why: "alias" },
   { from: "/foh/reviews",             to: "/grow/reputation",                 why: "alias" },
   { from: "/office/advisor",          to: "/studio/advisory",                 why: "alias" },
@@ -43,9 +43,9 @@ export const RETIRED: Retired[] = [
   { from: "/office/suppliers", to: "/administrate/suppliers",          why: "alias" },
   { from: "/office/team", to: "/administrate/team",               why: "alias" },
   { from: "/order",                   to: "/execute/orders",                  why: "alias" },
-  { from: "/recipes",                 to: "/h/:house/kitchen/recipes",        why: "alias (public /recipes/<slug> untouched)" },
+  { from: "/recipes",                 to: "/h/:house/menu/recipes",        why: "alias (public /recipes/<slug> untouched)" },
   { from: "/recipes/:id/cook",        to: "/execute/cook/:id",                why: "alias" },
-  { from: "/recipes/:id/edit",        to: "/develop/menu/:id/edit",           why: "alias" },
+  { from: "/recipes/:id/edit",        to: "/h/:house/menu/recipes/:id?tab=edit", why: "alias" },
   { from: "/schedule",                to: "/administrate/team/schedule",      why: "alias" },
   { from: "/h/:house/office",         to: "/h/:house",                        why: "room landing (rooms left the nav)" },
   { from: "/h/:house/:room",          to: "/h/:house",                        why: "room landing (rooms left the nav)" },
@@ -68,11 +68,11 @@ export const RETIRED: Retired[] = [
   { from: "/grow",        to: "/h/:house", why: "dup #2 (pillar landing)" },
   { from: "/administrate", to: "/h/:house", why: "dup #2 (pillar landing)" },
   // #3 list every recipe → Cook
-  { from: "/develop/recipes", to: "/h/:house/kitchen/recipes", why: "dup #3" },
-  { from: "/develop/menu",    to: "/h/:house/kitchen/recipes", why: "dup #3" },
-  { from: "/menu",            to: "/h/:house/kitchen/recipes", why: "dup #3" },
+  { from: "/develop/recipes", to: "/h/:house/menu/recipes", why: "dup #3" },
+  { from: "/develop/menu",    to: "/h/:house/menu/recipes", why: "dup #3" },
+  { from: "/menu",            to: "/h/:house/menu/recipes", why: "dup #3" },
   // #4 open one recipe
-  { from: "/develop/menu/:id", to: "/h/:house/kitchen/recipes/:id", why: "dup #4" },
+  { from: "/develop/menu/:id", to: "/h/:house/menu/recipes/:id", why: "dup #4" },
   { from: "/menu/:id",         to: "/develop/menu/publish",         why: "dup #4 (menu-item + 86 lives on the publish grid)" },
   // #7 / #8 money
   { from: "/administrate/finance/dashboard", to: "/administrate/finance", why: "dup #7" },
@@ -95,6 +95,17 @@ export const RETIRED: Retired[] = [
   { from: "/administrate/advisor",               to: "/studio/advisory", why: "dup #18" },
   { from: "/administrate/advisor/:id",           to: "/studio/advisory", why: "dup #18" },
   { from: "/administrate/advisor/:id/checklist", to: "/studio/advisory", why: "dup #18" },
+
+  // ---- slice 2 · Menu (2026-09-26) — one list, one recipe page, one costing screen
+  { from: "/h/:house/:room/recipes",          to: "/h/:house/menu/recipes",              why: "slice 2: rooms left the URL" },
+  { from: "/h/:house/:room/recipes/:id",      to: "/h/:house/menu/recipes/:id",          why: "slice 2: rooms left the URL" },
+  { from: "/h/:house/:room/ingredients",      to: "/h/:house/menu/ingredients",          why: "slice 2: rooms left the URL" },
+  { from: "/develop/menu/:id/edit",           to: "/h/:house/menu/recipes/:id?tab=edit", why: "dup #4: edit is a tab of the recipe page" },
+  { from: "/develop/menu/:id/calculation",    to: "/h/:house/menu/recipes/:id?tab=cost", why: "dup #5: costing is a tab of the recipe page" },
+  { from: "/develop/menu/engineering",        to: "/h/:house/menu/costing",              why: "dup #5: one price screen" },
+  { from: "/develop/repricing",               to: "/h/:house/menu/costing?tab=repricing", why: "dup #5: one price screen" },
+  { from: "/develop/wine/prices",             to: "/develop/wine?tab=prices",            why: "single: wine prices is a tab of wine" },
+
   // singles
   { from: "/feedback",         to: "/",              why: "feedback is a Chef intent" },
   { from: "/studio/partners",  to: "/studio/houses", why: "no partner logs in yet" },

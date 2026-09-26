@@ -306,7 +306,7 @@ export async function computeRecipeCost(
         price_asof: null,
         price_tier: null,
         status: "no_alias",
-        note: "no alias → link it in /kitchen/ingredients",
+        note: "no alias → link it in /menu/ingredients",
       };
     }
     if (!priced) {

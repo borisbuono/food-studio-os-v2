@@ -95,7 +95,7 @@ export default function ReviewQueue({ cards }: { cards: ReviewCard[] }) {
               </div>
               <div className="flex shrink-0 flex-col gap-2">
                 <button disabled={pending} onClick={() => run([c.id], "approve")} className="rounded-md bg-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40">Approve</button>
-                <Link href={`/h/bm/kitchen/recipes/${c.id}`} className="rounded-md border border-line px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-wide">Edit</Link>
+                <Link href={`/h/bm/menu/recipes/${c.id}`} className="rounded-md border border-line px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-wide">Edit</Link>
                 <button disabled={pending} onClick={() => run([c.id], "discard")} className="rounded-md border border-tomato/50 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-tomato disabled:opacity-40">Discard</button>
               </div>
             </div>

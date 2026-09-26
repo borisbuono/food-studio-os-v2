@@ -160,7 +160,7 @@ export default function PrepList({
       setSelected(new Set());
       await reload();
       if (j?.recipe?.id) {
-        window.location.href = `/h/${houseSlug}/kitchen/recipes/${j.recipe.id}`;
+        window.location.href = `/h/${houseSlug}/menu/recipes/${j.recipe.id}`;
       }
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -212,7 +212,7 @@ export default function PrepList({
           </div>
           <div className="flex flex-col gap-2 shrink-0">
             <Link
-              href={`/h/${houseSlug}/kitchen/recipes`}
+              href={`/h/${houseSlug}/menu/recipes`}
               className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5 text-center"
             >
               Recipes
@@ -343,7 +343,7 @@ export default function PrepList({
                       </div>
                       {it.linked_recipe_id ? (
                         <Link
-                          href={`/h/${houseSlug}/kitchen/recipes/${it.linked_recipe_id}`}
+                          href={`/h/${houseSlug}/menu/recipes/${it.linked_recipe_id}`}
                           className="shrink-0 rounded-full border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink-soft hover:bg-black/5"
                           aria-label="open linked recipe"
                         >

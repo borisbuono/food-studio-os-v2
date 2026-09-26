@@ -23,6 +23,7 @@ const matchWine = (lineName: string, wines: Wine[]) => {
   return wines.find((w) => { const wn = w.name.toLowerCase(); return wn && (n.includes(wn) || wn.includes(n.split(" ")[0])); })?.id || "";
 };
 
+// Folded into /develop/wine?tab=prices (slim OS slice 2).
 export default function WinePrices() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [wines, setWines] = useState<Wine[]>([]);
@@ -73,10 +74,8 @@ export default function WinePrices() {
   const applicable = rows.filter((r) => r.wineId && r.unit_price != null).length;
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/develop/wine" className="font-sans text-sm text-ink-soft">← cellar</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · prices from the delivery note</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">Update wine costs</h1>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
+      <h2 className="font-serif text-2xl text-ink">Update wine costs</h2>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Photograph the delivery note or invoice. Chef reads the lines and matches them to your cellar; you confirm, and each wine’s cost updates so the margin re-costs itself. The recurring loop — every delivery keeps the prices honest.</p>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />

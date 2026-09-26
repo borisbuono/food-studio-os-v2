@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
@@ -7,6 +6,7 @@ import { FOOD_SECTION_LIST } from "@/lib/menuClassify";
 export const dynamic = "force-dynamic";
 const eur = (n: number) => "€" + n.toFixed(2);
 
+// Folded into /h/<slug>/menu/costing?tab=repricing (slim OS slice 2).
 export default async function Repricing() {
   
   const supabase = supabaseServer();const items = (await supabase.from("menu_items").select("name,price,cost,target_margin_pct,computed_price,category").eq("is_active", true).in("section", FOOD_SECTION_LIST).eq("restaurant_id", serverRestaurantId())).data || [];
@@ -20,10 +20,8 @@ export default async function Repricing() {
   });
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-tomato">Repricing</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">Price against target margin</h1>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
+      <h2 className="font-serif text-2xl text-ink">Price against target margin</h2>
 
       <ul className="mt-6 divide-y divide-black/10 border-t border-black/10">
         {rows.map((r: any, i: number) => (
