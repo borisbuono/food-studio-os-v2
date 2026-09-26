@@ -82,7 +82,7 @@ STRIPE_SECRET_KEY=...
 TINK_CLIENT_ID=... TINK_CLIENT_SECRET=...`}</pre>
       </section>
 
-      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay"><Link href="/administrate/finance/dashboard">← back to finance</Link></p>
+      <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay"><Link href="/administrate/finance">← back to finance</Link></p>
     </main>
   );
 }

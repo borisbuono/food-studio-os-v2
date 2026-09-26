@@ -187,7 +187,7 @@ export default function HomeSlim({ data }: { data: CompassData }) {
             ))}
           </ul>
           {rest > 0 ? (
-            <Link href="/administrate/inbox" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+            <Link href="/files/inbox" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
               +{rest} more →
             </Link>
           ) : null}
@@ -201,7 +201,7 @@ export default function HomeSlim({ data }: { data: CompassData }) {
           <ul className="mt-3 flex flex-col gap-2">
             {d.highestImpact.slice(0, 3).map((t) => (
               <li key={t.id}>
-                <Link href="/office/master-todo" className="flex items-baseline justify-between gap-3 border-b border-black/5 py-2 hover:border-black/20">
+                <Link href="/administrate/master-todo" className="flex items-baseline justify-between gap-3 border-b border-black/5 py-2 hover:border-black/20">
                   <span className="font-serif text-[15px] text-ink truncate">{t.title}</span>
                   <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-clay">{Math.round(t.impact_score)}</span>
                 </Link>
@@ -214,7 +214,7 @@ export default function HomeSlim({ data }: { data: CompassData }) {
       {/* Tiny footer strip — entity label + Salas (rooms) drawer */}
       <div className="mt-10 flex items-baseline justify-between border-t border-black/10 pt-4 font-mono text-[10px] uppercase tracking-wide">
         <span className="text-clay"><span className="text-ink">{ENTITY_LABEL[entity]}</span> · slim mode</span>
-        <Link href="/administrate" style={{ color: "var(--accent)" }}>Salas →</Link>
+        <Link href="/studio/houses" style={{ color: "var(--accent)" }}>Houses →</Link>
       </div>
     </main>
   );

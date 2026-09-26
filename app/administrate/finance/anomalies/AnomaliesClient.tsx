@@ -50,7 +50,7 @@ function sourceHref(r: Row): string | null {
   if (r.kind === "eod_cash_ratio_high" || r.kind === "eod_no_source") return "/administrate/finance/eod";
   if (r.kind === "bank_movement_unmatched_long" || r.kind === "duplicate_asiento" || r.kind === "intercompany_ghost") return "/administrate/finance/reconciliation";
   if (r.kind === "invoice_missing_supplier" || r.kind === "invoice_amount_outlier" || r.kind === "posting_before_bank") return "/administrate/finance/scans";
-  if (r.kind === "vat_ratio_deviation") return "/administrate/finance/dashboard";
+  if (r.kind === "vat_ratio_deviation") return "/administrate/finance";
   return null;
 }
 

@@ -131,7 +131,7 @@ export async function readFoodCost(sb: SupabaseClient, q: string, scope: FoodCos
   const all = await candidates(sb, scope);
   const ranked = all.map((c) => ({ c, score: nameScore(query, c.name) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.c.name.length - b.c.name.length);
   const best = ranked[0];
-  const listHref = scope.house ? "/h/" + scope.house + "/kitchen/recipes" : "/develop/recipes";
+  const listHref = scope.house ? "/h/" + scope.house + "/kitchen/recipes" : "/studio/recipes/review";
 
   // Ambiguous or nothing: clarify with the 3 nearest names (deduped).
   if (!best || best.score < 0.45) {
@@ -179,7 +179,7 @@ export async function readFoodCost(sb: SupabaseClient, q: string, scope: FoodCos
   const over = overTargetAlert(fcp, target);
   const name = pick.name;
   const href = pick.source === "recipe" || recipeId
-    ? (scope.house ? "/h/" + scope.house + "/kitchen/recipes/" + (recipeId || pick.id) : "/develop/menu/" + (recipeId || pick.id))
+    ? (scope.house ? "/h/" + scope.house + "/kitchen/recipes/" + (recipeId || pick.id) : listHref)
     : listHref;
 
   const lines: string[] = [];

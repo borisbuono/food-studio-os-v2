@@ -160,22 +160,27 @@ function toLines(s: string, max = 4, width = 140): string[] {
   return out.length ? out : [clip(s, width)];
 }
 
-// The card body navigates here. Rooms live under a house; without a house we
-// fall back to the entity-agnostic surface rather than guessing a slug.
+// The card body navigates here. Slim OS (2026-09-26, slice 1): every target
+// is a surviving verb screen or leaf — /boh, /office, /develop/recipes,
+// /develop/menu and the room landings are gone. Without a house in scope we
+// fall back to a house-agnostic survivor rather than guessing a slug:
+// `/` picks the house, `/studio/recipes/review` is the Studio recipe list.
 function pageHref(word: string, house: string | null): string | null {
   const h = house ? "/h/" + house : null;
   const w = word.toLowerCase();
-  if (/receta|recipe/.test(w)) return h ? h + "/kitchen/recipes" : "/develop/recipes";
-  if (/reserva|booking/.test(w)) return "/execute/bookings";
+  if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
+  if (/reserva|booking|servir|\bserve\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/calendar";
-  if (/inbox|comentario|mensaje|bandeja/.test(w)) return h ? h + "/office/inbox" : "/office";
-  if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/boh";
-  if (/caja|eod|cierre/.test(w)) return "/administrate/finance/eod";
-  if (/equipo|team/.test(w)) return "/administrate/team";
-  if (/oficina|office/.test(w)) return h ? h + "/office" : "/office";
-  if (/cocina|kitchen/.test(w)) return h ? h + "/kitchen" : "/boh";
-  if (/sala|dining|comedor/.test(w)) return h ? h + "/dining" : "/";
-  if (/inicio|home|start/.test(w)) return "/";
+  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social/.test(w)) return h ? h + "/office/inbox" : "/";
+  if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
+  if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/office/eod" : "/administrate/finance/eod";
+  if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : "/administrate/finance";
+  if (/equipo|team|gente|people|personal|plantilla/.test(w)) return "/administrate/team";
+  if (/pedido|order|compra|\bbuy\b|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
+  if (/oficina|office/.test(w)) return h ? h + "/office/eod" : "/administrate/finance";
+  if (/cocina|kitchen/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
+  if (/estudio|studio/.test(w)) return "/studio";
+  if (/inicio|home|start|casa/.test(w)) return h ? h : "/";
   return null;
 }
 
@@ -331,7 +336,7 @@ async function readRecipes(q: string, ctx: ReadCtx): Promise<{ card: ChefCard; s
       .eq("is_archived", false).ilike("name", needle).limit(5);
     rows = r.data || [];
   }
-  const listHref = pageHref("recipes", ctx.house) || "/develop/recipes";
+  const listHref = pageHref("recipes", ctx.house) || "/studio/recipes/review";
   if (!rows.length) {
     return { say: t.no_recipe + ": " + clip(q, 30), card: { title: t.no_recipe, lines: [clip(q, 80)], kind: "read", entity_label: label, href: listHref } };
   }
@@ -344,7 +349,9 @@ async function readRecipes(q: string, ctx: ReadCtx): Promise<{ card: ChefCard; s
     return ae - be || an.length - bn.length;
   });
   const r: any = ranked[0];
-  const href = ctx.house ? "/h/" + ctx.house + "/kitchen/recipes/" + r.id : "/develop/menu/" + r.id;
+  // Without a house the /h/<slug> recipe page cannot be addressed; the
+  // Studio review list is the survivor (the /develop/menu/<id> page is gone).
+  const href = ctx.house ? "/h/" + ctx.house + "/kitchen/recipes/" + r.id : "/studio/recipes/review";
   const { data: steps } = await sb.from("recipe_steps").select("order_idx, body").eq("recipe_id", r.id).order("order_idx").limit(3);
   const stepLines = (steps || []).map((s: any) => clip(s.body, 80));
   const methodLines = stepLines.length ? stepLines : String(r.method || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 3).map((x) => clip(x, 80));
@@ -393,7 +400,7 @@ async function readPrep(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> 
   const sb = supabaseServer();
   const t = T[ctx.lang];
   const date = tzDate(ctx.scope.entity.timezone);
-  const href = pageHref("prep", ctx.house) || "/boh";
+  const href = pageHref("prep", ctx.house) || "/";
   const { data } = await sb.from("prep_lists").select("name, quantity, unit, status, station").eq("entity_id", ctx.scope.entity.id).eq("service_date", date).order("created_at");
   const items = data || [];
   const done = items.filter((i: any) => i.status === "done").length;
@@ -433,7 +440,7 @@ function tzOffsetMinutes(tz: string): number {
 async function readInbox(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> {
   const sb = supabaseServer();
   const t = T[ctx.lang];
-  const href = pageHref("inbox", ctx.house) || "/office";
+  const href = pageHref("inbox", ctx.house) || "/";
   const [{ data: w }, { data: top }] = await Promise.all([
     sb.from("social_inbox_waiting").select("waiting").eq("entity_id", ctx.scope.entity.id).maybeSingle(),
     sb.from("social_comments").select("author_handle, author_name, text, platform").eq("entity_id", ctx.scope.entity.id)
@@ -675,7 +682,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
       case "inbox_open": {
         const seen = input.clientState?.inbox_seen || [];
         const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen });
-        const href = pageHref("inbox", houseSlug) || "/office";
+        const href = pageHref("inbox", houseSlug) || "/";
         const piece = items.length ? itemCard(items[0], entityId, lang, label, Math.max(0, total - seen.length - 1), "walk") : emptyCard(lang, label, href);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "walk", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
       }
@@ -686,7 +693,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const count = Math.max(1, Math.min(10, Number(args.count) || 1));
         const seen = args.next ? (input.clientState?.inbox_seen || []) : [];
         const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen, who: who || undefined });
-        const href = pageHref("inbox", houseSlug) || "/office";
+        const href = pageHref("inbox", houseSlug) || "/";
         if (!items.length) {
           const piece = who ? whoCard(lang, who, 0, label) : emptyCard(lang, label, href);
           return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "approve", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
@@ -744,7 +751,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const date = tzDate(scope.entity.timezone);
         const { data: rows } = await sb.from("prep_lists").select("id, name, quantity, unit, status").eq("entity_id", entityId).eq("service_date", date).ilike("name", "%" + name.replace(/\s+/g, "%") + "%").limit(5);
         const items = rows || [];
-        if (!items.length) return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "prep", q: name, scope: chefScope }, confidence: conf, say: tl.no_prep_item(name), needs_confirm: false, card: { title: tl.no_prep_item(name), lines: [date], kind: "read", entity_label: label, href: pageHref("prep", houseSlug) || "/boh" } }, "card");
+        if (!items.length) return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "prep", q: name, scope: chefScope }, confidence: conf, say: tl.no_prep_item(name), needs_confirm: false, card: { title: tl.no_prep_item(name), lines: [date], kind: "read", entity_label: label, href: pageHref("prep", houseSlug) || "/" } }, "card");
         // Exact name first, else the single match; two or more → ask.
         const exact = items.filter((i: any) => String(i.name || "").toLowerCase() === name.toLowerCase());
         const pick: any = exact.length === 1 ? exact[0] : items.length === 1 ? items[0] : null;
@@ -761,7 +768,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
           transcript: message, language: lang,
           intent: { kind: "update", surface: "prep", id: pick.id, patch, undoable: true }, confidence: conf,
           say: title + ": " + after, needs_confirm: false, undoable: true, action, alternatives: alt,
-          card: { title, lines: [after, date], kind: "write", entity_label: label, href: pageHref("prep", houseSlug) || "/boh" },
+          card: { title, lines: [after, date], kind: "write", entity_label: label, href: pageHref("prep", houseSlug) || "/" },
         }, "pending_undo");
       }
       case "clarify": {

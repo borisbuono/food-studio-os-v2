@@ -91,7 +91,7 @@ export default async function Reconciliation() {
   return (
     <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <AssistantContext context={{ kind: "bank_movements", entity: ec, unmatched: (unmatched || []).slice(0, 50).map((m: any) => ({ id: m.id, date: m.movement_date, description: m.description, amount_eur: m.amount_eur, bank_account: m.bank_account })), proposed_count: proposedCount }} />
-      <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
+      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← dashboard</Link>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Bank · {ec} · reconciliation</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">What's in motion.</h1>
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">Every bank movement, matched or not. The matcher proposes — you decide. Proposed matches sit on top, then any older unmatched rows below.</p>

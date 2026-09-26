@@ -150,7 +150,8 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
     }, []),
     // food cost (slice C): standing on a recipe page → offer its costing.
     safe(async (): Promise<Candidate[]> => {
-      const m = String(input.route || "").match(/\/(?:kitchen\/recipes|develop\/menu)\/([0-9a-f-]{36})(?:[/?#]|$)/i);
+      // /h/<slug>/kitchen/recipes/<id> is the one recipe page now (/develop/menu/<id> deleted 2026-09-26).
+      const m = String(input.route || "").match(/\/kitchen\/recipes\/([0-9a-f-]{36})(?:[/?#]|$)/i);
       if (!m) return [];
       const { data } = await sb.from("recipes").select("name").eq("id", m[1]).maybeSingle();
       const name = String((data as any)?.name || "").trim();

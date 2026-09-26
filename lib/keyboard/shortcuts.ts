@@ -15,13 +15,17 @@ export type ShortcutTarget = { href: string; label: string };
 export const GO_TARGETS: Record<string, ShortcutTarget> = {
   h: { href: "/",                          label: "Home" },
   f: { href: "/administrate/finance",      label: "Finance" },
-  m: { href: "/develop/menu",              label: "Menu" },
-  r: { href: "/develop/recipes",           label: "Recipes" },
-  t: { href: "/administrate/team",         label: "Team" },
-  o: { href: "/office",                    label: "Office" },
-  b: { href: "/boh",                       label: "BOH" },
+  // Slim OS 2026-09-26: /develop/menu, /develop/recipes, /office, /boh and
+  // /command are gone. Cookie-scoped survivors only — the house-scoped Cook
+  // screen needs a slug the shortcut table has no access to, so `m`/`r`
+  // land on the Studio recipe review list.
+  m: { href: "/execute/bookings",          label: "Serve" },
+  r: { href: "/studio/recipes/review",     label: "Recipes (review)" },
+  t: { href: "/administrate/team",         label: "People" },
+  o: { href: "/execute/orders",            label: "Buy" },
+  b: { href: "/administrate/finance/eod",  label: "Close" },
   s: { href: "/administrate/settings",     label: "Settings" },
-  c: { href: "/command",                   label: "Command center" },
+  c: { href: "/studio",                    label: "Studio" },
   i: { href: "/files/inbox",               label: "Files inbox" },
 };
 

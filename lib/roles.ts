@@ -4,8 +4,8 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
   office: {
     label: "Office",
     points: [
-      { href: "/grow/inbox", label: "Inbox", blurb: "Emails, requests, reviews — what needs a reply or a call." },
-      { href: "/messages", label: "Team", blurb: "Everyone the team, in one place: channels, roster, message anyone." },
+      { href: "/grow/reputation", label: "Reviews", blurb: "What guests wrote — what needs a reply." },
+      { href: "/administrate/team", label: "Team", blurb: "Everyone on the team, in one place." },
       { href: "/administrate/finance", label: "The numbers", blurb: "What's moving — revenue, covers, costs to react to." },
       { href: "/administrate/suppliers", label: "Suppliers", blurb: "Orders, prices, deliveries." },
     ],
@@ -14,14 +14,14 @@ export const ROLES: Record<RoleKey, { label: string; points: { href: string; lab
     label: "Back of House",
     points: [
       { href: "/execute/pass", label: "The Pass", blurb: "Tonight's prep + cleaning + close-down, scaled to tomorrow's covers." },
-      { href: "/menu", label: "Menu", blurb: "Every dish — recipe, Calculation, story, allergens, Cook Mode." },
+      { href: "/execute/orders", label: "Orders", blurb: "What came in, what to order." },
     ],
   },
   foh: {
     label: "Front of House",
     points: [
       { href: "/execute/pass", label: "The Pass", blurb: "Tonight: covers, specials, 86s, close-down." },
-      { href: "/menu", label: "Menu", blurb: "Sell and present every dish." },
+      { href: "/grow/relationships", label: "Guests", blurb: "Who is coming back, what they like." },
       { href: "/administrate/events", label: "Events", blurb: "Private events and catering." },
       { href: "/administrate/team/schedule", label: "Schedule", blurb: "Who is on, when." },
     ],
@@ -50,7 +50,6 @@ export function mapDbRole(dbRole: string | null | undefined): { world: World; is
 // canonical routing source; this list is the shorter "hard block" set.
 export const OFFICE_ONLY_PREFIXES = [
   "/administrate",
-  "/office",
   "/grow/reach",
   "/grow/commercials",
 ];

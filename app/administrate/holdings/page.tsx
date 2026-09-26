@@ -1,20 +1,13 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { serverEntity } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
-import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
 
 export default async function HoldingsMap() {
-  // When the entity switcher = Holdings (BBH), the console is home.
-  // The entity-map view stays reachable via /administrate/holdings/map for
-  // anyone who wants the raw structural tree.
-  if (serverEntity() === E_HOLDINGS) {
-    redirect("/administrate/holdings/console");
-  }
-
+  // 2026-09-26: this used to bounce Holdings to the group console; the
+  // console merged into /studio and this page is now the Studio › Houses ›
+  // Structure leaf, so it always renders.
   const supabase = supabaseServer();
   const entities = (await supabase.from("entities").select("id,name,entity_type,legal_form,city,country,parent_entity_id,is_active").order("name")).data || [];
   const rels = (await supabase.from("entity_relationships").select("source_entity_id,target_entity_id,relationship_type")).data || [];
@@ -35,7 +28,7 @@ export default async function HoldingsMap() {
       <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Holdings · entity map</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">The structure</h1>
-      <Link href="/administrate/holdings/console" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Open group console →</Link>
+      <Link href="/studio" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Studio →</Link>
 
       <div className="mt-8">
         {roots.map((e: any) => <Node key={e.id} e={e} depth={0} />)}

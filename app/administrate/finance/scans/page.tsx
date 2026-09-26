@@ -53,7 +53,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
   return (
     <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
       <AssistantContext context={{ kind: "invoices", entity: ec, openInvoices: rows.slice(0, 20).map((r) => ({ id: r.id, supplier: r.supplier_name || r.provider?.name || null, amount_eur: r.amount_eur, flagged_reason: r.flagged_reason, match_status: r.match_status })), topId: rows[0]?.id || null }} />
-      <Link href="/administrate/finance/dashboard" className="font-sans text-sm text-ink-soft">← dashboard</Link>
+      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← dashboard</Link>
       <span className="ml-3 inline-block font-mono text-sm text-clay">Hold Chef to snap a doc.</span>
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Scans · {ec} · invoice triage</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">What needs a call.</h1>

@@ -69,10 +69,10 @@ export type CompassData = Record<EntityKey, {
 const ENTITY_CODE: Record<EntityKey, string> = { [E_HOLDINGS]: "BBH", [E_BM]: "BM", [E_TALLER]: "IFL", [E_UTOPIA]: "UTOPIA", };
 
 const PILLARS: { href: string; label: string; blurb: string }[] = [
-  { href: "/develop/menu-engineering", label: "Develop", blurb: "Menu, recipes, wine, lexicon" },
-  { href: "/execute/pass", label: "Execute", blurb: "Pass, prep, deliveries, service" },
-  { href: "/administrate/finance", label: "Administrate", blurb: "Numbers, invoices, team" },
-  { href: "/grow", label: "Grow", blurb: "Guests, offers, reach, reviews" },
+  { href: "/execute/bookings", label: "Serve", blurb: "Bookings, pass, prep" },
+  { href: "/studio/recipes/review", label: "Cook", blurb: "Recipes, menu, wine" },
+  { href: "/execute/orders", label: "Buy", blurb: "Orders, deliveries, suppliers" },
+  { href: "/administrate/finance", label: "Close", blurb: "Till, money, paper" },
 ];
 
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
@@ -334,7 +334,7 @@ export default function HomeCompass({ data }: { data: CompassData }) {
         <div className="mt-6 border-b border-black/10 pb-4">
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Cash today</p>
           <p className="mt-1 font-serif text-4xl text-ink leading-none">{eur(d.cashToday)}</p>
-          <Link href="/administrate/finance/dashboard" className="mt-2 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
+          <Link href="/administrate/finance" className="mt-2 inline-block font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>
             The numbers ›
           </Link>
         </div>

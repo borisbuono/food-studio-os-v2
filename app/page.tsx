@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { EntityKey, ENTITY_LABEL, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getMyMembershipContext, ROOM_TO_PATH } from "@/lib/memberships";
+import { getMyMembershipContext, landingFor } from "@/lib/memberships";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +70,7 @@ export default async function Page() {
   try {
     const ctx = await getMyMembershipContext();
     if (ctx.signedIn && ctx.memberships.length) {
-      const target = ROOM_TO_PATH[ctx.primaryRoom];
+      const target = landingFor(ctx);
       if (target && target !== "/") _landing = target;
       // Boris walk 2026-09-10 — reset the sticky fs_entity cookie to
       // `holdings` for owner-multi users on every visit to /. Without

@@ -22,13 +22,18 @@ import {
 
 export type Room = "kitchen" | "dining" | "office" | "studio";
 
-// Route the room resolves to. "kitchen" → /boh (URL stays alive), etc.
-export const ROOM_TO_PATH: Record<Room, string> = {
-  kitchen: "/boh",
-  dining:  "/foh",
-  office:  "/office",
-  studio:  "/studio",
-};
+// Where a signed-in person lands from `/`. Slim OS (2026-09-26): the room
+// dashboards (/boh, /foh, /office) are gone — a single-house person lands on
+// THEIR house's idle screen, /h/<slug>; owners and multi-house people on
+// /studio. Rooms are not destinations any more.
+export function landingFor(ctx: MyMembershipContext): string | null {
+  if (!ctx.signedIn || !ctx.memberships.length) return null;
+  if (ctx.primaryRoom === "studio") return "/studio";
+  const m = ctx.memberships[0];
+  const ent = ctx.entities.find((e) => e.id === m.entity_id);
+  if (ent?.slug) return `/h/${ent.slug}`;
+  return "/studio";
+}
 
 export const ROOM_LABEL: Record<Room, string> = {
   kitchen: "Kitchen",

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { authCookieOptions } from "@/lib/authCookies";
+import { retiredTarget } from "@/lib/routing/retired";
+import { ENTITY_TO_HOUSE_SLUG } from "@/lib/houses";
 
 // -----------------------------------------------------------------------------
 // Sitewide auth wall — 2026-08-30
@@ -197,6 +199,32 @@ export async function middleware(request: NextRequest) {
 
   return await withSupabaseSession(request, async (user, supabase) => {
     if (user) {
+      // Slim OS (2026-09-26, slice 1): retired addresses 308 to their
+      // survivor — never a 404. The table is lib/routing/retired.ts. A
+      // survivor under /h/<slug>/** takes the slug from the URL, else from
+      // the fs_entity cookie (pinned map first, then entities.slug), else
+      // lands on `/` which picks the house.
+      const retired = retiredTarget(pathname, null);
+      if (retired) {
+        let house: string | null = houseSlugFromPath(pathname);
+        if (!house && retired.needsHouse) {
+          const ent = request.cookies.get("fs_entity")?.value || null;
+          house = (ent && ENTITY_TO_HOUSE_SLUG[ent as keyof typeof ENTITY_TO_HOUSE_SLUG]) || null;
+          if (!house && ent && /^[0-9a-f-]{36}$/i.test(ent)) {
+            try {
+              const { data } = await supabase.from("entities").select("slug").eq("id", ent).eq("entity_type", "operating_venue").maybeSingle();
+              house = (data as { slug?: string | null } | null)?.slug || null;
+            } catch { house = null; }
+          }
+        }
+        const hit = retiredTarget(pathname, house)!;
+        const url = request.nextUrl.clone();
+        const [toPath, toQuery] = hit.to.split("?");
+        url.pathname = toPath;
+        url.search = toQuery ? "?" + toQuery : search || "";
+        return NextResponse.redirect(url, 308);
+      }
+
       // Authenticated → let it through, binding the house cookie on /h/<slug>.
       const slug = houseSlugFromPath(pathname);
       if (!slug || isPrefetch(request)) return null;
