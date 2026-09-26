@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   normTaxId, normDocNo, resolveEntityFromDoc, normaliseBands, bandTotals, checkLines,
-  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, vatCategoryCheck, resolveHoldedContact, holdedTaxKey, supplierCountry, ticketMatch, ticketStatus, facturaRequestDraft, type OwnEntity,
+  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, vatCategoryCheck, resolveHoldedContact, holdedTaxKey, supplierCountry, dateImplausible, ticketMatch, ticketStatus, facturaRequestDraft, type OwnEntity,
 } from "../lib/capture/pure";
 
 let fails = 0;
@@ -36,6 +36,14 @@ eq("BBH by CIF", resolveEntityFromDoc({ vat_id: "B13655717", name: null }, OWN).
 eq("BM by name only", resolveEntityFromDoc({ vat_id: null, name: "BISTRO MONDO IBIZA, S.L." }, OWN), { kind: "document", code: "BM", by: "name" });
 eq("old BM CIF B57481517 → triage", resolveEntityFromDoc({ vat_id: "B57481517", name: "Bistro Mondo Ibiza SL" }, OWN).kind, "unknown");
 eq("26-09 live: IFL name + CIF one digit short → IFL, flagged", resolveEntityFromDoc({ vat_id: "B5784593", name: "IBIZA FOOD LAB S.L" }, OWN), { kind: "document", code: "IFL", by: "name", cifMisread: "B5784593" });
+eq("26-09 Cash Loto: BISTRO MONDO SL + B13859594 → BM", resolveEntityFromDoc({ vat_id: "B13859594", name: "BISTRO MONDO SL" }, OWN).kind === "document", true);
+eq("26-09 Cash Loto: BISTRO MONDO SL + B13655534 (2 off) → BM", resolveEntityFromDoc({ vat_id: "B13655534", name: "BISTRO MONDO SL" }, OWN), { kind: "document", code: "BM", by: "name", cifMisread: "B13655534" });
+eq("26-09 BISTRO MUNDO SL → BM", resolveEntityFromDoc({ vat_id: "B13655694", name: "BISTRO MUNDO SL" }, OWN).kind, "document");
+eq("26-09 BISTRO MONAI + far CIF → triage, never rejected", resolveEntityFromDoc({ vat_id: "B13050244", name: "BISTRO MONAI SL" }, OWN).kind, "unknown");
+eq("26-09 station ticket, no customer → triage", resolveEntityFromDoc({ vat_id: null, name: "MARJOIL, S.A.U.", customer_details_present: false }, OWN).kind, "unknown");
+eq("PES MATT still rejected", resolveEntityFromDoc({ vat_id: "B56995855", name: "PES MATT IBIZA S.L", customer_details_present: true }, OWN).kind, "third_party");
+eq("date 2028 implausible", dateImplausible("2028-09-25", new Date("2026-09-26")), true);
+eq("date July 2025 fine", dateImplausible("2025-07-17", new Date("2026-09-26")), false);
 eq("third party rejected", resolveEntityFromDoc({ vat_id: "B12345674", name: "PES MATT IBIZA SL" }, OWN).kind, "third_party");
 eq("nothing readable → triage", resolveEntityFromDoc({ vat_id: null, name: null }, OWN).kind, "unknown");
 

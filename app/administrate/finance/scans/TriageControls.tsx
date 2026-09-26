@@ -20,7 +20,9 @@ export default function TriageControls({ table, id, entityGuessed, flags, issues
   const [note, setNote] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const ack = flags.filter((f) => ACKABLE[f]);
-  if (!entityGuessed && !ack.length && !(issues && issues.length)) return null;
+  const badDate = flags.includes("date_implausible");
+  const [date, setDate] = useState("");
+  if (!entityGuessed && !ack.length && !badDate && !(issues && issues.length)) return null;
 
   async function go(body: Record<string, unknown>) {
     setBusy(true); setErr(null);
@@ -46,6 +48,13 @@ export default function TriageControls({ table, id, entityGuessed, flags, issues
           {["BM", "IFL", "BBH"].map((e) => (
             <button key={e} disabled={busy} onClick={() => go({ action: "set_entity", entity: e })} className={btn + " text-ink"}>{e}</button>
           ))}
+        </div>
+      ) : null}
+      {badDate ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="font-serif text-[14px] text-ink">Date read looks wrong — date on the paper:</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-lg border border-line bg-transparent px-2 py-1 font-sans text-[13px] text-ink" />
+          <button disabled={busy || !date} onClick={() => go({ action: "set_date", date })} className={btn + " text-ink"}>Save date</button>
         </div>
       ) : null}
       {ack.map((f) => (

@@ -8,6 +8,7 @@ import PushToHolded from "./PushToHolded";
 import ScanUpload from "./ScanUpload";
 import TriageControls from "./TriageControls";
 import TicketChase from "./TicketChase";
+import RecheckAll from "./RecheckAll";
 import { supabaseJob } from "@/lib/supabaseJob";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +77,15 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
   const { data: newSup } = me?.user
     ? await supabaseJob().from("controller_suppliers").select("id,name,cif,created_at").like("notes", "created by capture funnel % — review").order("created_at", { ascending: false }).limit(50)
     : { data: [] };
+  // Funnel captures the rules rejected or parked — re-checkable in one go.
+  const [{ data: rInv }, { data: rAlb }] = await Promise.all([
+    supabase.from("invoice_inbox").select("id").eq("entity_id", ec).not("file_sha256", "is", null).is("holded_doc_id", null).in("match_status", ["rejected", "needs_triage"]).limit(200),
+    supabase.from("albarans").select("id").eq("entity_id", ec).not("file_sha256", "is", null).in("match_status", ["rejected", "needs_triage"]).limit(200),
+  ]);
+  const recheck = [
+    ...((rInv as any[]) || []).map((r) => ({ table: "invoice_inbox" as const, id: r.id as string })),
+    ...((rAlb as any[]) || []).map((r) => ({ table: "albarans" as const, id: r.id as string })),
+  ];
   const linksBy = new Map<string, any[]>();
   for (const l of (linkData as any[]) || []) { const a = linksBy.get(l.linked_invoice_id) || []; a.push(l); linksBy.set(l.linked_invoice_id, a); }
 
@@ -108,6 +118,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
       </div>
 
       <ScanUpload />
+      <RecheckAll items={recheck} />
 
       {(newSup as any[] || []).length ? (
         <div className="mt-4 rounded-xl border border-line p-4">

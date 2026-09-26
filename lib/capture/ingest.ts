@@ -19,7 +19,7 @@ import { matchForSupplier } from "@/lib/capture/match";
 import { linkTicketsForFactura, refreshTicketStatus, enrichSupplierFromDoc } from "@/lib/capture/tickets";
 import {
   resolveEntityFromDoc, normTaxId, normDocNo, normName, normaliseBands, bandTotals, checkLines, lineArithmeticOk,
-  docTypeFromWord, dedup, num, r2, vatCategoryCheck, supplierCountry, type Line, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
+  docTypeFromWord, dedup, num, r2, vatCategoryCheck, supplierCountry, namesOverlap, editDistance, dateImplausible, type Line, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
 } from "@/lib/capture/pure";
 
 // Entity slug → the text code the finance tables key on. The CIFs themselves
@@ -54,15 +54,21 @@ async function resolveSupplier(job: SupabaseClient, name: string | null, cifRaw:
   if (cif) {
     const hit = rows.find((r) => normTaxId(r.cif) === cif);
     if (hit) return { id: hit.id, flags };
+    // Same supplier, CIF misread by 1–2 characters (faded thermal paper: AIBSA's
+    // A46239976 came back as A46259976, A46254916, A46299176… on 26-09). Needs
+    // the name to agree too, so two real suppliers with close CIFs never merge.
+    const near = rows.find((r) => normTaxId(r.cif) && editDistance(cif, normTaxId(r.cif)!) <= 2 && namesOverlap(name, r.name));
+    if (near) return { id: near.id, flags: ["supplier_cif_misread"] };
   }
   const nm = normName(name);
   const byName = nm ? rows.find((r) => normName(r.name) === nm) : undefined;
   if (byName) {
-    if (!byName.cif && cif) {
+    if (!byName.cif && cif && !rows.some((r) => r.id !== byName.id && normTaxId(r.cif) && editDistance(cif, normTaxId(r.cif)!) <= 2)) {
       await job.from("controller_suppliers").update({ cif }).eq("id", byName.id).is("cif", null);
       return { id: byName.id, flags: ["supplier_cif_filled"] };
     }
     if (!cif || normTaxId(byName.cif) === cif) return { id: byName.id, flags };
+    if (editDistance(cif, normTaxId(byName.cif)!) <= 2) return { id: byName.id, flags: ["supplier_cif_misread"] };
     flags.push("supplier_cif_conflict");
   }
   const base = String(name || cif || "Unknown").trim().toUpperCase().slice(0, 80);
@@ -90,26 +96,30 @@ export async function ingestCapture(args: {
   filename?: string | null;
   sessionCode: EntityCode;       // only used when the paper can't tell us
   source?: "paper_photo" | "manual_upload";
+  // Re-file an already captured document with the current rules, from what was
+  // read the first time: no second read of the paper, no second upload.
+  reuse?: { extracted: Extracted; storagePath: string; sha: string; replace: { table: "invoice_inbox" | "albarans"; id: string } };
 }): Promise<IngestResult> {
   const { sb, buf, mediaType } = args;
   const job = supabaseJob();
-  const sha = createHash("sha256").update(Buffer.from(new Uint8Array(buf))).digest("hex");
+  const reuse = args.reuse;
+  const sha = reuse ? reuse.sha : createHash("sha256").update(Buffer.from(new Uint8Array(buf))).digest("hex");
 
   // 0) Same bytes already captured → return that row.
-  for (const table of ["invoice_inbox", "albarans"] as const) {
+  if (!reuse) for (const table of ["invoice_inbox", "albarans"] as const) {
     const { data } = await sb.from(table).select("id").eq("file_sha256", sha).limit(1).maybeSingle();
     if (data) return { ok: true, status: "already_captured", table, id: (data as any).id, reason: "same file bytes" };
   }
 
   // 1) Read the paper.
-  const ext = await extractDocument(buf, mediaType);
+  const ext: { ok: true; data: Extracted } | { ok: false; error: string } = reuse ? { ok: true, data: reuse.extracted } : await extractDocument(buf, mediaType);
   const x: Extracted = ext.ok ? ext.data : {};
   const extractionError = ext.ok ? null : ext.error;
   const flags: string[] = [];
   if (!ext.ok) flags.push("extraction_failed");
 
   // 2) Entity from the addressee.
-  const verdict = resolveEntityFromDoc({ vat_id: x.addressee_vat_id, name: x.addressee_name }, await ownEntities(job));
+  const verdict = resolveEntityFromDoc({ vat_id: x.addressee_vat_id, name: x.addressee_name, customer_details_present: x.customer_details_present }, await ownEntities(job));
   let entity: EntityCode = args.sessionCode;
   let entitySource = "session_guess";
   let status: "filed" | "needs_triage" | "rejected" = "filed";
@@ -157,6 +167,7 @@ export async function ingestCapture(args: {
   if (pl && Number(pl[2]) > Math.max(1, Number(x.pages_seen || 1))) flags.push("multipage_incomplete");
   const vatIssues = vatCategoryCheck({ supplier_name: x.supplier_name, lines: lc.keep, bands });
   if (vatIssues.length) flags.push("vat_rate_category_mismatch");
+  if (dateImplausible(iso(x.document_date))) { flags.push("date_implausible"); if (status === "filed") status = "needs_triage"; }
   if (!normTaxId(x.supplier_vat_id)) flags.push("no_supplier_cif");
   if (!normDocNo(x.doc_number)) flags.push("no_doc_number");
 
@@ -170,22 +181,26 @@ export async function ingestCapture(args: {
 
   // 5) Storage (under the entity the PAPER names).
   const ts = Date.now();
-  const storagePath = `${entity}/${docType}/${ts}-${sha.slice(0, 8)}.${EXT[mediaType] || "bin"}`;
+  const storagePath = reuse ? reuse.storagePath : `${entity}/${docType}/${ts}-${sha.slice(0, 8)}.${EXT[mediaType] || "bin"}`;
 
   // 6) Dedup on (supplier CIF + doc no + total).
   if (supplierCif && normDocNo(x.doc_number) && status !== "rejected") {
     const { data: priorRows } = await sb.from(table)
       .select(`id, supplier_vat_id, ${docNoCol}, ${totalCol}, conflict_values, flags`)
       .eq("supplier_vat_id", supplierCif).limit(500);
-    const prior: PriorDoc[] = (priorRows || []).map((r: any) => ({
+    const prior: PriorDoc[] = (priorRows || []).filter((r: any) => !(reuse && r.id === reuse.replace.id)).map((r: any) => ({
       id: r.id, supplier_cif: r.supplier_vat_id, doc_no: r[docNoCol], total: num(r[totalCol]),
       alt_totals: (Array.isArray(r.conflict_values) ? r.conflict_values : []).map((c: any) => num(c?.total)).filter((t: any) => t !== null),
     }));
     const dv = dedup({ supplier_cif: supplierCif, doc_no: x.doc_number || null, total }, prior);
-    if (dv.kind === "duplicate") return { ok: true, status: "duplicate", table, id: dv.of, reason: "same supplier CIF + doc number + total" };
+    if (dv.kind === "duplicate") {
+      if (reuse) await dropRow(sb, reuse.replace.table, reuse.replace.id);
+      return { ok: true, status: "duplicate", table, id: dv.of, reason: "same supplier CIF + doc number + total" };
+    }
     if (dv.kind === "conflict") {
       // Keep the evidence: store this copy's file and values on the ONE record.
-      await sb.storage.from("captures").upload(storagePath, buf, { contentType: mediaType, upsert: false });
+      if (!reuse) await sb.storage.from("captures").upload(storagePath, buf, { contentType: mediaType, upsert: false });
+      if (reuse) await dropRow(sb, reuse.replace.table, reuse.replace.id);
       const row: any = (priorRows || []).find((r: any) => r.id === dv.of);
       const cv = Array.isArray(row?.conflict_values) ? row.conflict_values : [];
       cv.push({ total, base: hdrBase, vat: hdrVat, storage_path: storagePath, file_sha256: sha, handwritten_changes: !!x.handwritten_changes, captured_at: new Date().toISOString() });
@@ -195,8 +210,12 @@ export async function ingestCapture(args: {
     }
   }
 
-  const up = await sb.storage.from("captures").upload(storagePath, buf, { contentType: mediaType, upsert: false });
-  if (up.error) return { ok: false, status: 500, error: "storage: " + up.error.message };
+  if (!reuse) {
+    const up = await sb.storage.from("captures").upload(storagePath, buf, { contentType: mediaType, upsert: false });
+    if (up.error) return { ok: false, status: 500, error: "storage: " + up.error.message };
+  } else {
+    await dropRow(sb, reuse.replace.table, reuse.replace.id);
+  }
   const signed = await sb.storage.from("captures").createSignedUrl(storagePath, 60 * 60 * 24 * 30);
   const docUrl = signed.data?.signedUrl || null;
 
@@ -340,4 +359,14 @@ export async function writeLines(sb: SupabaseClient, a: {
     try { await recomputeAfterIngest(sb, a.entity, a.lines.map((l) => s(l.product_name))); } catch { /* best-effort */ }
   }
   return rows.length;
+}
+
+// Remove a captured row and what hangs off it, so it can be re-filed.
+async function dropRow(sb: SupabaseClient, table: "invoice_inbox" | "albarans", id: string) {
+  await sb.from("purchase_lines").delete().eq(table === "albarans" ? "albaran_id" : "invoice_inbox_id", id);
+  if (table === "invoice_inbox") {
+    await sb.from("albarans").update({ linked_invoice_id: null, link_method: null, match_status: "unmatched" }).eq("linked_invoice_id", id);
+    await sb.from("invoice_inbox").update({ linked_factura_id: null, factura_status: "unchecked" }).eq("linked_factura_id", id);
+  }
+  await sb.from(table).delete().eq("id", id);
 }

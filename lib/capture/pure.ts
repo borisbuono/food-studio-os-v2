@@ -45,8 +45,31 @@ export type EntityVerdict =
   | { kind: "third_party"; addressee: string }     // addressed to someone else → reject
   | { kind: "unknown"; reason: string };            // guess from session, flag needs_triage
 
+const GENERIC = new Set(["SL", "SA", "SLU", "IBIZA", "EIVISSA", "DEPT", "DEPARTAMENTO", "DE", "DEL", "LA", "EL"]);
+const sigTokens = (v: string | null | undefined) => normName(v).split(" ").filter((t) => t.length >= 3 && !GENERIC.has(t));
+const tokenClose = (a: string, b: string) => a === b || (Math.min(a.length, b.length) >= 5 && editDistance(a, b) <= 1);
+
+// How well a printed customer name fits one of ours:
+//   "full"    every significant printed token is one of the entity's ("BISTRO MONDO SL", "BISTRO MUNDO SL")
+//   "partial" at least one long token matches ("BISTRO MONAI SL")
+function nameFit(printed: string | null | undefined, legal: string | null | undefined): "full" | "partial" | null {
+  const p = sigTokens(printed), l = sigTokens(legal);
+  if (!p.length || !l.length) return null;
+  const hits = p.filter((t) => l.some((u) => tokenClose(t, u)));
+  if (hits.length === p.length && hits.length >= Math.min(2, l.length)) return "full";
+  if (hits.some((t) => t.length >= 5)) return "partial";
+  return null;
+}
+
+// Two supplier names that share a long significant token ("ALIMENTACION IBIZA
+// AIBSA" ~ "CASH LOTO IBIZA ALIMENTACION…", "CAN ESCARRER" ~ "CAN ESCARRER SLU").
+export function namesOverlap(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = sigTokens(a), y = sigTokens(b);
+  return x.some((t) => t.length >= 5 && y.some((u) => tokenClose(t, u)));
+}
+
 export function resolveEntityFromDoc(
-  addressee: { vat_id?: string | null; name?: string | null },
+  addressee: { vat_id?: string | null; name?: string | null; customer_details_present?: boolean | null },
   own: OwnEntity[],
 ): EntityVerdict {
   const cif = normTaxId(addressee.vat_id);
@@ -54,23 +77,28 @@ export function resolveEntityFromDoc(
     const hit = own.find((e) => normTaxId(e.tax_id) === cif);
     if (hit) return { kind: "document", code: hit.code, by: "cif" };
   }
-  const nm = normName(addressee.name);
-  if (nm) {
-    const hit = own.find((e) => e.legal_name && nm.includes(normName(e.legal_name)));
-    if (hit) {
-      // Name matched but the printed CIF is a different one (e.g. B57481517 on
-      // old BM paper) — never trust the name over a contradicting CIF.
-      if (cif && normTaxId(hit.tax_id) && normTaxId(hit.tax_id) !== cif) {
-        // One character off our own CIF under our own name = our misread
-        // (real case 26-09: Pardalet albarán to IBIZA FOOD LAB read as B5784593).
-        // Anything further away stays a question (B57481517 on old BM paper).
-        if (editDistance(cif, normTaxId(hit.tax_id)!) <= 1) return { kind: "document", code: hit.code, by: "name", cifMisread: cif };
-        return { kind: "unknown", reason: `name ${hit.code} but CIF ${cif} matches no entity` };
-      }
-      return { kind: "document", code: hit.code, by: "name" };
-    }
+  const dist = (e: OwnEntity) => (cif && normTaxId(e.tax_id) ? editDistance(cif, normTaxId(e.tax_id)!) : 99);
+  const fits = own.map((e) => ({ e, fit: nameFit(addressee.name, e.legal_name), d: dist(e) }));
+  const full = fits.filter((f) => f.fit === "full");
+  if (full.length === 1) {
+    const f = full[0];
+    if (!cif) return { kind: "document", code: f.e.code, by: "name" };
+    // Our name + a CIF one or two characters off ours = our misread. Faded
+    // thermal Cash&Carry receipts read BM's B13659594 as B13859594, B13655534,
+    // B13696594… (26-09 batch). Further off stays a question (B57481517).
+    if (f.d <= 2) return { kind: "document", code: f.e.code, by: "name", cifMisread: cif };
+    return { kind: "unknown", reason: `name ${f.e.code} but CIF ${cif} matches no entity` };
   }
+  // Not ours for sure, but close enough that a human decides — never auto-reject:
+  // a CIF 1–2 characters from ours, a partial name ("BISTRO MONAI"), or a
+  // document that carries no customer details at all (a till ticket).
+  const nearCif = fits.find((f) => f.d <= 2);
+  if (nearCif) return { kind: "unknown", reason: `CIF ${cif} is close to ${nearCif.e.code}'s` };
+  const partial = fits.find((f) => f.fit === "partial" || f.fit === "full");
+  if (partial) return { kind: "unknown", reason: `name looks like ${partial.e.code}` };
+  if (addressee.customer_details_present === false) return { kind: "unknown", reason: "no customer details on the document" };
   if (cif) return { kind: "third_party", addressee: `${addressee.name || "?"} (${cif})` };
+  const nm = normName(addressee.name);
   if (nm && nm.length > 3) return { kind: "third_party", addressee: String(addressee.name) };
   return { kind: "unknown", reason: "no addressee readable" };
 }
@@ -373,8 +401,18 @@ export function matchAlbaranes(
 export const BLOCKING_FLAGS = [
   "entity_guessed", "third_party_addressee", "conflicting_copies", "duplicate",
   "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "vat_rate_category_mismatch",
-  "tax_regime_needs_accountant", "no_customer_details",
+  "tax_regime_needs_accountant", "no_customer_details", "date_implausible",
 ] as const;
+
+// A document date in the future or older than 18 months is a misread until a
+// human says otherwise (26-09 batch: 2028, 2029, 2020, 2006 on 2026 paper).
+export function dateImplausible(iso: string | null | undefined, today = new Date()): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso + "T00:00:00Z");
+  if (!Number.isFinite(t)) return true;
+  const now = today.getTime();
+  return t > now + 7 * 86400000 || t < now - 548 * 86400000;
+}
 export function pushBlockers(row: { doc_type: string | null; flags: string[] | null; holded_doc_id: string | null; match_status: string | null; vat_bands: VatBand[] | null }): string[] {
   const out: string[] = [];
   if (row.holded_doc_id) out.push("already_in_holded");

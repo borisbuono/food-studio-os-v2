@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 //   { table, id, action: "set_entity", entity }       guessed entity → confirmed; lines written, matcher run
 //   { table, id, action: "ack_flag", flag, note }     printed value checked and correct (note required)
 //   { table, id, action: "ack_supplier" }             new supplier looked at once
+//   { table, id, action: "set_date", date }             the date as printed, when the reading was implausible
 //   { table, id, action: "reject", note }
 // Every action is logged on the row (triage_log) with who and when.
 
@@ -92,6 +93,18 @@ export async function POST(req: NextRequest) {
         }
       }
       return NextResponse.json({ ok: true, flags: rest, lines });
+    }
+
+    if (action === "set_date") {
+      const d = String(b?.date || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return NextResponse.json({ ok: false, error: "date must be YYYY-MM-DD" }, { status: 400 });
+      const rest = flags.filter((f) => f !== "date_implausible");
+      const patch: Record<string, unknown> = { document_date: d, flags: rest, triage_log: stamp({ from: row.document_date, to: d, note }) };
+      if (row.match_status === "needs_triage" && !rest.some((f) => ["entity_guessed", "low_confidence"].includes(f))) patch.match_status = "unmatched";
+      const { error } = await sb.from(table).update(patch).eq("id", id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      await sb.from("purchase_lines").update({ doc_date: d }).eq(table === "albarans" ? "albaran_id" : "invoice_inbox_id", id);
+      return NextResponse.json({ ok: true, date: d });
     }
 
     if (action === "ack_supplier") {
