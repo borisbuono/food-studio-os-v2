@@ -6,8 +6,9 @@
 // reserve = the Chef control + its chips + this dock's grip; the six-verb
 // row sits in the same band when open. Nothing else is fixed down there.
 //
-//   idle (/h/<slug>)        grip only   → reserve 120 px (+ safe area)
-//   grip swiped / verb open six words   → reserve 164 px  (body[data-dock=open])
+//   idle (/h/<slug>)        grip only   → reserve 136 px (+ safe area)
+//   grip swiped / verb open six words   → reserve 180 px  (body[data-dock=open])
+// The grip sits at 112 px, clear of the control's padded 112 px hit area.
 //   a verb word tapped twice → its leaves (≤ 5 recent-first, rest under more)
 //                              as a sheet above the row
 //
@@ -72,7 +73,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
     <div
       data-dock
       className="pointer-events-none absolute inset-x-0 flex flex-col items-stretch"
-      style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
+      style={{ bottom: "calc(112px + env(safe-area-inset-bottom, 0px))" }}
     >
       {leavesVerb && leaves.length ? (
         <div className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-line bg-paper px-2 py-2 shadow-lg" role="menu" aria-label={leavesVerb.label}>
