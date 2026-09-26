@@ -97,7 +97,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
       ) : null}
 
       {open ? (
-        <nav aria-label="Verbs" className="pointer-events-auto mx-1 flex h-11 items-stretch justify-between px-1">
+        <nav aria-label="Verbs" className="pointer-events-auto flex h-11 items-stretch justify-between border-t border-line bg-paper/95 px-2 backdrop-blur">
           {verbs.map((v) => {
             const href = resolveHouseHref(v.href, houseSlug);
             if (!href) return null;
@@ -134,7 +134,7 @@ export default function Dock({ pathname, houseSlug, studioScope, enabled }: Prop
         onClick={() => { setManual(!open); if (open) setLeavesFor(null); }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className="pointer-events-auto mx-auto flex h-6 w-24 items-center justify-center"
+        className={"pointer-events-auto flex h-6 w-full items-center justify-center " + (open ? "bg-paper/95 backdrop-blur" : "")}
         data-dock-grip
       >
         <span className="block h-1 w-9 rounded-full bg-ink/40" />
