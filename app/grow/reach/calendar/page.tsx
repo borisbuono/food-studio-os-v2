@@ -115,7 +115,7 @@ const STATUS_PILL: Record<Status, { bg: string; fg: string; border: string; labe
   failed:      { bg: "bg-tomato/10",  fg: "text-tomato", border: "border-tomato/40",  label: "failed" },
 };
 
-export default function CalendarPage() {
+export default function CalendarPage(props?: { house?: string; embedded?: boolean }) {
   const [entity, setEntity] = useState<EntityKey>(E_BM);
   const [weekStart, setWeekStart] = useState<Date>(() => startOfMadridWeek(new Date()));
   const [posts, setPosts] = useState<Post[]>([]);
@@ -134,7 +134,7 @@ export default function CalendarPage() {
   // here with the house in scope, so the calendar opens on THAT venue instead
   // of whatever fs_entity last pointed at. Falls back to the cookie mirror.
   const searchParams = useSearchParams();
-  const houseParam = searchParams?.get("house")?.toLowerCase() || null;
+  const houseParam = (props?.house || searchParams?.get("house"))?.toLowerCase() || null;
   useEffect(() => {
     const fromHouse = houseParam ? HOUSE_SLUG_TO_ENTITY[houseParam] : undefined;
     if (fromHouse) { setEntity(fromHouse); return; }
@@ -257,7 +257,7 @@ export default function CalendarPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12" style={{ ["--accent" as any]: accent }}>
-      <Link href="/grow/reach" className="font-sans text-sm text-ink-soft">← Reach</Link>
+      {props?.embedded ? null : <Link href="/grow/reach" className="font-sans text-sm text-ink-soft">← Reach</Link>}
       <div className="mt-6 flex items-baseline justify-between gap-6">
         <div>
           <p className="font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Comms · calendar</p>

@@ -67,7 +67,7 @@ export default function TodayAgenda({ tz, todayYmd, events, todos, entityNames }
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Today</p>
           <h1 className="font-serif text-3xl">{dateLabel}</h1>
         </div>
-        <Link href="/me/calendar" className="rounded border border-black/15 px-2 py-1 text-xs">Week →</Link>
+        <Link href="/me/today?tab=calendar" className="rounded border border-black/15 px-2 py-1 text-xs">Week →</Link>
       </div>
 
       {allDay.length ? (

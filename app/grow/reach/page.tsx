@@ -2,7 +2,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { listCampaigns as wixListCampaigns, listAudiences as wixListAudiences } from "@/lib/integrations/marketing/wix-newsletter";
 import { getAccountState as metaGetAccountState, listCampaigns as metaListCampaigns } from "@/lib/integrations/marketing/meta-ads";
-import ConnectIntegration from "@/app/administrate/finance/setup/[entity]/ConnectIntegration";
+import ConnectIntegration from "@/app/administrate/finance/setup/_entity/ConnectIntegration";
 import type { EntityCode } from "@/lib/integrations/types";
 import type { WixCampaignSummary, WixAudienceSummary } from "@/lib/integrations/marketing/wix-newsletter";
 import type { MetaAccountState, MetaCampaignRow } from "@/lib/integrations/marketing/meta-ads";

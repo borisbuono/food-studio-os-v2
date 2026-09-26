@@ -17,7 +17,7 @@
 // localStorage and the Chef router, and renaming them buys nothing the chef
 // can see. `label` below is the EN word; renderers call verbLabel()
 // (lib/nav/labels.ts) so the rail, dock and ⌘K follow the fs_lang cookie.
-//   /me    = Today · Calendar · Learn · Account
+//   /me    = Today (+ My week) · Learn · Account
 // Only the ORDER of a verb's leaves is personal — recent-first from
 // localStorage (lib/nav/recent.ts); at most LEAVES_VISIBLE show before "more".
 //
@@ -50,13 +50,13 @@ const H = "/h/{house}";
 // ---------------------------------------------------------------- House
 export const HOUSE_VERBS: NavVerb[] = [
   {
+    // Slice 4 (2026-09-26): Service = bookings · pass · prep · floor · guests
+    // · events (moved from Close) · calendar · wall screen. Reviews moved to Comms.
     key: "serve", label: "Service", href: "/execute/bookings", hint: "who is coming, what is on the pass",
     gate: { room: "dining" },
     leaves: [
-      { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/prep/templates`, label: "Prep templates", hint: "prep template weekly", gate: { room: "kitchen" } },
-      { href: "/execute/pass/metrics",      label: "Pass metrics",   hint: "what left the kitchen", gate: { room: "kitchen" } },
+      { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep metrics", gate: { room: "kitchen" } },
+      { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today templates", gate: { room: "kitchen" } },
       { href: "/execute/floor",             label: "Floor",          hint: "floor plan tables", gate: { room: "dining", feature: "foh" } },
       { href: "/grow/relationships",        label: "Guests",         hint: "crm guests relationships", gate: { room: "dining", feature: "foh" } },
       { href: "/administrate/events",       label: "Events",         hint: "private dining catering", gate: { room: "office" } },
@@ -66,73 +66,75 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "cook", label: "Menu", href: `${H}/kitchen/recipes`, hint: "the recipes and the menu",
+    // Slice 2 (2026-09-26): one recipe list, one recipe page (edit + costing
+    // as tabs), one costing screen. Wine / bar / lexicon are leaves.
+    key: "cook", label: "Menu", href: `${H}/menu/recipes`, hint: "the recipes and the menu",
     gate: { room: "kitchen" },
     leaves: [
+      { href: `${H}/menu/costing`,          label: "Costing",        hint: "menu engineering repricing price margin", gate: { room: "office" } },
       { href: "/develop/recipes/import",    label: "Import recipe",  hint: "paste url import", gate: { room: "kitchen" } },
-      { href: "/develop/menu/publish",      label: "Publish menu",   hint: "publish guest menu", gate: { room: "kitchen" } },
-      { href: "/develop/menu/engineering",  label: "Menu engineering", hint: "stars dogs matrix", gate: { room: "office" } },
-      { href: "/develop/repricing",         label: "Repricing",      hint: "reprice target margin", gate: { room: "office" } },
-      { href: "/develop/wine",              label: "Wine",           hint: "wine list bottles", gate: { room: "kitchen" } },
-      { href: "/develop/wine/prices",       label: "Wine prices",    hint: "update wine costs", gate: { room: "office" } },
+      { href: "/develop/menu/publish",      label: "Publish menu",   hint: "publish guest menu 86", gate: { room: "kitchen" } },
+      { href: "/develop/wine",              label: "Wine",           hint: "wine list bottles prices", gate: { room: "kitchen" } },
       { href: "/develop/bar",               label: "Bar",            hint: "cocktails bar list", gate: { room: "kitchen" } },
       { href: "/develop/lexicon",           label: "Lexicon",        hint: "culinary lexicon taxonomy", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/ingredients`,   label: "Ingredients",    hint: "ingredient aliases", gate: { room: "kitchen" } },
+      { href: `${H}/menu/ingredients`,      label: "Ingredients",    hint: "ingredient aliases", gate: { room: "kitchen" } },
     ],
   },
   {
+    // Slice 3 (2026-09-26): Supplies = orders · receiving (tab) · scans (link
+    // to the capture funnel's screen) · inventory · suppliers · HACCP temps.
     key: "buy", label: "Supplies", href: "/execute/orders", hint: "what came in, what to order",
     gate: { room: "kitchen" },
     leaves: [
-      { href: "/execute/receiving",         label: "Receiving",      hint: "log a delivery", gate: { room: "kitchen" } },
-      { href: "/capture",                   label: "Capture",        hint: "photograph a document", gate: { room: "kitchen" } },
-      { href: "/administrate/suppliers",    label: "Suppliers",      hint: "vendors", gate: { room: "office" } },
+      { href: "/execute/orders?tab=receiving", label: "Receiving",    hint: "log a delivery", gate: { room: "kitchen" } },
+      { href: "/administrate/finance/scans", label: "Scans",          hint: "invoices albaranes holded scan inbox paper", gate: { room: "office" } },
       { href: "/execute/inventory",         label: "Inventory",      hint: "stock count", gate: { room: "kitchen" } },
+      { href: "/administrate/suppliers",    label: "Suppliers",      hint: "vendors", gate: { room: "office" } },
       { href: "/execute/temp",              label: "Temps",          hint: "haccp temperature log", gate: { room: "kitchen" } },
-      { href: "/administrate/finance/scans", label: "Scan queue",    hint: "holded scan inbox paper", gate: { room: "office" } },
-      { href: "/files/inbox",               label: "Files inbox",    hint: "triage documents" },
-      { href: "/administrate/invoices",     label: "Missing invoices", hint: "supplier docs stuck", gate: { room: "office" } },
+      { href: "/capture",                   label: "Capture",        hint: "photograph a document", gate: { room: "kitchen" } },
     ],
   },
   {
-    key: "close", label: "Money", href: `${H}/office/eod`, hint: "the till and the money",
+    // Slice 3 (2026-09-26): ONE Money landing per house — close, reports,
+    // finance, costs, variance, forecast, integrations, paper as tabs.
+    key: "close", label: "Money", href: `${H}/money`, hint: "the till and the money",
     gate: { room: "office" },
     leaves: [
-      { href: "/administrate/finance",      label: "Finance",        hint: "money dashboard", gate: { room: "office" } },
-      { href: "/administrate/finance/eod",  label: "EOD reports",    hint: "end of day close cash", gate: { room: "office" } },
-      { href: "/administrate/finance/reconciliation", label: "Reconciliation", hint: "bank match unmatched", gate: { room: "office" } },
+      { href: `${H}/money?tab=reports`,     label: "EOD reports",    hint: "end of day close cash", gate: { room: "office" } },
+      { href: `${H}/money?tab=finance`,     label: "Finance",        hint: "money dashboard how the house is doing", gate: { room: "office" } },
+      { href: "/administrate/finance/reconciliation", label: "Reconciliation", hint: "bank match unmatched patterns", gate: { room: "office" } },
       { href: "/administrate/finance/anomalies", label: "Anomalies", hint: "finance triage", gate: { room: "office" } },
-      { href: "/administrate/finance/costs", label: "Costs",         hint: "costs over time", gate: { room: "office" } },
-      { href: "/administrate/finance/variance", label: "Variance",   hint: "where stock went", gate: { room: "office" } },
-      { href: "/administrate/finance/forecast", label: "Forecast",   hint: "forecast", gate: { room: "office" } },
-      { href: "/administrate/finance/payments", label: "Payments",   hint: "are we being charged", gate: { room: "office" } },
-      { href: "/administrate/finance/pos-sync", label: "POS sync",   hint: "fresto pos sync status", gate: { room: "office" } },
-      { href: "/administrate/finance/integrations", label: "Integrations", hint: "substrate integrations", gate: { room: "office" } },
+      { href: `${H}/money?tab=costs`,       label: "Costs",          hint: "costs variance forecast over time", gate: { room: "office" } },
+      { href: `${H}/money?tab=integrations`, label: "Integrations",  hint: "payments pos sync fresto substrate", gate: { room: "office" } },
+      { href: `${H}/money?tab=paper`,       label: "Paper",          hint: "documents files inbox missing invoices", gate: { room: "office" } },
       { href: "/administrate/finance/setup", label: "Finance setup", hint: "onboard entities holded", gate: { room: "office" } },
     ],
   },
   {
-    key: "people", label: "Team", href: "/administrate/team", hint: "who is here, who is coming",
+    // Slice 4 (2026-09-26): ONE Team landing per house — team, rota, labour,
+    // invite as tabs. Hiring = the Sep-21 SOP layer (first-shift / first-week
+    // are steps on the person page). Academy has one door.
+    key: "people", label: "Team", href: `${H}/team`, hint: "who is here, who is coming",
     gate: { room: "office" },
     leaves: [
-      { href: "/administrate/team/schedule", label: "Rota",          hint: "shifts schedule", gate: { room: "office" } },
-      { href: `${H}/office/labor`,          label: "Labour",         hint: "clock log labour cost", gate: { room: "office" } },
-      { href: `${H}/clock`,                 label: "Clock station",  hint: "clock in out punch" },
+      { href: `${H}/team?tab=rota`,         label: "Rota",           hint: "shifts schedule labour", gate: { room: "office" } },
       { href: `${H}/office/hiring`,         label: "Hiring",         hint: "hr funnel candidates openings", gate: { room: "office", feature: "hiring" } },
+      { href: `${H}/clock`,                 label: "Clock station",  hint: "clock in out punch" },
       { href: "/academy",                   label: "Academy",        hint: "lessons training", gate: { feature: "academy" } },
-      { href: "/administrate/team/invite",  label: "Invite",         hint: "invite whatsapp teammate", gate: { room: "office" } },
+      { href: `${H}/team?tab=invite`,       label: "Invite",         hint: "invite whatsapp teammate", gate: { room: "office" } },
     ],
   },
   {
-    key: "reach", label: "Comms", href: `${H}/office/inbox`, hint: "what we say, what they say back",
+    // Slice 4 (2026-09-26): ONE Comms screen — Inbox (comments, DMs) ·
+    // Reviews (moved in from Serve) · Calendar · Saved replies as tabs.
+    key: "reach", label: "Comms", href: `${H}/comms`, hint: "what we say, what they say back",
     gate: { room: "office" },
     leaves: [
-      { href: "/grow/reach/calendar?house={house}", label: "Posting calendar", hint: "content calendar social posts", gate: { room: "office" } },
-      { href: "/grow/reputation",           label: "Reviews",        hint: "ratings reviews reputation", gate: { room: "dining", feature: "foh" } },
+      { href: `${H}/comms?tab=reviews`,     label: "Reviews",        hint: "ratings reviews reputation", gate: { room: "office" } },
+      { href: `${H}/comms?tab=calendar`,    label: "Posting calendar", hint: "content calendar social posts", gate: { room: "office" } },
       { href: "/grow/reach?house={house}",  label: "Accounts",       hint: "meta wix ads channels", gate: { room: "office" } },
       { href: "/grow/reach/ads",            label: "Ads",            hint: "meta ads", gate: { room: "office" } },
       { href: "/grow/commercials",          label: "Commercials",    hint: "offers deals", gate: { room: "office" } },
-      { href: `${H}/office/inbox/saved`,    label: "Saved replies",  hint: "canned replies", gate: { room: "office" } },
       { href: "/grow/reputation/settings",  label: "Review platforms", hint: "connect google tripadvisor", gate: { room: "office" } },
     ],
   },
@@ -151,14 +153,13 @@ export const STUDIO_VERBS: NavVerb[] = [
     key: "money", label: "Money", href: "/studio/money", hint: "portfolio money", gate: { room: "studio" },
     leaves: [
       { href: "/studio/money/menu-margin",  label: "Menu margin",    hint: "margin across houses", gate: { room: "studio" } },
-      { href: "/administrate/finance",      label: "Consolidated finance", hint: "group finance", gate: { room: "studio" } },
       { href: "/administrate/finance/setup", label: "Finance setup", hint: "onboard entities", gate: { room: "studio" } },
     ],
   },
   {
     key: "people", label: "Team", href: "/studio/people", hint: "people across houses", gate: { room: "studio" },
     leaves: [
-      { href: "/administrate/team/invite",  label: "Invite",         hint: "invite teammate", gate: { room: "studio" } },
+      { href: "/h/{house}/team?tab=invite", label: "Invite",         hint: "invite teammate", gate: { room: "studio" } },
     ],
   },
   {
@@ -187,8 +188,9 @@ export const STUDIO_VERBS: NavVerb[] = [
 
 // ---------------------------------------------------------------- /me
 export const ME_VERBS: NavVerb[] = [
-  { key: "today",    label: "Today",    href: "/me/today",    hint: "my todos and calendar rows", leaves: [] },
-  { key: "calendar", label: "Calendar", href: "/me/calendar", hint: "my calendar google", leaves: [] },
+  // Slice 4 (2026-09-26, audit #19): /me/calendar folded into Today as a tab.
+  { key: "today",    label: "Today",    href: "/me/today",    hint: "my todos and calendar rows",
+    leaves: [{ href: "/me/today?tab=calendar", label: "My week", hint: "my calendar google" }] },
   { key: "learn",    label: "Learn",    href: "/academy",     hint: "lessons training", gate: { feature: "academy" }, leaves: [] },
   {
     key: "account", label: "Account", href: "/account", hint: "profile me",

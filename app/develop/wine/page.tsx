@@ -1,4 +1,6 @@
 import Link from "next/link";
+import TabNav, { pickTab } from "@/components/nav/TabNav";
+import WinePrices from "@/components/merged/menu/WinePrices";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId } from "@/lib/serverVenue";
 import { noEmoji } from "@/lib/text";
@@ -7,22 +9,25 @@ export const dynamic = "force-dynamic";
 const ORDER = ["sparkling", "petnat", "white", "orange", "amber", "rose", "red", "to_classify"];
 const LABEL: Record<string, string> = { sparkling: "Sparkling", petnat: "Pét-Nat", white: "White", orange: "Orange", amber: "Amber", rose: "Rosé", red: "Red", to_classify: "To classify" };
 
-export default async function Wine() {
-  
+const TABS = [{ key: "list", label: "Wine list" }, { key: "prices", label: "Update prices" }];
+
+// /develop/wine — the cellar. Slim OS slice 2: /develop/wine/prices folded in
+// as the "Update prices" tab (route retired → ?tab=prices).
+export default async function Wine({ searchParams }: { searchParams?: { tab?: string } }) {
+  const tab = pickTab(TABS, searchParams?.tab);
   const supabase = supabaseServer();const wines = (await supabase.from("menu_items").select("id,name,price,glass_price,bottle_price,wine_style,producer,region,vintage,is_eighty_six").eq("is_active", true).eq("section", "wine").eq("restaurant_id", serverRestaurantId())).data || [];
   const styled = (s: string) => wines.filter((w: any) => (w.wine_style || "to_classify") === s);
   const priced = (w: any) => [w.glass_price ? "€" + w.glass_price + " glass" : null, (w.bottle_price || w.price) ? "€" + (w.bottle_price || w.price) + " bottle" : null].filter(Boolean).join(" · ");
 
   return (
     <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-tomato">Cellar · the wine list</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">{wines.length} wines</h1>
-      <div className="mt-3 flex gap-4 font-mono text-[11px] uppercase tracking-wide text-tomato">
-        <span className="text-clay">+ Scan · hold Chef</span>
-        <Link href="/develop/wine/train">Train the list</Link>
-        <Link href="/develop/wine/prices">Update prices</Link>
-        <Link href="/administrate/finance/costs">Cost trends</Link>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Menu · Wine</p>
+      <h1 className="mt-1 font-serif text-3xl text-ink">{wines.length} wines</h1>
+      <TabNav base="/develop/wine" tabs={TABS} active={tab} className="mt-5" />
+      {tab === "prices" ? <div className="[&>main]:px-0"><WinePrices /></div> : (<>
+      <div className="mt-3 flex gap-4 font-mono text-[11px] uppercase tracking-wide text-clay">
+        <span>+ Scan · hold Chef</span>
+        <Link href="/develop/wine/train" className="text-ink">Train the list</Link>
       </div>
 
       {ORDER.filter((s) => styled(s).length).map((s) => (
@@ -44,6 +49,7 @@ export default async function Wine() {
         </section>
       ))}
       <p className="mt-8 font-mono text-[10px] uppercase tracking-wide text-clay">Coming: scan the bottle label on receiving (Vivino-style) → auto-fill producer / region / vintage / tasting + catch vintage changes · by-the-glass & Coravin freshness · sommelier training</p>
+      </>)}
     </main>
   );
 }

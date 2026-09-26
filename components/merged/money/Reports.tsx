@@ -1,0 +1,42 @@
+import { supabaseServer } from "@/lib/supabaseServer";
+import { serverRestaurantId, serverEntity } from "@/lib/serverVenue";
+import { ENTITY_LABEL } from "@/lib/entities";
+
+export const dynamic = "force-dynamic";
+const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
+
+export default async function EodList() {
+  const supabase = supabaseServer();
+  const rid = serverRestaurantId();
+  const entity = serverEntity();
+  const venues = (await supabase.from("restaurants").select("id,name")).data || [];
+  const vname = new Map(venues.map((v: any) => [v.id, v.name]));
+  const eod = (await supabase
+    .from("eod_accounting")
+    .select("restaurant_id,report_date,actual_covers,revenue,revenue_food,revenue_wine,revenue_bar,eighty_six_notes,wastage_notes")
+    .eq("restaurant_id", rid)
+    .order("report_date", { ascending: false })
+    .limit(60)).data || [];
+
+  return (
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
+      <p className="font-sans text-xs font-medium text-ink-soft">End-of-day reports · {ENTITY_LABEL[entity]}</p>
+      <h2 className="mt-2 font-serif text-2xl text-ink">{eod.length} reports</h2>
+
+      <div className="mt-6 space-y-4">
+        {eod.map((r: any, i: number) => (
+          <div key={i} className="rounded-2xl border border-black/10 bg-card p-5">
+            <div className="flex items-baseline justify-between">
+              <span className="font-serif text-[18px] text-ink">{vname.get(r.restaurant_id) || "Venue"}</span>
+              <span className="font-mono text-[11px] text-clay">{r.report_date}</span>
+            </div>
+            <p className="mt-1 font-sans text-[14px] text-ink-soft">{eur(Number(r.revenue || 0))} · {Number(r.actual_covers || 0).toLocaleString("en-GB")} covers</p>
+            <p className="mt-1 font-mono text-[11px] text-clay">food {eur(Number(r.revenue_food || 0))} · wine {eur(Number(r.revenue_wine || 0))} · bar {eur(Number(r.revenue_bar || 0))}</p>
+            {r.eighty_six_notes ? <p className="mt-2 font-sans text-[13px] text-ink-soft">86: {r.eighty_six_notes}</p> : null}
+          </div>
+        ))}
+        {!eod.length ? <p className="font-sans text-[14px] text-clay">No reports yet for {ENTITY_LABEL[entity]}.</p> : null}
+      </div>
+    </main>
+  );
+}

@@ -83,7 +83,7 @@ export default async function WineHub({ params }: { params: { id: string } }) {
       <div className="mt-8 grid grid-cols-3 gap-2">
         <span className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-clay">Hold Chef · scan</span>
         <Link href="/develop/wine/train" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">Train list</Link>
-        <Link href="/develop/wine/prices" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">From invoice</Link>
+        <Link href="/develop/wine?tab=prices" className="rounded-xl border border-line px-3 py-3 text-center font-sans text-[12px] text-ink">From invoice</Link>
       </div>
     </main>
   );

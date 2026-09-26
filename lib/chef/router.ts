@@ -174,17 +174,17 @@ function toLines(s: string, max = 4, width = 140): string[] {
 function pageHref(word: string, house: string | null): string | null {
   const h = house ? "/h/" + house : null;
   const w = word.toLowerCase();
-  if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
+  if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
   if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
-  if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/calendar";
-  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/office/inbox" : "/";
+  if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/today?tab=calendar";
+  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/comms" : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
-  if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/office/eod" : "/administrate/finance/eod";
-  if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : "/administrate/finance";
-  if (/equipo|team|gente|people|personal|plantilla/.test(w)) return "/administrate/team";
+  if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
+  if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
+  if (/equipo|team|gente|people|personal|plantilla/.test(w)) return h ? h + "/team" : "/studio/people";
   if (/pedido|order|compra|\bbuy\b|suppl|suministro|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
-  if (/oficina|office/.test(w)) return h ? h + "/office/eod" : "/administrate/finance";
-  if (/cocina|kitchen/.test(w)) return h ? h + "/kitchen/recipes" : "/studio/recipes/review";
+  if (/oficina|office/.test(w)) return h ? h + "/money" : "/studio/money";
+  if (/cocina|kitchen/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
   if (/estudio|studio/.test(w)) return "/studio";
   if (/inicio|home|start|casa/.test(w)) return h ? h : "/";
   return null;
@@ -357,7 +357,7 @@ async function readRecipes(q: string, ctx: ReadCtx): Promise<{ card: ChefCard; s
   const r: any = ranked[0];
   // Without a house the /h/<slug> recipe page cannot be addressed; the
   // Studio review list is the survivor (the /develop/menu/<id> page is gone).
-  const href = ctx.house ? "/h/" + ctx.house + "/kitchen/recipes/" + r.id : "/studio/recipes/review";
+  const href = ctx.house ? "/h/" + ctx.house + "/menu/recipes/" + r.id : "/studio/recipes/review";
   const { data: steps } = await sb.from("recipe_steps").select("order_idx, body").eq("recipe_id", r.id).order("order_idx").limit(3);
   const stepLines = (steps || []).map((s: any) => clip(s.body, 80));
   const methodLines = stepLines.length ? stepLines : String(r.method || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 3).map((x) => clip(x, 80));
@@ -419,7 +419,7 @@ async function readPrep(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> 
 async function readCalendar(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> {
   const t = T[ctx.lang];
   const tz = ctx.scope.entity.timezone;
-  const href = pageHref("calendar", ctx.house) || "/me/calendar";
+  const href = pageHref("calendar", ctx.house) || "/me/today?tab=calendar";
   // Local midnight → next midnight, expressed as UTC instants. Cheap trick:
   // format today's date in the venue tz, then let Date parse it with the
   // venue's current UTC offset.

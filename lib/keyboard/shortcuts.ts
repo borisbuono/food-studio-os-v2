@@ -14,7 +14,10 @@ export type ShortcutTarget = { href: string; label: string };
 
 export const GO_TARGETS: Record<string, ShortcutTarget> = {
   h: { href: "/",                          label: "Home" },
-  f: { href: "/administrate/finance",      label: "Finance" },
+  // Slices 2–4 (2026-09-26): the house-scoped landings need a slug this table
+  // has no access to; the retired addresses below 308 to /h/<cookie house>/…
+  // in middleware (one hop), so the keys keep working.
+  f: { href: "/administrate/finance",      label: "Money" },
   // Slim OS 2026-09-26: /develop/menu, /develop/recipes, /office, /boh and
   // /command are gone. Cookie-scoped survivors only — the house-scoped Cook
   // screen needs a slug the shortcut table has no access to, so `m`/`r`
@@ -26,7 +29,7 @@ export const GO_TARGETS: Record<string, ShortcutTarget> = {
   b: { href: "/administrate/finance/eod",  label: "Money" },
   s: { href: "/administrate/settings",     label: "Settings" },
   c: { href: "/studio",                    label: "Studio" },
-  i: { href: "/files/inbox",               label: "Files inbox" },
+  i: { href: "/files/inbox",               label: "Paper" },
 };
 
 // Should shortcuts fire? False when the operator is typing into a form,

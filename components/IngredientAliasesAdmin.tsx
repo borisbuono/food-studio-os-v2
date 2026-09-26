@@ -12,7 +12,7 @@ type Alias = {
   created_at: string;
 };
 
-// /h/[slug]/kitchen/ingredients — admin surface for ingredient_aliases.
+// /h/[slug]/menu/ingredients — admin surface for ingredient_aliases.
 // One row per alias variant. Boris types the canonical name, the supplier
 // spelling (as it appears on purchase_lines), and a unit. Conversion is
 // left at 1 unless the alias is in a different unit than the canonical.
@@ -128,7 +128,7 @@ export default function IngredientAliasesAdmin({
             <h1 className="font-serif text-xl leading-tight">Ingredient aliases</h1>
           </div>
           <Link
-            href={`/h/${houseSlug}/kitchen/recipes`}
+            href={`/h/${houseSlug}/menu/recipes`}
             className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5"
           >
             Back

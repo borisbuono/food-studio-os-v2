@@ -5,8 +5,12 @@ import { noEmoji } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
-export default async function SupplierHub({ params }: { params: { id: string } }) {
-  
+import AddProduct from "./AddProduct";
+
+// Slim OS slice 3: /administrate/suppliers/[id]/add-product folded in as
+// ?tab=add-product (a sheet on the supplier, per the critic's singles).
+export default async function SupplierHub({ params, searchParams }: { params: { id: string }; searchParams?: { tab?: string } }) {
+  if (searchParams?.tab === "add-product") return <AddProduct />;
   const supabase = supabaseServer();const { data: p } = await supabase.from("providers").select("*").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/suppliers");
 
@@ -78,7 +82,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
       {/* the three actions this surface absorbs */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link href={"/execute/orders?supplier=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Place an order</Link>
-        <Link href="/execute/pass#receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
+        <Link href="/execute/orders?tab=receiving" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Receive delivery</Link>
         <Link href="/administrate/finance/costs" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Cost trends →</Link>
         {p.category === "wine" ? (
           <span className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-clay">Hold Chef to scan a label</span>
@@ -114,7 +118,7 @@ export default async function SupplierHub({ params }: { params: { id: string } }
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-serif text-xl text-ink">{products.length} products</h2>
-          <Link href={"/administrate/suppliers/" + params.id + "/add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">+ add</Link>
+          <Link href={"/administrate/suppliers/" + params.id + "?tab=add-product"} className="font-mono text-[11px] uppercase tracking-wide text-ink-soft">+ add</Link>
         </div>
         {!products.length ? <p className="mt-2 font-sans text-[14px] text-clay">No catalog yet. Build it from your last invoice.</p> : (
           <ul className="mt-3 divide-y divide-black/5 rounded-2xl border border-line bg-card">

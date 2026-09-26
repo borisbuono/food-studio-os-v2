@@ -9,8 +9,12 @@ export const dynamic = "force-dynamic";
 const ORDER = ["enquiry", "proposal", "confirmed", "completed", "cancelled"];
 const eur = (n: number) => "€" + Math.round(n).toLocaleString("en-GB");
 
-export default async function Events() {
-  
+import NewEvent from "./NewEvent";
+
+// Events — catering & private dining (a Service leaf; Boris: events move
+// Close → Serve). Slim OS slice 4: /administrate/events/new folded in as ?new=1.
+export default async function Events({ searchParams }: { searchParams?: { new?: string } }) {
+  if (searchParams?.new) return <NewEvent />;
   const supabase = supabaseServer();const evs = (await supabase.from("sales_events").select("title,event_type,status,client_name,event_date,guests_count,estimated_revenue,estimated_gp_pct,theme").eq("restaurant_id", serverRestaurantId()).order("event_date", { ascending: true })).data || [];
   const groups: Record<string, any[]> = {};
   evs.forEach((e: any) => { const k = (e.status || "other").toLowerCase(); (groups[k] ||= []).push(e); });
@@ -18,10 +22,9 @@ export default async function Events() {
 
   return (
     <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Events · the pipeline</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Catering & private events</h1>
-      <Link href="/administrate/events/new" className="mt-4 inline-block rounded-xl bg-[color:var(--accent)] px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">+ New event</Link>
+      <Link href="/administrate/events?new=1" className="mt-4 inline-block rounded-xl bg-[color:var(--accent)] px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]">+ New event</Link>
 
       {keys.map((k) => (
         <section key={k} className="mt-8">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { houseNameForSlug } from "@/lib/houses";
 import { getHouseBySlug } from "@/lib/houses.server";
 import PrepList from "@/components/PrepList";
+import Templates from "./Templates";
 
 // /h/<slug>/kitchen/prep — full-screen prep list for a house's kitchen.
 // Full-screen (no AppChrome / sidebar) because the phone view for the
@@ -20,7 +21,9 @@ function tzTodayISO(tz: string): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: tz });
 }
 
-export default async function KitchenPrepPage({ params }: { params: { house: string; room: string } }) {
+// Slim OS slice 4: /prep/templates folded in as ?tab=templates.
+export default async function KitchenPrepPage({ params, searchParams }: { params: { house: string; room: string }; searchParams?: { tab?: string } }) {
+  if (searchParams?.tab === "templates") return <Templates params={params} />;
   const house = await getHouseBySlug(params.house);
   if (!house) redirect("/studio");
   if (params.room !== "kitchen") redirect(`/h/${params.house}`);
