@@ -113,7 +113,10 @@ export async function ingestCapture(args: {
   let entity: EntityCode = args.sessionCode;
   let entitySource = "session_guess";
   let status: "filed" | "needs_triage" | "rejected" = "filed";
-  if (verdict.kind === "document") { entity = verdict.code; entitySource = verdict.by === "cif" ? "document_cif" : "document_name"; }
+  if (verdict.kind === "document") {
+    entity = verdict.code; entitySource = verdict.by === "cif" ? "document_cif" : "document_name";
+    if (verdict.cifMisread) flags.push("addressee_cif_misread");
+  }
   else if (verdict.kind === "third_party") { flags.push("third_party_addressee"); status = "rejected"; }
   else { flags.push("entity_guessed"); status = "needs_triage"; }
 
@@ -143,7 +146,9 @@ export async function ingestCapture(args: {
   if (bands.length && total !== null && Math.abs(bt.total - total) > 0.05) flags.push("totals_dont_reconcile");
   if (!bands.length && (docType === "invoice" || docType === "ticket")) flags.push("no_vat_bands");
   const rawLines = Array.isArray(x.lines) ? x.lines : [];
-  const lc = checkLines(rawLines, hdrBase ?? (bands.length ? bt.base : null));
+  // Lines must add up to the base of ALL tax bands. The printed "subtotal" can
+  // leave out a small 21 % item (Viapa 260023946: 108,00 printed, bands 109,80).
+  const lc = checkLines(rawLines, bands.length ? bt.base : hdrBase);
   flags.push(...lc.flags);
   const conf = num(x.confidence);
   if (conf !== null && conf < LOW_CONFIDENCE) { flags.push("low_confidence"); if (status === "filed") status = "needs_triage"; }
@@ -205,7 +210,7 @@ export async function ingestCapture(args: {
     supplier_name: s(x.supplier_name),
     supplier_vat_id: supplierCif || s(x.supplier_vat_id),
     document_date: docDate,
-    subtotal_eur: hdrBase ?? (bands.length ? bt.base : null),
+    subtotal_eur: bands.length ? bt.base : hdrBase,
     vat_eur: bands.length ? bt.vat : hdrVat,           // vat_eur is the SUM of the bands
     grand_total_eur: total,
     vat_bands: bands.length ? bands : null,

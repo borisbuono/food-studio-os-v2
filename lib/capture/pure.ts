@@ -41,7 +41,7 @@ export function normName(v: string | null | undefined): string {
 // ── entity from the document ─────────────────────────────────────────────
 export type OwnEntity = { code: EntityCode; tax_id: string | null; legal_name: string | null };
 export type EntityVerdict =
-  | { kind: "document"; code: EntityCode; by: "cif" | "name" }
+  | { kind: "document"; code: EntityCode; by: "cif" | "name"; cifMisread?: string }
   | { kind: "third_party"; addressee: string }     // addressed to someone else → reject
   | { kind: "unknown"; reason: string };            // guess from session, flag needs_triage
 
@@ -61,6 +61,10 @@ export function resolveEntityFromDoc(
       // Name matched but the printed CIF is a different one (e.g. B57481517 on
       // old BM paper) — never trust the name over a contradicting CIF.
       if (cif && normTaxId(hit.tax_id) && normTaxId(hit.tax_id) !== cif) {
+        // One character off our own CIF under our own name = our misread
+        // (real case 26-09: Pardalet albarán to IBIZA FOOD LAB read as B5784593).
+        // Anything further away stays a question (B57481517 on old BM paper).
+        if (editDistance(cif, normTaxId(hit.tax_id)!) <= 1) return { kind: "document", code: hit.code, by: "name", cifMisread: cif };
         return { kind: "unknown", reason: `name ${hit.code} but CIF ${cif} matches no entity` };
       }
       return { kind: "document", code: hit.code, by: "name" };
@@ -69,6 +73,15 @@ export function resolveEntityFromDoc(
   if (cif) return { kind: "third_party", addressee: `${addressee.name || "?"} (${cif})` };
   if (nm && nm.length > 3) return { kind: "third_party", addressee: String(addressee.name) };
   return { kind: "unknown", reason: "no addressee readable" };
+}
+
+export function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
 }
 
 // ── money ────────────────────────────────────────────────────────────────

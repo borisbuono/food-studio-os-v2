@@ -35,6 +35,7 @@ eq("IFL by CIF, dept line ignored", resolveEntityFromDoc({ vat_id: "B-57984593",
 eq("BBH by CIF", resolveEntityFromDoc({ vat_id: "B13655717", name: null }, OWN).kind === "document", true);
 eq("BM by name only", resolveEntityFromDoc({ vat_id: null, name: "BISTRO MONDO IBIZA, S.L." }, OWN), { kind: "document", code: "BM", by: "name" });
 eq("old BM CIF B57481517 → triage", resolveEntityFromDoc({ vat_id: "B57481517", name: "Bistro Mondo Ibiza SL" }, OWN).kind, "unknown");
+eq("26-09 live: IFL name + CIF one digit short → IFL, flagged", resolveEntityFromDoc({ vat_id: "B5784593", name: "IBIZA FOOD LAB S.L" }, OWN), { kind: "document", code: "IFL", by: "name", cifMisread: "B5784593" });
 eq("third party rejected", resolveEntityFromDoc({ vat_id: "B12345674", name: "PES MATT IBIZA SL" }, OWN).kind, "third_party");
 eq("nothing readable → triage", resolveEntityFromDoc({ vat_id: null, name: null }, OWN).kind, "unknown");
 
