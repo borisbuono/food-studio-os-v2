@@ -77,7 +77,21 @@ export async function POST(req: NextRequest) {
       if (row.match_status === "needs_triage" && !rest.some((f) => ["entity_guessed", "low_confidence"].includes(f))) patch.match_status = "unmatched";
       const { error } = await sb.from(table).update(patch).eq("id", id);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, flags: rest });
+      // Lines are held back while a document is in triage; write them once it's cleared
+      // (26-09: Carnicería JR 0-139834 had 3 lines read and none saved after low_confidence).
+      let lines = 0;
+      const cleared = patch.match_status === "unmatched" || (row.match_status !== "needs_triage" && !rest.includes("entity_guessed"));
+      if (cleared && String(row.entity_source || "") !== "session_guess") {
+        const col = table === "albarans" ? "albaran_id" : "invoice_inbox_id";
+        const { count } = await sb.from("purchase_lines").select("id", { count: "exact", head: true }).eq(col, id);
+        if (!count) {
+          const x = row.ocr_extracted || {};
+          const lc = checkLines(Array.isArray(x.lines) ? x.lines : [], num(x.subtotal_eur));
+          lines = Math.max(0, await writeLines(sb, { table, id, entity: row.entity_id, supplierId: row.supplier_id, docDate: row.document_date, docRef: row[docNoCol] || null, lines: lc.keep }));
+          if (row.supplier_id) await matchForSupplier(sb, row.entity_id, row.supplier_id).catch(() => null);
+        }
+      }
+      return NextResponse.json({ ok: true, flags: rest, lines });
     }
 
     if (action === "ack_supplier") {

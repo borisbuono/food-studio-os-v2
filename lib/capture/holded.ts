@@ -35,6 +35,23 @@ type Row = {
 };
 const COLS = "id, entity_id, doc_type, flags, match_status, holded_doc_id, holded_pushed_at, vat_bands, supplier_name, supplier_vat_id, invoice_number, document_date, due_date, grand_total_eur, storage_path, file_sha256, holded_push_log, supplier_id";
 
+// The key the OS stores can be stale or a v2 token (BM's is: "Holded v2 403",
+// found on the first live check 26-09). Try it, then the environment key, and
+// use the first one the v1 invoicing API actually accepts.
+const ENV_KEY: Record<string, string | undefined> = {
+  IFL: process.env.HOLDED_API_KEY_TALLER, BM: process.env.HOLDED_API_KEY_BISTRO_MONDO, BBH: process.env.HOLDED_API_KEY_HOLDINGS,
+};
+export async function workingHoldedKey(ent: "BM" | "IFL" | "BBH"): Promise<string | null> {
+  const candidates = Array.from(new Set([await getEntityCredential(ent, "holded"), ENV_KEY[ent]].filter(Boolean) as string[]));
+  for (const k of candidates) {
+    try {
+      const r = await fetch(V1 + "/taxes", { headers: { key: k, accept: "application/json" } });
+      if (r.ok) return k;
+    } catch { /* next */ }
+  }
+  return null;
+}
+
 // "2026-07-17" → unix seconds of 00:00 Europe/Madrid.
 export function madridEpoch(day: string): number {
   const [y, m, d] = day.split("-").map(Number);
@@ -183,8 +200,8 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
   if (!row) return { ok: false, status: 404, error: "not found" };
   const ent = row.entity_id as "BM" | "IFL" | "BBH";
   if (!["BM", "IFL", "BBH"].includes(ent)) return { ok: false, status: 400, error: `no Holded for entity ${row.entity_id}` };
-  const key = await getEntityCredential(ent, "holded");
-  if (!key) return { ok: false, status: 500, error: `no Holded key for ${ent}` };
+  const key = await workingHoldedKey(ent);
+  if (!key) return { ok: false, status: 502, error: `Holded rejected every key we have for ${ent}. The key stored in the OS (Finance → Setup → Connect) is failing — replace it with the invoicing API key from Holded → Settings → Developers.` };
 
   const blockers = pushBlockers(row as any);
   if (!row.document_date) blockers.push("no_document_date");

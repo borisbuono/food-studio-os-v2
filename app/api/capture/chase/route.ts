@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseJob } from "@/lib/supabaseJob";
 import { requireManagerOf } from "@/lib/access/requireManager";
-import { getEntityCredential } from "@/lib/integrations/credentials";
-import { holdedContacts } from "@/lib/capture/holded";
+import { holdedContacts, workingHoldedKey } from "@/lib/capture/holded";
 import { refreshTicketStatus, ticketsWithoutDetails } from "@/lib/capture/tickets";
 import { facturaRequestDraft, normTaxId, num } from "@/lib/capture/pure";
 
@@ -57,7 +56,7 @@ export async function POST(req: NextRequest) {
       const to: { email: string; from: string }[] = [];
       if (sup?.email) to.push({ email: sup.email, from: "printed on their documents / supplier record" });
       try {
-        const key = ["BM", "IFL", "BBH"].includes(t.entity_id) ? await getEntityCredential(t.entity_id, "holded") : null;
+        const key = ["BM", "IFL", "BBH"].includes(t.entity_id) ? await workingHoldedKey(t.entity_id) : null;
         if (key && normTaxId(t.supplier_vat_id)) {
           for (const c of await holdedContacts(key)) {
             if (normTaxId(c.code) !== normTaxId(t.supplier_vat_id) && normTaxId(c.vatnumber) !== normTaxId(t.supplier_vat_id)) continue;
