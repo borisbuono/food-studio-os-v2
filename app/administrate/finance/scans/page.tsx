@@ -6,6 +6,8 @@ import { SupplierChip } from "@/components/chips";
 import { E_BM, E_HOLDINGS, E_TALLER, E_UTOPIA } from "@/lib/entities";
 import PushToHolded from "./PushToHolded";
 import ScanUpload from "./ScanUpload";
+import TriageControls from "./TriageControls";
+import { supabaseJob } from "@/lib/supabaseJob";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +42,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
 
   let query = supabase
     .from("invoice_inbox")
-    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider_id,provider:provider_id(name),doc_type,flags,entity_source,vat_bands,invoice_number,document_date,grand_total_eur,addressee_name,addressee_vat_id,conflict_values")
+    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider_id,provider:provider_id(name),doc_type,flags,entity_source,vat_bands,invoice_number,document_date,grand_total_eur,addressee_name,addressee_vat_id,conflict_values,vat_issues:ocr_extracted->vat_category_issues")
     .eq("entity_id", ec)
     .order("arrived_at", { ascending: false })
     .limit(100);
@@ -56,13 +58,19 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
   // Albaranes: stay in the OS (cost basis), never pushed to Holded.
   const { data: albData } = tab === "albaranes"
     ? await supabase.from("albarans")
-        .select("id,document_date,supplier_name,doc_number,grand_total_eur,vat_bands,flags,entity_source,match_status,linked_invoice_id,link_method,photo_url,conflict_values")
+        .select("id,document_date,supplier_name,doc_number,grand_total_eur,vat_bands,flags,entity_source,match_status,linked_invoice_id,link_method,photo_url,conflict_values,vat_issues:ocr_extracted->vat_category_issues")
         .eq("entity_id", ec).order("document_date", { ascending: false, nullsFirst: false }).limit(200)
     : { data: [] };
   const albs: any[] = (albData as any[]) || [];
   const invIds = rows.map((r) => r.id);
   const { data: linkData } = invIds.length
     ? await supabase.from("albarans").select("id,linked_invoice_id,doc_number,grand_total_eur").in("linked_invoice_id", invIds)
+    : { data: [] };
+  // Suppliers the funnel created on first sight — look at them once before the
+  // first push (Holded often has the same supplier under another spelling).
+  const { data: me } = await supabase.auth.getUser();
+  const { data: newSup } = me?.user
+    ? await supabaseJob().from("controller_suppliers").select("id,name,cif,created_at").like("notes", "created by capture funnel % — review").order("created_at", { ascending: false }).limit(50)
     : { data: [] };
   const linksBy = new Map<string, any[]>();
   for (const l of (linkData as any[]) || []) { const a = linksBy.get(l.linked_invoice_id) || []; a.push(l); linksBy.set(l.linked_invoice_id, a); }
@@ -97,6 +105,16 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
 
       <ScanUpload />
 
+      {(newSup as any[] || []).length ? (
+        <div className="mt-4 rounded-xl border border-line p-4">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-amber">New suppliers to look at once · {(newSup as any[]).length}</p>
+          <p className="mt-1 font-serif italic text-[13px] text-ink-soft">Created from scans. Check none is a supplier you already have under another spelling — confirm each from its invoice's Holded check.</p>
+          <ul className="mt-2 space-y-0.5">
+            {(newSup as any[]).map((s: any) => <li key={s.id} className="font-mono text-[11px] text-ink-soft">{s.name}{s.cif ? " · " + s.cif : " · no CIF"}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
       {tab === "albaranes" ? (
         albs.length === 0 ? <p className="mt-10 font-serif italic text-[15px] text-ink-soft">No albaranes captured for {ec} yet.</p> : (
           <ul className="mt-6 divide-y divide-line border-t border-line">
@@ -113,6 +131,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
                   {(a.flags || []).map((f: string) => <span key={f} className={BAD_FLAGS.has(f) ? "text-tomato" : "text-amber"}>{f.replace(/_/g, " ")}</span>)}
                   {a.photo_url ? <a href={a.photo_url} target="_blank" rel="noreferrer" className="text-ink-soft">view →</a> : null}
                 </div>
+                {a.match_status !== "rejected" ? <TriageControls table="albarans" id={a.id} entityGuessed={a.entity_source === "session_guess"} flags={a.flags || []} issues={a.vat_issues} /> : null}
               </li>
             ))}
           </ul>
@@ -171,6 +190,9 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
                   {r.holded_doc_id ? <a href={"https://app.holded.com/invoices/purchase/" + r.holded_doc_id} target="_blank" rel="noreferrer" className="font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent)" }}>Open in Holded →</a> : null}
                   {r.doc_url ? <a href={r.doc_url} target="_blank" rel="noreferrer" className="font-mono text-[10px] uppercase tracking-wide text-ink-soft">View doc →</a> : null}
                 </div>
+                {r.doc_type && !["rejected", "duplicate", "approved"].includes(r.match_status) ? (
+                  <TriageControls table="invoice_inbox" id={r.id} entityGuessed={r.entity_source === "session_guess"} flags={r.flags || []} issues={r.vat_issues} />
+                ) : null}
                 {r.doc_type === "invoice" && !r.holded_doc_id && !["rejected", "duplicate"].includes(r.match_status) ? (
                   <PushToHolded id={r.id} entity={ec} total={r.grand_total_eur ?? r.amount_eur ?? null} />
                 ) : null}

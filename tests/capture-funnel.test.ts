@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   normTaxId, normDocNo, resolveEntityFromDoc, normaliseBands, bandTotals, checkLines,
-  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, type OwnEntity,
+  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, vatCategoryCheck, resolveHoldedContact, type OwnEntity,
 } from "../lib/capture/pure";
 
 let fails = 0;
@@ -88,6 +88,32 @@ eq("Juntos 197.96 is NOT 126.09+71.83 (4 c off)", matchAlbaranes({ date: "2026-0
 // push gate
 eq("push blocked on guessed entity", pushBlockers({ doc_type: "invoice", flags: ["entity_guessed"], holded_doc_id: null, match_status: "unmatched", vat_bands: [{ rate: 10, base: 1, cuota: 0.1 }] }), ["entity_guessed"]);
 eq("albaran never pushable", pushBlockers({ doc_type: "albaran", flags: [], holded_doc_id: null, match_status: "unmatched", vat_bands: [{ rate: 10, base: 1, cuota: 0.1 }] }), ["doc_type_albaran"]);
+
+// IVA rate vs category — the Carburantes Baleares 102470 case
+eq("fuel supplier at 10% flagged", vatCategoryCheck({ supplier_name: "CARBURANTES BALEARES SL", bands: [{ rate: 10, base: 61.75, cuota: 6.17 }] }).length, 1);
+eq("fuel line at 10% flagged", vatCategoryCheck({ supplier_name: "Estacion X", lines: [{ line_number: 1, product_name: "Gasóleo A", vat_rate: 10 }] })[0]?.cat, "fuel");
+eq("wine at 10% flagged", vatCategoryCheck({ supplier_name: "Juntos", lines: [{ line_number: 2, product_name: "Vino tinto Crianza", vat_rate: 10 }] })[0]?.cat, "alcohol");
+eq("tomatoes at 10% fine", vatCategoryCheck({ supplier_name: "Pardalet", lines: [{ line_number: 1, product_name: "Tomate pera", vat_rate: 10 }] }).length, 0);
+eq("fuel at 21% fine", vatCategoryCheck({ supplier_name: "Carburantes Baleares", bands: [{ rate: 21, base: 50, cuota: 10.5 }] }).length, 0);
+
+// Holded contact — real BM contacts, 26-09
+const HC = [
+  { id: "a", name: "MENEGHELLO CASAGRANDE SL", code: "B57329609", vatnumber: "" },
+  { id: "b", name: "MENEGHELLO FISH SL", code: "B16515413", vatnumber: "B16515413" },
+  { id: "c", name: "MENEGHELLO FOOD SL", code: "B16515413", vatnumber: "" },
+  { id: "d", name: "HERMANOS MENEGHELLO SL", code: "B57170300", vatnumber: "B57170300" },
+  { id: "e", name: "CAN ESCARRER SLU", code: "B16607780", vatnumber: "" },
+];
+eq("single CIF hit → automatic", resolveHoldedContact("B16607780", "Juntos Farm", HC), { kind: "cif", id: "e", name: "CAN ESCARRER SLU" });
+const mc = resolveHoldedContact("B16515413", "MENEGHELLO FOOD, S.L.", HC);
+eq("Meneghello shared CIF → pick one", mc.kind === "choose" && mc.reason === "same_cif_several_contacts" && mc.candidates.length === 2, true);
+const nc = resolveHoldedContact("B99999999", "Meneghello Pesca SL", HC);
+eq("unknown CIF, lookalike name → pick or new", nc.kind === "choose" && nc.reason === "name_lookalikes" && nc.candidates.length === 4, true);
+eq("retired [DUPLICATE] contact ignored (Viapa)", resolveHoldedContact("B57329815", "VIAPA PLAGE SL", [
+  { id: "x", name: "[DUPLICATE - do not use] VIAPA PLAGE SL -> use VIAPA PLAGE SL (6706cab1)", code: "B57329815" },
+  { id: "y", name: "VIAPA PLAGE SL", code: "B57329815" }]), { kind: "cif", id: "y", name: "VIAPA PLAGE SL" });
+eq("unknown everything → new", resolveHoldedContact("B99999999", "Vintax SL", HC).kind, "new");
+eq("category mismatch blocks push", pushBlockers({ doc_type: "invoice", flags: ["vat_rate_category_mismatch"], holded_doc_id: null, match_status: "unmatched", vat_bands: [{ rate: 10, base: 1, cuota: 0.1 }] }), ["vat_rate_category_mismatch"]);
 
 // ── fixtures ──
 const dir = process.argv[2];

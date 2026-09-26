@@ -272,7 +272,7 @@ export function matchAlbaranes(
 // warning next to the tick.
 export const BLOCKING_FLAGS = [
   "entity_guessed", "third_party_addressee", "conflicting_copies", "duplicate",
-  "totals_dont_reconcile", "no_supplier_cif", "no_doc_number",
+  "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "vat_rate_category_mismatch",
 ] as const;
 export function pushBlockers(row: { doc_type: string | null; flags: string[] | null; holded_doc_id: string | null; match_status: string | null; vat_bands: VatBand[] | null }): string[] {
   const out: string[] = [];
@@ -282,4 +282,66 @@ export function pushBlockers(row: { doc_type: string | null; flags: string[] | n
   if (row.match_status === "rejected" || row.match_status === "duplicate") out.push(`status_${row.match_status}`);
   for (const f of row.flags || []) if ((BLOCKING_FLAGS as readonly string[]).includes(f)) out.push(f);
   return out;
+}
+
+// ── IVA rate vs what was bought ──────────────────────────────────────────
+// The class-B and GGM findings were wrong rates booked as printed. These
+// categories are 21 % in Spain; anything else on them is the supplier's
+// error to fix, not ours to deduct. (Carburantes Baleares 102470 printed
+// fuel at 10 %.) Food rates (4/10) are not policed here — too many edge cases.
+const MUST_21: { cat: string; re: RegExp }[] = [
+  { cat: "fuel", re: /\b(CARBURANTES?|GASOIL|GASOLEO|DIESEL|GASOLINAS?|GASOLINERA|ESTACION DE SERVICIO|SIN PLOMO|ADBLUE|COMBUSTIBLES?|SP ?95|SP ?98|REPSOL|CEPSA|GALP)\b/ },
+  { cat: "energy", re: /\b(ELECTRICIDAD|ENERGIA ELECTRICA|TERMINO DE (ENERGIA|POTENCIA)|KWH|GAS NATURAL|BUTANO|PROPANO|ENDESA|IBERDROLA|NATURGY|RESPIRA ENERGIA|GESA)\b/ },
+  { cat: "equipment_service", re: /\b(MAQUINARIA|REPARACION|MANTENIMIENTO|SERVICIO TECNICO|MANO DE OBRA|DESPLAZAMIENTO|ALQUILER|RENTING|LEASING|INSTALACION)\b/ },
+  { cat: "alcohol", re: /\b(VINO|VINS?|CERVEZA|CAVA|CHAMPAGNE|GINEBRA|GIN|RON|WHISK(E)?Y|VODKA|LICOR|VERMUT|TEQUILA|MEZCAL|BRANDY|COGNAC|SIDRA)\b/ },
+];
+export type VatCategoryIssue = { where: string; cat: string; printed: number; expected: 21 };
+
+export function vatCategoryCheck(doc: { supplier_name?: string | null; lines?: Line[]; bands?: VatBand[] }): VatCategoryIssue[] {
+  const out: VatCategoryIssue[] = [];
+  const sup = normName(doc.supplier_name);
+  const supCat = MUST_21.find((c) => (c.cat === "fuel" || c.cat === "energy") && c.re.test(sup));
+  if (supCat) {
+    // A fuel/energy supplier: every band must be 21 %.
+    for (const b of doc.bands || []) if (b.base !== 0 && b.rate !== 21) out.push({ where: `document band ${b.rate}%`, cat: supCat.cat, printed: b.rate, expected: 21 });
+  }
+  for (const l of doc.lines || []) {
+    const rate = num(l.vat_rate);
+    if (rate === null || rate === 21) continue;
+    const name = normName(l.product_name);
+    const hit = MUST_21.find((c) => c.re.test(name));
+    if (hit) out.push({ where: `line ${l.line_number} "${String(l.product_name).slice(0, 40)}"`, cat: hit.cat, printed: rate, expected: 21 });
+  }
+  return out;
+}
+
+// ── Holded contact for this supplier ─────────────────────────────────────
+// Holded carries the same supplier under several spellings, sometimes on the
+// SAME CIF (MENEGHELLO FISH SL + MENEGHELLO FOOD SL both B16515413). Posting
+// by contactCode alone lets Holded pick one — or invent a new contact. So the
+// contact is resolved here and anything but a single CIF hit goes to a human.
+export type HContact = { id: string; name: string | null; code?: string | null; vatnumber?: string | null; tradeName?: string | null; type?: string | null };
+export type ContactVerdict =
+  | { kind: "cif"; id: string; name: string | null }
+  | { kind: "choose"; reason: "same_cif_several_contacts" | "name_lookalikes"; candidates: HContact[] }
+  | { kind: "new" };
+
+const STOP = new Set(["SL", "SA", "SLU", "SOCIEDAD", "LIMITADA", "DE", "DEL", "LA", "EL", "LOS", "LAS", "Y", "HERMANOS", "IBIZA", "EIVISSA", "GRUPO", "FOOD", "FOODS", "COMERCIAL"]);
+const tokens = (s: string | null | undefined) => normName(s).split(" ").filter((t) => t.length >= 4 && !STOP.has(t));
+
+export function resolveHoldedContact(cifRaw: string | null | undefined, name: string | null | undefined, all: HContact[]): ContactVerdict {
+  // Contacts already retired in Holded ("[DUPLICATE - do not use] VIAPA PLAGE SL …") never receive new documents.
+  const contacts = all.filter((c) => !/^\s*\[?\s*DUPLICA/i.test(String(c.name || "")));
+  const cif = normTaxId(cifRaw);
+  if (cif) {
+    const byCif = contacts.filter((c) => normTaxId(c.code) === cif || normTaxId(c.vatnumber) === cif);
+    if (byCif.length === 1) return { kind: "cif", id: byCif[0].id, name: byCif[0].name };
+    if (byCif.length > 1) return { kind: "choose", reason: "same_cif_several_contacts", candidates: byCif };
+  }
+  const mine = new Set(tokens(name));
+  if (mine.size) {
+    const look = contacts.filter((c) => [...tokens(c.name), ...tokens(c.tradeName)].some((t) => mine.has(t)));
+    if (look.length) return { kind: "choose", reason: "name_lookalikes", candidates: look.slice(0, 8) };
+  }
+  return { kind: "new" };
 }

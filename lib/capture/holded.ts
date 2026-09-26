@@ -20,7 +20,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEntityCredential } from "@/lib/integrations/credentials";
-import { normDocNo, normName, normTaxId, pushBlockers, r2, type VatBand } from "@/lib/capture/pure";
+import { supabaseJob } from "@/lib/supabaseJob";
+import { normDocNo, normName, normTaxId, pushBlockers, r2, resolveHoldedContact, type ContactVerdict, type HContact, type VatBand } from "@/lib/capture/pure";
 
 const V1 = "https://api.holded.com/api/invoicing/v1";
 const DRY_RUN = process.env.FS_HOLDED_DRY_RUN !== "false";
@@ -30,9 +31,9 @@ type Row = {
   holded_doc_id: string | null; holded_pushed_at: string | null; vat_bands: VatBand[] | null;
   supplier_name: string | null; supplier_vat_id: string | null; invoice_number: string | null;
   document_date: string | null; due_date: string | null; grand_total_eur: number | null;
-  storage_path: string | null; file_sha256: string | null; holded_push_log: any;
+  storage_path: string | null; file_sha256: string | null; holded_push_log: any; supplier_id: string | null;
 };
-const COLS = "id, entity_id, doc_type, flags, match_status, holded_doc_id, holded_pushed_at, vat_bands, supplier_name, supplier_vat_id, invoice_number, document_date, due_date, grand_total_eur, storage_path, file_sha256, holded_push_log";
+const COLS = "id, entity_id, doc_type, flags, match_status, holded_doc_id, holded_pushed_at, vat_bands, supplier_name, supplier_vat_id, invoice_number, document_date, due_date, grand_total_eur, storage_path, file_sha256, holded_push_log, supplier_id";
 
 // "2026-07-17" → unix seconds of 00:00 Europe/Madrid.
 export function madridEpoch(day: string): number {
@@ -97,11 +98,31 @@ export async function findInHolded(key: string, row: Row): Promise<HoldedCandida
   return out;
 }
 
-export function buildPayload(row: Row) {
+async function holdedContacts(key: string): Promise<HContact[]> {
+  const r = await h(key, "/contacts");
+  if (!r.ok || !Array.isArray(r.json)) throw new Error(`Holded contacts ${r.status}`);
+  return r.json.map((c: any) => ({ id: c.id, name: c.name, code: c.code, vatnumber: c.vatnumber, tradeName: c.tradeName, type: c.type }));
+}
+
+export type ContactChoice = { contact_id?: string; contact_new?: boolean };
+
+// Decide which Holded contact the purchase goes to. Only a single CIF hit is
+// automatic; lookalikes or a shared CIF need Boris to pick (or say "new").
+function contactDecision(v: ContactVerdict, choice: ContactChoice): { ok: true; contactId: string | null } | { ok: false; blocker: string } {
+  if (v.kind === "cif") return { ok: true, contactId: v.id };
+  if (choice.contact_id) {
+    if (v.kind === "choose" && v.candidates.some((c) => c.id === choice.contact_id)) return { ok: true, contactId: choice.contact_id };
+    return { ok: false, blocker: "holded_contact_not_a_candidate" };
+  }
+  if (v.kind === "new") return { ok: true, contactId: null };
+  if (choice.contact_new && v.reason === "name_lookalikes") return { ok: true, contactId: null };
+  return { ok: false, blocker: v.reason === "same_cif_several_contacts" ? "holded_contact_pick_one_same_cif" : "holded_contact_check_lookalikes" };
+}
+
+export function buildPayload(row: Row, contactId: string | null = null) {
   const bands = (row.vat_bands || []).filter((b) => b.base !== 0);
   return {
-    contactCode: normTaxId(row.supplier_vat_id) || undefined,
-    contactName: row.supplier_name || undefined,
+    ...(contactId ? { contactId } : { contactCode: normTaxId(row.supplier_vat_id) || undefined, contactName: row.supplier_name || undefined }),
     date: madridEpoch(row.document_date!),
     dueDate: row.due_date ? madridEpoch(row.due_date) : undefined,
     invoiceNum: row.invoice_number || undefined,
@@ -125,12 +146,13 @@ async function logPush(sb: SupabaseClient, row: Row, entry: Record<string, unkno
 }
 
 export type PushResult =
-  | { ok: true; mode: "preflight"; blockers: string[]; warnings: string[]; in_holded: HoldedCandidate[]; payload: unknown; dry_run: boolean }
+  | { ok: true; mode: "preflight"; blockers: string[]; warnings: string[]; in_holded: HoldedCandidate[]; payload: unknown; dry_run: boolean;
+      contact: ContactVerdict; supplier: { id: string | null; name: string | null; cif: string | null; unreviewed: boolean } }
   | { ok: true; mode: "create" | "attach_existing"; holded_doc_id: string; attachment_ref: string; readback: unknown; dry_run: false }
   | { ok: true; mode: "create"; dry_run: true; payload: unknown }
   | { ok: false; status: number; error: string; detail?: unknown };
 
-export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, mode: "preflight" | "create" | "attach_existing", holdedId?: string): Promise<PushResult> {
+export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, mode: "preflight" | "create" | "attach_existing", holdedId?: string, choice: ContactChoice = {}): Promise<PushResult> {
   const row = await loadRow(sb, id);
   if (!row) return { ok: false, status: 404, error: "not found" };
   const ent = row.entity_id as "BM" | "IFL" | "BBH";
@@ -142,12 +164,28 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
   if (!row.document_date) blockers.push("no_document_date");
   if (!row.storage_path) blockers.push("no_pdf");
   const warnings = (row.flags || []).filter((f) => !blockers.includes(f));
+
+  // A supplier the funnel created on first sight must be looked at once by a
+  // human before anything is posted against it.
+  let supplier = { id: row.supplier_id, name: row.supplier_name, cif: row.supplier_vat_id, unreviewed: false };
+  if (row.supplier_id) {
+    const { data: sup } = await supabaseJob().from("controller_suppliers").select("id, name, cif, notes").eq("id", row.supplier_id).maybeSingle();
+    if (sup) supplier = { id: (sup as any).id, name: (sup as any).name, cif: (sup as any).cif, unreviewed: /capture funnel .* — review$/.test(String((sup as any).notes || "")) };
+  }
+  if (supplier.unreviewed) blockers.push("supplier_unreviewed");
+
   let inHolded: HoldedCandidate[] = [];
-  try { inHolded = await findInHolded(key, row); }
-  catch (e: any) { return { ok: false, status: 502, error: "could not check Holded for an existing copy: " + (e?.message || e) }; }
+  let contact: ContactVerdict;
+  try {
+    inHolded = await findInHolded(key, row);
+    contact = resolveHoldedContact(row.supplier_vat_id, row.supplier_name, await holdedContacts(key));
+  } catch (e: any) { return { ok: false, status: 502, error: "could not check Holded: " + (e?.message || e) }; }
+  const cd = contactDecision(contact, choice);
+  if (mode !== "attach_existing" && !cd.ok && !(mode === "preflight" && contact.kind === "choose")) blockers.push(cd.blocker);
+  if (contact.kind === "new") warnings.push("new_holded_contact_will_be_created");
 
   if (mode === "preflight") {
-    return { ok: true, mode, blockers, warnings, in_holded: inHolded, payload: buildPayload(row), dry_run: DRY_RUN };
+    return { ok: true, mode, blockers, warnings, in_holded: inHolded, payload: buildPayload(row, cd.ok ? cd.contactId : null), dry_run: DRY_RUN, contact, supplier };
   }
 
   // Fetch the PDF from storage — no PDF, no push.
@@ -178,7 +216,8 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
   // mode === "create"
   if (blockers.length) return { ok: false, status: 409, error: "blocked: " + blockers.join(", ") };
   if (inHolded.length) return { ok: false, status: 409, error: "already in Holded — attach to the existing doc instead", detail: inHolded };
-  const payload = buildPayload(row);
+  if (!cd.ok) return { ok: false, status: 409, error: "Holded contact not decided: " + cd.blocker };
+  const payload = buildPayload(row, cd.contactId);
   if (!payload.items.length) return { ok: false, status: 409, error: "no VAT bands to post" };
   if (DRY_RUN) return { ok: true, mode: "create", dry_run: true, payload };
 

@@ -18,7 +18,7 @@ import { extractDocument, EXTRACTION_MODEL, type Extracted } from "@/lib/capture
 import { matchForSupplier } from "@/lib/capture/match";
 import {
   resolveEntityFromDoc, normTaxId, normDocNo, normName, normaliseBands, bandTotals, checkLines, lineArithmeticOk,
-  docTypeFromWord, dedup, num, r2, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
+  docTypeFromWord, dedup, num, r2, vatCategoryCheck, type Line, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
 } from "@/lib/capture/pure";
 
 // Entity slug → the text code the finance tables key on. The CIFs themselves
@@ -136,6 +136,8 @@ export async function ingestCapture(args: {
   if (x.handwritten_changes) flags.push("handwritten_changes");
   const pl = String(x.page_label || "").match(/(\d+)\s*(?:de|of|\/)\s*(\d+)/i);
   if (pl && Number(pl[2]) > Math.max(1, Number(x.pages_seen || 1))) flags.push("multipage_incomplete");
+  const vatIssues = vatCategoryCheck({ supplier_name: x.supplier_name, lines: lc.keep, bands });
+  if (vatIssues.length) flags.push("vat_rate_category_mismatch");
   if (!normTaxId(x.supplier_vat_id)) flags.push("no_supplier_cif");
   if (!normDocNo(x.doc_number)) flags.push("no_doc_number");
 
@@ -199,7 +201,7 @@ export async function ingestCapture(args: {
     flags: uniqFlags,
     file_sha256: sha,
     raw_ocr_text: s(x.raw_ocr_text),
-    ocr_extracted: { ...x, extraction_error: extractionError, entity_verdict: verdict, filename: args.filename || null } as any,
+    ocr_extracted: { ...x, extraction_error: extractionError, entity_verdict: verdict, vat_category_issues: vatIssues, filename: args.filename || null } as any,
   };
   let id: string;
   if (table === "albarans") {
@@ -245,37 +247,11 @@ export async function ingestCapture(args: {
   // 8) Lines → purchase_lines. Only when the entity came off the paper: a
   //    guessed entity would feed the wrong venue's recipe costs.
   let linesWritten = 0;
-  if (status === "filed" && entitySource !== "session_guess" && lc.keep.length && (docType === "invoice" || docType === "albaran" || docType === "ticket")) {
-    const rows = lc.keep.map((l, i) => ({
-      entity_code: entity,
-      restaurant_id: CODE_RESTAURANT[entity] || null,
-      supplier_id: sup.id,
-      invoice_inbox_id: table === "invoice_inbox" ? id : null,
-      albaran_id: table === "albarans" ? id : null,
-      doc_date: docDate,
-      doc_ref: s(x.doc_number),
-      line_number: Number(l.line_number) || i + 1,
-      product_code: s(l.product_code),
-      raw_product_text: s(l.product_name),
-      qty: num(l.quantity),
-      unit: s(l.unit),
-      unit_price_eur: num(l.unit_price_eur),
-      discount_pct: num(l.discount_pct),
-      line_subtotal_eur: num(l.line_subtotal_eur),
-      vat_rate: num(l.vat_rate),
-      vat_amount_eur: num(l.vat_amount_eur),
-      line_total_eur: num(l.line_total_eur) ?? (num(l.line_subtotal_eur) !== null && num(l.vat_rate) !== null ? r2(num(l.line_subtotal_eur)! * (1 + num(l.vat_rate)! / 100)) : null),
-      confidence: num(l.confidence),
-      arithmetic_ok: lineArithmeticOk(l),
-      source: "capture_funnel",
-      imported_at: new Date().toISOString(),
-    }));
-    const { error } = await sb.from("purchase_lines").insert(rows);
-    if (!error) linesWritten = rows.length;
-    else await sb.from(table).update({ flags: [...uniqFlags, "lines_not_saved"] }).eq("id", id);
-    if (linesWritten && entity !== "BBH") {
-      try { await recomputeAfterIngest(sb, entity, lc.keep.map((l) => s(l.product_name))); } catch { /* costing refresh is best-effort */ }
-    }
+  if (status === "filed" && entitySource !== "session_guess" && (docType === "invoice" || docType === "albaran" || docType === "ticket")) {
+    linesWritten = await writeLines(sb, {
+      table, id, entity, supplierId: sup.id, docDate, docRef: s(x.doc_number), lines: lc.keep,
+    });
+    if (linesWritten < 0) { await sb.from(table).update({ flags: [...uniqFlags, "lines_not_saved"] }).eq("id", id); linesWritten = 0; }
   }
 
   // 9) Albarán ↔ invoice links for this supplier.
@@ -285,4 +261,46 @@ export async function ingestCapture(args: {
   }
 
   return { ok: true, status, table, id, entity, entity_source: entitySource, doc_type: docType, flags: uniqFlags, lines: linesWritten, matched, extraction_error: extractionError };
+}
+
+// purchase_lines for one captured document. Returns rows written, −1 on error.
+// Also used by triage once a guessed entity has been confirmed by a human.
+export async function writeLines(sb: SupabaseClient, a: {
+  table: "invoice_inbox" | "albarans"; id: string; entity: EntityCode; supplierId: string | null;
+  docDate: string | null; docRef: string | null; lines: Line[];
+}): Promise<number> {
+  if (!a.lines.length) return 0;
+  const rows = a.lines.map((l, i) => {
+    const sub = num(l.line_subtotal_eur), rate = num(l.vat_rate);
+    return {
+      entity_code: a.entity,
+      restaurant_id: CODE_RESTAURANT[a.entity] || null,
+      supplier_id: a.supplierId,
+      invoice_inbox_id: a.table === "invoice_inbox" ? a.id : null,
+      albaran_id: a.table === "albarans" ? a.id : null,
+      doc_date: a.docDate,
+      doc_ref: a.docRef,
+      line_number: Number(l.line_number) || i + 1,
+      product_code: s(l.product_code),
+      raw_product_text: s(l.product_name),
+      qty: num(l.quantity),
+      unit: s(l.unit),
+      unit_price_eur: num(l.unit_price_eur),
+      discount_pct: num(l.discount_pct),
+      line_subtotal_eur: sub,
+      vat_rate: rate,
+      vat_amount_eur: num(l.vat_amount_eur),
+      line_total_eur: num(l.line_total_eur) ?? (sub !== null && rate !== null ? r2(sub * (1 + rate / 100)) : null),
+      confidence: num(l.confidence),
+      arithmetic_ok: lineArithmeticOk(l),
+      source: "capture_funnel",
+      imported_at: new Date().toISOString(),
+    };
+  });
+  const { error } = await sb.from("purchase_lines").insert(rows);
+  if (error) return -1;
+  if (a.entity !== "BBH") {
+    try { await recomputeAfterIngest(sb, a.entity, a.lines.map((l) => s(l.product_name))); } catch { /* best-effort */ }
+  }
+  return rows.length;
 }

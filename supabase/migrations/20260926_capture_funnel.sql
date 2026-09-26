@@ -64,3 +64,7 @@ alter table public.purchase_lines
   add column if not exists albaran_id uuid references public.albarans(id) on delete cascade,
   add column if not exists arithmetic_ok boolean;
 create index if not exists purchase_lines_albaran_idx on public.purchase_lines (albaran_id);
+
+-- second pass (applied as capture_funnel_triage_20260926): who cleared what, and why
+alter table public.invoice_inbox add column if not exists triage_log jsonb;
+alter table public.albarans      add column if not exists triage_log jsonb;
