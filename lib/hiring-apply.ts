@@ -127,7 +127,7 @@ export type ApplyPageInfo = {
   name: string;
   legal_name: string;
   accent: string | null;
-  tax_id: string | null;
+  tax_id?: string | null; // removed from the anon RPC 2026-09-26 (P0-8); read via apply_page_legal() service-side
   address_line1: string | null;
   city: string | null;
   postal_code: string | null;

@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron/heartbeat";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { cronDb } from "@/lib/cron/heartbeat";
@@ -89,14 +90,10 @@ function inferRestaurantId(to: string, subject: string, body: string): string | 
   return null;
 }
 
+// P0-6 (audit 2026-09-26): fail closed — Bearer CRON_SECRET only. The
+// any-signed-in-user branch let a tenant user of another venue fire this job.
 async function isAuthorized(req: NextRequest): Promise<boolean> {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  if (secret && auth === `Bearer ${secret}`) return true;
-  // Session check must use the request-bound client — the job client has no cookie.
-  const { supabaseServer } = await import("@/lib/supabaseServer");
-  const { data: userRes } = await supabaseServer().auth.getUser();
-  return !!userRes?.user;
+  return (await cronAuthorized(req)).ok;
 }
 
 export async function GET(req: NextRequest) {

@@ -27,10 +27,28 @@ const B64 = (buf: Buffer | Uint8Array): string =>
 const UNB64 = (s: string): Buffer =>
   Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4), "base64");
 
+// P0-7 (audit 2026-09-26): the old fallback signed with the PUBLIC anon key,
+// so with GUEST_TOKEN_SECRET unset anyone could forge a guest link. No fallback.
+// Fails loudly at module load on the server (not during `next build`, which
+// may not have runtime env) so a missing var is a 500 with a clear message on
+// the guest routes, never a silently forgeable token.
+const GUEST_SECRET_MISSING =
+  "GUEST_TOKEN_SECRET is not set. Guest self-service links cannot be signed or verified. " +
+  "Add GUEST_TOKEN_SECRET (>= 32 random chars) to the environment and redeploy.";
+
 function secret(): string {
-  const s = process.env.GUEST_TOKEN_SECRET || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!s) throw new Error("GUEST_TOKEN_SECRET not set");
+  const s = process.env.GUEST_TOKEN_SECRET;
+  if (!s || s.length < 16) throw new Error(GUEST_SECRET_MISSING);
   return s;
+}
+
+if (
+  typeof process !== "undefined" &&
+  process.env.NEXT_PHASE !== "phase-production-build" &&
+  process.env.NODE_ENV === "production" &&
+  !process.env.GUEST_TOKEN_SECRET
+) {
+  throw new Error(GUEST_SECRET_MISSING);
 }
 
 const NINETY_DAYS = 90 * 24 * 60 * 60;

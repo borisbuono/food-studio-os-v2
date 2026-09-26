@@ -1,3 +1,6 @@
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireAnyMembership } from "@/lib/access/requireManager";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -6,6 +9,10 @@ const SYSTEM = `You are reading a supplier delivery note or invoice from a photo
 unit_price is the price per single unit (per bottle if wine) BEFORE VAT where you can tell. If only a line total and qty are shown, compute unit_price = total / qty. Use dot decimals. Skip subtotal/VAT/total summary rows — only real product lines. If a number isn't legible, use null.`;
 
 export async function POST(req: Request) {
+  // P0-5 (audit 2026-09-26): vision spend needs a real team membership, not
+  // just a login.
+  const gate = await requireAnyMembership(supabaseServer());
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
   const body = await req.json().catch(() => ({}));
   const image = String(body?.image || "");
   const media_type = String(body?.media_type || "image/jpeg");

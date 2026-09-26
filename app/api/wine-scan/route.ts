@@ -1,3 +1,6 @@
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireAnyMembership } from "@/lib/access/requireManager";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -6,6 +9,9 @@ const SYSTEM = `You are a sommelier reading a wine label from a photo. From the 
 Use the label's language for names; write tasting_notes, pitch and description in English. If a field isn't legible, infer conservatively from what is visible or leave it "". vintage is the year only.`;
 
 export async function POST(req: Request) {
+  // P0-5 (audit 2026-09-26): vision spend needs a real team membership.
+  const gate = await requireAnyMembership(supabaseServer());
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
   // iOS Safari kills large JSON POSTs with "Load failed" — accept multipart
   // FormData too so the client can stream a Blob directly. Falls back to the
   // legacy JSON-base64 shape for any older caller.

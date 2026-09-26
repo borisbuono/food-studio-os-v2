@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recomputeAfterIngest } from "@/lib/recipes/recompute";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { requirePlatformOwner } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,6 +102,9 @@ async function handle() {
   if (!user) {
     return NextResponse.json({ ok: false, error: "not signed in — visit /login first" }, { status: 401 });
   }
+  // P0-5 (audit 2026-09-26): admin-only; reprocesses BM captures with vision.
+  const gate = await requirePlatformOwner(sb);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
   const results: any[] = [];
   for (const path of ORPHANS) {

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { APPLY_CONTACT, applyClient, type ApplyPageInfo } from "@/lib/hiring-apply";
 import ApplyForm from "./ApplyForm";
+import { supabaseService } from "@/lib/supabaseService";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,20 @@ export default async function ApplyPage({
   const { data } = await applyClient().rpc("apply_page_info", { p_slug: params.house });
   const ent = data as ApplyPageInfo | null;
   if (!ent?.id) notFound();
+
+  // P0-8 (audit 2026-09-26): the anon RPC no longer carries tax_id. The
+  // consent notice still has to show the CIF (GDPR controller identity), so
+  // it is read server-side with the service role from apply_page_legal(),
+  // which anon/authenticated cannot execute. Rendered into HTML here; the
+  // browser never gets an API that returns it.
+  let taxId: string | null = null;
+  try {
+    const svc = supabaseService();
+    if (svc) {
+      const { data: legal } = await svc.rpc("apply_page_legal", { p_slug: params.house });
+      taxId = (legal as any)?.tax_id ?? null;
+    }
+  } catch { /* consent block degrades to "legal details pending" */ }
   const openings = ent.openings || [];
 
   const source = (searchParams.src || searchParams.utm_source || "apply_page").slice(0, 40).toLowerCase();
@@ -69,7 +84,7 @@ export default async function ApplyPage({
         legalName={ent.legal_name || ent.name}
         accent={ent.accent || "#111111"}
         contact={APPLY_CONTACT[params.house] || "hola@ibzfoodstudio.com"}
-        taxId={ent.tax_id}
+        taxId={taxId}
         addressLine1={ent.address_line1}
         city={ent.city}
         postalCode={ent.postal_code}

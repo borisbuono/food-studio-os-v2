@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron/heartbeat";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { ingestForMailbox, type AdminMailbox } from "@/lib/files/gmail-ingest";
@@ -16,13 +17,9 @@ export const dynamic = "force-dynamic";
 // secret set) we skip the check so `curl` works — same convention as the
 // finance/nightly-scan endpoint.
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") || "";
-    if (auth !== "Bearer " + secret) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
-  }
+  // P0-6 (audit 2026-09-26): fail closed — Bearer CRON_SECRET only.
+  const cron = await cronAuthorized(req);
+  if (!cron.ok) return NextResponse.json({ ok: false, error: "unauthorized", who: cron.who }, { status: 401 });
 
   // A 15-min cron with a 20-min ingest window gives 5 min of overlap so a
   // sweep that runs a few seconds late doesn't miss anything.

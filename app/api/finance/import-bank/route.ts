@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest) {
     const file = form.get("file"); const entity = String(form.get("entity") || "").toUpperCase(); const bankAccount = String(form.get("bank_account") || "CaixaBank");
     if (!(file instanceof Blob)) return NextResponse.json({ ok: false, error: "no file" }, { status: 400 });
     if (!ENTITY_OK.has(entity)) return NextResponse.json({ ok: false, error: "entity required (IFL/BM/BBH)" }, { status: 400 });
+    // P0-5 (audit 2026-09-26): only a manager of the entity may load its bank file.
+    const gate = await requireManagerOf(supabaseServer(), entity);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array", cellDates: true });

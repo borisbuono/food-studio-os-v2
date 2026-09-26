@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron/heartbeat";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseJob, hasServiceRole } from "@/lib/supabaseJob";
 import { detectAll, type EntityCode } from "@/lib/finance/anomaly-detector";
@@ -15,13 +16,10 @@ export const dynamic = "force-dynamic";
 // Vercel Cron sends GET with `Authorization: Bearer $CRON_SECRET`. In dev,
 // we skip the check so `curl` works — same convention as other routes.
 export async function GET(req: NextRequest) {
+  // P0-6 (audit 2026-09-26): fail closed — Bearer CRON_SECRET only.
+  const cron = await cronAuthorized(req);
+  if (!cron.ok) return NextResponse.json({ ok: false, error: "unauthorized", who: cron.who }, { status: 401 });
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") || "";
-    if (auth !== "Bearer " + secret) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
-  }
 
   const entities: EntityCode[] = ["IFL", "BM", "BBH"];
   const anomaly = await Promise.all(entities.map((e) => detectAll(e, { user_id: null }).catch((err) => ({ error: String(err?.message || err), upserted: 0, by_kind: {} as any, candidates: [] }))));

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { requireManagerOfAll } from "@/lib/access/requireManager";
 import { detectAll, type EntityCode } from "@/lib/finance/anomaly-detector";
 
 export const runtime = "nodejs";
@@ -28,8 +29,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "provide entity_code or entities[]" }, { status: 400 });
     }
     const sb = supabaseServer();
-    const { data: u } = await sb.auth.getUser();
-    const uid = u.user?.id || null;
+    // P0-5 (audit 2026-09-26): detectAll runs on the service role; the caller
+    // must manage every entity named before it does.
+    const gate = await requireManagerOfAll(sb, entities);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
+    const uid = gate.uid;
 
     const results = await Promise.all(entities.map((e) => detectAll(e, { user_id: uid })));
     const summary = entities.map((e, i) => ({

@@ -20,15 +20,18 @@ import { supabaseService } from "@/lib/supabaseService";
 // lane never adopted it. Proof: the first eod-accounting-rebuild call read
 // pos_days:0 for both venues against 485 BM rows that are demonstrably there.
 
+// Fails CLOSED (audit 2026-09-26, P0-6). Before: an unset CRON_SECRET made
+// every /api/cron/* public (middleware allow-lists the prefix), and any signed-in
+// user of any tenant could fire fresto-backfill?entities=BM. Now the ONLY way
+// in is the Bearer. Vercel crons send it automatically when CRON_SECRET is set;
+// GitHub Actions send secrets.CRON_SECRET; pg_cron does not call these routes.
+// A platform owner who wants to run a job by hand passes the same header.
 export async function cronAuthorized(req: NextRequest): Promise<{ ok: boolean; who: string }> {
   const secret = process.env.CRON_SECRET;
+  if (!secret) return { ok: false, who: "no_secret_set" };
   const auth = req.headers.get("authorization") || "";
-  if (secret && auth === `Bearer ${secret}`) return { ok: true, who: "cron_secret" };
-  if (!secret) return { ok: true, who: "no_secret_set" };
-  const sb = supabaseServer();
-  const { data } = await sb.auth.getUser();
-  if (data?.user) return { ok: true, who: "user:" + (data.user.email || data.user.id) };
-  return { ok: false, who: "anon" };
+  if (auth === `Bearer ${secret}`) return { ok: true, who: "cron_secret" };
+  return { ok: false, who: "unauthorized" };
 }
 
 // The client every cron job should use. Falls back to the session client so

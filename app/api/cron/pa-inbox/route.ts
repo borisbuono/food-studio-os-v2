@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron/heartbeat";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseJob } from "@/lib/supabaseJob";
 import { materialiseNotes } from "@/lib/chef/paInbox";
@@ -16,11 +17,9 @@ export const dynamic = "force-dynamic";
 // (curl -H "Authorization: Bearer $CRON_SECRET" https://www.foodstudio.ai/api/cron/pa-inbox)
 // or wire it from pg_cron + pg_net like social-inbox-pull when a slot frees.
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") || "";
-    if (auth !== "Bearer " + secret) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  // P0-6 (audit 2026-09-26): fail closed — Bearer CRON_SECRET only.
+  const cron = await cronAuthorized(req);
+  if (!cron.ok) return NextResponse.json({ ok: false, error: "unauthorized", who: cron.who }, { status: 401 });
   const sb = supabaseJob();
   const r = await materialiseNotes(sb, { limit: 100 });
   // What the PA session still has to pull down.

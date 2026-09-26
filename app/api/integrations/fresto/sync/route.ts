@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { requireManagerOf } from "@/lib/access/requireManager";
 import { persistPullToPos, frestoStatus, FRESTO_DRY_RUN } from "@/lib/integrations/pos/fresto";
 import type { EntityCode } from "@/lib/integrations/types";
 
@@ -55,6 +56,12 @@ export async function POST(req: NextRequest) {
     const cronAuthed = !!secret && auth === `Bearer ${secret}`;
     if (!uid && !cronAuthed) {
       return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    // P0-5 (audit 2026-09-26): a session alone is not enough — the caller must
+    // manage the venue they are pulling. Cron bearer keeps its own lane.
+    if (!cronAuthed) {
+      const gate = await requireManagerOf(sb, entity);
+      if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     }
 
     const dates = eachDate(date_from, date_to);
