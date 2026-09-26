@@ -263,9 +263,12 @@ export default function ChefRoot() {
   }, []);
 
   // --- executing writes -----------------------------------------------------
-  const act = useCallback(async (action: ChefAction): Promise<ChefActResult> => {
+  // Slice A: outbound actions carry the server-minted confirm token, the turn
+  // id and how the gate was resolved; the server consumes the token and
+  // writes the resolution. Without a valid token the server answers 403.
+  const act = useCallback(async (action: ChefAction, gate?: { confirm_token?: string | null; turn_id?: string | null; via?: "tap" | "voice" }): Promise<ChefActResult> => {
     try {
-      const r = await fetch("/api/chef/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, language: lang }) });
+      const r = await fetch("/api/chef/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, language: lang, confirm_token: gate?.confirm_token || null, turn_id: gate?.turn_id || lastTurnId.current || null, via: gate?.via || "tap" }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d?.ok) return { ok: false, error: d?.error || ("HTTP " + r.status) };
       return d as ChefActResult;
@@ -274,9 +277,9 @@ export default function ChefRoot() {
     }
   }, [lang]);
 
-  const runAction = useCallback(async (action: ChefAction, voice: boolean) => {
+  const runAction = useCallback(async (action: ChefAction, voice: boolean, gate?: { confirm_token?: string | null; turn_id?: string | null; via?: "tap" | "voice" }) => {
     setBusy(true);
-    const res = await act(action);
+    const res = await act(action, gate);
     if (!res.ok) {
       showResult({ title: t("chef.error"), lines: [res.error || t("chef.offline")], kind: "error" }, { keep: false });
       if (voice) void speak(t("chef.error") + ". " + (res.error || ""));
@@ -284,7 +287,7 @@ export default function ChefRoot() {
     }
     if (res.navigate) { toIdle(); router.push(res.navigate); return; }
     const c: CardT = res.card || { title: t("chef.done"), lines: [], kind: "write" };
-    void logResolution(lastTurnId.current, "done", c.title);
+    // resolution "done" is written by /api/chef/act (slice A) — no client PATCH.
     // Batch approve ("the first three"): the next item gets its OWN read-back.
     if (action.type === "approve_reply" && batchRemaining.current > 0) {
       batchRemaining.current -= 1;
@@ -426,16 +429,32 @@ export default function ChefRoot() {
     if (editReply) {
       const er = editReply;
       setEditReply(null);
-      const readback = lang === "es" ? "Respondo a " + er.author + ": «" + trimmed + "». ¿Envío?" : "Reply to " + er.author + ": “" + trimmed + "”. Send it?";
+      void logResolution(lastTurnId.current, "edited");
+      setTranscript(trimmed);
+      setState("thinking"); setBusy(true);
+      // Slice A: the server logs the turn, composes the read-back and mints
+      // the one-shot token; the browser cannot make this send legal on its own.
+      let minted: any = null;
+      try {
+        const r = await fetch("/api/chef/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          action: { type: "approve_reply", entity_id: entityId, kind: "comment", id: er.id, text: trimmed, author: er.author },
+          language: lang, transcript: trimmed, route: pathname, source: voice ? "voice" : "typed",
+        }) });
+        minted = await r.json().catch(() => null);
+        if (!r.ok || !minted?.ok) minted = { error: minted?.error || ("HTTP " + r.status) };
+      } catch (e: any) { minted = { error: e?.message || "network" }; }
+      if (!minted?.confirm_token) {
+        showResult({ title: t("chef.error"), lines: [String(minted?.error || t("chef.offline"))], kind: "error" }, { keep: false });
+        return;
+      }
+      lastTurnId.current = minted.turn_id || lastTurnId.current;
       const turn: ChefTurn = {
         transcript: trimmed, language: lang,
         intent: { kind: "approve", surface: "social", id: er.id, action: "send" }, confidence: 1,
-        say: readback, readback, needs_confirm: true, confirm_voice: true, turn_id: lastTurnId.current,
-        action: { type: "approve_reply", entity_id: entityId, kind: "comment", id: er.id, text: trimmed, author: er.author },
+        say: minted.readback, readback: minted.readback, needs_confirm: true, confirm_voice: true, turn_id: minted.turn_id || null,
+        confirm_token: minted.confirm_token, action: minted.action,
         card: { title: (lang === "es" ? "Responder a " : "Reply to ") + er.author, lines: [trimmed], kind: "confirm" },
       };
-      void logResolution(lastTurnId.current, "edited");
-      setTranscript(trimmed);
       openConfirm(turn, voice);
       return;
     }
@@ -696,6 +715,7 @@ export default function ChefRoot() {
       const turn: ChefTurn = {
         transcript: transcript || "", language: lang, intent: { kind: "approve", surface: "social", id: "", action: "send" }, confidence: 1,
         say: a.readback, readback: a.readback, needs_confirm: true, confirm_voice: !!a.voice_ok, action: a.action, turn_id: lastTurnId.current,
+        confirm_token: a.confirm_token || null,
         card: { ...(card || { title: a.label, lines: [] }), kind: "confirm", primary: undefined, chip: undefined, secondary: undefined },
       };
       openConfirm(turn, false);
@@ -717,8 +737,9 @@ export default function ChefRoot() {
     const { turn, voice } = pending;
     closeVoiceWindow("closed");
     setPending(null);
-    void logResolution(turn.turn_id, how === "voice" ? "confirmed_voice" : "confirmed_tap");
-    void runAction(turn.action!, voice);
+    // confirmed_tap / confirmed_voice are written server-side when the token
+    // is consumed — the browser only forwards the token it was given.
+    void runAction(turn.action!, voice, { confirm_token: turn.confirm_token || null, turn_id: turn.turn_id || null, via: how });
   }, [closeVoiceWindow, pending, runAction]);
 
   const onNo = useCallback(() => {

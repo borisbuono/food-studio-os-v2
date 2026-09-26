@@ -9,6 +9,7 @@
 // The model classifies; the code decides. Nothing in this file writes to a
 // business table — only chef_turns for the log.
 
+import { attachConfirmTokens } from "@/lib/chef/confirm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
@@ -517,6 +518,10 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
   const finish = async (turn: ChefTurn, outcome: Outcome) => {
     turn.turn_id = await logTurn(input, turn, outcome, t0, cost);
     turn.latency_ms = Date.now() - t0;
+    // Slice A: every confirm surface on this turn gets a one-shot server token
+    // (needs_confirm action + card "confirm" buttons). /api/chef/act refuses
+    // the outbound class without it.
+    await attachConfirmTokens(supabaseServer(), input.uid, turn);
     return turn;
   };
   const clarify = (question: string, say: string) => finish(clarifyTurn(message, lang, question, say, label), "clarify");
@@ -636,7 +641,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
           transcript: message, language: lang,
           intent: { kind: "run_agent", agent_type, objective }, confidence: conf,
           say: tl.agent + ": " + clip(objective, 50), needs_confirm: true, readback, action, alternatives: alt,
-          card: { title: tl.agent, lines: [clip(objective, 140), label || ""].filter(Boolean), kind: "confirm", entity_label: label, primary: { label: lang === "es" ? "Sí, lanzar" : "Yes, run it", kind: "act", action }, chip: alt ? { label: tl.or_ask, kind: "none" } : undefined },
+          card: { title: tl.agent, lines: [clip(objective, 140), label || ""].filter(Boolean), kind: "confirm", entity_label: label, primary: { label: lang === "es" ? "Sí, lanzar" : "Yes, run it", kind: "confirm", action, readback }, chip: alt ? { label: tl.or_ask, kind: "none" } : undefined },
         }, "pending_confirm");
       }
       // ---------------------------------------------------------------- Phase 2

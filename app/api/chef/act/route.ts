@@ -5,6 +5,7 @@ import { getMyMembershipContext } from "@/lib/memberships";
 import type { ChefAction, ChefActResult, ChefCard, ChefLang } from "@/lib/chef/types";
 import { approveAndSend } from "@/lib/social/inboxAct";
 import { materialiseNotes } from "@/lib/chef/paInbox";
+import { consumeConfirmToken, needsConfirmToken, writeTurnResolution, type ConfirmVia } from "@/lib/chef/confirm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,15 @@ export const dynamic = "force-dynamic";
 // token; run_agent creates the charter and queues a PA inbox note (the
 // request leaves the account, so it is written down for the PA runner, not
 // executed in-app); undo consumes a token and deletes the row it points at.
+//
+// Slice A (2026-09-26) — the confirmation gate is enforced HERE, not in the
+// browser. Outbound-class actions (run_agent, approve_reply — see
+// lib/chef/confirm.ts CONFIRM_REQUIRED) are refused with 403 not_confirmed
+// unless the request carries a one-shot confirm_token minted by /api/ask (or
+// /api/chef/confirm) for THIS user, THIS turn and THIS exact action. The
+// token is consumed atomically; the server then writes chef_turns.resolution
+// (confirmed_tap / confirmed_voice → done / failed). Voice yes and the tap
+// arrive through the same token.
 
 const T = {
   es: {
@@ -26,6 +36,7 @@ const T = {
     note_queued: "Nota para la PA en cola", note_written: "Nota para la PA lista (pa_inbox)",
     sent: (a: string) => "Enviado a " + a, send_failed: "No se ha enviado", skipped: (a: string) => "Saltado " + a,
     booking: "Reserva actualizada", prep_upd: "Mise actualizada", not_found: "No encuentro esa fila",
+    not_confirmed: "Falta la confirmación — pídemelo otra vez", confirm_expired: "La confirmación ha caducado — pídemelo otra vez",
   },
   en: {
     remember: "Noted", feedback: "Feedback saved", prep: "Added to today's prep",
@@ -35,6 +46,7 @@ const T = {
     note_queued: "PA inbox note queued", note_written: "PA inbox note written (pa_inbox)",
     sent: (a: string) => "Sent to " + a, send_failed: "Not sent", skipped: (a: string) => "Skipped " + a,
     booking: "Booking updated", prep_upd: "Prep updated", not_found: "Can't find that row",
+    not_confirmed: "Not confirmed — ask me again", confirm_expired: "That confirmation expired — ask me again",
   },
 } as const;
 
@@ -52,22 +64,50 @@ function clip(s: string, n: number) { s = String(s || "").trim(); return s.lengt
 function card(title: string, lines: string[], entity_label?: string, kind: ChefCard["kind"] = "write"): ChefCard {
   return { title: clip(title, 60), lines: lines.slice(0, 4), kind, entity_label };
 }
-function fail(error: string, status = 400) {
-  const r: ChefActResult = { ok: false, error };
+function fail(error: string, status = 400, extra?: Record<string, unknown>) {
+  const r: ChefActResult = { ok: false, error, ...(extra || {}) } as ChefActResult;
   return Response.json(r, { status });
 }
 
-export async function POST(req: Request) {
+async function handle(req: Request) {
   const body = await req.json().catch(() => ({}));
   const lang: ChefLang = body?.language === "es" ? "es" : "en";
   const t = T[lang];
   const action = (body?.action && typeof body.action === "object" ? body.action : body) as ChefAction;
   if (!action || typeof (action as any).type !== "string") return fail("action required");
+  // Slice A: gate inputs ride alongside the action, never inside it.
+  const confirmToken: string | null = body?.confirm_token ? String(body.confirm_token) : null;
+  const turnIdIn: string | null = body?.turn_id && /^[0-9a-f-]{36}$/i.test(String(body.turn_id)) ? String(body.turn_id) : null;
+  const via: ConfirmVia = body?.via === "voice" ? "voice" : "tap";
 
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
-  const uid = u.user?.id;
+  const uid = (u.user?.id || "") as string;
   if (!uid) return fail("auth", 401);
+
+  // ---------------------------------------------------------------- confirm gate (server-side)
+  // Outbound class: no consumed token, no execution. Resolution is written by
+  // the server from here on; the client's PATCH /api/chef/turn can no longer
+  // assert confirmed_* or done.
+  let gateTurnId: string | null = turnIdIn;
+  if (needsConfirmToken(action)) {
+    const c = await consumeConfirmToken(sb, uid, confirmToken, action, via);
+    if (!c.ok) {
+      await writeTurnResolution(sb, uid, turnIdIn, "refused_" + c.reason);
+      return fail(c.reason === "expired" ? t.confirm_expired : t.not_confirmed, 403, { code: "not_confirmed", reason: c.reason });
+    }
+    gateTurnId = c.turn_id || turnIdIn;
+    await writeTurnResolution(sb, uid, gateTurnId, via === "voice" ? "confirmed_voice" : "confirmed_tap");
+  }
+  const res = await execute();
+  if (gateTurnId && action.type !== "undo") {
+    let title: string | null = null;
+    try { const j = await res.clone().json(); title = j?.card?.title || j?.error || null; } catch {}
+    await writeTurnResolution(sb, uid, gateTurnId, res.status < 400 ? "done" : "failed", title);
+  }
+  return res;
+
+  async function execute(): Promise<Response> {
 
   // ---------------------------------------------------------------- undo
   if (action.type === "undo") {
@@ -265,11 +305,12 @@ export async function POST(req: Request) {
     }
     // ---------------------------------------------------------------- Phase 2
     case "approve_reply": {
-      // Outbound. The client only reaches here after the read-back + Yes
-      // (tap, or a spoken yes inside the closed-grammar window). The gate
-      // itself is inside meta-reply (approved_by_boris) — same as the page.
+      // Outbound. We only get here after consumeConfirmToken() above accepted
+      // the one-shot token for THIS action (tap or spoken yes). approved_by_boris
+      // is written inside confirmApproval() behind that token; meta-reply still
+      // re-checks it on the row.
       const kind = action.kind === "dm" ? "dm" : "comment";
-      const r = await approveAndSend(sb, kind, String(action.id || ""), String(action.text || ""), uid);
+      const r = await approveAndSend(sb, kind, String(action.id || ""), String(action.text || ""), uid, String(confirmToken));
       if (!r.ok) return fail(r.error || t.send_failed, r.http === 200 ? 502 : r.http);
       const who = action.author || "";
       const res: ChefActResult = { ok: true, card: { ...card(t.sent(who), [clip(action.text, 140)], label, "write"), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } }, undo_token: null };
@@ -308,3 +349,6 @@ export async function POST(req: Request) {
       return fail("unknown action type");
   }
 }
+}
+
+export async function POST(req: Request) { return handle(req); }

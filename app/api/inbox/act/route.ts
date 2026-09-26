@@ -3,6 +3,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseService } from "@/lib/supabaseService";
 import { draftItem, type DraftKind } from "@/lib/social/inboxDraft";
 import { approveAndSend, callMetaReply } from "@/lib/social/inboxAct";
+import { mintAndConsumePageTick } from "@/lib/chef/confirm";
+import type { ChefAction } from "@/lib/chef/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +46,14 @@ export async function POST(req: NextRequest) {
 
   if (action === "approve") {
     // Shared with Chef (lib/social/inboxAct) — one approve path, one gate.
-    const r = await approveAndSend(sb, kind, id, String(p.text ?? ""), u.user.id);
+    // Slice A: the page tick IS the operator's explicit gesture, so the gate
+    // is minted and consumed here in one step; approved_by_boris is written
+    // only inside confirmApproval() behind that token.
+    const text = String(p.text ?? "");
+    const act: ChefAction = { type: "approve_reply", entity_id: String((row as any).entity_id || ""), kind: kind === "dm" ? "dm" : "comment", id, text };
+    const token = await mintAndConsumePageTick(sb, u.user.id, act);
+    if (!token) return NextResponse.json({ ok: false, error: "not_confirmed" }, { status: 403 });
+    const r = await approveAndSend(sb, kind, id, text, u.user.id, token);
     if (r.status === "error") return NextResponse.json({ ok: false, error: r.error }, { status: r.http });
     return NextResponse.json({ ok: r.ok, status: r.status, error: r.error, reply_remote_id: r.reply_remote_id }, { status: r.http });
   }

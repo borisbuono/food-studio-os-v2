@@ -33,7 +33,7 @@ export type ChefCardAction =
   | { label: string; kind: "navigate"; href: string }
   | { label: string; kind: "act"; action: ChefAction }   // posts to /api/chef/act
   | { label: string; kind: "capture_page"; capture_id: string }  // Phase 2: photograph another page of this capture
-  | { label: string; kind: "confirm"; action: ChefAction; readback: string; voice_ok?: boolean }  // Phase 2: opens the read-back gate, then acts
+  | { label: string; kind: "confirm"; action: ChefAction; readback: string; voice_ok?: boolean; confirm_token?: string | null }  // Phase 2: opens the read-back gate, then acts. Slice A: server-minted one-shot token the act MUST carry
   | { label: string; kind: "turn"; message: string }      // Phase 2: runs another turn ("#inbox_next")
   | { label: string; kind: "edit_reply"; id: string; author: string; draft: string }  // Phase 2: next utterance = the new reply text
   | { label: string; kind: "none" };                      // dismiss (e.g. "Looks right")
@@ -64,6 +64,18 @@ export type ChefAction =
   | { type: "booking_update"; entity_id: string; id: string; patch: { service_time?: string; party_size?: number; service_date?: string; notes?: string }; label?: string }  // undoable
   | { type: "prep_update"; entity_id: string; id: string; patch: { quantity?: number | null; unit?: string | null; status?: string; name?: string }; label?: string }         // undoable
   | { type: "undo"; undo_token: string };
+
+// Slice A (2026-09-26): what the client posts to /api/chef/act. The action
+// plus the server-minted confirm token (outbound class only), the turn it
+// came from and how the gate was resolved — so the server can consume the
+// token and write chef_turns.resolution itself.
+export type ChefActRequest = {
+  action: ChefAction;
+  language?: ChefLang;
+  confirm_token?: string | null;
+  turn_id?: string | null;
+  via?: "tap" | "voice";
+};
 
 export type ChefActResult = {
   ok: boolean;
@@ -96,6 +108,10 @@ export type ChefTurn = {
   // this many more "#approve_next" turns, each with its own read-back + Yes.
   batch_remaining?: number;
   turn_id?: string | null;       // chef_turns.id
+  // Slice A: one-shot token minted server-side for needs_confirm turns whose
+  // action is in the outbound class (run_agent, approve_reply). /api/chef/act
+  // refuses those actions (403 not_confirmed) unless it consumes this token.
+  confirm_token?: string | null;
   latency_ms?: number;
   // Compat for legacy /api/ask callers (reputation draft, AssistantContext):
   reply?: string;
