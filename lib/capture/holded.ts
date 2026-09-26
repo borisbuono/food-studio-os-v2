@@ -108,7 +108,7 @@ export function buildPayload(row: Row) {
     approveDoc: false,
     desc: `${row.supplier_name || "Proveedor"} ${row.invoice_number || ""}`.trim(),
     notes: `FS OS capture ${row.id} · PDF adjunto · líneas por tipo de IVA`,
-    items: bands.map((b) => ({ name: `Base imponible IVA ${b.rate}%`, units: 1, subtotal: r2(b.base), tax: b.rate })),
+    items: bands.map((b) => ({ name: `Base imponible IVA ${b.rate}%`, units: 1, subtotal: r2(b.base), tax: b.rate, taxes: [`p_iva_${b.rate}`] })),
   };
 }
 
@@ -217,12 +217,22 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
     total: Math.abs(Number(got.total) - want) <= 0.02,
     date: got.date ? dayOf(Number(got.date)) === row.document_date : false,
     contact: !!(got.contactName || got.contact),
+    // Every band landed as IVA at its rate (the finance lane found IGIC codes
+    // on old docs — a wrong tax key would pass the total check at 0 % → 0 %).
+    taxes: (() => {
+      const prods: any[] = Array.isArray(got.products) ? got.products : [];
+      const bands = (row!.vat_bands || []).filter((b) => b.base !== 0);
+      if (prods.length !== bands.length) return false;
+      return bands.every((b) => prods.some((p) => Math.abs(Number(p.price) * Number(p.units || 1) - b.base) <= 0.01
+        && Number(p.tax) === b.rate && (!Array.isArray(p.taxes) || p.taxes.includes(`p_iva_${b.rate}`))));
+    })(),
+    vat: Math.abs(Number(got.tax) - (row!.vat_bands || []).reduce((a, b) => a + b.cuota, 0)) <= 0.02,
   };
-  if (!checks.found || !checks.total || !checks.date || !checks.contact) {
+  if (!checks.found || !checks.total || !checks.date || !checks.contact || !checks.taxes || !checks.vat) {
     return rollback("read-back did not match the scan", { checks, holded_total: got.total, holded_date: got.date, want_total: want });
   }
   const ref = `attach:${a.status}:${row.file_sha256 || ""}`;
-  const readback = { ...checks, holded_total: got.total, docNumber: got.docNumber || null, approved: !!got.approvedAt, status: got.status };
+  const readback = { ...checks, holded_total: got.total, docNumber: got.docNumber || null, docNumber_matches: normDocNo(got.docNumber) === normDocNo(row.invoice_number), draft: !!got.draft, approved: !!got.approvedAt, status: got.status };
   await logPush(sb, row, { step: "create", ok: true, holded_id: newId, attach: a, readback, payload, by: uid },
     { holded_doc_id: newId, holded_attachment_ref: ref, holded_pushed_at: new Date().toISOString(), holded_pushed_by: uid,
       match_status: "approved", triaged_by: uid, triaged_at: new Date().toISOString() });
