@@ -184,6 +184,8 @@ export function normaliseBands(raw: unknown): { bands: VatBand[]; flags: string[
     const base = num((b as any)?.base);
     let cuota = num((b as any)?.cuota);
     if (rate === null || base === null) continue;
+    // An empty "Recargo eq." column read as a 0 % surcharge is not a tax line (Juntos FVA/8413, 26-09).
+    if (regime === "re" && (rate === 0 || !(num((b as any)?.cuota) || 0))) continue;
     if (SELF_ASSESSED.has(regime) || regime === "exempt" || regime === "not_subject") cuota = cuota ?? 0;
     const k = `${regime}:${rate}`;
     const cur = by.get(k) || { regime, rate, base: 0, cuota: 0, country: (b as any)?.country || null };
