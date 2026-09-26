@@ -68,9 +68,14 @@ async function isConnected(entity: EntityCode, vendor: string): Promise<boolean>
   } catch { return false; }
 }
 
-export default async function GrowReach({ searchParams }: { searchParams: { entity?: string } }) {
+// `?house=<slug>` (2026-09-26): the House sidebar's Reach section links here
+// with the house in scope; a slug wins over `?entity=` when both are present.
+const HOUSE_TO_OPT: Record<string, EntityOpt> = { bm: "BM", taller: "IFL" };
+
+export default async function GrowReach({ searchParams }: { searchParams: { entity?: string; house?: string } }) {
+  const fromHouse = HOUSE_TO_OPT[(searchParams?.house || "").toLowerCase()];
   const raw = (searchParams?.entity || "IFL").toUpperCase();
-  const entity: EntityOpt = (raw === "BM" ? "BM" : "IFL");
+  const entity: EntityOpt = fromHouse ?? (raw === "BM" ? "BM" : "IFL");
   const meta = ENTITIES.find((e) => e.code === entity)!;
 
   const [wixConn, metaConn] = await Promise.all([

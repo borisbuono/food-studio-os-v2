@@ -75,11 +75,29 @@ export type Scope =
   | { level: "house"; houseSlug: HouseSlug }
   | { level: "room"; houseSlug: HouseSlug; room: HouseRoom };
 
+// Reach — a top-level House verb (Boris ruling 2026-09-26: social is what he
+// will use most, and each venue has its own accounts). Three items, all
+// scoped to the house in the URL: the posting calendar and the accounts page
+// are the Holdings-tree pages accepting `?house=<slug>`; the inbox is the
+// URL-scoped Meta comments + DMs page. Lives in every house tree (full and
+// per-room) and is NOT repeated under Office.
+const HOUSE_REACH: SidebarSection = {
+  key: "growth",
+  label: "Reach",
+  items: [
+    { href: "/grow/reach/calendar?house={house}", label: "Posting calendar" },
+    // Waiting-count badge is filled in by DesktopSidebar from social_inbox_waiting.
+    { href: "/h/{house}/office/inbox",            label: "Inbox" },
+    { href: "/grow/reach?house={house}",          label: "Accounts" },
+  ],
+};
+
 // Operating venue (BM, Taller) — the operator's day-to-day surface.
-// REMOVED vs the old universal tree: Holdings link, Reach, Commercials,
+// REMOVED vs the old universal tree: Holdings link, Commercials,
 // Settings-that-belong-to-holdings, /develop/menu-engineering. Those live on
-// the Holdings scope now.
+// the Holdings scope now. Reach came back 2026-09-26 as its own section.
 const OPERATING_VENUE: SidebarSection[] = [
+  HOUSE_REACH,
   {
     key: "foh",
     label: "Dining Room",
@@ -143,9 +161,7 @@ const OPERATING_VENUE: SidebarSection[] = [
       // which is the Studio content calendar, on the Holdings tree he had
       // been dropped into. URL-scoped: carries the house slug.
       { href: "/h/{house}/calendar",                  label: "Calendar" },
-      // 2026-09-23: Meta comment + DM inbox. URL-scoped; the waiting count
-      // badge is filled in by DesktopSidebar from social_inbox_waiting.
-      { href: "/h/{house}/office/inbox",              label: "Inbox" },
+      // Inbox (/h/{house}/office/inbox) moved to the Reach section 2026-09-26.
       { href: "/administrate/events",                 label: "Events" },
       // "Decisions" → /administrate/decisions dropped 2026-09-22: the page
       // moved to /grow/inbox in ef0a39c and the link had 404'd since.
@@ -163,15 +179,20 @@ const HOLDING_COMPANY: SidebarSection[] = [
     items: [
       { href: "/administrate/holdings/console",       label: "Group console" },
       { href: "/administrate/finance",                label: "Consolidated finance" },
-      { href: "/administrate/holdings/intercompany",  label: "Intercompany" },
+      // "Intercompany" → /administrate/holdings/intercompany dropped 2026-09-26:
+      // no page exists; the flows render inside the Group console.
       { href: "/administrate/holdings",               label: "The Structure" },
     ],
   },
   {
     key: "portfolio",
     label: "Portfolio",
+    // 2026-09-26: /administrate/portfolio never existed (404). The three
+    // Studio-scoped destination pages from task #34 are the real ones.
     items: [
-      { href: "/administrate/portfolio",              label: "Advisory + partners + landlords" },
+      { href: "/studio/advisory",                     label: "Advisory" },
+      { href: "/studio/partners",                     label: "Partners" },
+      { href: "/studio/landlords",                    label: "Landlords" },
     ],
   },
   {
@@ -201,8 +222,11 @@ const ADVISORY_CLIENT: SidebarSection[] = [
     label: "Advisory",
     items: [
       { href: "/administrate/advisor",                label: "Client dashboard" },
-      { href: "/administrate/advisor/pnl",            label: "Project P&L" },
-      { href: "/administrate/advisor/invoices",       label: "Invoices out" },
+      // "Project P&L" (/administrate/advisor/pnl) and "Invoices out"
+      // (/administrate/advisor/invoices) dropped 2026-09-26: neither page
+      // exists — both fell into the [client_id] dynamic route and rendered a
+      // client page for a client called "pnl" / "invoices". P&L and invoices
+      // are reached from the dashboard per client.
     ],
   },
 ];
@@ -214,9 +238,10 @@ const PARTNER: SidebarSection[] = [
     key: "partner",
     label: "Partner",
     items: [
-      { href: "/administrate/partner",                label: "Partner dashboard" },
-      { href: "/administrate/partner/licence",        label: "Licence agreement" },
-      { href: "/administrate/partner/revshare",       label: "Rev-share ledger" },
+      // 2026-09-26: /administrate/partner, /licence and /revshare never
+      // existed (3 × 404). Until partner-facing pages are built the tree
+      // points at the one partners page that does exist.
+      { href: "/studio/partners",                     label: "Partners" },
     ],
   },
 ];
@@ -228,9 +253,10 @@ const LANDLORD: SidebarSection[] = [
     key: "landlord",
     label: "Landlord",
     items: [
-      { href: "/administrate/landlord",                    label: "Lease dashboard" },
-      { href: "/administrate/landlord/invoices-in",        label: "Invoices in" },
-      { href: "/administrate/landlord/consulting",         label: "Side-consulting billing" },
+      // 2026-09-26: /administrate/landlord, /invoices-in and /consulting
+      // never existed (3 × 404). Until landlord-facing pages are built the
+      // tree points at the one landlords page that does exist.
+      { href: "/studio/landlords",                    label: "Landlords" },
     ],
   },
 ];
@@ -274,9 +300,13 @@ const STUDIO: SidebarSection[] = [
 // Office-room scope — when the user is on /office/*, show only the Office
 // section from the operating tree. Extracted from OPERATING_VENUE so we don't
 // duplicate the item list.
-const OFFICE_ROOM: SidebarSection[] = [OPERATING_VENUE[2]];
-const BOH_ROOM:    SidebarSection[] = [OPERATING_VENUE[1]];
-const FOH_ROOM:    SidebarSection[] = [OPERATING_VENUE[0]];
+// Looked up by key (not index) since Reach sits first in the house tree.
+// Reach is a house verb, not a room, so every room tree carries it too —
+// otherwise Boris standing in /office would lose the section he uses most.
+const houseSection = (key: SidebarSection["key"]): SidebarSection => OPERATING_VENUE.find((s) => s.key === key)!;
+const OFFICE_ROOM: SidebarSection[] = [houseSection("office"), HOUSE_REACH];
+const BOH_ROOM:    SidebarSection[] = [houseSection("boh"),    HOUSE_REACH];
+const FOH_ROOM:    SidebarSection[] = [houseSection("foh"),    HOUSE_REACH];
 
 // The public function the sidebar renders. Missing scope → operating venue
 // (safest for an unauthenticated preview, matches the current default cookie).

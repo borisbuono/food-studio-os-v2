@@ -99,10 +99,14 @@ const ROUTES: Route[] = [
   { label: "Schedule",                href: "/administrate/team/schedule", hint: "shifts rota", pillar: "office", gate: { room: "office" } },
   { label: "Calendar",                href: "/h/{house}/calendar",     hint: "house calendar shifts bookings prep", pillar: "office", gate: { room: "office" } },
   { label: "Events",                  href: "/administrate/events",    hint: "private dining", pillar: "office", gate: { room: "office" } },
-  { label: "Decisions",               href: "/administrate/decisions", hint: "log rationale", pillar: "office", gate: { room: "office" } },
+  // "Decisions" → /administrate/decisions dropped 2026-09-26: the page moved
+  // to /grow/inbox (ef0a39c) and the row had 404'd since.
   { label: "Holdings",                href: "/administrate/holdings",  hint: "group parent", pillar: "office", gate: { room: "studio" } },
-  { label: "Reach",                   href: "/grow/reach",             hint: "ads channels", pillar: "office", gate: { room: "studio" } },
-  { label: "Reach calendar",          href: "/grow/reach/calendar",    hint: "content calendar", pillar: "office", gate: { room: "studio" } },
+  // Reach is a house verb (2026-09-26): rows carry the house in scope and
+  // are dropped when none resolves; the Holdings sidebar keeps the group view.
+  { label: "Reach · posting calendar", href: "/grow/reach/calendar?house={house}", hint: "content calendar social posts", pillar: "office", gate: { room: "office" } },
+  { label: "Reach · inbox",           href: "/h/{house}/office/inbox", hint: "meta comments dms replies", pillar: "office", gate: { room: "office" } },
+  { label: "Reach · accounts",        href: "/grow/reach?house={house}", hint: "ads channels meta wix", pillar: "office", gate: { room: "office" } },
   { label: "Commercials",             href: "/grow/commercials",       hint: "deals contracts", pillar: "office", gate: { room: "studio" } },
   { label: "Settings",                href: "/administrate/settings",  hint: "system settings", gate: { room: "office" } },
   { label: "Account",                 href: "/account",                hint: "profile me" },
@@ -164,7 +168,8 @@ const NEW_ITEMS: Route[] = [
   { label: "New · team invite",   href: "/administrate/team/invite",       hint: "invite whatsapp", gate: { room: "office" } },
   { label: "New · hiring opening", href: "/h/{house}/office/hiring/new",   hint: "open role recruit", gate: { room: "office", feature: "hiring" } },
   { label: "New · order",         href: "/execute/orders",                 hint: "supplier order", gate: { room: "kitchen" } },
-  { label: "New · campaign",      href: "/grow/reach/campaigns/new",       hint: "ad reach campaign", gate: { room: "studio" } },
+  // "New · campaign" → /grow/reach/campaigns/new dropped 2026-09-26: the
+  // composer was never built (see lib/integrations/marketing/wix-newsletter.ts).
 ];
 
 function parseMode(input: string): Mode {

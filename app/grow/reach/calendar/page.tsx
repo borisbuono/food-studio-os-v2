@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { HOUSE_SLUG_TO_ENTITY } from "@/lib/houses";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { ENTITY_ACCENT, ENTITY_LABEL, type EntityKey, E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 export const dynamic = "force-dynamic";
@@ -128,10 +130,17 @@ export default function CalendarPage() {
   const ec = ENTITY_CODE[entity];
   const accent = ENTITY_ACCENT[entity];
 
+  // `?house=<slug>` (2026-09-26) — the House sidebar's Reach section links
+  // here with the house in scope, so the calendar opens on THAT venue instead
+  // of whatever fs_entity last pointed at. Falls back to the cookie mirror.
+  const searchParams = useSearchParams();
+  const houseParam = searchParams?.get("house")?.toLowerCase() || null;
   useEffect(() => {
+    const fromHouse = houseParam ? HOUSE_SLUG_TO_ENTITY[houseParam] : undefined;
+    if (fromHouse) { setEntity(fromHouse); return; }
     const e = (typeof window !== "undefined" ? localStorage.getItem("fs_entity") : null) as EntityKey | null;
     if (e) setEntity(e);
-  }, []);
+  }, [houseParam]);
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");

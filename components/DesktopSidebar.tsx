@@ -332,8 +332,10 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
                     // Longest-prefix wins inside a section, so "Overview"
                     // (/studio) isn't lit on every /studio/* page next to
                     // the item the user actually opened (e.g. Houses).
-                    const matches = (h: string) => pathname === h || pathname.startsWith(h + "/");
-                    const best = section.items.filter((x) => matches(x.href)).sort((x, y) => y.href.length - x.href.length)[0];
+                    // Hrefs may carry a query (Reach → ?house=<slug>); match on the path only.
+                    const pathOf = (h: string) => h.split("?")[0];
+                    const matches = (h: string) => pathname === pathOf(h) || pathname.startsWith(pathOf(h) + "/");
+                    const best = section.items.filter((x) => matches(x.href)).sort((x, y) => pathOf(y.href).length - pathOf(x.href).length)[0];
                     const active = !!best && best.href === it.href;
                     return (
                       <li key={it.href}>

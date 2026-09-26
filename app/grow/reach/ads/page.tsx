@@ -70,9 +70,13 @@ const DISABLED_LABEL: Record<number, { label: string; blurb: string }> = {
   101: { label: "Closed", blurb: "Account closed by Meta." },
 };
 
-export default async function AdsPage({ searchParams }: { searchParams: { entity?: string } }) {
+// `?house=<slug>` (2026-09-26): house-scoped entry from the Reach section.
+const HOUSE_TO_OPT: Record<string, EntityOpt> = { bm: "BM", taller: "IFL" };
+
+export default async function AdsPage({ searchParams }: { searchParams: { entity?: string; house?: string } }) {
+  const fromHouse = HOUSE_TO_OPT[(searchParams?.house || "").toLowerCase()];
   const raw = (searchParams?.entity || "BM").toUpperCase();
-  const entity: EntityOpt = (raw === "IFL" ? "IFL" : "BM");
+  const entity: EntityOpt = fromHouse ?? (raw === "IFL" ? "IFL" : "BM");
   const brand = ENTITIES.find((e) => e.code === entity)!.brand;
   const accent = entity === "BM" ? "#9A3122" : "#3F4C28";
 
