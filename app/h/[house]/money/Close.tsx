@@ -18,6 +18,7 @@ import ManualEodClient from "./ManualEodClient";
 
 export const dynamic = "force-dynamic";
 
+// Folded into /h/<slug>/money as the Close tab (slim OS slice 3).
 export default async function ManualEodPage({ params }: { params: { house: string } }) {
   const slug = params.house;
   const house = await getHouseBySlug(slug);
@@ -49,15 +50,10 @@ export default async function ManualEodPage({ params }: { params: { house: strin
   }).format(new Date());
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-3xl px-6 py-6">
       <div className="flex items-baseline justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
-            <Link href={`/h/${slug}`} className="hover:text-ink">← {houseNameForSlug(slug)}</Link>
-            <span className="mx-2 text-clay">/</span>
-            <span>Money</span>
-          </p>
-          <h1 className="mt-2 font-serif text-3xl text-ink leading-tight">Enter yesterday's close</h1>
+          <h2 className="font-serif text-2xl text-ink leading-tight">Enter yesterday's close</h2>
           <p className="mt-2 font-serif italic text-[14px] text-ink-soft">
             Manual entry — the numbers land in <span className="font-mono not-italic text-[12px]">eod_pos</span> tagged <span className="font-mono not-italic text-[12px]">source=manual</span> just like a Fresto pull.
           </p>

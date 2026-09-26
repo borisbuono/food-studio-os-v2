@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { serverRestaurantId, serverEntity } from "@/lib/serverVenue";
 import { ENTITY_LABEL } from "@/lib/entities";
@@ -20,11 +19,9 @@ export default async function EodList() {
     .limit(60)).data || [];
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
-      <p className="mt-6 font-sans text-xs font-medium text-ink-soft">End-of-day reports · {ENTITY_LABEL[entity]}</p>
-      <h1 className="mt-2 font-serif text-3xl text-ink">{eod.length} reports</h1>
-      <Link href="/administrate/finance/eod/new" className="mt-4 inline-block rounded-xl px-5 py-3 font-sans text-[14px] font-medium text-[#F7F7F4]" style={{ background: "var(--accent)" }}>+ Close today's service</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
+      <p className="font-sans text-xs font-medium text-ink-soft">End-of-day reports · {ENTITY_LABEL[entity]}</p>
+      <h2 className="mt-2 font-serif text-2xl text-ink">{eod.length} reports</h2>
 
       <div className="mt-6 space-y-4">
         {eod.map((r: any, i: number) => (

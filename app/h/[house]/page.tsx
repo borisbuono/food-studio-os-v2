@@ -190,7 +190,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
             )}
           </p>
           <Link
-            href={`/h/${slug}/office/eod`}
+            href={`/h/${slug}/money`}
             className="border border-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-ink hover:text-paper"
           >
             + Enter today's close

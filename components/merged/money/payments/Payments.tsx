@@ -30,8 +30,7 @@ export default async function PaymentsPage() {
   return (
     <>
       <AssistantContext context={chefContext} />
-      <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-10">
-        <Link href="/administrate/finance" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
+      <main className="mx-auto max-w-4xl lg:max-w-6xl px-6 py-6">
         <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-clay">Command Center · Payment health</p>
         <h1 className="mt-1 font-serif text-[34px] leading-[1.05] text-ink">Are we being charged?</h1>
         <p className="mt-2 font-serif italic text-[15px] text-ink-soft">Every SaaS bill across IFL, BM, BBH. Anything not <span className="text-basil">healthy</span> gets a card. Tap "Fix now" to open the vendor's billing page.</p>

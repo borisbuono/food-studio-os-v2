@@ -6,7 +6,8 @@ import { noEmoji } from "@/lib/text";
 export const dynamic = "force-dynamic";
 const eur = (n: number) => (n < 0 ? "-€" : "€") + Math.abs(n).toFixed(2);
 
-export default async function Variance({ searchParams }: { searchParams: { by?: string } }) {
+// Folded into /h/<slug>/money?tab=variance (slim OS slice 3).
+export default async function Variance({ searchParams, base }: { searchParams: { by?: string }; base: string }) {
   
   const supabase = supabaseServer();const by = (searchParams?.by === "recipe" ? "recipe" : "ingredient") as "recipe" | "ingredient";
   const rid = serverRestaurantId();
@@ -69,8 +70,7 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
   const biggest = ingRows[0];
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← the numbers</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>Variance · theoretical vs. actual</p>
       <h1 className="mt-2 font-serif text-4xl leading-tight text-ink">Where the stock went</h1>
       <p className="mt-3 font-sans text-[15px] leading-relaxed text-ink-soft">Book = opening stock minus what the recipes say the day's sales should have used. Counted = the physical stock-take. The gap is waste, over-portioning or shrinkage — priced out.</p>
@@ -82,8 +82,8 @@ export default async function Variance({ searchParams }: { searchParams: { by?: 
       </div>
 
       <div className="mt-5 inline-flex rounded-xl border border-line p-1">
-        <Link href="/administrate/finance/variance?by=ingredient" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By ingredient</Link>
-        <Link href="/administrate/finance/variance?by=recipe" className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By recipe</Link>
+        <Link href={`${base}?tab=variance&by=ingredient`} className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "ingredient" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By ingredient</Link>
+        <Link href={`${base}?tab=variance&by=recipe`} className={"rounded-lg px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide " + (by === "recipe" ? "bg-[color:var(--accent)] text-[#FCEFE7]" : "text-ink-soft")}>By recipe</Link>
       </div>
 
       {by === "ingredient" ? (

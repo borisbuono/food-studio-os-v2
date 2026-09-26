@@ -33,7 +33,7 @@ export const RETIRED: Retired[] = [
   { from: "/office/advisor",          to: "/studio/advisory",                 why: "alias" },
   { from: "/office/charters",         to: "/administrate/agent-charters",     why: "alias" },
   { from: "/office/chef-log",         to: "/h/:house/office/chef-log",        why: "alias" },
-  { from: "/office/finance", to: "/administrate/finance",            why: "alias" },
+  { from: "/office/finance", to: "/h/:house/money?tab=finance",       why: "alias" },
   { from: "/office/grow/commercials", to: "/grow/commercials",                why: "alias" },
   { from: "/office/grow/reach/ads",   to: "/grow/reach/ads",                  why: "alias" },
   { from: "/office/grow/reach",       to: "/grow/reach",                      why: "alias" },
@@ -75,8 +75,8 @@ export const RETIRED: Retired[] = [
   { from: "/develop/menu/:id", to: "/h/:house/menu/recipes/:id", why: "dup #4" },
   { from: "/menu/:id",         to: "/develop/menu/publish",         why: "dup #4 (menu-item + 86 lives on the publish grid)" },
   // #7 / #8 money
-  { from: "/administrate/finance/dashboard", to: "/administrate/finance", why: "dup #7" },
-  { from: "/administrate/finance/eod/new",   to: "/h/:house/office/eod",  why: "dup #8" },
+  { from: "/administrate/finance/dashboard", to: "/h/:house/money?tab=finance", why: "dup #7" },
+  { from: "/administrate/finance/eod/new",   to: "/h/:house/money",  why: "dup #8" },
   // #12 / #13 people
   { from: "/administrate/team/onboarding",   to: "/h/:house/office/hiring", why: "dup #12 (older hiring system)" },
   { from: "/administrate/team/onboard/new",  to: "/h/:house/office/hiring", why: "dup #12 (older hiring system)" },
@@ -105,6 +105,24 @@ export const RETIRED: Retired[] = [
   { from: "/develop/menu/engineering",        to: "/h/:house/menu/costing",              why: "dup #5: one price screen" },
   { from: "/develop/repricing",               to: "/h/:house/menu/costing?tab=repricing", why: "dup #5: one price screen" },
   { from: "/develop/wine/prices",             to: "/develop/wine?tab=prices",            why: "single: wine prices is a tab of wine" },
+
+  // ---- slice 3 · Money + Supplies (2026-09-26) — one Money landing per house, Supplies tabs
+  { from: "/h/:house/office/eod",             to: "/h/:house/money",                     why: "slice 3: Close is the Money landing" },
+  { from: "/administrate/finance/eod",        to: "/h/:house/money?tab=reports",         why: "slice 3: tab" },
+  { from: "/administrate/finance",            to: "/h/:house/money?tab=finance",         why: "dup #7: one money dashboard per house" },
+  { from: "/administrate/finance/costs",      to: "/h/:house/money?tab=costs",           why: "single: Money merge" },
+  { from: "/administrate/finance/variance",   to: "/h/:house/money?tab=variance",        why: "single: Money merge" },
+  { from: "/administrate/finance/forecast",   to: "/h/:house/money?tab=forecast",        why: "single: Money merge" },
+  { from: "/administrate/finance/payments",   to: "/h/:house/money?tab=integrations",    why: "single: Integrations merge" },
+  { from: "/administrate/finance/pos-sync",   to: "/h/:house/money?tab=integrations",    why: "single: Integrations merge" },
+  { from: "/administrate/finance/integrations", to: "/h/:house/money?tab=integrations",  why: "single: Integrations merge" },
+  { from: "/files/inbox",                     to: "/h/:house/money?tab=paper",           why: "dup #9: one document inbox (links to Scans)" },
+  { from: "/administrate/invoices",           to: "/h/:house/money?tab=paper",           why: "dup #9: one document inbox (links to Scans)" },
+  { from: "/administrate/finance/reconciliation/patterns", to: "/administrate/finance/reconciliation?tab=patterns", why: "single: tab" },
+  { from: "/administrate/finance/setup/:entity", to: "/administrate/finance/setup?entity=:entity", why: "single: folded into setup" },
+  { from: "/execute/receiving",               to: "/execute/orders?tab=receiving",       why: "dup #20: receiving is a tab of orders" },
+  { from: "/execute/orders/picker",           to: "/execute/orders?tab=picker",          why: "single: picker is a tab of orders" },
+  { from: "/administrate/suppliers/:id/add-product", to: "/administrate/suppliers/:id?tab=add-product", why: "single: sheet on the supplier" },
 
   // singles
   { from: "/feedback",         to: "/",              why: "feedback is a Chef intent" },

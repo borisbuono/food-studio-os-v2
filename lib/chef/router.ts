@@ -179,11 +179,11 @@ function pageHref(word: string, house: string | null): string | null {
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/calendar";
   if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/office/inbox" : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
-  if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/office/eod" : "/administrate/finance/eod";
-  if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : "/administrate/finance";
+  if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
+  if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
   if (/equipo|team|gente|people|personal|plantilla/.test(w)) return "/administrate/team";
   if (/pedido|order|compra|\bbuy\b|suppl|suministro|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
-  if (/oficina|office/.test(w)) return h ? h + "/office/eod" : "/administrate/finance";
+  if (/oficina|office/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/cocina|kitchen/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
   if (/estudio|studio/.test(w)) return "/studio";
   if (/inicio|home|start|casa/.test(w)) return h ? h : "/";

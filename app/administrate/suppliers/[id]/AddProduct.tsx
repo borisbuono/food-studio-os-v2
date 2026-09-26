@@ -6,6 +6,7 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 const UNITS = ["kg", "g", "l", "ml", "unit", "case", "box"];
 
+// Folded into /administrate/suppliers/[id]?tab=add-product (slim OS slice 3).
 export default function AddProduct() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -20,13 +21,13 @@ export default function AddProduct() {
     if (f.pack_size) payload.pack_size = f.pack_size;
     const { error } = await supabaseBrowser.from("provider_products").insert(payload);
     if (error) { setErr(error.message); setBusy(false); return; }
-    router.push("/administrate/suppliers/" + params.id);
+    router.push("/administrate/suppliers/" + params.id); router.refresh();
   }
   const inp = "mt-1 w-full rounded-xl border border-black/15 bg-card px-4 py-3 font-sans text-[14px] text-ink";
   const lbl = "font-mono text-[10px] uppercase tracking-wide text-clay";
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <Link href={"/administrate/suppliers/" + params.id} className="font-sans text-sm text-ink-soft">← supplier</Link>
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Add product</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">A new line for this supplier</h1>

@@ -8,6 +8,7 @@ type Match = { product_id: string; name: string; unit: string | null; unit_price
 
 const eur = (n: number) => "€" + n.toFixed(2);
 
+// Folded into /execute/orders?tab=picker (slim OS slice 3).
 export default function Picker() {
   const [q, setQ] = useState("");
   const [products, setProducts] = useState<any[]>([]);
@@ -45,8 +46,7 @@ export default function Picker() {
   const cheapest = matches[0];
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/administrate/suppliers" className="font-sans text-sm text-ink-soft">← suppliers</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Find a product · across all suppliers</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">What are you looking for?</h1>
       <p className="mt-2 font-serif text-[14px] italic text-ink-soft">Tomatoes, gambas, parmesan — type it. See who's got it, at what price, pick the best.</p>

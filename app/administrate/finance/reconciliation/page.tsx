@@ -4,6 +4,10 @@ import { serverEntity } from "@/lib/serverVenue";
 import AssistantContext from "@/components/AssistantContext";
 import ProposedMatchesClient, { type OpenMatch, type AltCandidate } from "./ProposedMatchesClient";
 import ReconciliationSourcePreview from "./ReconciliationSourcePreview";
+import Patterns from "./Patterns";
+import TabNav, { pickTab } from "@/components/nav/TabNav";
+
+const TABS = [{ key: "movements", label: "Movements" }, { key: "patterns", label: "Patterns" }];
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +24,20 @@ const CAT: Record<string, string> = {
   unmatched: "Unmatched",
 };
 
-export default async function Reconciliation() {
+// Slim OS slice 3: /administrate/finance/reconciliation/patterns folded in
+// as the Patterns tab (route retired → ?tab=patterns).
+export default async function Reconciliation({ searchParams }: { searchParams?: { tab?: string } }) {
+  const tab = pickTab(TABS, searchParams?.tab);
+  if (tab === "patterns") {
+    return (
+      <div className="mx-auto max-w-2xl lg:max-w-5xl px-6 pt-8">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Money</p>
+        <h1 className="mt-1 font-serif text-3xl text-ink">Reconciliation</h1>
+        <TabNav base="/administrate/finance/reconciliation" tabs={TABS} active={tab} className="mt-5" />
+        <div className="[&>main]:px-0 [&>main]:pt-4"><Patterns /></div>
+      </div>
+    );
+  }
   const supabase = supabaseServer();
   const entity = serverEntity();
   const ec = ENTITY_CODE[entity] || "IFL";
@@ -89,11 +106,13 @@ export default async function Reconciliation() {
   const proposedCount = openList.filter((r) => r.top_candidate_id).length;
 
   return (
-    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 pt-8 pb-12">
       <AssistantContext context={{ kind: "bank_movements", entity: ec, unmatched: (unmatched || []).slice(0, 50).map((m: any) => ({ id: m.id, date: m.movement_date, description: m.description, amount_eur: m.amount_eur, bank_account: m.bank_account })), proposed_count: proposedCount }} />
-      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← dashboard</Link>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Money</p>
+      <h1 className="mt-1 font-serif text-3xl text-ink">Reconciliation</h1>
+      <TabNav base="/administrate/finance/reconciliation" tabs={TABS} active={tab} className="mt-5" />
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Bank · {ec} · reconciliation</p>
-      <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">What's in motion.</h1>
+      <h2 className="mt-2 font-serif text-2xl text-ink leading-tight">What's in motion.</h2>
       <p className="mt-2 font-serif italic text-[15px] text-ink-soft">Every bank movement, matched or not. The matcher proposes — you decide. Proposed matches sit on top, then any older unmatched rows below.</p>
 
       <div className="mt-8 grid grid-cols-4 gap-3 border-t border-line pt-5">

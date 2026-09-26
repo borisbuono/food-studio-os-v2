@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getBindings } from "@/lib/integrations/registry";
+import SetupEntity from "./_entity/SetupEntity";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ const ENTITIES = [
   { code: "BBH", brand: "Holdings",           fiscal: "Boris Buono Holdings SL", restaurant_id: null },
 ];
 
-export default async function SetupIndex() {
+// Slim OS slice 3: /administrate/finance/setup/[entity] folded in — one
+// entity's readiness page renders here with ?entity=<code>.
+export default async function SetupIndex({ searchParams }: { searchParams?: { entity?: string } }) {
+  if (searchParams?.entity) return <SetupEntity params={{ entity: searchParams.entity }} />;
   const sb = supabaseServer();
   const bindings = getBindings();
   const stats = await Promise.all(ENTITIES.map(async (e) => {
@@ -24,7 +28,6 @@ export default async function SetupIndex() {
 
   return (
     <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
-      <Link href="/administrate/finance" className="font-mono text-[10px] uppercase tracking-wide text-clay">← finance</Link>
       <h1 className="mt-3 font-serif text-[34px] leading-[1.05] text-ink">Onboard the three companies</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">One readiness page per entity. Open each to see what's wired, what's missing, and how to feed the backlog in.</p>
 
@@ -33,7 +36,7 @@ export default async function SetupIndex() {
           const b = bindings.find((x) => x.entity === e.code);
           const acctStatus = b?.accounting?.status || "off";
           return (
-            <Link key={e.code} href={`/administrate/finance/setup/${e.code}`} className="block rounded-2xl border border-line bg-paper p-5 hover:border-ink-soft">
+            <Link key={e.code} href={`/administrate/finance/setup?entity=${e.code}`} className="block rounded-2xl border border-line bg-paper p-5 hover:border-ink-soft">
               <div className="flex items-baseline justify-between">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-wide text-clay">{e.code}</p>

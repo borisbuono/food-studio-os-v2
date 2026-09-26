@@ -49,11 +49,10 @@ export default function Costs() {
     return out.sort((a, b) => Math.abs(b.chg) - Math.abs(a.chg));
   }, [rows]);
 
-  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12"><p className="font-serif text-2xl text-ink">Loading cost trends…</p></main>;
+  if (!ready) return <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6"><p className="font-serif text-2xl text-ink">Loading cost trends…</p></main>;
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/administrate/finance" className="font-sans text-sm text-ink-soft">← finance</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Costs · price trends</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">What we pay, over time</h1>
       <p className="mt-2 font-sans text-[14px] leading-relaxed text-ink-soft">Every cost logged from a delivery note lands here — wine, food, cleaning. Red climbs, green eases. Tap a line to see the points.</p>

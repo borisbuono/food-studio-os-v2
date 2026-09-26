@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { serverEntity } from "@/lib/serverVenue";
 import type { EntityKey } from "@/lib/entities";
-import ConnectIntegration from "@/app/administrate/finance/setup/[entity]/ConnectIntegration";
+import ConnectIntegration from "@/app/administrate/finance/setup/_entity/ConnectIntegration";
 import { E_BM, E_TALLER, E_UTOPIA, E_HOLDINGS } from "@/lib/entities";
 
 export const dynamic = "force-dynamic";
