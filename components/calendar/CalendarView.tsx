@@ -52,7 +52,7 @@ function sourceHref(e: CalEvent, slugs: Record<string, string>): string | null {
   const slug = e.entity_id ? slugs[e.entity_id] : null;
   switch (e.source_type) {
     case "interview": return slug ? `/h/${slug}/office/hiring` : null;
-    case "shift": return slug ? `/h/${slug}/office/labor` : null;
+    case "shift": return slug ? `/h/${slug}/team?tab=labour` : null;
     case "social": return "/grow/reach/calendar";
     default: return null;
   }

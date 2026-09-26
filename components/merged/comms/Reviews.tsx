@@ -37,6 +37,8 @@ const PLATFORMS = [
   { key: "thefork", label: "TheFork" },
 ] as const;
 
+// The Reviews tab of /h/<slug>/comms (slim OS slice 4, audit #15; Boris:
+// reviews move Serve → Reach) — was /grow/reputation.
 export default async function GrowReputation() {
   const sb = supabaseServer();
   const rid = serverRestaurantId();
@@ -56,13 +58,12 @@ export default async function GrowReputation() {
   for (const s of (status || []) as StatusRow[]) statusByPlatform[s.platform] = s;
 
   return (
-    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-10">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-6">
 
       <header className="mt-4 flex items-baseline justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-tomato">Grow · Reputation</p>
-          <h1 className="mt-1 font-serif text-3xl text-ink">Reviews inbox</h1>
+          <h2 className="mt-1 font-serif text-2xl text-ink">Reviews inbox</h2>
         </div>
         <Link href="/grow/reputation/settings" className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-ink-soft">settings ⚙</Link>
       </header>

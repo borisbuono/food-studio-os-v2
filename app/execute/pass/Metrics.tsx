@@ -24,6 +24,7 @@ type Row = {
 const pct = (n: number) => (Number.isFinite(n) ? n : 0).toFixed(1) + "%";
 const eur = (n: number) => "€" + Math.round(Number(n) || 0).toLocaleString("en-GB");
 
+// Folded into /execute/pass?tab=metrics (slim OS slice 4).
 export default function KitchenPass() {
   const [entity, setEntity] = useState<EntityKey>(E_BM);
   const [rows, setRows] = useState<Row[]>([]);
@@ -73,8 +74,7 @@ export default function KitchenPass() {
   );
 
   return (
-    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-12">
-      <Link href="/execute" className="font-sans text-sm text-ink-soft">← execute</Link>
+    <main className="mx-auto max-w-3xl lg:max-w-5xl px-6 py-6">
       <p className="mt-6 font-mono text-[10px] uppercase tracking-wide text-clay">Kitchen pass · leading indicators</p>
       <h1 className="mt-2 font-serif text-4xl text-ink leading-tight">Food that left the kitchen.</h1>
       <p className="mt-2 font-serif italic text-[14px] text-ink-soft">Comps, staff meals, waste. If POS revenue doesn't reflect them, food-cost % lies. These tiles show the truth from the operational P&L.</p>

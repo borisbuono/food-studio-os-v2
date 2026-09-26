@@ -7,6 +7,7 @@ import NewOpeningForm from "./NewOpeningForm";
 
 export const dynamic = "force-dynamic";
 
+// Folded into /h/<slug>/office/hiring?new=1 (slim OS slice 4).
 export default async function NewOpeningPage({ params }: { params: { house: string } }) {
   const slug = params.house;
   const house = await getHouseBySlug(slug);
@@ -14,7 +15,7 @@ export default async function NewOpeningPage({ params }: { params: { house: stri
   const entity_id = house.id;
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
-  if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/hiring/new`);
+  if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/hiring?new=1`);
 
   const houseName = houseNameForSlug(slug);
   return (

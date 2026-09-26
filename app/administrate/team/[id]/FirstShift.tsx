@@ -29,6 +29,8 @@ const MID_SHIFT = [
   { hour: 3, label: "Pre-close check-in",   blurb: "Are they still with us? Anything to slow down for?" },
 ];
 
+// Folded into /administrate/team/[id]?tab=first-shift (slim OS slice 4,
+// audit #12: the older hiring system's plans become steps of the person page).
 export default async function FirstShift({ params }: { params: { id: string } }) {
   const sb = supabaseServer();
   const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.id).maybeSingle();
@@ -48,7 +50,7 @@ export default async function FirstShift({ params }: { params: { id: string } })
   const soloShift = doneMap.get("first_solo_shift");
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <Link href={"/administrate/team/" + p.id + "/first-week"} className="font-sans text-sm text-ink-soft">back to first week</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>First shift · {ROLE_LABEL[role]}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name || p.email || "New hire")}</h1>

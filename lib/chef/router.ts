@@ -176,12 +176,12 @@ function pageHref(word: string, house: string | null): string | null {
   const w = word.toLowerCase();
   if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
   if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
-  if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/calendar";
-  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/office/inbox" : "/";
+  if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/today?tab=calendar";
+  if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/comms" : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
   if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
-  if (/equipo|team|gente|people|personal|plantilla/.test(w)) return "/administrate/team";
+  if (/equipo|team|gente|people|personal|plantilla/.test(w)) return h ? h + "/team" : "/studio/people";
   if (/pedido|order|compra|\bbuy\b|suppl|suministro|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
   if (/oficina|office/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/cocina|kitchen/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
@@ -419,7 +419,7 @@ async function readPrep(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> 
 async function readCalendar(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }> {
   const t = T[ctx.lang];
   const tz = ctx.scope.entity.timezone;
-  const href = pageHref("calendar", ctx.house) || "/me/calendar";
+  const href = pageHref("calendar", ctx.house) || "/me/today?tab=calendar";
   // Local midnight → next midnight, expressed as UTC instants. Cheap trick:
   // format today's date in the venue tz, then let Date parse it with the
   // venue's current UTC offset.

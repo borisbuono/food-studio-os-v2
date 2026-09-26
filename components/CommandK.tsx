@@ -107,12 +107,12 @@ const HELP_LINES: { cmd: string; desc: string }[] = [
 
 const NEW_ITEMS: Route[] = [
   { label: "New · booking",       href: "/execute/bookings",               hint: "reservation", gate: { room: "dining", feature: "bookings" } },
-  { label: "New · event",         href: "/administrate/events/new",        hint: "private dining", gate: { room: "office" } },
-  { label: "New · commercial",    href: "/grow/commercials/new",           hint: "deal contract", gate: { room: "office" } },
-  { label: "New · relationship",  href: "/grow/relationships/new",         hint: "crm lead", gate: { room: "dining", feature: "foh" } },
+  { label: "New · event",         href: "/administrate/events?new=1",        hint: "private dining", gate: { room: "office" } },
+  { label: "New · commercial",    href: "/grow/commercials?new=1",           hint: "deal contract", gate: { room: "office" } },
+  { label: "New · relationship",  href: "/grow/relationships?new=1",         hint: "crm lead", gate: { room: "dining", feature: "foh" } },
   { label: "New · recipe import", href: "/develop/recipes/import",         hint: "paste url", gate: { room: "kitchen" } },
-  { label: "New · team invite",   href: "/administrate/team/invite",       hint: "invite whatsapp", gate: { room: "office" } },
-  { label: "New · hiring opening", href: "/h/{house}/office/hiring/new",   hint: "open role recruit", gate: { room: "office", feature: "hiring" } },
+  { label: "New · team invite",   href: "/h/{house}/team?tab=invite",       hint: "invite whatsapp", gate: { room: "office" } },
+  { label: "New · hiring opening", href: "/h/{house}/office/hiring?new=1",   hint: "open role recruit", gate: { room: "office", feature: "hiring" } },
   { label: "New · order",         href: "/execute/orders",                 hint: "supplier order", gate: { room: "kitchen" } },
   // "New · campaign" → /grow/reach/campaigns/new dropped 2026-09-26: the
   // composer was never built (see lib/integrations/marketing/wix-newsletter.ts).

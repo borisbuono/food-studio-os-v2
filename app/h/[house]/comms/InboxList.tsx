@@ -250,7 +250,7 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
 
       <div className="mt-6 flex items-center justify-between text-xs text-clay">
         <button onClick={() => router.refresh()} className="underline-offset-2 hover:underline">Refresh</button>
-        <a href={`/h/${slug}/office/inbox/saved`} className="underline-offset-2 hover:underline">Saved replies</a>
+        <a href={`/h/${slug}/comms?tab=saved`} className="underline-offset-2 hover:underline">Saved replies</a>
       </div>
 
       {toast ? (

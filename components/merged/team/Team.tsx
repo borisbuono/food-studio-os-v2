@@ -5,6 +5,7 @@ import InviteTeammate from "@/components/InviteTeammate";
 
 export const dynamic = "force-dynamic";
 
+// Folded into /h/<slug>/team (slim OS slice 4) — was /administrate/team.
 export default async function Team() {
   
   const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
@@ -26,8 +27,7 @@ export default async function Team() {
   ].filter((p) => p.name);
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Team · HR & schedule</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">Who’s on the team</h1>
       {(pending || joinedThisWeek) ? (

@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 // Manager's first-week checklist for a specific new hire.
 // Reads live from onboarding_steps + team_invitations, no derived cache.
 
+// Folded into /administrate/team/[id]?tab=first-week (slim OS slice 4,
+// audit #12: the older hiring system's plans become steps of the person page).
 export default async function FirstWeek({ params }: { params: { id: string } }) {
   const sb = supabaseServer();
   const { data: p } = await sb.from("profiles").select("id,name,role,restaurant_id,email").eq("id", params.id).maybeSingle();
@@ -39,7 +41,7 @@ export default async function FirstWeek({ params }: { params: { id: string } }) 
   const pct = totalSteps ? Math.round((doneSteps / totalSteps) * 100) : 0;
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <Link href="/administrate/team/onboarding" className="font-sans text-sm text-ink-soft">back to pipeline</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>First week · {ROLE_LABEL[role]}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{noEmoji(p.name || p.email || "New hire")}</h1>

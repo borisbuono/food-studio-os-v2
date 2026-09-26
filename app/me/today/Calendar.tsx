@@ -11,10 +11,11 @@ export const dynamic = "force-dynamic";
 // /me/calendar — everything with MY name on it, across venues: my shifts,
 // interviews I lead, tasks assigned to me, my meetings, plus my Google
 // calendar as dimmed busy blocks (read-only overlay).
+// Folded into /me/today?tab=calendar (slim OS slice 4, audit #19).
 export default async function MyCalendarPage() {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
-  if (!u.user?.id) redirect("/login?next=/me/calendar");
+  if (!u.user?.id) redirect("/login?next=/me/today?tab=calendar");
   const mine = await myEntities();
   const tz = mine.tz;
   const today = zonedParts(new Date(), tz).ymd;
@@ -39,7 +40,6 @@ export default async function MyCalendarPage() {
         entityNames={mine.names}
         extraActions={
           <>
-            <Link href="/me/today" className="rounded border border-black/15 px-2 py-1">Today</Link>
             <Link href="/me/booking" className="rounded border border-black/15 px-2 py-1">Booking page</Link>
             <GoogleConnect />
           </>

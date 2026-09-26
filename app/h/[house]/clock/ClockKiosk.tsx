@@ -138,7 +138,7 @@ export default function ClockKiosk({ entity_id, roster, houseName, houseSlug }: 
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <a className="rounded border border-black/15 px-3 py-1.5" href={`/h/${houseSlug}/office/labor`}>Manage</a>
+          <a className="rounded border border-black/15 px-3 py-1.5" href={`/h/${houseSlug}/team?tab=labour`}>Manage</a>
         </div>
       </header>
 
@@ -152,7 +152,7 @@ export default function ClockKiosk({ entity_id, roster, houseName, houseSlug }: 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {roster.length === 0 && (
             <div className="col-span-full rounded border border-dashed border-black/15 p-6 text-sm text-clay">
-              No team members yet. Add people at <a className="underline" href={`/h/${houseSlug}/office/labor`}>Manage roster</a>.
+              No team members yet. Add people at <a className="underline" href={`/h/${houseSlug}/team?tab=labour`}>Manage roster</a>.
             </div>
           )}
 

@@ -9,6 +9,8 @@ const ROLES = ["worker", "chef", "maitre", "manager", "owner"];
 // foodstudio.ai cut over to v2 on 2026-06-10 — invites point at the real domain now
 const LOGIN_URL = "https://foodstudio.ai/login";
 
+// Folded into /h/<slug>/team?tab=invite (slim OS slice 4) — was
+// /administrate/team/invite.
 export default function InviteToTeam() {
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
   const [name, setName] = useState("");
@@ -63,7 +65,7 @@ export default function InviteToTeam() {
 
   if (done)
     return (
-      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
         <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">{tr("invite.back")}</Link>
         <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{tr("invite.saved")}</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">{t("invite.saved.title", ui).replace("{name}", name)}</h1>
@@ -84,7 +86,7 @@ export default function InviteToTeam() {
     );
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">{tr("invite.back")}</Link>
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: "var(--accent)" }}>{tr("invite.eyebrow")}</p>
       <h1 className="mt-2 font-serif text-3xl text-ink">{tr("invite.title")}</h1>

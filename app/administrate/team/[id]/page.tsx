@@ -10,7 +10,18 @@ function fmtDay(s: string) {
   return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export default async function PersonHub({ params }: { params: { id: string } }) {
+import FirstShift from "./FirstShift";
+import FirstWeek from "./FirstWeek";
+import TabNav, { pickTab } from "@/components/nav/TabNav";
+
+const TABS = [{ key: "person", label: "Person" }, { key: "first-shift", label: "First shift" }, { key: "first-week", label: "First week" }];
+
+// Slim OS slice 4: first-shift / first-week plans are tabs here (routes retired).
+export default async function PersonHub({ params, searchParams }: { params: { id: string }; searchParams?: { tab?: string } }) {
+  const tab = pickTab(TABS, searchParams?.tab);
+  const tabs = <div className="mx-auto max-w-xl lg:max-w-4xl px-6 pt-8"><TabNav base={`/administrate/team/${params.id}`} tabs={TABS} active={tab} /></div>;
+  if (tab === "first-shift") return <div>{tabs}<FirstShift params={params} /></div>;
+  if (tab === "first-week") return <div>{tabs}<FirstWeek params={params} /></div>;
   
   const supabase = supabaseServer();const { data: p } = await supabase.from("profiles").select("id,name,role,restaurant_id,email,color").eq("id", params.id).maybeSingle();
   if (!p) redirect("/administrate/team");
@@ -36,7 +47,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
 
   return (
     <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/administrate/team" className="font-sans text-sm text-ink-soft">← team</Link>
+      <TabNav base={`/administrate/team/${params.id}`} tabs={TABS} active={tab} />
       <p className="mt-6 font-sans text-xs font-medium" style={{ color: p.color || "var(--accent)" }}>Person · {p.role || "team"}</p>
       <h1 className="mt-2 font-serif text-4xl leading-[1.05] text-ink">{noEmoji(p.name)}</h1>
       <p className="mt-2 font-mono text-[11px] uppercase tracking-wide text-clay">{[venue?.name, p.email].filter(Boolean).join(" · ")}</p>
@@ -74,7 +85,7 @@ export default async function PersonHub({ params }: { params: { id: string } }) 
 
       {/* Person atom action set */}
       <div className="mt-8 grid grid-cols-2 gap-3">
-        <Link href={"/messages?to=" + p.id} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
+        <Link href={"/messages"} className="rounded-xl bg-[color:var(--accent)] px-4 py-3 text-center font-sans text-[14px] font-medium text-[#F7F7F4]">Message</Link>
         <Link href="/administrate/team/schedule" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Schedule</Link>
         <Link href="/academy" className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Skill ladder</Link>
         <Link href={"/administrate/team/" + p.id + "/training"} className="rounded-xl border border-line bg-card px-4 py-3 text-center font-sans text-[14px] text-ink">Training</Link>

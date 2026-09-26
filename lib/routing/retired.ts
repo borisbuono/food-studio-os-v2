@@ -29,7 +29,7 @@ export const RETIRED: Retired[] = [
   { from: "/foh/guests",              to: "/grow/relationships",              why: "alias" },
   { from: "/foh/menu",                to: "/h/:house/menu/recipes",        why: "alias" },
   { from: "/foh/pass", to: "/execute/pass",                    why: "alias" },
-  { from: "/foh/reviews",             to: "/grow/reputation",                 why: "alias" },
+  { from: "/foh/reviews",             to: "/h/:house/comms?tab=reviews",      why: "alias" },
   { from: "/office/advisor",          to: "/studio/advisory",                 why: "alias" },
   { from: "/office/charters",         to: "/administrate/agent-charters",     why: "alias" },
   { from: "/office/chef-log",         to: "/h/:house/office/chef-log",        why: "alias" },
@@ -41,12 +41,12 @@ export const RETIRED: Retired[] = [
   { from: "/office/master-todo",      to: "/administrate/master-todo",        why: "alias" },
   { from: "/office/settings", to: "/administrate/settings",           why: "alias" },
   { from: "/office/suppliers", to: "/administrate/suppliers",          why: "alias" },
-  { from: "/office/team", to: "/administrate/team",               why: "alias" },
+  { from: "/office/team", to: "/h/:house/team",                   why: "alias" },
   { from: "/order",                   to: "/execute/orders",                  why: "alias" },
   { from: "/recipes",                 to: "/h/:house/menu/recipes",        why: "alias (public /recipes/<slug> untouched)" },
   { from: "/recipes/:id/cook",        to: "/execute/cook/:id",                why: "alias" },
   { from: "/recipes/:id/edit",        to: "/h/:house/menu/recipes/:id?tab=edit", why: "alias" },
-  { from: "/schedule",                to: "/administrate/team/schedule",      why: "alias" },
+  { from: "/schedule",                to: "/h/:house/team?tab=rota",          why: "alias" },
   { from: "/h/:house/office",         to: "/h/:house",                        why: "room landing (rooms left the nav)" },
   { from: "/h/:house/:room",          to: "/h/:house",                        why: "room landing (rooms left the nav)" },
 
@@ -87,8 +87,8 @@ export const RETIRED: Retired[] = [
   { from: "/foh/academy", to: "/academy", why: "dup #14" },
   { from: "/office/academy", to: "/academy", why: "dup #14" },
   // #15 read what people wrote to us → Reach
-  { from: "/grow/inbox", to: "/h/:house/office/inbox", why: "dup #15" },
-  { from: "/messages",   to: "/h/:house/office/inbox", why: "dup #15 (legacy)" },
+  { from: "/grow/inbox", to: "/h/:house/comms", why: "dup #15" },
+  { from: "/messages",   to: "/h/:house/comms", why: "dup #15 (legacy)" },
   // #16 chef log
   { from: "/administrate/chef-log", to: "/h/:house/office/chef-log", why: "dup #16" },
   // #18 advisory
@@ -123,6 +123,24 @@ export const RETIRED: Retired[] = [
   { from: "/execute/receiving",               to: "/execute/orders?tab=receiving",       why: "dup #20: receiving is a tab of orders" },
   { from: "/execute/orders/picker",           to: "/execute/orders?tab=picker",          why: "single: picker is a tab of orders" },
   { from: "/administrate/suppliers/:id/add-product", to: "/administrate/suppliers/:id?tab=add-product", why: "single: sheet on the supplier" },
+
+  // ---- slice 4 · Team + Comms + Service (2026-09-26)
+  { from: "/administrate/team",               to: "/h/:house/team",                      why: "slice 4: one Team landing per house" },
+  { from: "/administrate/team/schedule",      to: "/h/:house/team?tab=rota",             why: "dup #11: Rota tab" },
+  { from: "/h/:house/office/labor",           to: "/h/:house/team?tab=labour",           why: "dup #11: Labour tab" },
+  { from: "/administrate/team/invite",        to: "/h/:house/team?tab=invite",           why: "single: invite is a sheet on team" },
+  { from: "/administrate/team/:id/first-shift", to: "/administrate/team/:id?tab=first-shift", why: "dup #12: a step on the person page" },
+  { from: "/administrate/team/:id/first-week",  to: "/administrate/team/:id?tab=first-week",  why: "dup #12: a step on the person page" },
+  { from: "/h/:house/office/hiring/new",      to: "/h/:house/office/hiring?new=1",       why: "single: sheet on hiring" },
+  { from: "/h/:house/office/inbox",           to: "/h/:house/comms",                     why: "slice 4: Comms = inbox + reviews + calendar" },
+  { from: "/h/:house/office/inbox/saved",     to: "/h/:house/comms?tab=saved",           why: "single: saved replies is a tab" },
+  { from: "/grow/reputation",                 to: "/h/:house/comms?tab=reviews",         why: "dup #15: reviews are a Comms tab (Serve → Reach)" },
+  { from: "/execute/pass/metrics",            to: "/execute/pass?tab=metrics",           why: "dup #6: metrics is a tab of the pass" },
+  { from: "/h/:house/:room/prep/templates",   to: "/h/:house/:room/prep?tab=templates",  why: "single: templates is a tab of prep" },
+  { from: "/me/calendar",                     to: "/me/today?tab=calendar",              why: "dup #19: my calendar is a tab of Today" },
+  { from: "/administrate/events/new",         to: "/administrate/events?new=1",          why: "single: sheet on events" },
+  { from: "/grow/relationships/new",          to: "/grow/relationships?new=1",           why: "single: sheet on guests" },
+  { from: "/grow/commercials/new",            to: "/grow/commercials?new=1",             why: "single: sheet on commercials" },
 
   // singles
   { from: "/feedback",         to: "/",              why: "feedback is a Chef intent" },

@@ -84,7 +84,13 @@ for (const r of retired.RETIRED) {
   // (/administrate/team/onboarding ↔ /administrate/team/[id]) is gone as a
   // page — middleware redirects before the sibling could swallow it.
   const resolved = resolvePage(from);
-  const still = resolved && !(!r.from.includes(":") && /\[/.test(resolved));
+  // Same for a parameterised pattern: /h/:house/office/hiring/new resolves
+  // only through hiring/[opening] once new/page.tsx is gone — more dynamic
+  // segments in the resolved file than params in the pattern means a
+  // sibling swallowed it, not that the page survived.
+  const params = (r.from.match(/:/g) || []).length;
+  const dyn = resolved ? (resolved.match(/\[/g) || []).length : 0;
+  const still = resolved && dyn <= params;
   // A retired path whose pattern also matches a surviving dynamic route
   // (/h/:house/:room ↔ /h/[house]/[room]/page.tsx) counts as stale only if
   // the exact page file is the retired one.

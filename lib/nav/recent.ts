@@ -15,22 +15,31 @@ export function readRecent(): RecentMap {
   try { const v = JSON.parse(localStorage.getItem(KEY) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; }
 }
 
+// Slices 2–4 (2026-09-26) fold sibling screens into `?tab=` on a survivor, so
+// a leaf's identity is path + tab. The key keeps only that one param.
+export function recentKey(href: string): string {
+  const [path, q] = href.split("?");
+  const tab = q ? new URLSearchParams(q).get("tab") : null;
+  return tab ? `${path}?tab=${tab}` : path;
+}
+
 export function touchRecent(pathname: string): RecentMap {
   if (typeof window === "undefined" || !pathname) return {};
   const cur = readRecent();
   cur[pathname] = Date.now();
+  const tab = new URLSearchParams(window.location.search || "").get("tab");
+  if (tab) cur[`${pathname}?tab=${tab}`] = Date.now();
   const entries = Object.entries(cur).sort((a, b) => b[1] - a[1]).slice(0, MAX);
   const next: RecentMap = Object.fromEntries(entries);
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
   return next;
 }
 
-// Leaves visited (by path, query ignored) first, most recent first; the rest
+// Leaves visited (by path + tab) first, most recent first; the rest
 // in authored order. Stable and pure so the desktop rail and the phone dock
 // agree.
 export function orderByRecent<T extends { href: string }>(leaves: T[], recent: RecentMap): T[] {
-  const pathOf = (h: string) => h.split("?")[0];
-  const stamp = (l: T) => recent[pathOf(l.href)] || 0;
+  const stamp = (l: T) => recent[recentKey(l.href)] || 0;
   const seen = leaves.filter((l) => stamp(l) > 0).sort((a, b) => stamp(b) - stamp(a));
   const rest = leaves.filter((l) => stamp(l) === 0);
   return [...seen, ...rest];

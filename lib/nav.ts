@@ -17,7 +17,7 @@
 // localStorage and the Chef router, and renaming them buys nothing the chef
 // can see. `label` below is the EN word; renderers call verbLabel()
 // (lib/nav/labels.ts) so the rail, dock and ⌘K follow the fs_lang cookie.
-//   /me    = Today · Calendar · Learn · Account
+//   /me    = Today (+ My week) · Learn · Account
 // Only the ORDER of a verb's leaves is personal — recent-first from
 // localStorage (lib/nav/recent.ts); at most LEAVES_VISIBLE show before "more".
 //
@@ -50,13 +50,13 @@ const H = "/h/{house}";
 // ---------------------------------------------------------------- House
 export const HOUSE_VERBS: NavVerb[] = [
   {
+    // Slice 4 (2026-09-26): Service = bookings · pass · prep · floor · guests
+    // · events (moved from Close) · calendar · wall screen. Reviews moved to Comms.
     key: "serve", label: "Service", href: "/execute/bookings", hint: "who is coming, what is on the pass",
     gate: { room: "dining" },
     leaves: [
-      { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today", gate: { room: "kitchen" } },
-      { href: `${H}/kitchen/prep/templates`, label: "Prep templates", hint: "prep template weekly", gate: { room: "kitchen" } },
-      { href: "/execute/pass/metrics",      label: "Pass metrics",   hint: "what left the kitchen", gate: { room: "kitchen" } },
+      { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep metrics", gate: { room: "kitchen" } },
+      { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today templates", gate: { room: "kitchen" } },
       { href: "/execute/floor",             label: "Floor",          hint: "floor plan tables", gate: { room: "dining", feature: "foh" } },
       { href: "/grow/relationships",        label: "Guests",         hint: "crm guests relationships", gate: { room: "dining", feature: "foh" } },
       { href: "/administrate/events",       label: "Events",         hint: "private dining catering", gate: { room: "office" } },
@@ -111,27 +111,30 @@ export const HOUSE_VERBS: NavVerb[] = [
     ],
   },
   {
-    key: "people", label: "Team", href: "/administrate/team", hint: "who is here, who is coming",
+    // Slice 4 (2026-09-26): ONE Team landing per house — team, rota, labour,
+    // invite as tabs. Hiring = the Sep-21 SOP layer (first-shift / first-week
+    // are steps on the person page). Academy has one door.
+    key: "people", label: "Team", href: `${H}/team`, hint: "who is here, who is coming",
     gate: { room: "office" },
     leaves: [
-      { href: "/administrate/team/schedule", label: "Rota",          hint: "shifts schedule", gate: { room: "office" } },
-      { href: `${H}/office/labor`,          label: "Labour",         hint: "clock log labour cost", gate: { room: "office" } },
-      { href: `${H}/clock`,                 label: "Clock station",  hint: "clock in out punch" },
+      { href: `${H}/team?tab=rota`,         label: "Rota",           hint: "shifts schedule labour", gate: { room: "office" } },
       { href: `${H}/office/hiring`,         label: "Hiring",         hint: "hr funnel candidates openings", gate: { room: "office", feature: "hiring" } },
+      { href: `${H}/clock`,                 label: "Clock station",  hint: "clock in out punch" },
       { href: "/academy",                   label: "Academy",        hint: "lessons training", gate: { feature: "academy" } },
-      { href: "/administrate/team/invite",  label: "Invite",         hint: "invite whatsapp teammate", gate: { room: "office" } },
+      { href: `${H}/team?tab=invite`,       label: "Invite",         hint: "invite whatsapp teammate", gate: { room: "office" } },
     ],
   },
   {
-    key: "reach", label: "Comms", href: `${H}/office/inbox`, hint: "what we say, what they say back",
+    // Slice 4 (2026-09-26): ONE Comms screen — Inbox (comments, DMs) ·
+    // Reviews (moved in from Serve) · Calendar · Saved replies as tabs.
+    key: "reach", label: "Comms", href: `${H}/comms`, hint: "what we say, what they say back",
     gate: { room: "office" },
     leaves: [
-      { href: "/grow/reach/calendar?house={house}", label: "Posting calendar", hint: "content calendar social posts", gate: { room: "office" } },
-      { href: "/grow/reputation",           label: "Reviews",        hint: "ratings reviews reputation", gate: { room: "dining", feature: "foh" } },
+      { href: `${H}/comms?tab=reviews`,     label: "Reviews",        hint: "ratings reviews reputation", gate: { room: "office" } },
+      { href: `${H}/comms?tab=calendar`,    label: "Posting calendar", hint: "content calendar social posts", gate: { room: "office" } },
       { href: "/grow/reach?house={house}",  label: "Accounts",       hint: "meta wix ads channels", gate: { room: "office" } },
       { href: "/grow/reach/ads",            label: "Ads",            hint: "meta ads", gate: { room: "office" } },
       { href: "/grow/commercials",          label: "Commercials",    hint: "offers deals", gate: { room: "office" } },
-      { href: `${H}/office/inbox/saved`,    label: "Saved replies",  hint: "canned replies", gate: { room: "office" } },
       { href: "/grow/reputation/settings",  label: "Review platforms", hint: "connect google tripadvisor", gate: { room: "office" } },
     ],
   },
@@ -156,7 +159,7 @@ export const STUDIO_VERBS: NavVerb[] = [
   {
     key: "people", label: "Team", href: "/studio/people", hint: "people across houses", gate: { room: "studio" },
     leaves: [
-      { href: "/administrate/team/invite",  label: "Invite",         hint: "invite teammate", gate: { room: "studio" } },
+      { href: "/h/{house}/team?tab=invite", label: "Invite",         hint: "invite teammate", gate: { room: "studio" } },
     ],
   },
   {
@@ -185,8 +188,9 @@ export const STUDIO_VERBS: NavVerb[] = [
 
 // ---------------------------------------------------------------- /me
 export const ME_VERBS: NavVerb[] = [
-  { key: "today",    label: "Today",    href: "/me/today",    hint: "my todos and calendar rows", leaves: [] },
-  { key: "calendar", label: "Calendar", href: "/me/calendar", hint: "my calendar google", leaves: [] },
+  // Slice 4 (2026-09-26, audit #19): /me/calendar folded into Today as a tab.
+  { key: "today",    label: "Today",    href: "/me/today",    hint: "my todos and calendar rows",
+    leaves: [{ href: "/me/today?tab=calendar", label: "My week", hint: "my calendar google" }] },
   { key: "learn",    label: "Learn",    href: "/academy",     hint: "lessons training", gate: { feature: "academy" }, leaves: [] },
   {
     key: "account", label: "Account", href: "/account", hint: "profile me",

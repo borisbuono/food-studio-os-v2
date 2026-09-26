@@ -9,6 +9,8 @@ function dayLabel(d: Date) { return d.toLocaleDateString("en-GB", { weekday: "sh
 function iso(d: Date) { return d.toISOString().slice(0, 10); }
 const hhmm = (t: string | null) => (t || "").slice(0, 5);
 
+// Folded into /h/<slug>/team?tab=rota (slim OS slice 4, audit #11) — was
+// /administrate/team/schedule.
 export default function Schedule() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState<any[]>([]);
@@ -56,8 +58,7 @@ export default function Schedule() {
   const shiftsOn = (d: Date) => shifts.filter((s) => s.shift_date === iso(d)).sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 
   return (
-    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-12">
-      <Link href="/" className="font-sans text-sm text-ink-soft">← home</Link>
+    <main className="mx-auto max-w-xl lg:max-w-4xl px-6 py-6">
       <p className="mt-6 font-sans text-xs font-medium text-ink-soft">Schedule · weekly rota</p>
       {/* Today's roster — who's in, who's late */}
       {today.length ? (

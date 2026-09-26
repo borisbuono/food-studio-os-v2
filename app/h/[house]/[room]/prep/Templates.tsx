@@ -5,6 +5,7 @@ import PrepTemplates from "@/components/PrepTemplates";
 
 export const dynamic = "force-dynamic";
 
+// Folded into /h/<slug>/<room>/prep?tab=templates (slim OS slice 4).
 export default async function KitchenPrepTemplatesPage({ params }: { params: { house: string; room: string } }) {
   const house = await getHouseBySlug(params.house);
   if (!house) redirect("/studio");

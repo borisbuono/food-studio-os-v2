@@ -51,7 +51,11 @@ type Candidate = {
   team_member_id?: string | null;
 };
 
-export default async function HiringPage({ params }: { params: { house: string } }) {
+import NewOpening from "./NewOpening";
+
+// Slim OS slice 4: /h/<slug>/office/hiring?new=1 folded in as ?new=1.
+export default async function HiringPage({ params, searchParams }: { params: { house: string }; searchParams?: { new?: string } }) {
+  if (searchParams?.new) return <NewOpening params={params} />;
   const slug = params.house;
   const house = await getHouseBySlug(slug);
   if (!house) redirect("/studio");
@@ -122,7 +126,7 @@ export default async function HiringPage({ params }: { params: { house: string }
             Application page ↗
           </Link>
           <Link
-            href={`/h/${slug}/office/hiring/new`}
+            href={`/h/${slug}/office/hiring?new=1`}
             className="rounded border border-black/15 bg-black px-3 py-1.5 text-xs text-white"
           >
             New opening
@@ -169,7 +173,7 @@ export default async function HiringPage({ params }: { params: { house: string }
           </ul>
         ) : (
           <p className="mt-2 text-sm text-clay">
-            No openings yet. <Link href={`/h/${slug}/office/hiring/new`} className="underline">Create one</Link>.
+            No openings yet. <Link href={`/h/${slug}/office/hiring?new=1`} className="underline">Create one</Link>.
           </p>
         )}
       </section>

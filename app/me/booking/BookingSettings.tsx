@@ -55,7 +55,7 @@ export default function BookingSettings({ initial, venues, myName, hasPerson }: 
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">My booking page</p>
           <h1 className="font-serif text-2xl">Book time with {p.display_name || "me"}</h1>
         </div>
-        <Link href="/me/calendar" className="rounded border border-black/15 px-2 py-1 text-xs">Calendar</Link>
+        <Link href="/me/today?tab=calendar" className="rounded border border-black/15 px-2 py-1 text-xs">Calendar</Link>
       </div>
       {saved ? (
         <p className="text-sm">Link: <span className="select-all font-mono">{link}</span>{" "}

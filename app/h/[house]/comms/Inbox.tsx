@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 //
 // Spec: 06_PA/_INBOX/TO_OS_build_prompt_comments_dms_2026-09-23.md §4.
 
+// The Inbox tab of /h/<slug>/comms (slim OS slice 4) — was /h/<slug>/office/inbox.
 export default async function InboxPage({ params }: { params: { house: string } }) {
   const slug = params.house;
   const house = await getHouseBySlug(slug);
@@ -90,14 +91,13 @@ export default async function InboxPage({ params }: { params: { house: string } 
   const waiting = items.filter((i) => ["new", "drafted"].includes(i.status)).length;
 
   return (
-    <main className="mx-auto max-w-3xl px-3 py-4 sm:px-6 sm:py-8">
+    <main className="mx-auto max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/10 pb-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Inbox · {houseNameForSlug(slug)}</p>
-          <h1 className="font-serif text-2xl">
+          <h2 className="font-serif text-2xl">
             Comments &amp; DMs
             {waiting ? <span className="ml-2 rounded-full bg-black px-2 py-0.5 align-middle font-mono text-xs text-white">{waiting}</span> : null}
-          </h1>
+          </h2>
           <p className="mt-1 text-xs text-clay">
             One tap sends. Nothing leaves without it.
             {lastPull ? <> · last pull {new Date(lastPull).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: house.timezone })}</> : null}

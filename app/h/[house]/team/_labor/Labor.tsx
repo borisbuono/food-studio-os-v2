@@ -22,6 +22,8 @@ type ShiftRow = {
 // House currency, not a hardcoded euro (stress test 2026-09-21).
 function eur(house: House, n: number): string { return houseMoney(house, n, 2); }
 
+// Folded into /h/<slug>/team?tab=labour (slim OS slice 4, audit #11) — was
+// /h/<slug>/office/labor.
 export default async function LaborPage({ params }: { params: { house: string } }) {
   const slug = params.house;
   const house = await getHouseBySlug(slug);

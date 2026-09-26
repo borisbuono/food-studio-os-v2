@@ -213,7 +213,7 @@ export default async function HouseLandingPage({ params }: { params: { house: st
               Open clock
             </Link>
             <Link
-              href={`/h/${slug}/office/labor`}
+              href={`/h/${slug}/team?tab=labour`}
               className="border border-black/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink hover:bg-black/[.04]"
             >
               Labor dashboard

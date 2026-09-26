@@ -11,13 +11,14 @@ export const dynamic = "force-dynamic";
 // drafter reads (apply, hours, booking, dogs, parking). Edited in place;
 // rows write through RLS (managed-entity policies).
 
+// The Saved replies tab of /h/<slug>/comms (slim OS slice 4).
 export default async function SavedRepliesPage({ params }: { params: { house: string } }) {
   const slug = params.house;
   const house = await getHouseBySlug(slug);
   if (!house) redirect("/studio");
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
-  if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/inbox/saved`);
+  if (!u.user?.id) redirect(`/login?next=/h/${slug}/comms?tab=saved`);
 
   const { data } = await sb.from("social_saved_replies")
     .select("id, key, title, lang, body, sort, active")
@@ -27,9 +28,9 @@ export default async function SavedRepliesPage({ params }: { params: { house: st
     <main className="mx-auto max-w-3xl px-3 py-4 sm:px-6 sm:py-8">
       <div className="border-b border-black/10 pb-3">
         <p className="font-mono text-[10px] uppercase tracking-wide text-clay">
-          <Link href={`/h/${slug}/office/inbox`} className="hover:underline">Inbox</Link> · {houseNameForSlug(slug)}
+          {houseNameForSlug(slug)}
         </p>
-        <h1 className="font-serif text-2xl">Saved replies</h1>
+        <h2 className="font-serif text-2xl">Saved replies</h2>
         <p className="mt-1 text-xs text-clay">
           Facts only. The drafter reuses these; anything in square brackets is a placeholder you still have to fill — those rows stay off until you switch them on.
         </p>
