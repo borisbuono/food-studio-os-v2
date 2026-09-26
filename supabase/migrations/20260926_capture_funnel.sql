@@ -68,3 +68,29 @@ create index if not exists purchase_lines_albaran_idx on public.purchase_lines (
 -- second pass (applied as capture_funnel_triage_20260926): who cleared what, and why
 alter table public.invoice_inbox add column if not exists triage_log jsonb;
 alter table public.albarans      add column if not exists triage_log jsonb;
+
+-- third pass (applied as capture_funnel_tickets_suppliers_20260926):
+-- tickets (factura simplificada) and the factura chase; supplier contact + billing facts
+alter table public.invoice_inbox
+  add column if not exists ticket_number text,
+  add column if not exists customer_details_present boolean,
+  add column if not exists factura_status text,
+  add column if not exists linked_factura_id uuid references public.invoice_inbox(id) on delete set null,
+  add column if not exists factura_request jsonb;
+alter table public.invoice_inbox drop constraint if exists invoice_inbox_factura_status_check;
+alter table public.invoice_inbox add constraint invoice_inbox_factura_status_check
+  check (factura_status is null or factura_status = any (array['unchecked','resolved','requestable_client','requestable_new','awaiting_factura','consolidated','not_obtainable']));
+create index if not exists invoice_inbox_ticket_idx on public.invoice_inbox (ticket_number) where ticket_number is not null;
+
+alter table public.controller_suppliers
+  add column if not exists email text,
+  add column if not exists phone text,
+  add column if not exists address text,
+  add column if not exists website text,
+  add column if not exists invoice_issued_by text,                 -- who issues the factura (Solred fuel → CaixaBank)
+  add column if not exists billing_mode text,                      -- per_transaction | consolidated_monthly
+  add column if not exists registered_for jsonb not null default '{}',  -- {"BM": "2026-09-26"} our CIF registered with them
+  add column if not exists enrichment jsonb;
+alter table public.controller_suppliers drop constraint if exists controller_suppliers_billing_mode_check;
+alter table public.controller_suppliers add constraint controller_suppliers_billing_mode_check
+  check (billing_mode is null or billing_mode = any (array['per_transaction','consolidated_monthly']));

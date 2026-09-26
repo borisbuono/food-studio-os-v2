@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   normTaxId, normDocNo, resolveEntityFromDoc, normaliseBands, bandTotals, checkLines,
-  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, vatCategoryCheck, resolveHoldedContact, type OwnEntity,
+  lineArithmeticOk, docTypeFromWord, dedup, matchAlbaranes, pushBlockers, num, vatCategoryCheck, resolveHoldedContact, holdedTaxKey, supplierCountry, ticketMatch, ticketStatus, facturaRequestDraft, type OwnEntity,
 } from "../lib/capture/pure";
 
 let fails = 0;
@@ -40,9 +40,9 @@ eq("nothing readable → triage", resolveEntityFromDoc({ vat_id: null, name: nul
 
 // VAT bands
 const nb = normaliseBands([{ rate: 10, base: 61.75, cuota: 6.17 }, { rate: 21, base: "12,00", cuota: "2,52" }, { rate: 10, base: 10, cuota: 1 }]);
-eq("bands merged per rate", nb.bands, [{ rate: 10, base: 71.75, cuota: 7.17 }, { rate: 21, base: 12, cuota: 2.52 }]);
-eq("band totals", bandTotals(nb.bands), { base: 83.75, vat: 9.69, total: 93.44 });
-eq("cuota mismatch flagged", normaliseBands([{ rate: 21, base: 100, cuota: 10 }]).flags, ["vat_cuota_mismatch_21"]);
+eq("bands merged per rate", nb.bands, [{ regime: "iva", rate: 10, base: 71.75, cuota: 7.17, country: null }, { regime: "iva", rate: 21, base: 12, cuota: 2.52, country: null }]);
+eq("band totals", bandTotals(nb.bands), { base: 83.75, vat: 9.69, retention: 0, total: 93.44 });
+eq("cuota mismatch flagged", normaliseBands([{ rate: 21, base: 100, cuota: 10 }]).flags, ["tax_cuota_mismatch_iva_21"]);
 eq("spanish number", num("1.234,56"), 1234.56);
 
 // lines
@@ -114,6 +114,41 @@ eq("retired [DUPLICATE] contact ignored (Viapa)", resolveHoldedContact("B5732981
   { id: "y", name: "VIAPA PLAGE SL", code: "B57329815" }]), { kind: "cif", id: "y", name: "VIAPA PLAGE SL" });
 eq("unknown everything → new", resolveHoldedContact("B99999999", "Vintax SL", HC).kind, "new");
 eq("category mismatch blocks push", pushBlockers({ doc_type: "invoice", flags: ["vat_rate_category_mismatch"], holded_doc_id: null, match_status: "unmatched", vat_bands: [{ rate: 10, base: 1, cuota: 0.1 }] }), ["vat_rate_category_mismatch"]);
+
+// Every tax regime → Holded purchase key (live list, 26-09)
+eq("IVA 10", holdedTaxKey({ regime: "iva", rate: 10, base: 1, cuota: 0.1 }), "p_iva_10");
+eq("IVA 7.5", holdedTaxKey({ regime: "iva", rate: 7.5, base: 1, cuota: 0.08 }), "p_iva_75");
+eq("no deducible 21", holdedTaxKey({ regime: "iva_nd", rate: 21, base: 1, cuota: 0.21 }), "p_iva_nd_21");
+eq("intracom goods 10", holdedTaxKey({ regime: "intra_goods", rate: 10, base: 1, cuota: 0 }), "p_iva_adqintrab_10");
+eq("intracom services 21", holdedTaxKey({ regime: "intra_services", rate: 21, base: 1, cuota: 0 }), "p_iva_adqintras_21");
+eq("ISP 21", holdedTaxKey({ regime: "isp", rate: 21, base: 1, cuota: 0 }), "p_iva_invsuj");
+eq("import 21", holdedTaxKey({ regime: "import", rate: 21, base: 1, cuota: 0.21 }), "p_iva_imp_21");
+eq("exento", holdedTaxKey({ regime: "exempt", rate: 0, base: 1, cuota: 0 }), "p_iva_exento");
+eq("IRPF 15", holdedTaxKey({ regime: "retention", rate: 15, base: 100, cuota: 15 }), "p_ret_15");
+eq("IGIC has no key → accountant", holdedTaxKey({ regime: "igic", rate: 7, base: 1, cuota: 0.07 }), null);
+eq("recargo has no key → accountant", holdedTaxKey({ regime: "re", rate: 1.4, base: 1, cuota: 0.01 }), null);
+eq("German MwSt → accountant", holdedTaxKey({ regime: "foreign_vat", rate: 19, base: 1, cuota: 0.19, country: "DE" }), null);
+const mix = normaliseBands([{ regime: "iva", rate: 21, base: 1000, cuota: 210 }, { regime: "retention", rate: 15, base: 1000, cuota: 150 }]);
+eq("IRPF reduces the total", bandTotals(mix.bands), { base: 1000, vat: 210, retention: 150, total: 1060 });
+const re = normaliseBands([{ regime: "iva", rate: 10, base: 100, cuota: 10 }, { regime: "re", rate: 1.4, base: 100, cuota: 1.4 }]);
+eq("recargo on the same base, flagged", [bandTotals(re.bands).total, re.flags.includes("tax_regime_needs_accountant")], [111.4, true]);
+const ic = normaliseBands([{ regime: "intra_goods", rate: 10, base: 500, cuota: 0 }]);
+eq("intracom: self-assessed, total = base", [bandTotals(ic.bands).total, ic.flags.includes("self_assessed_vat")], [500, true]);
+eq("pushBlockers: IGIC band blocks", pushBlockers({ doc_type: "invoice", flags: [], holded_doc_id: null, match_status: "unmatched", vat_bands: [{ regime: "igic", rate: 7, base: 10, cuota: 0.7 }] }), ["no_holded_tax_key_igic_7"]);
+eq("country: GGM DE", supplierCountry("DE123456789"), { country: "DE", eu: true });
+eq("country: Spanish CIF", supplierCountry("B16515413"), { country: "ES", eu: true });
+eq("country: NIE is Spanish", supplierCountry("Y0752624D").country, "ES");
+
+// Tickets ↔ facturas (§11–12) — the real Mercadona pile
+eq("ticket exact", ticketMatch("4253-025-934413", "4253 025 934413"), "exact");
+eq("our misread 4251 vs factura 4253", ticketMatch("4251-018-870315", "4253-018-870315"), "one_off");
+eq("two digits off is not a match", ticketMatch("4251-018-870316", "4253-018-870315"), null);
+eq("Solred ticket → no per-ticket chase", ticketStatus({ hasFactura: false, consolidated: true, isClient: true, requested: false, impossible: false }), "consolidated");
+eq("Chiringuito: later facturas to BM → client", ticketStatus({ hasFactura: false, consolidated: false, isClient: true, requested: false, impossible: false }), "requestable_client");
+eq("Can Rafa ferretería: new provider", ticketStatus({ hasFactura: false, consolidated: false, isClient: false, requested: false, impossible: false }), "requestable_new");
+eq("factura found beats everything", ticketStatus({ hasFactura: true, consolidated: true, isClient: false, requested: true, impossible: false }), "resolved");
+const dr = facturaRequestDraft({ template: "new", supplier: "Ferretería Can Rafa", ticket: "1-1303", date: "2026-08-29", amount: 27.05, us: { legal_name: "Bistro Mondo Ibiza SL", tax_id: "B13659594", address: "…" } });
+eq("new-client draft asks to register + carries NIF + amount", dr.body.includes("B13659594") && dr.body.includes("27,05 €") && dr.body.includes("alta"), true);
 
 // ── fixtures ──
 const dir = process.argv[2];

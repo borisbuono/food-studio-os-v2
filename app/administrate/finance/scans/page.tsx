@@ -7,6 +7,7 @@ import { E_BM, E_HOLDINGS, E_TALLER, E_UTOPIA } from "@/lib/entities";
 import PushToHolded from "./PushToHolded";
 import ScanUpload from "./ScanUpload";
 import TriageControls from "./TriageControls";
+import TicketChase from "./TicketChase";
 import { supabaseJob } from "@/lib/supabaseJob";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,10 @@ const FLAG_TONE: Record<string, string> = {
   totals_dont_reconcile: "tomato",
   low_confidence: "amber",
 };
-const BAD_FLAGS = new Set(["entity_guessed", "third_party_addressee", "conflicting_copies", "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "extraction_failed", "multipage_incomplete"]);
+// Tax band label: regime + rate ("IVA 10%", "IGIC 7%", "IRPF −15%", "Intracom. bienes 21%").
+const REGIME: Record<string, string> = { iva: "IVA", iva_nd: "IVA no deducible", iva_bi: "IVA inversión", re: "Recargo eq.", intra_goods: "Intracom. bienes", intra_services: "Intracom. servicios", isp: "ISP", import: "Importación", exempt: "Exento", not_subject: "No sujeto", igic: "IGIC", ipsi: "IPSI", foreign_vat: "IVA extranjero", retention: "IRPF −" };
+const bandLabel = (b: any) => `${REGIME[b.regime || "iva"] || b.regime}${b.regime === "retention" ? "" : " "}${b.rate}%${b.country ? " " + b.country : ""}`;
+const BAD_FLAGS = new Set(["tax_regime_needs_accountant", "no_customer_details", "entity_guessed", "third_party_addressee", "conflicting_copies", "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "extraction_failed", "multipage_incomplete"]);
 
 export default async function Scans({ searchParams }: { searchParams: { status?: string; supplier?: string; id?: string; ent?: string } }) {
   const supabase = supabaseServer();
@@ -42,7 +46,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
 
   let query = supabase
     .from("invoice_inbox")
-    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider_id,provider:provider_id(name),doc_type,flags,entity_source,vat_bands,invoice_number,document_date,grand_total_eur,addressee_name,addressee_vat_id,conflict_values,vat_issues:ocr_extracted->vat_category_issues")
+    .select("id,arrived_at,source,source_ref,amount_eur,vat_eur,match_status,flagged_reason,holded_doc_id,doc_url,notes,supplier_name,provider_id,provider:provider_id(name),doc_type,flags,entity_source,vat_bands,invoice_number,document_date,grand_total_eur,addressee_name,addressee_vat_id,conflict_values,vat_issues:ocr_extracted->vat_category_issues,ticket_number,factura_status,linked_factura_id")
     .eq("entity_id", ec)
     .order("arrived_at", { ascending: false })
     .limit(100);
@@ -169,7 +173,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
                 </div>
                 {r.doc_type ? (
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-wide">
-                    <span className="text-ink-soft">{r.doc_type}{r.invoice_number ? " · " + r.invoice_number : ""}{r.document_date ? " · " + r.document_date : ""}</span>
+                    <span className="text-ink-soft">{r.doc_type}{r.doc_type === "ticket" && r.ticket_number ? " · " + r.ticket_number : r.invoice_number ? " · " + r.invoice_number : ""}{r.document_date ? " · " + r.document_date : ""}</span>
                     <span className={r.entity_source === "session_guess" ? "text-tomato" : "text-clay"}>
                       {ec}{r.entity_source === "session_guess" ? " · entity guessed" : r.entity_source ? " · from " + (r.addressee_vat_id || r.addressee_name || "paper") : ""}
                     </span>
@@ -177,7 +181,7 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
                   </div>
                 ) : null}
                 {Array.isArray(r.vat_bands) && r.vat_bands.length ? (
-                  <p className="mt-1 font-mono text-[11px] text-ink-soft">{r.vat_bands.map((b: any) => `${b.rate}%: ${eur(b.base)} + ${eur(b.cuota)}`).join("  ·  ")}</p>
+                  <p className="mt-1 font-mono text-[11px] text-ink-soft">{r.vat_bands.map((b: any) => `${bandLabel(b)}: ${eur(b.base)} + ${eur(b.cuota)}`).join("  ·  ")}</p>
                 ) : null}
                 {Array.isArray(r.conflict_values) && r.conflict_values.length ? (
                   <p className="mt-1 font-mono text-[11px] text-tomato">Other copies of this number: {r.conflict_values.map((c: any) => eur(c.total) + (c.handwritten_changes ? " (hand-corrected)" : "")).join(", ")} — supplier dispute, not posted.</p>
@@ -192,6 +196,9 @@ export default async function Scans({ searchParams }: { searchParams: { status?:
                 </div>
                 {r.doc_type && !["rejected", "duplicate", "approved"].includes(r.match_status) ? (
                   <TriageControls table="invoice_inbox" id={r.id} entityGuessed={r.entity_source === "session_guess"} flags={r.flags || []} issues={r.vat_issues} />
+                ) : null}
+                {r.doc_type === "ticket" && r.match_status !== "rejected" ? (
+                  <TicketChase id={r.id} status={r.factura_status} supplier={r.supplier_name} amount={r.grand_total_eur ?? r.amount_eur ?? null} date={r.document_date} />
                 ) : null}
                 {r.doc_type === "invoice" && !r.holded_doc_id && !["rejected", "duplicate"].includes(r.match_status) ? (
                   <PushToHolded id={r.id} entity={ec} total={r.grand_total_eur ?? r.amount_eur ?? null} />

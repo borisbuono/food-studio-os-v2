@@ -26,7 +26,12 @@ export type Extracted = {
   subtotal_eur?: number | null;
   vat_eur?: number | null;
   grand_total_eur?: number | null;
-  vat_bands?: { rate: number; base: number; cuota: number }[];
+  vat_bands?: { regime?: string; rate: number; base: number; cuota: number; label?: string; country?: string | null }[];
+  customer_details_present?: boolean | null;   // OUR name + NIF printed as the customer
+  simplified_invoice_number?: string | null;   // ticket / factura simplificada number
+  referenced_ticket_numbers?: string[];        // a factura that cites the ticket(s) it replaces
+  supplier_contact?: { email?: string | null; phone?: string | null; address?: string | null; website?: string | null } | null;
+  payment_card_scheme?: string | null;         // "SOLRED", "VISA" …
   referenced_doc_numbers?: string[];        // albarán numbers an invoice lists
   handwritten_changes?: boolean;
   page_label?: string | null;               // "1 de 2" as printed
@@ -57,7 +62,18 @@ Reply ONLY with strict JSON, no prose, no code fences. Use null when you cannot 
   "subtotal_eur": number,             // total base imponible
   "vat_eur": number,                  // total cuota IVA
   "grand_total_eur": number,          // total a pagar
-  "vat_bands": [ { "rate": 10, "base": 61.75, "cuota": 6.17 } ],   // ONE entry per IVA rate printed in the tax summary. Multi-rate documents are normal (food 10, drinks/non-food 21, some 4).
+  "vat_bands": [ { "regime": "iva", "rate": 10, "base": 61.75, "cuota": 6.17, "label": "IVA 10%" } ],
+      // ONE entry per tax line in the tax summary. Multi-rate documents are normal (food 10, drinks/non-food 21, some 4).
+      // regime: "iva" | "re" (recargo de equivalencia) | "intra_goods" / "intra_services" (EU supplier, "inversión del sujeto pasivo" / "reverse charge" / "Steuerschuldnerschaft", 0 cuota printed)
+      //   | "isp" (Spanish inversión del sujeto pasivo) | "import" | "exempt" ("exento art. 20") | "not_subject" ("no sujeto")
+      //   | "igic" (Canarias) | "ipsi" (Ceuta/Melilla) | "foreign_vat" (MwSt, TVA, IVA of another country — add "country": "DE")
+      //   | "retention" (IRPF withheld, e.g. -15 %: rate 15, base = the base it applies to, cuota = amount withheld as a positive number)
+      // label = the tax line exactly as printed.
+  "customer_details_present": boolean,  // true ONLY if the document prints the CUSTOMER's company name AND NIF/CIF. A till ticket that shows IVA but no customer NIF is false.
+  "simplified_invoice_number": string,  // for a ticket / factura simplificada: its number as printed (e.g. "4253-025-934413")
+  "referenced_ticket_numbers": [string],// on a full factura: any "Factura simplificada nº / Ticket nº / Nº de ticket" it cites
+  "supplier_contact": { "email": string, "phone": string, "address": string, "website": string },  // the ISSUER's, as printed
+  "payment_card_scheme": string,        // card scheme or fuel card printed ("SOLRED", "VISA", "MASTERCARD"), null if none
   "referenced_doc_numbers": [string], // albarán / delivery numbers the document lists (invoices that consolidate deliveries)
   "handwritten_changes": boolean,     // true if quantities/prices are struck out or corrected by hand
   "page_label": string | null,        // "Página 1 de 2" etc. as printed
@@ -71,6 +87,7 @@ Reply ONLY with strict JSON, no prose, no code fences. Use null when you cannot 
 }
 
 Rules:
+- A till ticket / "factura simplificada" is "ticket" even when it breaks out IVA; what makes a factura is the customer's fiscal details.
 - Classify by the PRINTED TITLE WORD and the document series, not by whether prices appear. Albaranes in this business routinely carry prices AND IVA; they are still albaranes.
 - The addressee is the customer block. A department or delivery line is NOT the customer company.
 - Lines are products only. Do not emit totals, "base imponible", "IVA", "suma" or tax summary rows as lines.

@@ -21,7 +21,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEntityCredential } from "@/lib/integrations/credentials";
 import { supabaseJob } from "@/lib/supabaseJob";
-import { normDocNo, normName, normTaxId, pushBlockers, r2, resolveHoldedContact, type ContactVerdict, type HContact, type VatBand } from "@/lib/capture/pure";
+import { normDocNo, normName, normTaxId, pushBlockers, r2, resolveHoldedContact, holdedTaxKey, bandTotals, isSelfAssessed, type ContactVerdict, type HContact, type VatBand } from "@/lib/capture/pure";
 
 const V1 = "https://api.holded.com/api/invoicing/v1";
 const DRY_RUN = process.env.FS_HOLDED_DRY_RUN !== "false";
@@ -98,10 +98,10 @@ export async function findInHolded(key: string, row: Row): Promise<HoldedCandida
   return out;
 }
 
-async function holdedContacts(key: string): Promise<HContact[]> {
+export async function holdedContacts(key: string): Promise<HContact[]> {
   const r = await h(key, "/contacts");
   if (!r.ok || !Array.isArray(r.json)) throw new Error(`Holded contacts ${r.status}`);
-  return r.json.map((c: any) => ({ id: c.id, name: c.name, code: c.code, vatnumber: c.vatnumber, tradeName: c.tradeName, type: c.type }));
+  return r.json.map((c: any) => ({ id: c.id, name: c.name, code: c.code, vatnumber: c.vatnumber, tradeName: c.tradeName, type: c.type, email: c.email || null }));
 }
 
 export type ContactChoice = { contact_id?: string; contact_new?: boolean };
@@ -119,8 +119,34 @@ function contactDecision(v: ContactVerdict, choice: ContactChoice): { ok: true; 
   return { ok: false, blocker: v.reason === "same_cif_several_contacts" ? "holded_contact_pick_one_same_cif" : "holded_contact_check_lookalikes" };
 }
 
+const REGIME_LABEL: Record<string, string> = {
+  iva: "IVA", iva_nd: "IVA no deducible", iva_bi: "IVA bien de inversión", intra_goods: "Adq. intracom. bienes",
+  intra_services: "Adq. intracom. servicios", isp: "Inversión sujeto pasivo", import: "Importación",
+  exempt: "Exento", not_subject: "No sujeto",
+};
+
+// One item per tax band. IRPF is not an item: Holded carries it as `retention`
+// on the items it applies to — only when it applies to the whole base.
+export function buildItems(row: Row): { items: any[]; problem: string | null } {
+  const all = (row.vat_bands || []).filter((b) => b.base !== 0);
+  const ret = all.filter((b) => b.regime === "retention");
+  const bands = all.filter((b) => b.regime !== "retention");
+  if (ret.length > 1) return { items: [], problem: "more_than_one_irpf_rate" };
+  const baseSum = r2(bands.reduce((a, b) => a + b.base, 0));
+  if (ret.length && Math.abs(ret[0].base - baseSum) > 0.02) return { items: [], problem: "irpf_on_part_of_the_base" };
+  const items = bands.map((b) => {
+    const key = holdedTaxKey(b);
+    const reg = b.regime || "iva";
+    return {
+      name: `Base imponible ${REGIME_LABEL[reg] || reg} ${b.rate}%`.replace(/ 0%$/, reg === "exempt" || reg === "not_subject" ? "" : " 0%"),
+      units: 1, subtotal: r2(b.base), tax: reg === "exempt" || reg === "not_subject" ? 0 : b.rate, taxes: key ? [key] : [],
+      ...(ret.length ? { retention: ret[0].rate } : {}),
+    };
+  });
+  return { items, problem: null };
+}
+
 export function buildPayload(row: Row, contactId: string | null = null) {
-  const bands = (row.vat_bands || []).filter((b) => b.base !== 0);
   return {
     ...(contactId ? { contactId } : { contactCode: normTaxId(row.supplier_vat_id) || undefined, contactName: row.supplier_name || undefined }),
     date: madridEpoch(row.document_date!),
@@ -128,8 +154,8 @@ export function buildPayload(row: Row, contactId: string | null = null) {
     invoiceNum: row.invoice_number || undefined,
     approveDoc: false,
     desc: `${row.supplier_name || "Proveedor"} ${row.invoice_number || ""}`.trim(),
-    notes: `FS OS capture ${row.id} · PDF adjunto · líneas por tipo de IVA`,
-    items: bands.map((b) => ({ name: `Base imponible IVA ${b.rate}%`, units: 1, subtotal: r2(b.base), tax: b.rate, taxes: [`p_iva_${b.rate}`] })),
+    notes: `FS OS capture ${row.id} · PDF adjunto · una línea por impuesto`,
+    items: buildItems(row).items,
   };
 }
 
@@ -181,6 +207,14 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
     contact = resolveHoldedContact(row.supplier_vat_id, row.supplier_name, await holdedContacts(key));
   } catch (e: any) { return { ok: false, status: 502, error: "could not check Holded: " + (e?.message || e) }; }
   const cd = contactDecision(contact, choice);
+  // Every tax key must exist and be switched on in THIS company's Holded.
+  const bi = buildItems(row);
+  if (bi.problem) blockers.push(bi.problem);
+  try {
+    const tx = await h(key, "/taxes");
+    const live = new Set<string>((Array.isArray(tx.json) ? tx.json : []).filter((t: any) => t.status !== false).map((t: any) => String(t.key)));
+    for (const it of bi.items) for (const k of it.taxes as string[]) if (live.size && !live.has(k)) blockers.push(`holded_tax_key_off_${k}`);
+  } catch { /* the read-back still checks keys */ }
   if (mode !== "attach_existing" && !cd.ok && !(mode === "preflight" && contact.kind === "choose")) blockers.push(cd.blocker);
   if (contact.kind === "new") warnings.push("new_holded_contact_will_be_created");
 
@@ -218,7 +252,9 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
   if (inHolded.length) return { ok: false, status: 409, error: "already in Holded — attach to the existing doc instead", detail: inHolded };
   if (!cd.ok) return { ok: false, status: 409, error: "Holded contact not decided: " + cd.blocker };
   const payload = buildPayload(row, cd.contactId);
-  if (!payload.items.length) return { ok: false, status: 409, error: "no VAT bands to post" };
+  if (bi.problem) return { ok: false, status: 409, error: "blocked: " + bi.problem };
+  if (!payload.items.length) return { ok: false, status: 409, error: "no tax bands to post" };
+  if (payload.items.some((i: any) => !i.taxes.length)) return { ok: false, status: 409, error: "a tax band has no Holded key — accountant" };
   if (DRY_RUN) return { ok: true, mode: "create", dry_run: true, payload };
 
   // Lock: one push at a time per row (stale after 5 min).
@@ -260,12 +296,22 @@ export async function pushToHolded(sb: SupabaseClient, uid: string, id: string, 
     // on old docs — a wrong tax key would pass the total check at 0 % → 0 %).
     taxes: (() => {
       const prods: any[] = Array.isArray(got.products) ? got.products : [];
-      const bands = (row!.vat_bands || []).filter((b) => b.base !== 0);
+      const bands = (row!.vat_bands || []).filter((b) => b.base !== 0 && b.regime !== "retention");
       if (prods.length !== bands.length) return false;
-      return bands.every((b) => prods.some((p) => Math.abs(Number(p.price) * Number(p.units || 1) - b.base) <= 0.01
-        && Number(p.tax) === b.rate && (!Array.isArray(p.taxes) || p.taxes.includes(`p_iva_${b.rate}`))));
+      return bands.every((b) => {
+        const key = holdedTaxKey(b)!;
+        return prods.some((p) => Math.abs(Number(p.price) * Number(p.units || 1) - b.base) <= 0.01
+          && (!Array.isArray(p.taxes) || p.taxes.includes(key))
+          // group keys (intra / ISP) carry the self-assessed pair; don't insist on p.tax there
+          && (isSelfAssessed(b) || b.regime === "exempt" || b.regime === "not_subject" || Number(p.tax) === b.rate));
+      });
     })(),
-    vat: Math.abs(Number(got.tax) - (row!.vat_bands || []).reduce((a, b) => a + b.cuota, 0)) <= 0.02,
+    // Holded may report IRPF inside `tax` (negative) or apart; accept either.
+    vat: (() => {
+      const t = bandTotals(row!.vat_bands || []);
+      const g = Number(got.tax);
+      return Math.abs(g - t.vat) <= 0.02 || Math.abs(g - (t.vat - t.retention)) <= 0.02;
+    })(),
   };
   if (!checks.found || !checks.total || !checks.date || !checks.contact || !checks.taxes || !checks.vat) {
     return rollback("read-back did not match the scan", { checks, holded_total: got.total, holded_date: got.date, want_total: want });

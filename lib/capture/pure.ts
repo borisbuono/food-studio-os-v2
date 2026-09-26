@@ -83,37 +83,124 @@ export function num(v: unknown): number | null {
   return Number.isFinite(x) ? x : null;
 }
 
-export type VatBand = { rate: number; base: number; cuota: number };
-const VALID_RATES = new Set([0, 4, 5, 10, 21]);
+// Every tax line a Spanish or foreign supplier can print. One band per
+// (regime, rate). `iva` is the default so old rows ({rate, base, cuota}) still read.
+//   iva            IVA peninsular/Baleares — 0 · 2 · 4 · 5 · 7.5 · 10 · 12 · 21
+//   iva_nd         IVA no deducible (the accountant's call, never inferred)
+//   iva_bi         IVA bien de inversión
+//   re             Recargo de equivalencia 0.5 · 0.62 · 1.4 · 1.75 · 5.2 (surcharge on the same base)
+//   intra_goods    Adquisición intracomunitaria de bienes (EU supplier, 0 % printed, self-assessed)
+//   intra_services Adquisición intracomunitaria de servicios
+//   isp            Inversión del sujeto pasivo (domestic reverse charge)
+//   import         Importación (IVA paid at customs / DUA)
+//   exempt         Exento (art. 20 LIVA …)
+//   not_subject    No sujeto
+//   igic           Canarias 0 · 3 · 5 · 7 · 9.5 · 15 · 20
+//   ipsi           Ceuta / Melilla
+//   foreign_vat    another country's VAT (MwSt, TVA, IVA IT/PT …) — not deductible in Spain
+//   retention      IRPF withheld (15 · 7 · 19 · 1 · 2 · 24 · 35) — reduces the total
+export type TaxRegime =
+  | "iva" | "iva_nd" | "iva_bi" | "re" | "intra_goods" | "intra_services" | "isp" | "import"
+  | "exempt" | "not_subject" | "igic" | "ipsi" | "foreign_vat" | "retention";
+export const TAX_REGIMES: TaxRegime[] = ["iva", "iva_nd", "iva_bi", "re", "intra_goods", "intra_services", "isp", "import", "exempt", "not_subject", "igic", "ipsi", "foreign_vat", "retention"];
+export type VatBand = { rate: number; base: number; cuota: number; regime?: TaxRegime; country?: string | null };
 
-// Normalise bands: merge duplicates per rate, drop empties, flag odd rates
-// and cuotas that don't equal base × rate.
+const RATES: Record<TaxRegime, number[] | null> = {
+  iva: [0, 2, 4, 5, 7.5, 10, 12, 21], iva_nd: [4, 5, 7.5, 10, 21], iva_bi: [4, 10, 21],
+  re: [0.5, 0.62, 1.4, 1.75, 5.2], intra_goods: [0, 4, 10, 21], intra_services: [0, 4, 10, 21],
+  isp: [4, 10, 21], import: [4, 10, 21], exempt: [0], not_subject: [0],
+  igic: [0, 3, 5, 7, 9.5, 15, 20], ipsi: [0.5, 1, 2, 3, 4, 8, 10], foreign_vat: null,
+  retention: [1, 2, 7, 15, 19, 24, 35],
+};
+// Self-assessed: the supplier prints 0 cuota; the 303 carries the Spanish rate on both sides.
+const SELF_ASSESSED = new Set<TaxRegime>(["intra_goods", "intra_services", "isp"]);
+
+export function regimeOf(v: unknown): TaxRegime {
+  const t = String(v || "").toLowerCase().trim();
+  return (TAX_REGIMES as string[]).includes(t) ? (t as TaxRegime) : "iva";
+}
+
+// EU VAT prefixes (Greece is EL). A supplier id starting with one of these,
+// other than ES, is an EU supplier.
+const EU = new Set(["AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "FI", "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"]);
+export function supplierCountry(vatId: string | null | undefined): { country: string | null; eu: boolean } {
+  const t = String(vatId || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const pre = t.slice(0, 2);
+  if (/^[A-Z]{2}/.test(pre) && pre !== "ES" && EU.has(pre)) return { country: pre, eu: true };
+  if (/^(ES)?[A-Z0-9]\d{7}[A-Z0-9]$/.test(t)) return { country: "ES", eu: true };
+  if (/^[A-Z]{2}/.test(pre) && !/^[A-HJ-NP-SUVW]\d/.test(t)) return { country: pre, eu: false };
+  return { country: null, eu: false };
+}
+
+// Normalise bands: merge per (regime, rate), flag odd rates, cuota ≠ base × rate,
+// and anything our Holded books can't take without the accountant.
 export function normaliseBands(raw: unknown): { bands: VatBand[]; flags: string[] } {
   const flags: string[] = [];
-  const by = new Map<number, VatBand>();
+  const by = new Map<string, VatBand>();
   for (const b of Array.isArray(raw) ? raw : []) {
+    const regime = regimeOf((b as any)?.regime);
     const rate = num((b as any)?.rate);
     const base = num((b as any)?.base);
-    const cuota = num((b as any)?.cuota);
+    let cuota = num((b as any)?.cuota);
     if (rate === null || base === null) continue;
-    const cur = by.get(rate) || { rate, base: 0, cuota: 0 };
+    if (SELF_ASSESSED.has(regime) || regime === "exempt" || regime === "not_subject") cuota = cuota ?? 0;
+    const k = `${regime}:${rate}`;
+    const cur = by.get(k) || { regime, rate, base: 0, cuota: 0, country: (b as any)?.country || null };
     cur.base = r2(cur.base + base);
     cur.cuota = r2(cur.cuota + (cuota ?? r2((base * rate) / 100)));
-    by.set(rate, cur);
+    by.set(k, cur);
   }
-  const bands = Array.from(by.values()).sort((a, b) => a.rate - b.rate);
+  const bands = Array.from(by.values()).sort((a, b) => (a.regime || "").localeCompare(b.regime || "") || a.rate - b.rate);
   for (const b of bands) {
-    if (!VALID_RATES.has(b.rate)) flags.push(`vat_rate_unusual_${b.rate}`);
-    if (Math.abs(r2((b.base * b.rate) / 100) - b.cuota) > 0.05) flags.push(`vat_cuota_mismatch_${b.rate}`);
+    const reg = b.regime || "iva";
+    const allowed = RATES[reg];
+    if (allowed && !allowed.includes(b.rate)) flags.push(`tax_rate_unusual_${reg}_${b.rate}`);
+    const printedCuota = !SELF_ASSESSED.has(reg) && reg !== "exempt" && reg !== "not_subject";
+    if (printedCuota && Math.abs(r2((b.base * b.rate) / 100) - Math.abs(b.cuota)) > 0.05) flags.push(`tax_cuota_mismatch_${reg}_${b.rate}`);
+    if (reg === "igic" || reg === "ipsi" || reg === "foreign_vat" || reg === "re") flags.push("tax_regime_needs_accountant");
+    if (SELF_ASSESSED.has(reg)) flags.push("self_assessed_vat");
+    if (reg === "retention") flags.push("irpf_retention");
   }
-  return { bands, flags };
+  return { bands, flags: Array.from(new Set(flags)) };
 }
 
+// Totals as printed: bases once (a surcharge sits on an existing base),
+// cuotas of taxes actually charged, minus IRPF withheld.
 export function bandTotals(bands: VatBand[]) {
-  const base = r2(bands.reduce((a, b) => a + b.base, 0));
-  const vat = r2(bands.reduce((a, b) => a + b.cuota, 0));
-  return { base, vat, total: r2(base + vat) };
+  let base = 0, vat = 0, retention = 0;
+  for (const b of bands) {
+    const reg = b.regime || "iva";
+    if (reg === "retention") { retention += Math.abs(b.cuota); continue; }
+    if (reg !== "re") base += b.base;
+    if (!SELF_ASSESSED.has(reg)) vat += b.cuota;
+  }
+  base = r2(base); vat = r2(vat); retention = r2(retention);
+  return { base, vat, retention, total: r2(base + vat - retention) };
 }
+
+// Holded purchase tax keys (live list, BM, 26-09-2026 — GET /taxes).
+// null = no key in our books → the push is blocked for the accountant.
+export function holdedTaxKey(b: VatBand, kind: "goods" | "services" = "goods"): string | null {
+  const reg = b.regime || "iva";
+  const r = b.rate === 7.5 ? "75" : String(b.rate);
+  switch (reg) {
+    case "iva": return [0, 2, 4, 5, 7.5, 10, 12, 21].includes(b.rate) ? `p_iva_${r}` : null;
+    case "iva_nd": return [4, 5, 7.5, 10, 21].includes(b.rate) ? `p_iva_nd_${r}` : null;
+    case "iva_bi": return [4, 10, 21].includes(b.rate) ? `p_iva_bi_${r}` : null;
+    case "intra_goods": case "intra_services": {
+      if (b.rate === 0) return "p_iva_adqintrabs_0";
+      const g = reg === "intra_goods" || kind === "goods" ? "b" : "s";
+      return [4, 10, 21].includes(b.rate) ? `p_iva_adqintra${reg === "intra_services" ? "s" : g}_${r}` : null;
+    }
+    case "isp": return b.rate === 21 ? "p_iva_invsuj" : [4, 10].includes(b.rate) ? `p_iva_invsuj_${r}` : null;
+    case "import": return [4, 10, 21].includes(b.rate) ? `p_iva_imp_${r}` : null;
+    case "exempt": return "p_iva_exento";
+    case "not_subject": return "p_iva_nosujeto";
+    case "retention": return [7, 15, 19].includes(b.rate) ? `p_ret_${r}` : null;
+    default: return null; // re, igic, ipsi, foreign_vat
+  }
+}
+export function isSelfAssessed(b: VatBand) { return SELF_ASSESSED.has(b.regime || "iva"); }
 
 // ── lines ────────────────────────────────────────────────────────────────
 export type Line = {
@@ -273,6 +360,7 @@ export function matchAlbaranes(
 export const BLOCKING_FLAGS = [
   "entity_guessed", "third_party_addressee", "conflicting_copies", "duplicate",
   "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "vat_rate_category_mismatch",
+  "tax_regime_needs_accountant", "no_customer_details",
 ] as const;
 export function pushBlockers(row: { doc_type: string | null; flags: string[] | null; holded_doc_id: string | null; match_status: string | null; vat_bands: VatBand[] | null }): string[] {
   const out: string[] = [];
@@ -281,7 +369,8 @@ export function pushBlockers(row: { doc_type: string | null; flags: string[] | n
   if (!row.vat_bands || !row.vat_bands.length) out.push("no_vat_bands");
   if (row.match_status === "rejected" || row.match_status === "duplicate") out.push(`status_${row.match_status}`);
   for (const f of row.flags || []) if ((BLOCKING_FLAGS as readonly string[]).includes(f)) out.push(f);
-  return out;
+  for (const b of row.vat_bands || []) if (b.base !== 0 && !holdedTaxKey(b)) out.push(`no_holded_tax_key_${b.regime || "iva"}_${b.rate}`);
+  return Array.from(new Set(out));
 }
 
 // ── IVA rate vs what was bought ──────────────────────────────────────────
@@ -303,7 +392,7 @@ export function vatCategoryCheck(doc: { supplier_name?: string | null; lines?: L
   const supCat = MUST_21.find((c) => (c.cat === "fuel" || c.cat === "energy") && c.re.test(sup));
   if (supCat) {
     // A fuel/energy supplier: every band must be 21 %.
-    for (const b of doc.bands || []) if (b.base !== 0 && b.rate !== 21) out.push({ where: `document band ${b.rate}%`, cat: supCat.cat, printed: b.rate, expected: 21 });
+    for (const b of doc.bands || []) if ((b.regime || "iva") === "iva" && b.base !== 0 && b.rate !== 21) out.push({ where: `document band ${b.rate}%`, cat: supCat.cat, printed: b.rate, expected: 21 });
   }
   for (const l of doc.lines || []) {
     const rate = num(l.vat_rate);
@@ -320,7 +409,7 @@ export function vatCategoryCheck(doc: { supplier_name?: string | null; lines?: L
 // SAME CIF (MENEGHELLO FISH SL + MENEGHELLO FOOD SL both B16515413). Posting
 // by contactCode alone lets Holded pick one — or invent a new contact. So the
 // contact is resolved here and anything but a single CIF hit goes to a human.
-export type HContact = { id: string; name: string | null; code?: string | null; vatnumber?: string | null; tradeName?: string | null; type?: string | null };
+export type HContact = { id: string; name: string | null; code?: string | null; vatnumber?: string | null; tradeName?: string | null; type?: string | null; email?: string | null };
 export type ContactVerdict =
   | { kind: "cif"; id: string; name: string | null }
   | { kind: "choose"; reason: "same_cif_several_contacts" | "name_lookalikes"; candidates: HContact[] }
@@ -344,4 +433,51 @@ export function resolveHoldedContact(cifRaw: string | null | undefined, name: st
     if (look.length) return { kind: "choose", reason: "name_lookalikes", candidates: look.slice(0, 8) };
   }
   return { kind: "new" };
+}
+
+// ── tickets ↔ facturas (BUILD_PROMPT §11–12) ─────────────────────────────
+// A factura that replaces a ticket prints the ticket number on its face
+// ("Factura Simplificada: 4253-025-934413"), so the join is deterministic.
+// One-character differences are OUR misread (4251-… vs 4253-018-870315 on
+// the real pile): accept them only when date and total agree too, and let the
+// factura's value (printed digitally) win.
+export function ticketMatch(ticketNo: string | null | undefined, facturaRef: string | null | undefined): "exact" | "one_off" | null {
+  const a = normDocNo(ticketNo), b = normDocNo(facturaRef);
+  if (!a || !b || a.length < 6) return null;
+  if (a === b) return "exact";
+  if (a.length !== b.length) return null;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && ++d > 1) return null;
+  return d === 1 ? "one_off" : null;
+}
+
+// Where a ticket stands. The three jobs the prompt insists stay distinct:
+// resolved (factura found), obtainable (request it — client or new), impossible.
+export type FacturaStatus = "unchecked" | "resolved" | "requestable_client" | "requestable_new" | "awaiting_factura" | "consolidated" | "not_obtainable";
+export function ticketStatus(s: { hasFactura: boolean; consolidated: boolean; isClient: boolean; requested: boolean; impossible: boolean }): FacturaStatus {
+  if (s.hasFactura) return "resolved";
+  if (s.impossible) return "not_obtainable";
+  if (s.consolidated) return "consolidated";
+  if (s.requested) return "awaiting_factura";
+  return s.isClient ? "requestable_client" : "requestable_new";
+}
+
+export type FiscalParty = { legal_name: string; tax_id: string; address?: string | null };
+export function facturaRequestDraft(a: {
+  template: "client" | "new"; supplier: string; ticket: string | null; date: string | null; amount: number | null; us: FiscalParty; signer?: string;
+}) {
+  const eurES = (n: number | null) => n == null ? "—" : n.toFixed(2).replace(".", ",") + " €";
+  const d = a.date ? a.date.split("-").reverse().join("/") : "—";
+  const fiscal = `${a.us.legal_name}\nNIF: ${a.us.tax_id}\n${a.us.address || "[domicilio fiscal]"}`;
+  const sign = `${a.signer || "Boris Buono"}\n${a.us.legal_name}`;
+  if (a.template === "client") {
+    return {
+      subject: `Solicitud de factura — ticket ${a.ticket || ""} del ${d} (${eurES(a.amount)})`.replace("  ", " "),
+      body: `Buenos días,\n\nOs pedimos la factura completa correspondiente al ticket ${a.ticket || "adjunto"} del ${d}, por importe de ${eurES(a.amount)}, a nombre de:\n\n${fiscal}\n\nAdjuntamos copia del ticket.\n\nMuchas gracias,\n${sign}`,
+    };
+  }
+  return {
+    subject: `Alta como cliente y factura del ticket ${a.ticket || ""} del ${d}`.replace("  ", " "),
+    body: `Buenos días,\n\nSomos ${a.us.legal_name}. Os escribimos para daros de alta nuestros datos fiscales, de forma que las próximas compras se facturen directamente a nuestro nombre:\n\n${fiscal}\n\nY os pedimos, por favor, la factura del ticket ${a.ticket || "adjunto"} del ${d}, por importe de ${eurES(a.amount)}. Adjuntamos copia del ticket.\n\nMuchas gracias,\n${sign}`,
+  };
 }

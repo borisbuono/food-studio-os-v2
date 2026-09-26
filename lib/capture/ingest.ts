@@ -16,9 +16,10 @@ import { requireManagerOf } from "@/lib/access/requireManager";
 import { recomputeAfterIngest } from "@/lib/recipes/recompute";
 import { extractDocument, EXTRACTION_MODEL, type Extracted } from "@/lib/capture/extract";
 import { matchForSupplier } from "@/lib/capture/match";
+import { linkTicketsForFactura, refreshTicketStatus, enrichSupplierFromDoc } from "@/lib/capture/tickets";
 import {
   resolveEntityFromDoc, normTaxId, normDocNo, normName, normaliseBands, bandTotals, checkLines, lineArithmeticOk,
-  docTypeFromWord, dedup, num, r2, vatCategoryCheck, type Line, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
+  docTypeFromWord, dedup, num, r2, vatCategoryCheck, supplierCountry, type Line, type EntityCode, type OwnEntity, type DocType, type PriorDoc,
 } from "@/lib/capture/pure";
 
 // Entity slug → the text code the finance tables key on. The CIFs themselves
@@ -33,7 +34,7 @@ const LOW_CONFIDENCE = 0.85;
 
 export type IngestResult =
   | { ok: true; status: "filed" | "needs_triage" | "rejected"; table: "invoice_inbox" | "albarans"; id: string; entity: EntityCode;
-      entity_source: string; doc_type: DocType; flags: string[]; lines: number; matched?: unknown; extraction_error?: string | null }
+      entity_source: string; doc_type: DocType; flags: string[]; lines: number; matched?: unknown; ticket?: unknown; extraction_error?: string | null }
   | { ok: true; status: "already_captured" | "duplicate"; table: "invoice_inbox" | "albarans"; id: string; reason: string }
   | { ok: true; status: "conflicting_copies"; table: "invoice_inbox" | "albarans"; id: string; prior_total: number | null; this_total: number | null }
   | { ok: false; status: number; error: string };
@@ -120,9 +121,22 @@ export async function ingestCapture(args: {
   if (!gate.ok) return { ok: false, status: gate.status, error: `${gate.error} (document is addressed to ${entity})` };
 
   // 3) Type, VAT bands, totals, lines.
-  const docType = docTypeFromWord(x.doc_word, x.model_type);
+  let docType = docTypeFromWord(x.doc_word, x.model_type);
+  // §11: what makes a factura is OUR fiscal details on it, not a VAT breakdown.
+  if (docType === "invoice" && x.customer_details_present === false) { docType = "ticket"; }
+  if (docType === "ticket" && x.customer_details_present === true && verdict.kind === "document") docType = "invoice"; // simplificada cualificada
+  if (docType === "ticket") flags.push("no_customer_details");
+  if (docType === "ticket" && /SOLRED/i.test(String(x.payment_card_scheme || "") + " " + String(x.raw_ocr_text || ""))) flags.push("billed_via_card_scheme");
   const { bands, flags: bandFlags } = normaliseBands(x.vat_bands);
   flags.push(...bandFlags);
+  // EU supplier outside Spain: foreign VAT, or an intra-community purchase to self-assess.
+  // GGM Gastro (DE) was booked at tax 0 both ways — that call belongs to the accountant.
+  const sc = supplierCountry(x.supplier_vat_id);
+  if (sc.country && sc.country !== "ES") {
+    flags.push(sc.eu ? "eu_supplier" : "non_eu_supplier");
+    const explicit = bands.every((b) => ["intra_goods", "intra_services", "import", "foreign_vat", "exempt", "not_subject"].includes(b.regime || "iva"));
+    if (!explicit || !bands.length) flags.push("tax_regime_needs_accountant");
+  }
   const hdrBase = num(x.subtotal_eur), hdrVat = num(x.vat_eur), hdrTotal = num(x.grand_total_eur);
   const bt = bandTotals(bands);
   const total = hdrTotal ?? (bands.length ? bt.total : null);
@@ -226,6 +240,9 @@ export async function ingestCapture(args: {
       doc_type: docType,
       invoice_number: s(x.doc_number),
       addressee_name: s(x.addressee_name),
+      ticket_number: docType === "ticket" ? s(x.simplified_invoice_number) || s(x.doc_number) : null,
+      customer_details_present: typeof x.customer_details_present === "boolean" ? x.customer_details_present : null,
+      factura_status: docType === "ticket" ? "unchecked" : null,
       due_date: iso(x.due_date),
       payment_method: s(x.payment_method),
       payment_card_last4: s(x.payment_card_last4),
@@ -254,13 +271,28 @@ export async function ingestCapture(args: {
     if (linesWritten < 0) { await sb.from(table).update({ flags: [...uniqFlags, "lines_not_saved"] }).eq("id", id); linesWritten = 0; }
   }
 
+  // 8b) Supplier record: fill blanks from what the paper prints (§13).
+  if (sup.id && status !== "rejected") { try { await enrichSupplierFromDoc(sup.id, x.supplier_contact); } catch { /* best-effort */ } }
+
+  // 8c) Tickets ↔ facturas (§11–12).
+  let ticket: unknown = null;
+  if (table === "invoice_inbox" && status !== "rejected") {
+    try {
+      if (docType === "ticket") ticket = { status: await refreshTicketStatus(sb, id) };
+      else if (docType === "invoice") {
+        const refs = (Array.isArray(x.referenced_ticket_numbers) ? x.referenced_ticket_numbers : []).map(String).filter(Boolean);
+        if (refs.length) ticket = await linkTicketsForFactura(sb, { id, entity_id: entity, entity_source: entitySource, supplier_vat_id: supplierCif, document_date: docDate, grand_total_eur: total, refs });
+      }
+    } catch (e: any) { ticket = { error: String(e?.message || e) }; }
+  }
+
   // 9) Albarán ↔ invoice links for this supplier.
   let matched: unknown = null;
   if (status === "filed" && sup.id && (docType === "invoice" || docType === "albaran")) {
     try { matched = await matchForSupplier(sb, entity, sup.id); } catch (e: any) { matched = { error: String(e?.message || e) }; }
   }
 
-  return { ok: true, status, table, id, entity, entity_source: entitySource, doc_type: docType, flags: uniqFlags, lines: linesWritten, matched, extraction_error: extractionError };
+  return { ok: true, status, table, id, entity, entity_source: entitySource, doc_type: docType, flags: uniqFlags, lines: linesWritten, matched, ticket, extraction_error: extractionError };
 }
 
 // purchase_lines for one captured document. Returns rows written, −1 on error.
