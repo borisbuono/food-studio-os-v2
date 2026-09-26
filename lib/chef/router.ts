@@ -9,6 +9,7 @@
 // The model classifies; the code decides. Nothing in this file writes to a
 // business table — only chef_turns for the log.
 
+import { readFoodCost } from "@/lib/chef/foodCost";
 import { attachConfirmTokens } from "@/lib/chef/confirm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
@@ -208,6 +209,11 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   }
   if (/^(?:albar[aá]n|factura|foto|captura|capture|scan|escanea|escanear)(?:\s|$)/.test(m) || /^(?:haz|hacer|toma|take)\s+(?:una\s+)?(?:foto|captura|photo)/.test(m))
     return { intent: "capture", confidence: 0.97, language, args: { type: "auto" } };
+  // Slice C: food cost / margin — unambiguous phrasings skip the model.
+  const fc = m.match(/^(?:what'?s |whats |cu[aá]l es |dime )?(?:my |the |el |mi )?(?:food ?cost|coste|costo|escandallo|margen|margin)(?: de| del| de la| de los| de las| on| of| for)?\s+(?:the |el |la |los |las )?(.{2,60})$/)
+    || m.match(/^cu[aá]nto (?:me |nos )?(?:cuesta|cuestan)\s+(?:el |la |los |las |hacer el |hacer la )?(.{2,60})$/)
+    || m.match(/^(?:how much does|how much do)\s+(?:the )?(.{2,60}?)\s+cost(?: me| us)?\??$/);
+  if (fc) return { intent: "query food_cost", confidence: 0.94, language, args: { q: fc[1].replace(/[?¿.!]+$/g, "").trim() } };
   const rem = m.match(/^(?:ap[uú]ntate|apunta|recuerda|acu[eé]rdate|remember)\s+(?:que\s+|that\s+)?(.{3,})$/);
   if (rem) return { intent: "remember", confidence: 0.96, language, args: { text: message.trim().replace(/^[^\s]+\s+(?:que\s+|that\s+)?/i, "") } };
   if (/^(?:feedback|esto est[aá] mal|this is broken|bug)\b/.test(m)) {
@@ -228,6 +234,7 @@ Intents (exact strings) and their args:
 - "query prep"      {}                                       — today's prep list / mise en place
 - "query calendar"  {}                                       — what's on today
 - "query inbox"     {}                                       — waiting comments / messages
+- "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
 - "navigate"        {to: page word}                          — open/go to a page (recipes, bookings, calendar, inbox, prep, eod/caja, team, office, kitchen, dining, home)
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
 - "create prep"     {name, quantity?, unit?, station?}       — add an item to the prep list
@@ -257,7 +264,11 @@ Examples:
 "apúntate que a Noelia no le gusta el cilantro" → {"intent":"remember","confidence":0.95,"language":"es","args":{"text":"A Noelia no le gusta el cilantro"}}
 "esto está mal, el precio no cuadra" → {"intent":"feedback","confidence":0.9,"language":"es","args":{"text":"El precio no cuadra","feedback_kind":"bug"}}
 "que alguien investigue proveedores de ostras en Galicia" → {"intent":"run_agent","confidence":0.9,"language":"es","args":{"agent_type":"research","objective":"Investigar proveedores de ostras en Galicia"}}
-"why is the margin on the sea bass low" → {"intent":"query ask","confidence":0.8,"language":"en","args":{"q":"why is the margin on the sea bass low"}}
+"what's my food cost on the lamb" → {"intent":"query food_cost","confidence":0.94,"language":"en","args":{"q":"lamb"}}
+"cuánto me cuesta el brownie" → {"intent":"query food_cost","confidence":0.94,"language":"es","args":{"q":"brownie"}}
+"margin on the sea bass" → {"intent":"query food_cost","confidence":0.9,"language":"en","args":{"q":"sea bass"}}
+"why is the margin on the sea bass low" → {"intent":"query food_cost","confidence":0.8,"language":"en","args":{"q":"sea bass"}}
+"how did we do last week" → {"intent":"query ask","confidence":0.8,"language":"en","args":{"q":"how did we do last week"}}
 "eso" → {"intent":"clarify","confidence":0.2,"language":"es","args":{"question":"¿Qué quieres hacer?"}}
 "envía la respuesta a Marta" → {"intent":"approve","confidence":0.92,"language":"es","args":{"target":"reply","who":"Marta"}}
 "approve the first three comments" → {"intent":"approve","confidence":0.9,"language":"en","args":{"target":"reply","count":3}}
@@ -529,6 +540,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
   // Low confidence: one question, no guessing.
   if (c.intent !== "clarify" && conf < CONFIDENCE_READ_ONLY) return clarify(tl.not_sure, tl.not_sure_say);
 
+  // "query food_cost" (slice C) is a READ — deliberately not in this list.
   const isWrite = ["create prep", "create team", "remember", "feedback", "run_agent", "approve", "update bookings", "update prep", "inbox_open"].includes(c.intent);
   // Writes need a real house. Holdings is not a kitchen; never default to BM.
   if (isWrite && (!entityId || entityId === E_HOLDINGS)) return clarify(tl.which_house, tl.which_house_say);
@@ -576,6 +588,14 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
       case "query calendar": {
         const r = await readCalendar(rctx);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "calendar", q: "today", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      case "query food_cost": {
+        // Slice C: one card — cost, price, margin %, top 3 ingredients — from
+        // lib/chef/foodCost.ts (the maths behind GET /api/recipes/food-cost).
+        const q = String(args.q || message).trim();
+        const fcScope = { entity_id: entityId || scope.entity.id, entity_name: label || "", restaurant_id: scope.restaurant_id, house: houseSlug };
+        const r = await readFoodCost(supabaseServer(), q, fcScope, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "costing", q, scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, r.found ? "card" : "clarify");
       }
       case "query inbox": {
         const r = await readInbox(rctx);

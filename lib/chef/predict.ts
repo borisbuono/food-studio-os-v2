@@ -14,7 +14,7 @@ import { codeForEntityId } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
 
 export type ChefChip = { key: string; label: string; utterance: string };
-export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday";
+export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost";
 
 type Candidate = ChefChip & { key: ChipKey; score: number };
 
@@ -70,7 +70,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
   const code = codeForEntityId(entityId);
   const now = Date.now();
 
-  const [inbox, prep, bookings, captures, echo, calendar] = await Promise.all([
+  const [inbox, prep, bookings, captures, echo, calendar, foodCost] = await Promise.all([
     // inbox: rows waiting for a reply
     safe(async (): Promise<Candidate[]> => {
       const { data } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", entityId).maybeSingle();
@@ -148,9 +148,18 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
       if (!soon) return [];
       return [{ key: "calendar", label: es ? "Calendario" : "What's on", utterance: es ? "qué hay en el calendario" : "what's on today", score: 38 }];
     }, []),
+    // food cost (slice C): standing on a recipe page → offer its costing.
+    safe(async (): Promise<Candidate[]> => {
+      const m = String(input.route || "").match(/\/(?:kitchen\/recipes|develop\/menu)\/([0-9a-f-]{36})(?:[/?#]|$)/i);
+      if (!m) return [];
+      const { data } = await sb.from("recipes").select("name").eq("id", m[1]).maybeSingle();
+      const name = String((data as any)?.name || "").trim();
+      if (!name) return [];
+      return [{ key: "food_cost", label: clip(es ? "Food cost: " + name : "Food cost: " + name), utterance: es ? "cuánto me cuesta " + name : "food cost on " + name, score: 60 }];
+    }, []),
   ]);
 
-  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar].sort((a, b) => b.score - a.score);
+  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost].sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   const seenUtt = new Set<string>();
   const out: ChefChip[] = [];

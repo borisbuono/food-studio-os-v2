@@ -10,7 +10,8 @@ export type ChefLang = "es" | "en";
 
 export type ChefSurface =
   | "recipes" | "prep" | "menu" | "calendar" | "bookings" | "inbox"
-  | "social" | "hiring" | "eod" | "finance" | "team" | "files";
+  | "social" | "hiring" | "eod" | "finance" | "team" | "files"
+  | "costing";   // slice C (2026-09-26): food cost / margin of a dish
 
 export type ChefScope = { entity_id: string; house?: string; room?: string };
 
