@@ -7,6 +7,8 @@ import Inbox from "./Inbox";
 import Saved from "./Saved";
 import Reviews from "@/components/merged/comms/Reviews";
 import PostingCalendar from "@/app/grow/reach/calendar/page";
+import { verbWord } from "@/lib/nav/labels";
+import { serverLang } from "@/lib/i18nServer";
 
 // /h/<slug>/comms — ONE Comms screen per house (slim OS slice 4, critic
 // slice "Reach"; Boris: reviews move Serve → Reach).
@@ -41,7 +43,7 @@ export default async function CommsPage({ params, searchParams }: { params: { ho
   return (
     <div>
       <div className={`mx-auto ${tab === "calendar" ? "max-w-6xl" : tab === "reviews" ? "max-w-3xl lg:max-w-5xl" : "max-w-3xl"} px-3 pt-6 sm:px-6 sm:pt-8`}>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{houseNameForSlug(params.house)} · Comms</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{houseNameForSlug(params.house)} · {verbWord("reach", serverLang())}</p>
         <h1 className="mt-1 font-serif text-3xl text-ink">{TABS.find((t) => t.key === tab)?.label}</h1>
         <TabNav base={base} tabs={tabs} active={tab} className="mt-5" />
       </div>

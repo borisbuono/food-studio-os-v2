@@ -14,6 +14,8 @@ import PosSync from "@/components/merged/money/pos-sync/PosSync";
 import Integrations from "@/components/merged/money/Integrations";
 import FilesInbox from "@/components/merged/money/files-inbox/FilesInbox";
 import Invoices from "@/components/merged/money/Invoices";
+import { verbWord } from "@/lib/nav/labels";
+import { serverLang } from "@/lib/i18nServer";
 
 // /h/<slug>/money — ONE Money landing per house (slim OS slice 3).
 //
@@ -56,7 +58,7 @@ export default async function MoneyPage({ params, searchParams }: { params: { ho
   return (
     <div>
       <div className={`mx-auto ${wide ? "max-w-5xl lg:max-w-6xl xl:max-w-7xl" : "max-w-3xl lg:max-w-4xl"} px-6 pt-8`}>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{houseNameForSlug(params.house)} · Money</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{houseNameForSlug(params.house)} · {verbWord("close", serverLang())}</p>
         <div className="mt-1 flex items-baseline justify-between gap-4">
           <h1 className="font-serif text-3xl text-ink">{TABS.find((t) => t.key === tab)?.label}</h1>
           <span className="flex gap-4 font-mono text-[11px] uppercase tracking-wide text-ink-soft">

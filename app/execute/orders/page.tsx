@@ -3,6 +3,8 @@ import Order from "./Order";
 import Receiving from "./Receiving";
 import Picker from "./Picker";
 import TabNav, { pickTab } from "@/components/nav/TabNav";
+import { verbWord } from "@/lib/nav/labels";
+import { serverLang } from "@/lib/i18nServer";
 
 // /execute/orders — the Supplies landing (slim OS slice 3, audit #20 "goods
 // arriving"). Orders · Receiving · Picker as tabs; Scans is the capture
@@ -22,7 +24,7 @@ export default function SuppliesPage({ searchParams }: { searchParams?: { tab?: 
   return (
     <div>
       <div className="mx-auto max-w-xl lg:max-w-4xl px-6 pt-8">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Supplies</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{verbWord("buy", serverLang())}</p>
         <div className="mt-1 flex items-baseline justify-between gap-4">
           <h1 className="font-serif text-3xl text-ink">{tab === "receiving" ? "Receiving" : tab === "picker" ? "Find a product" : "Orders"}</h1>
           <Link href="/administrate/finance/scans" className="font-mono text-[11px] uppercase tracking-wide text-ink-soft hover:text-ink">Scans →</Link>

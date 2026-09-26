@@ -4,6 +4,8 @@ import { getHouseBySlug } from "@/lib/houses.server";
 import Engineering from "@/components/merged/menu/Engineering";
 import Repricing from "@/components/merged/menu/Repricing";
 import TabNav, { pickTab, MergedShell } from "@/components/nav/TabNav";
+import { verbWord } from "@/lib/nav/labels";
+import { serverLang } from "@/lib/i18nServer";
 
 // /h/<slug>/menu/costing — ONE price screen for a house (slim OS slice 2,
 // audit #5 "cost / price a dish"). Menu engineering + repricing as tabs;
@@ -23,7 +25,7 @@ export default async function MenuCostingPage({ params, searchParams }: { params
   const tab = pickTab(TABS, searchParams?.tab);
   const base = `/h/${params.house}/menu/costing`;
   return (
-    <MergedShell eyebrow="Menu" title="Costing" wide tabs={<TabNav base={base} tabs={TABS} active={tab} />}>
+    <MergedShell eyebrow={verbWord("cook", serverLang())} title="Costing" wide tabs={<TabNav base={base} tabs={TABS} active={tab} />}>
       {tab === "repricing" ? <Repricing /> : <Engineering houseSlug={params.house} />}
     </MergedShell>
   );
