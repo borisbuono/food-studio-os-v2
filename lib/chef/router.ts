@@ -250,7 +250,7 @@ Intents (exact strings) and their args:
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
 - "create prep"     {name, quantity?, unit?, station?}       — add an item to the prep list
 - "create team"     {title}                                  — a task / to-do for someone (not a prep item)
-- "remember"        {text}                                   — store a fact
+- "remember"        {text, domain?: "finance"|"purchasing"|"comms"|"legal"|"hiring"|"menu"|"web"|"other", subject?: supplier/counterparty/document named} — note something odd (goes to the observation log; not a task)
 - "feedback"        {text, feedback_kind: "love"|"idea"|"bug"|"confusing"} — something is wrong / an idea about the OS
 - "run_agent"       {agent_type: "research"|"build"|"write"|"pa", objective} — delegate work to an agent
 - "inbox_open"      {}                                       — walk the waiting comments one at a time ("abre la bandeja", "siguiente", "read me the comments")
@@ -272,7 +272,8 @@ Examples:
 "albarán" → {"intent":"capture","confidence":0.9,"language":"es","args":{"type":"delivery_note"}}
 "añade 2 kg de cebolla a la mise" → {"intent":"create prep","confidence":0.93,"language":"es","args":{"name":"cebolla","quantity":2,"unit":"kg"}}
 "que Marta llame al proveedor de pescado" → {"intent":"create team","confidence":0.85,"language":"es","args":{"title":"Marta: llamar al proveedor de pescado"}}
-"apúntate que a Noelia no le gusta el cilantro" → {"intent":"remember","confidence":0.95,"language":"es","args":{"text":"A Noelia no le gusta el cilantro"}}
+"apúntate que a Noelia no le gusta el cilantro" → {"intent":"remember","confidence":0.95,"language":"es","args":{"text":"A Noelia no le gusta el cilantro","domain":"other"}}
+"remember Servifruit delivered late again" → {"intent":"remember","confidence":0.95,"language":"en","args":{"text":"Servifruit delivered late again","domain":"purchasing","subject":"Servifruit"}}
 "esto está mal, el precio no cuadra" → {"intent":"feedback","confidence":0.9,"language":"es","args":{"text":"El precio no cuadra","feedback_kind":"bug"}}
 "que alguien investigue proveedores de ostras en Galicia" → {"intent":"run_agent","confidence":0.9,"language":"es","args":{"agent_type":"research","objective":"Investigar proveedores de ostras en Galicia"}}
 "what's my food cost on the lamb" → {"intent":"query food_cost","confidence":0.94,"language":"en","args":{"q":"lamb"}}
@@ -621,9 +622,13 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
       }
       case "remember": {
         const text = clip(String(args.text || message), 600);
-        const action: ChefAction = { type: "remember", text, entity_id: entityId };
+        // 28-09: remember → observation log. Domain/subject are the router's
+        // best guess; the DB normalises an unknown domain to 'other'.
+        const domain = typeof args.domain === "string" && args.domain ? String(args.domain).toLowerCase() : "other";
+        const subject = typeof args.subject === "string" && args.subject.trim() ? clip(args.subject, 120) : null;
+        const action: ChefAction = { type: "remember", text, entity_id: entityId, domain, subject };
         return finish({
-          transcript: message, language: lang, intent: { kind: "remember", text }, confidence: conf,
+          transcript: message, language: lang, intent: { kind: "remember", text, domain, subject }, confidence: conf,
           say: tl.remember_say + ": " + clip(text, 60), needs_confirm: false, undoable: true, action, alternatives: alt,
           card: { title: tl.remember, lines: [clip(text, 140)], kind: "write", entity_label: label },
         }, "pending_undo");

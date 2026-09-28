@@ -6,6 +6,8 @@ import type { ChefAction, ChefActResult, ChefCard, ChefLang } from "@/lib/chef/t
 import { approveAndSend } from "@/lib/social/inboxAct";
 import { materialiseNotes } from "@/lib/chef/paInbox";
 import { consumeConfirmToken, needsConfirmToken, writeTurnResolution, type ConfirmVia } from "@/lib/chef/confirm";
+import { observe } from "@/lib/observations";
+import { supabaseService } from "@/lib/supabaseService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ const T = {
   },
 } as const;
 
-const UNDO_TABLES = new Set(["assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments"]);
+const UNDO_TABLES = new Set(["observations", "assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments"]);
 const AGENT_TAG: Record<string, string> = { research: "RESEARCH", build: "OS", write: "MARKETING", pa: "PA" };
 
 function madridToday() {
@@ -141,6 +143,27 @@ async function handle(req: Request) {
       const r: ChefActResult = { ok: true, card: card(t.undone, [], undefined, "write") };
       return Response.json(r);
     }
+    // Observation log (28-09): the ONE sanctioned delete. authenticated has no
+    // DELETE privilege on observations; the service role removes the row, or —
+    // when SUPABASE_SERVICE_ROLE_KEY is not set on Vercel — the definer RPC
+    // observation_chef_undo() does the same under the same token check.
+    if ((row as any).table_name === "observations") {
+      const svc = supabaseService();
+      let removed = false;
+      if (svc) {
+        const { data: g, error } = await svc.from("observations").delete().eq("id", (row as any).row_id).is("synthesised_at", null).select("id");
+        if (error) return fail(error.message, 500);
+        removed = !!(g && g.length);
+      } else {
+        const { data: okRpc, error } = await sb.rpc("observation_chef_undo", { p_token: token });
+        if (error) return fail(error.message, 500);
+        removed = okRpc === true;
+      }
+      if (!removed) return fail(t.nothing_deleted, 403);
+      await sb.from("chef_undo").update({ used_at: new Date().toISOString() }).eq("token", token);
+      const r: ChefActResult = { ok: true, card: card(t.undone, [], undefined, "write") };
+      return Response.json(r);
+    }
     const { data: gone, error } = await sb.from((row as any).table_name).delete().eq("id", (row as any).row_id).select("id");
     if (error) return fail(error.message, 500);
     // Undoing a charter must also pull its queued _INBOX note, or the PA
@@ -203,13 +226,18 @@ async function handle(req: Request) {
 
   switch (action.type) {
     case "remember": {
+      // 28-09: `remember` writes to the OBSERVATION LOG (Foundation §3 store
+      // 2), not to assistant_memory / master_todos. One line, source 'chef',
+      // domain guessed by the router (else 'other'), subject = the
+      // counterparty if one was named. Undo deletes via the service role.
       const text = clip(action.text, 600);
       if (!text) return fail("text required");
-      const { data, error } = await sb.from("assistant_memory").insert({
-        user_id: uid, fact: text, scope: "global", entity_code: code, confidence: null, source_conversation_id: null,
-      }).select("id").maybeSingle();
-      if (error || !data) return fail(error?.message || "insert failed", 500);
-      return done("assistant_memory", (data as any).id, card(t.remember, [text], label));
+      const r = await observe(sb, {
+        entity_id: scope.entity.id, body: text, source: "chef",
+        domain: (action as any).domain || "other", subject: (action as any).subject || null,
+      });
+      if (!r.ok) return fail(r.error, r.status);
+      return done("observations", r.id, card(t.remember, [text], label));
     }
     case "feedback": {
       const text = clip(action.text, 2000);

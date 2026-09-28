@@ -23,7 +23,7 @@ export type ChefIntent =
   | { kind: "capture"; type: "delivery_note" | "invoice" | "wine" | "auto" }
   | { kind: "approve"; surface: "inbox" | "social" | "hiring" | "finance"; id: string; action: "send" | "post" | "pay" | "reject" }
   | { kind: "run_agent"; agent_type: "research" | "build" | "write" | "pa"; objective: string; deliverables?: string[] }
-  | { kind: "remember"; text: string }
+  | { kind: "remember"; text: string; domain?: string | null; subject?: string | null }
   | { kind: "feedback"; text: string; page: string; feedback_kind?: "love" | "idea" | "bug" | "confusing" }
   | { kind: "clarify"; question: string };
 
@@ -54,7 +54,7 @@ export type ChefCard = {
 // What the client posts to /api/chef/act. Every write goes through here so
 // the confirm gate and undo live in ONE place.
 export type ChefAction =
-  | { type: "remember"; text: string; entity_id: string }
+  | { type: "remember"; text: string; entity_id: string; domain?: string | null; subject?: string | null }  // → observations (28-09)
   | { type: "feedback"; text: string; page: string; feedback_kind?: "love" | "idea" | "bug" | "confusing"; entity_id: string }
   | { type: "prep_add"; entity_id: string; name: string; quantity?: number | null; unit?: string | null; station?: string | null; service_date?: string }
   | { type: "todo_add"; entity_id: string; title: string }
