@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RotaShift, RotaPerson, RotaWeekRow, RotaCost, RotaSettings } from "@/lib/rota/server";
+import RotaProposal from "./RotaProposal";
 
 // The Rota tab — /h/<slug>/team?tab=rota (rota S1, Boris's rulings 2026-10-01).
 //
@@ -34,6 +35,7 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
   const [editing, setEditing] = useState<RotaShift | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [proposing, setProposing] = useState(false);
 
   const money = useCallback((n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency, maximumFractionDigits: 0 }).format(n), [currency]);
 
@@ -129,11 +131,13 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
                 </button>
               )
             ) : null}
-            <a href={`/h/${houseSlug}/team?tab=rota&propose=1&week=${weekStart}`} className="rounded-md border border-dashed border-line px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink-soft hover:bg-black/5">Suggest cheaper rota</a>
+            {data?.shifts.length ? <button onClick={() => setProposing((v) => !v)} className="rounded-md border border-dashed border-line px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink-soft hover:bg-black/5">Suggest cheaper rota</button> : null}
           </div>
         ) : null}
         {week?.status === "published" && planned === 0 ? <p className="mt-3 font-mono text-[11px] text-clay">Published {week.published_at ? new Date(week.published_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} · {published} shifts live on the calendar</p> : null}
       </section>
+
+      {proposing && canWrite ? <RotaProposal entityId={entityId} weekStart={weekStart} currency={currency} onChanged={load} onClose={() => setProposing(false)} /> : null}
 
       {err ? <p className="mt-3 rounded-md border border-tomato/40 bg-tomato/5 px-3 py-2 text-[12px] text-tomato">{err}</p> : null}
 
