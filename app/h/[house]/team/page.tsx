@@ -33,13 +33,13 @@ export default async function TeamPage({ params, searchParams }: { params: { hou
   const base = `/h/${params.house}/team`;
   return (
     <div>
-      <div className={`mx-auto ${tab === "labour" ? "max-w-5xl" : "max-w-xl lg:max-w-4xl"} px-6 pt-8`}>
+      <div className={`mx-auto ${tab === "labour" || tab === "rota" ? "max-w-5xl lg:max-w-6xl" : "max-w-xl lg:max-w-4xl"} px-6 pt-8`}>
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">{houseNameForSlug(params.house)} · {verbWord("people", serverLang())}</p>
         <h1 className="mt-1 font-serif text-3xl text-ink">{TABS.find((t) => t.key === tab)?.label}</h1>
         <TabNav base={base} tabs={TABS} active={tab} className="mt-5" />
       </div>
       <div className="[&>main]:pt-4">
-        {tab === "rota" ? <Rota /> : tab === "labour" ? <Labor params={{ house: params.house }} /> : tab === "invite" ? <Invite /> : <Team />}
+        {tab === "rota" ? <Rota entityId={house.id} houseSlug={params.house} currency={house.currency_code} /> : tab === "labour" ? <Labor params={{ house: params.house }} /> : tab === "invite" ? <Invite /> : <Team />}
       </div>
     </div>
   );

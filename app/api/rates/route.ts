@@ -94,11 +94,16 @@ export async function POST(req: Request) {
     .is("effective_to", null)
     .lt("effective_from", from);
 
+  // Rota (2026-10-01): rates are read per PERSON (team_members.id) so a
+  // teammate without a login can still carry one. Carry the person_id here.
+  const { data: tmRow } = await sb.from("team_members").select("id").eq("auth_user_id", user_id).limit(1).maybeSingle();
+
   const { data: inserted, error } = await sb
     .from("labor_hourly_rates")
     .upsert({
       entity_id,
       user_id,
+      person_id: (tmRow as any)?.id || null,
       role: body.role ? String(body.role).trim().slice(0, 40) : null,
       hourly_rate_eur: rate,
       effective_from: from,
