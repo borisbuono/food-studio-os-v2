@@ -12,7 +12,7 @@ import type { RotaPerson } from "@/lib/rota/server";
 // 6 Special days           → entity_special_days (busier / closed / quiet), uplift per kind
 // Each section saves on its own; nothing is applied until the manager taps Save.
 
-type Settings = { overtime_rate: number; tolerance_minutes: number; default_budget_pct: number | null; staffing_bands: Array<{ max_covers: number; foh: number; boh: number }>; weekly_budget_eur: number | null; spend_per_cover: number | null; lunch_share: number; holiday_uplift: Record<string, number> };
+type Settings = { holiday_region: string | null; holiday_local: string | null; overtime_rate: number; tolerance_minutes: number; default_budget_pct: number | null; staffing_bands: Array<{ max_covers: number; foh: number; boh: number }>; weekly_budget_eur: number | null; spend_per_cover: number | null; lunch_share: number; holiday_uplift: Record<string, number> };
 type Special = { id: string; date: string; name: string; kind: "special" | "closed" | "quiet"; uplift: number | null; notes: string | null };
 type Holiday = { date: string; name: string; kind: string; scope: string };
 type Payload = { ok: boolean; can_write: boolean; settings: Settings; people: RotaPerson[]; special_days: Special[]; holidays: Holiday[] };
@@ -73,7 +73,8 @@ export default function RotaSettings({ entityId, houseSlug, currency = "EUR" }: 
 
       <CoversSection s={s} canWrite={canWrite} busy={busy === "covers"} saved={saved === "covers"} onSave={(patch) => post({ action: "settings", patch }, "covers")} />
 
-      <SpecialDays days={data.special_days} holidays={data.holidays} uplift={s.holiday_uplift} canWrite={canWrite} busy={busy} saved={saved}
+      <SpecialDays days={data.special_days} holidays={data.holidays} uplift={s.holiday_uplift} region={s.holiday_region} local={s.holiday_local} canWrite={canWrite} busy={busy} saved={saved}
+        onScope={(patch) => post({ action: "settings", patch }, "scope")}
         onAdd={(d) => post({ action: "special_add", ...d }, "special")} onDelete={(id) => post({ action: "special_delete", id }, "special:" + id)}
         onUplift={(patch) => post({ action: "settings", patch: { holiday_uplift: patch } }, "uplift")} />
 
@@ -209,8 +210,9 @@ function CoversSection({ s, canWrite, busy, saved, onSave }: { s: Settings; canW
 }
 
 // 6 — special days + holidays ---------------------------------------------------
-function SpecialDays({ days, holidays, uplift, canWrite, busy, saved, onAdd, onDelete, onUplift }: {
-  days: Special[]; holidays: Holiday[]; uplift: Record<string, number>; canWrite: boolean; busy: string | null; saved: string | null;
+function SpecialDays({ days, holidays, uplift, region, local, canWrite, busy, saved, onAdd, onDelete, onUplift, onScope }: {
+  days: Special[]; holidays: Holiday[]; uplift: Record<string, number>; region: string | null; local: string | null; canWrite: boolean; busy: string | null; saved: string | null;
+  onScope: (patch: { holiday_region: string; holiday_local: string }) => Promise<any>;
   onAdd: (d: { date: string; name: string; kind: string; uplift: string | null }) => Promise<any>; onDelete: (id: string) => Promise<any>; onUplift: (patch: Record<string, number>) => Promise<any>;
 }) {
   const [date, setDate] = useState("");
@@ -221,6 +223,9 @@ function SpecialDays({ days, holidays, uplift, canWrite, busy, saved, onAdd, onD
   useEffect(() => { setU({ national: String(uplift.national ?? 1.15), regional: String(uplift.regional ?? 1.15), local: String(uplift.local ?? 1.3), special: String(uplift.special ?? 1.4) }); }, [uplift]);
   const pct = (x: string) => { const n = Number(x); return Number.isFinite(n) ? (n >= 1 ? "+" : "") + Math.round((n - 1) * 100) + " %" : ""; };
   const upcoming = useMemo(() => holidays.slice(0, 12), [holidays]);
+  const [reg, setReg] = useState(region || "");
+  const [loc, setLoc] = useState(local || "");
+  useEffect(() => { setReg(region || ""); setLoc(local || ""); }, [region, local]);
   return (
     <Section title="Special days" hint="Days your room behaves differently: Sant Joan, closing parties, a private buy-out, a day you are closed. The forecast lifts (or drops) covers on these days; public holidays come from the OS calendar below.">
       <ul className="divide-y divide-line">
@@ -252,10 +257,18 @@ function SpecialDays({ days, holidays, uplift, canWrite, busy, saved, onAdd, onD
         <SaveRow busy={busy === "uplift"} saved={saved === "uplift"} canWrite={canWrite} onSave={() => onUplift({ national: Number(u.national), regional: Number(u.regional), local: Number(u.local), special: Number(u.special) })} label="Save uplift" />
       </div>
 
+      <div className="mt-4 border-t border-line pt-3">
+        <p className={lbl}>Where this house is (which regional and local holidays apply)</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <input value={reg} onChange={(e) => setReg(e.target.value)} placeholder="region · Illes Balears" className={inp} disabled={!canWrite} aria-label="region" />
+          <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="municipality · Eivissa" className={inp} disabled={!canWrite} aria-label="municipality" />
+        </div>
+        <SaveRow busy={busy === "scope"} saved={saved === "scope"} canWrite={canWrite} onSave={() => onScope({ holiday_region: reg, holiday_local: loc })} label="Save place" />
+      </div>
       {upcoming.length ? (
         <div className="mt-4 border-t border-line pt-3">
           <p className={lbl}>Public holidays the forecast knows (next 12)</p>
-          <ul className="mt-1 font-mono text-[11px] text-ink-soft">{upcoming.map((h, i) => <li key={i}>{dayOf(h.date)} · {h.name} <span className="text-clay">· {h.scope}</span></li>)}</ul>
+          <ul className="mt-1 font-mono text-[11px] text-ink-soft">{upcoming.map((h, i) => <li key={i}>{dayOf(h.date)} · {h.name} <span className="text-clay">· {h.scope}{(h as any).provisional ? " · provisional" : ""}</span></li>)}</ul>
         </div>
       ) : <p className="mt-3 font-mono text-[10px] text-clay">Public holidays appear here once the holiday calendar is loaded for this house.</p>}
     </Section>

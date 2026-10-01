@@ -26,14 +26,11 @@ export async function GET(req: Request) {
     isManager(sb, uid, entity_id),
     sb.from("entities").select("country_code, city, metadata").eq("id", entity_id).maybeSingle(),
   ]);
-  // Holidays the forecast will use (S7 table; absent until that slice is applied)
-  let holidays: any[] = [];
-  try {
-    const { data } = await sb.rpc("fn_entity_holidays", { p_entity: entity_id, p_from: today, p_to: addDays(today, 365) });
-    holidays = Array.isArray(data) ? data : [];
-  } catch { holidays = []; }
+  // Holidays the forecast will use (S7): national + region + municipality from holiday_calendar, plus the house's special days
+  const { data: hol } = await sb.rpc("fn_entity_holidays", { p_entity: entity_id, p_from: today, p_to: addDays(today, 365) });
+  const holidays: any[] = Array.isArray(hol) ? hol : [];
   const s = (Array.isArray(settingsRes.data) ? settingsRes.data[0] : settingsRes.data) as any;
-  const settings: RotaSettings & { weekly_budget_eur: number | null; spend_per_cover: number | null; lunch_share: number; holiday_uplift: Record<string, number> } = {
+  const settings: RotaSettings & { holiday_region: string | null; holiday_local: string | null } = {
     overtime_rate: Number(s?.overtime_rate ?? 1.25), tolerance_minutes: Number(s?.tolerance_minutes ?? 10),
     default_budget_pct: s?.default_budget_pct == null ? null : Number(s.default_budget_pct),
     staffing_bands: Array.isArray(s?.staffing_bands) ? s.staffing_bands : [],
@@ -41,6 +38,7 @@ export async function GET(req: Request) {
     spend_per_cover: s?.spend_per_cover == null ? null : Number(s.spend_per_cover),
     lunch_share: Number(s?.lunch_share ?? 0.4),
     holiday_uplift: s?.holiday_uplift && typeof s.holiday_uplift === "object" ? s.holiday_uplift : { national: 1.15, regional: 1.15, local: 1.3, special: 1.4 },
+    holiday_region: s?.holiday_region || null, holiday_local: s?.holiday_local || null,
   };
   return Response.json({ ok: true, can_write: mgr, settings, people, special_days: specialRes.data || [], holidays, entity: entRes.data || null });
 }
