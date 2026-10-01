@@ -71,7 +71,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     key: "cook", label: "Menu", href: `${H}/menu/recipes`, hint: "the recipes and the menu",
     gate: { room: "kitchen" },
     leaves: [
-      { href: `${H}/menu/costing`,          label: "Costing",        hint: "menu engineering repricing price margin", gate: { room: "office" } },
+      { href: `${H}/menu/costing`,          label: "Costing",        hint: "margin food cost menu engineering repricing price", gate: { room: "office" } },
       { href: "/develop/recipes/import",    label: "Import recipe",  hint: "paste url import", gate: { room: "kitchen" } },
       { href: "/develop/menu/publish",      label: "Publish menu",   hint: "publish guest menu 86", gate: { room: "kitchen" } },
       { href: "/develop/wine",              label: "Wine",           hint: "wine list bottles prices", gate: { room: "kitchen" } },

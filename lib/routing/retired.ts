@@ -23,7 +23,7 @@ export const RETIRED: Retired[] = [
   { from: "/boh/receiving",           to: "/execute/orders",                  why: "alias" },
   { from: "/boh/recipes",             to: "/h/:house/menu/recipes",        why: "alias" },
   { from: "/boh/wine",                to: "/develop/wine",                    why: "alias" },
-  { from: "/develop/menu-engineering", to: "/h/:house/menu/costing",          why: "alias" },
+  { from: "/develop/menu-engineering", to: "/h/:house/menu/costing?tab=engineering", why: "alias" },
   { from: "/execute/handover", to: "/execute/pass",                    why: "alias" },
   { from: "/foh/bookings", to: "/execute/bookings",                why: "alias" },
   { from: "/foh/guests",              to: "/grow/relationships",              why: "alias" },
@@ -102,7 +102,7 @@ export const RETIRED: Retired[] = [
   { from: "/h/:house/:room/ingredients",      to: "/h/:house/menu/ingredients",          why: "slice 2: rooms left the URL" },
   { from: "/develop/menu/:id/edit",           to: "/h/:house/menu/recipes/:id?tab=edit", why: "dup #4: edit is a tab of the recipe page" },
   { from: "/develop/menu/:id/calculation",    to: "/h/:house/menu/recipes/:id?tab=cost", why: "dup #5: costing is a tab of the recipe page" },
-  { from: "/develop/menu/engineering",        to: "/h/:house/menu/costing",              why: "dup #5: one price screen" },
+  { from: "/develop/menu/engineering",        to: "/h/:house/menu/costing?tab=engineering", why: "dup #5: one price screen" },
   { from: "/develop/repricing",               to: "/h/:house/menu/costing?tab=repricing", why: "dup #5: one price screen" },
   { from: "/develop/wine/prices",             to: "/develop/wine?tab=prices",            why: "single: wine prices is a tab of wine" },
 
