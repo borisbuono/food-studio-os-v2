@@ -141,7 +141,13 @@ export default function Margin({ entityId, houseSlug }: { entityId: string; hous
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em]">
                 <Badge conf={i.cost_confidence} bound={!!i.recipe_id || i.category === "set_menu"} />
-                {i.recipe_name ? <span className="text-ink-soft normal-case tracking-normal font-sans text-[12px]">→ {i.recipe_name}{i.recipe_quantities_estimated ? " · quantities estimated" : ""}{i.recipe_needs_review ? " · awaiting review" : ""}</span> : null}
+                {i.recipe_name ? <span className="text-ink-soft normal-case tracking-normal font-sans text-[12px]">→ {i.recipe_name}{i.recipe_needs_review && !i.recipe_quantities_estimated ? " · awaiting review" : ""}</span> : null}
+                {i.recipe_id && i.recipe_quantities_estimated ? (
+                  <span className="normal-case tracking-normal font-sans text-[12px] text-[#B27A08]">quantities estimated —
+                    {href ? <Link href={href} className="ml-1 underline hover:text-ink">check</Link> : null}
+                    <button disabled={busy === i.id} onClick={() => act(i.id, { quantities_ok: true })} className="ml-2 rounded-sm border border-[#B27A08]/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide hover:bg-[#B27A08]/10 disabled:opacity-50">they&apos;re right</button>
+                  </span>
+                ) : null}
                 {i.recipe_id && !q ? (
                   <button onClick={() => setOpen(open === i.id ? null : i.id)} className="text-clay hover:text-ink">change</button>
                 ) : null}

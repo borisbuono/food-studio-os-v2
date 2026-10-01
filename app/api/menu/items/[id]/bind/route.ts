@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 //   body { accept: true }     → keep the current low-confidence match; marks it human-confirmed.
 //   body { shell: true }      → no recipe exists: create a SHELL (needs_boris_review) and bind it.
 //   body { unbind: true }     → clear the binding.
+//   body { quantities_ok: true } → the estimated quantities on the bound recipe are right; clears the flag, re-costs.
 // Every path is one tap and reversible from the same row (Foundation §6).
 
 function isUuid(x: any): x is string {
@@ -29,6 +30,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
     if (!data?.length) return Response.json({ ok: false, error: "not allowed" }, { status: 403 });
     return Response.json({ ok: true, recipe_id: null });
+  }
+
+  if (body?.quantities_ok === true) {
+    const { data: mi } = await sb.from("menu_items").select("recipe_id, restaurant_id").eq("id", params.id).maybeSingle();
+    if (!mi?.recipe_id) return Response.json({ ok: false, error: "nothing bound" }, { status: 400 });
+    const { error } = await sb.rpc("recipe_quantities_confirm", { p_recipe: mi.recipe_id });
+    if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
+    const { data: rest } = await sb.from("restaurants").select("entity_id").eq("id", mi.restaurant_id).maybeSingle();
+    if (rest?.entity_id) await sb.rpc("fn_recost_entity", { p_entity: rest.entity_id, p_scope: "menu" });
+    return Response.json({ ok: true, recipe_id: mi.recipe_id });
   }
 
   if (body?.accept === true) {
