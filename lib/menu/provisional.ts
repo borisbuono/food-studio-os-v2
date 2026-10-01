@@ -27,6 +27,19 @@ export async function unpricedNames(sb: SupabaseClient, entityId: string, limit 
   const { data: lines } = await sb.from("recipe_ingredients").select("ingredient_name, name").in("recipe_id", [...new Set(rids)]).eq("cost_note", "no price for this ingredient").limit(500);
   const names = new Set<string>();
   for (const l of (lines || []) as any[]) { const n = String(l.ingredient_name || l.name || "").trim(); if (n && n.length <= 60) names.add(n); }
+  if (names.size >= limit) return [...names].slice(0, limit);
+  // then the rest of the venue's library, most-used names first — the nightly
+  // run works through it a batch at a time ("the rest nightly")
+  const { data: own } = await sb.from("recipes").select("id").eq("entity_id", entityId).eq("is_active", true).limit(2000);
+  const ownIds = (own || []).map((r: any) => r.id as string);
+  if (ownIds.length) {
+    const freq = new Map<string, number>();
+    for (let i = 0; i < ownIds.length; i += 300) {
+      const { data: more } = await sb.from("recipe_ingredients").select("ingredient_name, name").in("recipe_id", ownIds.slice(i, i + 300)).eq("cost_note", "no price for this ingredient").limit(2000);
+      for (const l of (more || []) as any[]) { const n = String(l.ingredient_name || l.name || "").trim(); if (n && n.length <= 60) freq.set(n, (freq.get(n) || 0) + 1); }
+    }
+    for (const [n] of [...freq.entries()].sort((a, b) => b[1] - a[1])) { if (names.size >= limit) break; names.add(n); }
+  }
   return [...names].slice(0, limit);
 }
 
