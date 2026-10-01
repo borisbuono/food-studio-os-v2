@@ -1,0 +1,23 @@
+# → copy to .github/workflows/recost-nightly.yml (the build token has no `workflow` scope; Boris adds it in GitHub, one paste).
+# Nightly re-cost of the menu as albaranes land (menu-first loop, 2026-10-01).
+# pg_cron already runs the SQL half (fn_recost_all, 01:40 UTC); this call adds
+# the Haiku provisional-price fill for ingredients no invoice has priced yet,
+# then re-costs the menu so the estimates show the same night.
+# Vercel Hobby cron slots are full — GitHub Actions free tier, zero cost.
+name: Recost nightly (02:10 UTC)
+
+on:
+  schedule:
+    - cron: "10 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  recost:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/cron/recost
+        run: |
+          curl -sSf -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://www.foodstudio.ai/api/cron/recost \
+            || echo "trigger failed (non-fatal)"
