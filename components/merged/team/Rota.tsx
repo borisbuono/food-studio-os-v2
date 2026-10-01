@@ -73,7 +73,11 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
 
   const cost = data?.cost;
   const week = data?.week;
-  const budgetEur = week?.budget_eur ?? (week?.budget_pct != null && week?.forecast_revenue != null ? (Number(week.budget_pct) / 100) * Number(week.forecast_revenue) : null);
+  // S5: a week without its own budget inherits the entity default (Team › Rota › Settings)
+  const st = data?.settings;
+  const budgetEur = week?.budget_eur ?? (week?.budget_pct != null && week?.forecast_revenue != null ? (Number(week.budget_pct) / 100) * Number(week.forecast_revenue) : null)
+    ?? st?.weekly_budget_eur ?? (st?.default_budget_pct != null && week?.forecast_revenue != null ? (Number(st.default_budget_pct) / 100) * Number(week.forecast_revenue) : null);
+  const budgetInherited = week?.budget_eur == null && week?.budget_pct == null && budgetEur != null;
   const over = budgetEur != null && cost ? cost.planned_eur - budgetEur : null;
   const pctOfForecast = cost && week?.forecast_revenue ? (cost.planned_eur / Number(week.forecast_revenue)) * 100 : null;
   const planned = (data?.shifts || []).filter((s) => s.status === "planned").length;
@@ -88,6 +92,7 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
         <span className="font-mono text-[12px] text-ink">{dayLabel(weekStart)} – {dayLabel(addDays(weekStart, 6))}</span>
         <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="rounded-md border border-line px-3 py-2 font-mono text-[11px] uppercase tracking-wide hover:bg-black/5">next ›</button>
       </div>
+      <div className="mt-2 flex justify-end"><a href={`/h/${houseSlug}/team/rota/settings`} className="font-mono text-[11px] uppercase tracking-wide text-clay underline-offset-2 hover:underline">Settings · rates, budget, bands</a></div>
 
       {/* budget strip — ruling 1 */}
       <section className="mt-4 rounded-2xl border border-line bg-card p-4">
@@ -96,7 +101,7 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Planned labour</p>
             <p className="font-serif text-3xl text-ink">{cost ? money(cost.planned_eur) : "—"}
               <span className="ml-2 font-mono text-[12px] text-clay">{cost ? hours(cost.planned_minutes) + " · " + cost.shifts + " shifts" : ""}</span></p>
-            {cost && cost.unpriced > 0 ? <p className="mt-1 font-sans text-[12px] text-tomato">{cost.unpriced} shift{cost.unpriced === 1 ? "" : "s"} without a pay rate — cost understated. Set rates in the Labour tab.</p> : null}
+            {cost && cost.unpriced > 0 ? <p className="mt-1 font-sans text-[12px] text-tomato">{cost.unpriced} shift{cost.unpriced === 1 ? "" : "s"} without a pay rate — cost understated. <a href={`/h/${houseSlug}/team/rota/settings`} className="underline">Set rates</a>.</p> : null}
           </div>
           <div className="text-right">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-clay">Budget</p>
@@ -104,6 +109,7 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
               {budgetEur != null ? money(budgetEur) : <span className="text-clay">{canWrite ? "set a budget" : "—"}</span>}
             </button>
             {week?.budget_pct != null ? <p className="font-mono text-[11px] text-clay">{week.budget_pct} % of {week.forecast_revenue != null ? money(Number(week.forecast_revenue)) : "forecast"}</p> : null}
+            {budgetInherited ? <p className="font-mono text-[11px] text-clay">house default</p> : null}
             {over != null ? <p className={"font-mono text-[12px] " + (over > 0 ? "text-tomato" : "text-ink-soft")}>{over > 0 ? "+" : ""}{money(over)} {over > 0 ? "over" : "under"}</p> : null}
             {pctOfForecast != null ? <p className="font-mono text-[11px] text-clay">{pctOfForecast.toFixed(1)} % of forecast revenue</p> : null}
           </div>

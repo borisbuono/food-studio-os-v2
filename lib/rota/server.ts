@@ -16,7 +16,7 @@ export type RotaShift = {
 export type RotaPerson = { id: string; name: string | null; role: string | null; auth_user_id: string | null; rate: number | null };
 export type RotaWeekRow = { id: string; week_start: string; budget_eur: number | null; budget_pct: number | null; forecast_revenue: number | null; status: "draft" | "published"; published_at: string | null } | null;
 export type RotaCost = { planned_minutes: number; planned_eur: number; shifts: number; unpriced: number; foh_minutes: number; boh_minutes: number };
-export type RotaSettings = { overtime_rate: number; tolerance_minutes: number; default_budget_pct: number | null; staffing_bands: Array<{ max_covers: number; foh: number; boh: number }> };
+export type RotaSettings = { overtime_rate: number; tolerance_minutes: number; default_budget_pct: number | null; staffing_bands: Array<{ max_covers: number; foh: number; boh: number }>; weekly_budget_eur: number | null; spend_per_cover: number | null; lunch_share: number; holiday_uplift: Record<string, number> };
 
 export function mondayOf(iso: string): string {
   const d = new Date(iso + "T12:00:00Z");
@@ -75,6 +75,9 @@ export async function loadWeek(sb: ReturnType<typeof supabaseServer>, entity_id:
   const settings: RotaSettings = {
     overtime_rate: Number(s?.overtime_rate ?? 1.25), tolerance_minutes: Number(s?.tolerance_minutes ?? 10),
     default_budget_pct: s?.default_budget_pct == null ? null : Number(s.default_budget_pct), staffing_bands: Array.isArray(s?.staffing_bands) ? s.staffing_bands : [],
+    // S5: entity defaults a new week inherits + forecast inputs
+    weekly_budget_eur: s?.weekly_budget_eur == null ? null : Number(s.weekly_budget_eur), spend_per_cover: s?.spend_per_cover == null ? null : Number(s.spend_per_cover),
+    lunch_share: Number(s?.lunch_share ?? 0.4), holiday_uplift: s?.holiday_uplift && typeof s.holiday_uplift === "object" ? s.holiday_uplift : {},
   };
   return {
     shifts: (shiftsRes.data || []) as RotaShift[],
