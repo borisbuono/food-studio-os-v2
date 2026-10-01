@@ -63,6 +63,9 @@ export default function PrepList({
   const [addUnit, setAddUnit] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [savingRecipe, setSavingRecipe] = useState(false);
+  // "Generate prep for tonight" (menu-first loop, slice 3): the batch it
+  // inserted, kept so one tap can take it back.
+  const [lastBatch, setLastBatch] = useState<{ ids: string[]; inserted: number; skipped: number } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -136,6 +139,44 @@ export default function PrepList({
       setLoading(false);
     }
   }, [entityId, serviceDate, reload]);
+
+  const generateFromMenu = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prep/list/from-menu`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entity_id: entityId, service_date: serviceDate }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "generate failed");
+      setLastBatch({ ids: j.ids || [], inserted: j.inserted || 0, skipped: j.skipped || 0 });
+      await reload();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setLoading(false);
+    }
+  }, [entityId, serviceDate, reload]);
+
+  const undoBatch = useCallback(async () => {
+    if (!lastBatch?.ids.length) { setLastBatch(null); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/prep/list/undo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: lastBatch.ids }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "undo failed");
+      setLastBatch(null);
+      await reload();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setLoading(false);
+    }
+  }, [lastBatch, reload]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((s) => {
@@ -218,11 +259,18 @@ export default function PrepList({
               Recipes
             </Link>
             <button
+              onClick={generateFromMenu}
+              disabled={loading}
+              className="rounded-md bg-ink px-3 py-2 text-[12px] font-mono uppercase tracking-wide text-white hover:opacity-90 disabled:opacity-50"
+            >
+              Prep for tonight
+            </button>
+            <button
               onClick={generateFromTemplate}
               disabled={loading}
               className="rounded-md border border-line px-3 py-2 text-[12px] font-mono uppercase tracking-wide hover:bg-black/5 disabled:opacity-50"
             >
-              Generate from template
+              From template
             </button>
             <button
               onClick={() => setAdding((v) => !v)}
@@ -250,6 +298,18 @@ export default function PrepList({
             );
           })}
         </div>
+
+        {lastBatch ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-line bg-black/[0.03] px-3 py-2">
+            <p className="font-sans text-[12px] text-ink">
+              {lastBatch.inserted} line{lastBatch.inserted === 1 ? "" : "s"} added from tonight&apos;s menu{lastBatch.skipped ? ` · ${lastBatch.skipped} already on the list` : ""}. Edit any line, or take it back.
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <button onClick={undoBatch} disabled={loading} className="rounded-md border border-line px-3 py-1 text-[11px] font-mono uppercase tracking-wide hover:bg-black/5 disabled:opacity-50">Undo</button>
+              <button onClick={() => setLastBatch(null)} className="rounded-md px-2 py-1 text-[11px] font-mono uppercase tracking-wide text-clay hover:text-ink">Keep</button>
+            </div>
+          </div>
+        ) : null}
 
         {adding ? (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -294,7 +354,7 @@ export default function PrepList({
         <div className="px-4 py-16 text-center">
           <p className="font-serif italic text-ink-soft">Prep list is empty for {serviceDate}.</p>
           <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-clay">
-            Tap Generate to pull today's templates, or Add item to start from scratch.
+            Tap Prep for tonight to build it from the menu, From template for the house routine, or Add item.
           </p>
         </div>
       ) : filtered.length === 0 ? (
