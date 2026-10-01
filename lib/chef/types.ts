@@ -12,7 +12,8 @@ export type ChefSurface =
   | "recipes" | "prep" | "menu" | "calendar" | "bookings" | "inbox"
   | "social" | "hiring" | "eod" | "finance" | "team" | "files"
   | "costing"    // slice C (2026-09-26): food cost / margin of a dish
-  | "rota" | "labour";   // rota S4 (2026-10-01): who works today, overtime queue, labour this week
+  | "rota" | "labour"    // rota S4 (2026-10-01): who works today, overtime queue, labour this week
+  | "cleaning";          // cleaning S4 (2026-10-02): what is open, tick a line, sign a list
 
 export type ChefScope = { entity_id: string; house?: string; room?: string };
 
@@ -65,6 +66,11 @@ export type ChefAction =
   | { type: "skip_comment"; entity_id: string; id: string; author?: string }                                          // undoable (status back)
   | { type: "booking_update"; entity_id: string; id: string; patch: { service_time?: string; party_size?: number; service_date?: string; notes?: string }; label?: string }  // undoable
   | { type: "prep_update"; entity_id: string; id: string; patch: { quantity?: number | null; unit?: string | null; status?: string; name?: string }; label?: string }         // undoable
+  // cleaning S4 (2026-10-02): tick goes through cleaning_tick() as the caller
+  // (undo = cleaning_tick(false) under the same token); sign is managers-only
+  // in the DB and arrives after a read-back + tap (not voice).
+  | { type: "cleaning_tick"; entity_id: string; id: string; label: string; list?: string }
+  | { type: "cleaning_sign"; entity_id: string; id: string; label: string; open?: number }
   | { type: "undo"; undo_token: string };
 
 // Slice A (2026-09-26): what the client posts to /api/chef/act. The action

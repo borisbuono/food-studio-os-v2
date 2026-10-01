@@ -10,6 +10,8 @@
 //
 // The tiles are display only: tapping them does nothing, Chef's control
 // does the talking. The only link is the tiny "← house" top-left.
+// Cleaning S4 (2026-10-02): fifth tile = open cleaning lines / total, and
+// how many lists still wait for a signature (✎).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -100,7 +102,7 @@ export default function PassScreen({ house, entityId, entityName, tz }: Props) {
       </header>
 
       {/* Middle: the now strip */}
-      <section className="my-auto grid grid-cols-2 gap-4 py-8 lg:grid-cols-4" aria-live="polite">
+      <section className="my-auto grid grid-cols-2 gap-4 py-8 lg:grid-cols-5" aria-live="polite">
         <Tile label={t("chef.pass_covers")} value={num(now?.covers)} sub={now ? now.bookings + " ×" : ""} />
         <Tile
           label={t("chef.pass_next")}
@@ -109,6 +111,7 @@ export default function PassScreen({ house, entityId, entityName, tz }: Props) {
         />
         <Tile label={t("chef.pass_prep")} value={num(now?.prep_open)} sub={now ? "/ " + now.prep_total : ""} />
         <Tile label={t("chef.pass_inbox")} value={num(now?.inbox_waiting)} sub="" />
+        <Tile label={t("chef.pass_cleaning")} value={num(now?.cleaning_open)} sub={now ? "/ " + now.cleaning_total + (now.cleaning_unsigned ? " · " + now.cleaning_unsigned + " ✎" : "") : ""} />
       </section>
 
       {/* Footer: one line above the Chef reserve */}

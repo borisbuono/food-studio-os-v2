@@ -38,6 +38,7 @@ const T = {
     note_queued: "Nota para la PA en cola", note_written: "Nota para la PA lista (pa_inbox)",
     sent: (a: string) => "Enviado a " + a, send_failed: "No se ha enviado", skipped: (a: string) => "Saltado " + a,
     booking: "Reserva actualizada", prep_upd: "Mise actualizada", not_found: "No encuentro esa fila",
+    cleaning_done: "Limpieza: hecho", cleaning_signed: "Lista firmada", cleaning_sign_refused: "No se ha firmado",
     not_confirmed: "Falta la confirmación — pídemelo otra vez", confirm_expired: "La confirmación ha caducado — pídemelo otra vez",
   },
   en: {
@@ -48,11 +49,12 @@ const T = {
     note_queued: "PA inbox note queued", note_written: "PA inbox note written (pa_inbox)",
     sent: (a: string) => "Sent to " + a, send_failed: "Not sent", skipped: (a: string) => "Skipped " + a,
     booking: "Booking updated", prep_upd: "Prep updated", not_found: "Can't find that row",
+    cleaning_done: "Cleaning: done", cleaning_signed: "List signed", cleaning_sign_refused: "Not signed",
     not_confirmed: "Not confirmed — ask me again", confirm_expired: "That confirmation expired — ask me again",
   },
 } as const;
 
-const UNDO_TABLES = new Set(["observations", "assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments"]);
+const UNDO_TABLES = new Set(["observations", "assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments", "cleaning_run_items"]);
 const AGENT_TAG: Record<string, string> = { research: "RESEARCH", build: "OS", write: "MARKETING", pa: "PA" };
 
 function madridToday() {
@@ -120,6 +122,15 @@ async function handle(req: Request) {
     if (!row || (row as any).used_at || Date.parse((row as any).expires_at) < Date.now() || !UNDO_TABLES.has((row as any).table_name))
       return fail(t.undo_bad, 410);
     const op = String((row as any).op || "delete");
+    // cleaning S4: the untick goes through the same RPC as the tick (the
+    // caller's own session; refused once the run is signed).
+    if ((row as any).table_name === "cleaning_run_items") {
+      const { error } = await sb.rpc("cleaning_tick", { p_item: (row as any).row_id, p_done: false, p_note: null });
+      if (error) return fail(/signed/.test(error.message) ? t.undo_bad : error.message, /signed/.test(error.message) ? 410 : 500);
+      await sb.from("chef_undo").update({ used_at: new Date().toISOString() }).eq("token", token);
+      const r: ChefActResult = { ok: true, card: card(t.undone, [], undefined, "write") };
+      return Response.json(r);
+    }
     // Phase 2: an UPDATE undo restores the row's previous values; a CAPTURE
     // undo removes the lines, the inbox row and the photo(s).
     if (op === "update") {
@@ -372,6 +383,21 @@ async function handle(req: Request) {
       const r = await patchRow("prep_lists", String(action.id || ""), patch, { entity_id: scope.entity.id });
       if (!r.ok) return fail(r.error, r.status);
       return doneUpdate("prep_lists", String(action.id), r.before, card(t.prep_upd, [clip(action.label || "", 140)], label));
+    }
+    case "cleaning_tick": {
+      const { data, error } = await sb.rpc("cleaning_tick", { p_item: String(action.id || ""), p_done: true, p_note: null });
+      if (error) return fail(error.message, /signed|member/.test(error.message) ? 403 : 500);
+      const it: any = data;
+      const line = [it?.label || action.label, it?.done_by_name ? (lang === "es" ? "por " : "by ") + it.done_by_name : null, action.list || null].filter(Boolean).join(" · ");
+      // op 'update' with before={} — the undo branch above routes by table, not by op
+      return doneUpdate("cleaning_run_items", String(action.id), {}, card(t.cleaning_done, [clip(line, 140)], label));
+    }
+    case "cleaning_sign": {
+      const { data, error } = await sb.rpc("cleaning_sign", { p_run: String(action.id || "") });
+      if (error) return fail(/managers only/.test(error.message) ? (lang === "es" ? "Solo un responsable puede firmar" : "Only a manager can sign") : /corrective/.test(error.message) ? (lang === "es" ? "Acción correctiva pendiente" : "Corrective action pending") : error.message, /managers|corrective/.test(error.message) ? 403 : 500);
+      const r: any = data;
+      const res: ChefActResult = { ok: true, card: card(t.cleaning_signed, [clip(action.label || r?.template_name || "", 100), r?.signed_by_name || ""], label), undo_token: null };
+      return Response.json(res);
     }
     default:
       return fail("unknown action type");

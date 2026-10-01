@@ -11,6 +11,7 @@
 
 import { readFoodCost } from "@/lib/chef/foodCost";
 import { readRotaToday, readOvertimePending, readLabourWeek, readRotaOptimise } from "@/lib/chef/rota";
+import { readCleaningToday, findCleaningItem, findRunToSign, tickAction, cleaningHref } from "@/lib/chef/cleaning";
 import { attachConfirmTokens } from "@/lib/chef/confirm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
@@ -181,6 +182,7 @@ function pageHref(word: string, house: string | null): string | null {
   if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/today?tab=calendar";
   if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/comms" : "/";
+  if (/limpieza|cleaning|haccp|appcc|registro de limpieza/.test(w)) return h ? h + "/service/cleaning" + (/registro|register/.test(w) ? "/register" : "") : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
   if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
@@ -216,6 +218,16 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
   if (m === "#margin_open") return { intent: "navigate", confidence: 1, language, args: { to: "margin" } };
   if (m === "#overtime_open") return { intent: "query overtime_pending", confidence: 1, language, args: {} };
+  // cleaning S4 (2026-10-02): what's open, tick one line by label, sign a list
+  if (m === "#cleaning_open") return { intent: "query cleaning_today", confidence: 1, language, args: {} };
+  if (m === "#cleaning_sign") return { intent: "cleaning_sign", confidence: 1, language, args: {} };
+  if (/^(?:qu[eé] (?:falta|queda) (?:de|en|por) (?:la )?limpieza|limpieza(?: de hoy| pendiente)?|qu[eé] (?:hay|falta) por limpiar|what'?s (?:left|open) (?:on|in) cleaning|cleaning(?: today| left| open)?|cleaning (?:list|lists)(?: today)?)\??$/.test(m)) return { intent: "query cleaning_today", confidence: 0.96, language, args: {} };
+  const ct = m.match(/^(?:marca|apunta|pon|tick|mark)\s+(?:la |el |los |las |the )?(.{2,60}?)\s+(?:como\s+)?(?:limpi[oa]s?|hech[oa]s?|lista|listo|done|clean|cleaned)\s*$/)
+    || m.match(/^(?:la |el |los |las |the )?(.{2,60}?)\s+(?:ya\s+)?(?:est[aá]n?\s+)?(?:limpi[oa]s?|limpiad[oa]s?|hech[oa]s?|is clean|are clean|is done|cleaned)\s*$/)
+    || m.match(/^(?:ya\s+)?(?:limpi[eé]|he limpiado|hemos limpiado|i cleaned|we cleaned|cleaned)\s+(?:la |el |los |las |the )?(.{2,60})$/);
+  if (ct && !/reserva|booking|mise|prep|caldo|stock/.test(ct[1])) return { intent: "update cleaning", confidence: 0.92, language, args: { label: ct[1].trim() } };
+  const cs = m.match(/^(?:firma|firmar|sign|sign off|aprueba)\s+(?:la |el |the )?(?:lista (?:de )?)?(?:limpieza(?: de)?\s*)?(.{0,40}?)\s*$/);
+  if (cs && /limpieza|cleaning|cierre|closing|apertura|opening|sala|cocina|pica|lista|list/.test(m)) return { intent: "cleaning_sign", confidence: 0.94, language, args: { list: cs[1].trim() || null } };
   // rota S8 (ruling C): where can hours come out this week → the proposal's lines
   if (/^(?:d[oó]nde|donde) (?:puedo |podemos |se puede(?:n)? )?(?:quitar|recortar|ahorrar|bajar) (?:horas|turnos|personal|gente)(?: esta semana| la semana que viene)?\??$/.test(m)
     || /^(?:where|how) can (?:i|we) (?:cut|save|take out|trim|drop) (?:hours|shifts|staff|labou?r)(?: this week| next week)?\??$/.test(m)
@@ -265,6 +277,9 @@ Intents (exact strings) and their args:
 - "query overtime_pending" {}                                  — overtime waiting for approval ("horas extra pendientes", "any overtime to approve")
 - "query labour_week" {}                                       — labour / staff cost this week, labour % ("coste de personal esta semana", "labour cost this week")
 - "query rota_optimise" {}                                     — where hours can come out / are missing this week, per service ("dónde puedo quitar horas esta semana", "where can I cut hours", "cuadrante más barato", "optimiza el cuadrante")
+- "query cleaning_today" {}                                    — what cleaning is left / open today ("qué falta de limpieza", "what's left on cleaning", "limpieza de hoy")
+- "update cleaning"  {label: the line as said}                 — mark ONE cleaning line done ("marca la campana limpia", "the fryer is clean", "ya limpié los baños")
+- "cleaning_sign"    {list?: list name}                        — a manager signs off a cleaning list ("firma el cierre de limpieza", "sign off the closing list")
 - "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
 - "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home, margin/margen (the costed menu)
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
@@ -296,6 +311,10 @@ Examples:
 "remember Servifruit delivered late again" → {"intent":"remember","confidence":0.95,"language":"en","args":{"text":"Servifruit delivered late again","domain":"purchasing","subject":"Servifruit"}}
 "esto está mal, el precio no cuadra" → {"intent":"feedback","confidence":0.9,"language":"es","args":{"text":"El precio no cuadra","feedback_kind":"bug"}}
 "que alguien investigue proveedores de ostras en Galicia" → {"intent":"run_agent","confidence":0.9,"language":"es","args":{"agent_type":"research","objective":"Investigar proveedores de ostras en Galicia"}}
+"qué falta de limpieza" → {"intent":"query cleaning_today","confidence":0.95,"language":"es","args":{}}
+"marca la campana limpia" → {"intent":"update cleaning","confidence":0.92,"language":"es","args":{"label":"campana"}}
+"the fryer is clean" → {"intent":"update cleaning","confidence":0.9,"language":"en","args":{"label":"fryer"}}
+"firma el cierre de limpieza" → {"intent":"cleaning_sign","confidence":0.92,"language":"es","args":{"list":"cierre"}}
 "what's my food cost on the lamb" → {"intent":"query food_cost","confidence":0.94,"language":"en","args":{"q":"lamb"}}
 "cuánto me cuesta el brownie" → {"intent":"query food_cost","confidence":0.94,"language":"es","args":{"q":"brownie"}}
 "margin on the sea bass" → {"intent":"query food_cost","confidence":0.9,"language":"en","args":{"q":"sea bass"}}
@@ -575,7 +594,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
   if (c.intent !== "clarify" && conf < CONFIDENCE_READ_ONLY) return clarify(tl.not_sure, tl.not_sure_say);
 
   // "query food_cost" (slice C) is a READ — deliberately not in this list.
-  const isWrite = ["create prep", "create team", "remember", "feedback", "run_agent", "approve", "update bookings", "update prep", "inbox_open"].includes(c.intent);
+  const isWrite = ["create prep", "create team", "remember", "feedback", "run_agent", "approve", "update bookings", "update prep", "inbox_open", "update cleaning", "cleaning_sign"].includes(c.intent);
   // Writes need a real house. Holdings is not a kitchen; never default to BM.
   if (isWrite && (!entityId || entityId === E_HOLDINGS)) return clarify(tl.which_house, tl.which_house_say);
 
@@ -650,6 +669,75 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
         const r = await readLabourWeek(supabaseServer(), rs, lang);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "labour", q: "week", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      // ---------------------------------------------------------------- cleaning S4
+      case "query cleaning_today": {
+        const cs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const r = await readCleaningToday(supabaseServer(), cs, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "cleaning", q: "today", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      case "update cleaning": {
+        // Read-back first, then the tick (undoable). Fuzzy on TODAY's open lines only.
+        const q = clip(String(args.label || ""), 80);
+        if (!q) return clarify(tl.not_sure, tl.not_sure_say);
+        const cs = { entity_id: entityId, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const { pick, candidates } = await findCleaningItem(supabaseServer(), cs, q);
+        const href = cleaningHref(houseSlug);
+        if (!pick) {
+          if (!candidates.length) {
+            const t = lang === "es" ? `No encuentro "${q}" en la limpieza de hoy` : `Can't find "${q}" on today's cleaning`;
+            return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "cleaning", q, scope: chefScope }, confidence: conf, say: t, needs_confirm: false, card: { title: t, lines: [], kind: "read", entity_label: label, href, primary: { label: lang === "es" ? "Abrir limpieza" : "Open cleaning", kind: "navigate", href } } }, "card");
+          }
+          const t = lang === "es" ? `${candidates.length} líneas parecidas — ¿cuál?` : `${candidates.length} similar lines — which one?`;
+          return finish({ transcript: message, language: lang, intent: { kind: "clarify", question: t }, confidence: conf, say: t, needs_confirm: false,
+            card: { title: t, lines: candidates.map((c) => `${c.label} · ${c.run.template_name}`), kind: "read", entity_label: label, href,
+              primary: { label: clip(candidates[0].label, 28), kind: "confirm", action: tickAction(entityId, candidates[0]), readback: (lang === "es" ? "Marcar hecho: " : "Mark done: ") + candidates[0].label },
+              chip: candidates[1] ? { label: clip(candidates[1].label, 28), kind: "confirm", action: tickAction(entityId, candidates[1]), readback: (lang === "es" ? "Marcar hecho: " : "Mark done: ") + candidates[1].label } : undefined } }, "clarify");
+        }
+        const action = tickAction(entityId, pick);
+        const readback = (lang === "es" ? "Marcar hecho: " : "Mark done: ") + pick.label + " (" + pick.run.template_name + ")";
+        return finish({
+          transcript: message, language: lang,
+          intent: { kind: "update", surface: "cleaning", id: pick.id, patch: { done: true }, undoable: true }, confidence: conf,
+          // a spoken "sí" may resolve this one: wet hands, low stakes, undoable
+          say: readback, needs_confirm: true, readback, action, undoable: true, confirm_voice: true,
+          card: { title: lang === "es" ? "¿Marcar hecho?" : "Mark done?", lines: [pick.label, pick.run.template_name], kind: "confirm", entity_label: label, href, primary: { label: lang === "es" ? "Sí, hecho" : "Yes, done", kind: "confirm", action, readback, voice_ok: true } },
+        }, "pending_confirm");
+      }
+      case "cleaning_sign": {
+        // Managers only (the DB checks again). Read-back then TAP — a signature
+        // is never a spoken yes.
+        const hint = args.list ? clip(String(args.list), 60) : null;
+        const cs = { entity_id: entityId, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const { pick, candidates } = await findRunToSign(supabaseServer(), cs, hint);
+        const href = cleaningHref(houseSlug);
+        if (!pick) {
+          if (!candidates.length) {
+            const t = lang === "es" ? "No hay listas sin firmar hoy" : "No unsigned lists today";
+            return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "cleaning", q: "sign", scope: chefScope }, confidence: conf, say: t, needs_confirm: false, card: { title: t, lines: [], kind: "read", entity_label: label, href } }, "card");
+          }
+          const t = lang === "es" ? `${candidates.length} listas sin firmar — ¿cuál?` : `${candidates.length} unsigned lists — which one?`;
+          const mk = (r: typeof candidates[number]) => ({ type: "cleaning_sign" as const, entity_id: entityId, id: r.id, label: r.template_name, open: r.items.filter((i) => !i.done).length });
+          const rb = (r: typeof candidates[number]) => (lang === "es" ? "Firmar " : "Sign ") + r.template_name + " · " + r.items.filter((i) => i.done).length + "/" + r.items.length;
+          return finish({ transcript: message, language: lang, intent: { kind: "clarify", question: t }, confidence: conf, say: t, needs_confirm: false,
+            card: { title: t, lines: candidates.map((r) => `${r.template_name} · ${r.items.filter((i) => i.done).length}/${r.items.length}`), kind: "read", entity_label: label, href,
+              primary: { label: clip(candidates[0].template_name, 28), kind: "confirm", action: mk(candidates[0]), readback: rb(candidates[0]), voice_ok: false },
+              chip: candidates[1] ? { label: clip(candidates[1].template_name, 28), kind: "confirm", action: mk(candidates[1]), readback: rb(candidates[1]), voice_ok: false } : undefined } }, "clarify");
+        }
+        const done = pick.items.filter((i) => i.done).length, open = pick.items.length - done;
+        const corr = pick.items.some((i) => i.kind === "corrective" && (!i.note || !i.done));
+        if (corr) {
+          const t = lang === "es" ? "Acción correctiva pendiente — rellénala en la lista antes de firmar" : "Corrective action pending — fill it on the list before signing";
+          return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "cleaning", q: "sign", scope: chefScope }, confidence: conf, say: t, needs_confirm: false, card: { title: t, lines: [pick.template_name], kind: "read", entity_label: label, href, primary: { label: lang === "es" ? "Abrir lista" : "Open list", kind: "navigate", href } } }, "card");
+        }
+        const action: ChefAction = { type: "cleaning_sign", entity_id: entityId, id: pick.id, label: pick.template_name, open };
+        const readback = (lang === "es" ? `Firmar ${pick.template_name}: ${done} de ${pick.items.length} hechas` : `Sign ${pick.template_name}: ${done} of ${pick.items.length} done`) + (open ? (lang === "es" ? ` — ${open} sin hacer. Tu nombre queda en el registro.` : ` — ${open} open. Your name goes on the record.`) : ".");
+        return finish({
+          transcript: message, language: lang,
+          intent: { kind: "update", surface: "cleaning", id: pick.id, patch: { status: "signed" }, undoable: false }, confidence: conf,
+          say: readback, needs_confirm: true, readback, action, confirm_voice: false,
+          card: { title: lang === "es" ? "¿Firmar la lista?" : "Sign the list?", lines: [pick.template_name, `${done}/${pick.items.length}`], kind: "confirm", entity_label: label, href, primary: { label: lang === "es" ? "Sí, firmar" : "Yes, sign", kind: "confirm", action, readback, voice_ok: false } },
+        }, "pending_confirm");
       }
       case "query inbox": {
         const r = await readInbox(rctx);

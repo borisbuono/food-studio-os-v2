@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { resolveEntityScope } from "@/lib/assistant/orchestrator";
 import { getMyMembershipContext } from "@/lib/memberships";
 import { getFrestoAdapter } from "@/lib/integrations/fresto";
+import { countOpenToday } from "@/lib/cleaning/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export type ChefNow = {
   prep_open: number;
   prep_total: number;
   inbox_waiting: number;
+  cleaning_open: number;      // cleaning S4: open lines on today's lists
+  cleaning_total: number;
+  cleaning_unsigned: number;  // runs without the responsible person's signature
   ts: string;
 };
 
@@ -54,7 +58,7 @@ export async function GET(req: Request) {
   const now = tzHHmm(tz);
   const rid = scope.restaurant_id;
 
-  const out: ChefNow = { covers: 0, bookings: 0, next_booking: null, prep_open: 0, prep_total: 0, inbox_waiting: 0, ts: new Date().toISOString() };
+  const out: ChefNow = { covers: 0, bookings: 0, next_booking: null, prep_open: 0, prep_total: 0, inbox_waiting: 0, cleaning_open: 0, cleaning_total: 0, cleaning_unsigned: 0, ts: new Date().toISOString() };
 
   // Bookings today — DB first, Fresto live adapter when the book lives there.
   try {
@@ -93,6 +97,12 @@ export async function GET(req: Request) {
     const { data: w } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", scope.entity.id).maybeSingle();
     out.inbox_waiting = Number((w as any)?.waiting || 0);
   } catch { /* inbox unavailable */ }
+
+  // Cleaning today (S4)
+  try {
+    const c = await countOpenToday(sb, scope.entity.id, today);
+    out.cleaning_open = c.open; out.cleaning_total = c.total; out.cleaning_unsigned = c.runs_open;
+  } catch { /* cleaning unavailable */ }
 
   return Response.json(out, { headers: { "cache-control": "no-store" } });
 }

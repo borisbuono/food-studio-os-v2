@@ -12,9 +12,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ENTITY_TO_RESTAURANT } from "@/lib/entities";
 import { codeForEntityId } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
+import { countOpenToday } from "@/lib/cleaning/server";
 
 export type ChefChip = { key: string; label: string; utterance: string };
-export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime";
+export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime" | "cleaning" | "cleaning_sign";
 
 type Candidate = ChefChip & { key: ChipKey; score: number };
 
@@ -70,7 +71,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
   const code = codeForEntityId(entityId);
   const now = Date.now();
 
-  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin, overtime] = await Promise.all([
+  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin, overtime, cleaning] = await Promise.all([
     // inbox: rows waiting for a reply
     safe(async (): Promise<Candidate[]> => {
       const { data } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", entityId).maybeSingle();
@@ -177,9 +178,25 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
       if (!(n > 0)) return [];
       return [{ key: "overtime", label: clip(es ? n + (n === 1 ? " hora extra" : " horas extra") + " por aprobar" : n + " overtime to approve"), utterance: "#overtime_open", score: 46 + Math.min(n, 10) + (hour >= 9 && hour <= 12 ? 10 : 0) }];
     }, []),
+    // cleaning (S4, 2026-10-02): open lines today; after the house's close time
+    // (entities.metadata.close_time, default 23:00) an unsigned closing list
+    // outranks everything — the record Sanidad asks for is the signed one.
+    safe(async (): Promise<Candidate[]> => {
+      const c = await countOpenToday(sb, entityId, today);
+      const out: Candidate[] = [];
+      if (c.open > 0) out.push({ key: "cleaning", label: clip(es ? c.open + " de limpieza pendientes" : c.open + " cleaning items open"), utterance: "#cleaning_open", score: 36 + Math.min(c.open, 10) + (hour >= 11 && hour <= 13 ? 8 : 0) + (hour >= 22 ? 12 : 0) });
+      if (c.closing_unsigned) {
+        const { data: e } = await sb.from("entities").select("metadata").eq("id", entityId).maybeSingle();
+        const ct = String((e as any)?.metadata?.close_time || "23:00");
+        const closeH = Number(ct.split(":")[0]);
+        const after = Number.isFinite(closeH) ? hour >= closeH || hour < 4 : hour >= 23 || hour < 4;
+        if (after) out.push({ key: "cleaning_sign", label: clip(es ? "Cierre sin firmar" : "Closing list not signed"), utterance: "#cleaning_sign", score: 70 });
+      }
+      return out;
+    }, []),
   ]);
 
-  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin, ...overtime].sort((a, b) => b.score - a.score);
+  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin, ...overtime, ...cleaning].sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   const seenUtt = new Set<string>();
   const out: ChefChip[] = [];
