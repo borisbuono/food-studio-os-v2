@@ -6,6 +6,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { entityTimezone, todayInTz, paidMinutes, nextDay, zonedWallClockToUtc, elapsedLabel } from "@/lib/labor";
 import RateManager from "./RateManager";
 import ExportButton from "./ExportButton";
+import OvertimeQueue from "./OvertimeQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -170,7 +171,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/10 pb-4">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-clay">Labor · {houseName}</p>
-          <h1 className="font-serif text-2xl">Clock-in log & labor cost</h1>
+          <h1 className="font-serif text-2xl">Overtime queue · clock log · pay rates</h1>
           <p className="mt-1 text-xs text-clay">Timezone {tz} · today {today}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -178,8 +179,12 @@ export default async function LaborPage({ params }: { params: { house: string } 
         </div>
       </div>
 
+      {/* Ruling 3 (2026-10-01): the overtime queue is the first thing on this tab —
+          every minute outside an agreed shift waits here for a tick. */}
+      <OvertimeQueue entityId={entity_id} tz={tz} currency={house.currency_code} />
+
       {/* Live floor */}
-      <section className="mt-6">
+      <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-clay">
           On the floor now — <span className="tabular-nums">{liveNow.length}</span>
         </h2>
@@ -246,8 +251,9 @@ export default async function LaborPage({ params }: { params: { house: string } 
       {/* Week aggregates */}
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-clay">
-          This week ({weekStart} → {today})
+          Clocked this week ({weekStart} → {today})
         </h2>
+        <p className="mt-1 text-xs text-clay">What the clock says. Pay is the agreed shift plus approved overtime — see the queue above and the Rota tab.</p>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded border border-black/10 p-3">
             <div className="text-xs text-clay">By person</div>
