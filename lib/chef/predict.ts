@@ -13,6 +13,7 @@ import { ENTITY_TO_RESTAURANT } from "@/lib/entities";
 import { codeForEntityId } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
 import { countOpenToday } from "@/lib/cleaning/server";
+import { canSeeCost } from "@/lib/access/costVisibility";
 
 export type ChefChip = { key: string; label: string; utterance: string };
 export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime" | "cleaning" | "cleaning_sign";
@@ -70,6 +71,15 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
   const rid = (ENTITY_TO_RESTAURANT as Record<string, string | undefined>)[entityId] || null;
   const code = codeForEntityId(entityId);
   const now = Date.now();
+  // Cost chips (food_cost, margin) are manager+ only while
+  // lib/access/costVisibility.ts says so (cook path 2026-10-02) — same flag as
+  // the Costing tab and the Chef food_cost answer.
+  const costOk = await safe(async () => {
+    if (canSeeCost(false)) return true;
+    if (!uid || !entityId) return false;
+    const { data } = await sb.rpc("fn_is_entity_manager", { uid, ent: entityId });
+    return data === true;
+  }, false);
 
   const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin, overtime, cleaning] = await Promise.all([
     // inbox: rows waiting for a reply
@@ -151,6 +161,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
     }, []),
     // food cost (slice C): standing on a recipe page → offer its costing.
     safe(async (): Promise<Candidate[]> => {
+      if (!costOk) return [];
       // /h/<slug>/menu/recipes/<id> is the one recipe page now (/develop/menu/<id> deleted 2026-09-26).
       const m = String(input.route || "").match(/\/menu\/recipes\/([0-9a-f-]{36})(?:[/?#]|$)/i);
       if (!m) return [];
@@ -163,7 +174,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
     // food cost runs over their target (30 % unless the item says otherwise).
     // Reads the costing run's own columns — nothing is recomputed here.
     safe(async (): Promise<Candidate[]> => {
-      if (!rid) return [];
+      if (!rid || !costOk) return [];
       const { data } = await sb.from("menu_items").select("price, food_cost_percent_actual, target_food_cost_percent")
         .eq("restaurant_id", rid).eq("is_active", true).not("food_cost_percent_actual", "is", null).gt("price", 0);
       const over = ((data || []) as any[]).filter((r) => Number(r.food_cost_percent_actual) > Number(r.target_food_cost_percent ?? 30)).length;

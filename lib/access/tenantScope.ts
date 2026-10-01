@@ -35,6 +35,9 @@ export type MembershipLite = {
   entity_id: string;
   role: string;
   room: PaletteRoom;
+  // Boris's per-person flag (memberships.can_receive, 2026-10-02): a cook or
+  // floor person who receives deliveries sees the Supplies verb.
+  can_receive?: boolean;
 };
 
 const OPERATING = new Set(["operating_venue", "operating"]);
@@ -83,7 +86,9 @@ export function filterAccessibleEntities(
 
 // --- Command palette gating --------------------------------------------------
 
-export type RouteFeature = "foh" | "bookings" | "hiring" | "academy";
+// "supplies" (2026-10-02): the Supplies verb — office room, or a membership
+// with can_receive=true in the house in scope.
+export type RouteFeature = "foh" | "bookings" | "hiring" | "academy" | "supplies";
 
 export type RouteGate = {
   // Room the route belongs to. Omitted = universal (Files, Account, Home).
@@ -98,12 +103,22 @@ export type PaletteAccess = {
   bookings: boolean;
   hiring: boolean;
   academy: boolean;
+  supplies: boolean;
 };
 
 // Nothing loaded yet (or signed out) → universal routes only. Fail closed.
 export const NO_ACCESS: PaletteAccess = {
-  rooms: new Set(), foh: false, bookings: false, hiring: false, academy: false,
+  rooms: new Set(), foh: false, bookings: false, hiring: false, academy: false, supplies: false,
 };
+
+// Role classes the three nav renderers reason about (2026-10-02, cook path):
+//   manager+  owner · manager · admin · gm · director · operator  → all six verbs
+//   worker    everyone else (cook · chef · foh · waiter · maitre · worker …)
+//             → Service · Menu · Team (+ Supplies when can_receive)
+export function isManagerRole(role: string | null | undefined): boolean {
+  const r = (role || "").toLowerCase().trim();
+  return ["owner", "manager", "admin", "gm", "director", "operator"].includes(r);
+}
 
 // Which rooms a membership opens. Owner → everything incl. Studio. Office
 // (manager / admin) → the whole house, because managers run the floor and
@@ -130,6 +145,7 @@ export function paletteAccessFor(
   const scopeIds = new Set(scopeEntities.map((e) => e.id));
 
   const rooms = new Set<PaletteRoom>();
+  let receives = false;
   for (const m of memberships) {
     const isOwner = (m.role || "").toLowerCase() === "owner";
     // Studio is portfolio-level: any owner membership grants it regardless
@@ -137,6 +153,7 @@ export function paletteAccessFor(
     if (isOwner) rooms.add("studio");
     if (!scopeIds.has(m.entity_id)) continue;
     for (const r of roomsForMembership(m)) rooms.add(r);
+    if (m.can_receive) receives = true;
   }
 
   return {
@@ -145,6 +162,7 @@ export function paletteAccessFor(
     bookings: scopeEntities.some((e) => e.bookings_enabled),
     hiring:   scopeEntities.some((e) => e.hiring_enabled),
     academy:  scopeEntities.some((e) => e.academy_enabled),
+    supplies: rooms.has("office") || rooms.has("studio") || receives,
   };
 }
 
@@ -154,5 +172,6 @@ export function canSeeRoute(gate: RouteGate, access: PaletteAccess): boolean {
   if (gate.feature === "bookings" && !access.bookings) return false;
   if (gate.feature === "hiring"   && !access.hiring)   return false;
   if (gate.feature === "academy"  && !access.academy)  return false;
+  if (gate.feature === "supplies" && !access.supplies) return false;
   return true;
 }

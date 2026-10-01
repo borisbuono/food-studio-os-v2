@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { isPrimaryEntity } from "@/lib/entities";
 import { setEntity as setEntityCtx, readEntityCookie } from "@/lib/ctx";
 import { scopeForUrl, itemsForHouse } from "@/lib/scope";
-import { flattenNav } from "@/lib/nav";
+import { visibleRows } from "@/lib/nav/visible";
 import { verbLabel } from "@/lib/nav/labels";
 import { getLang, type Lang } from "@/lib/i18n";
 import { fetchMyAccess, type MyAccess } from "@/lib/access/myAccess";
@@ -59,16 +59,17 @@ type Route = { label: string; href: string; hint: string; pillar?: Pillar; gate?
 // (scripts/verify_nav.mjs checks). Verb words follow the fs_lang cookie
 // (Service · Menu · Supplies · Money · Team · Comms / Servicio · Carta · …),
 // so the list is built per language, not once at module load.
-function routesFor(lang: Lang): Route[] {
+// 2026-10-02: rows come pre-filtered from lib/nav/visible.ts — the SAME
+// function the dock and the rail render from, so a cook's ⌘K matches his dock.
+function routesFor(lang: Lang, access: PaletteAccess): Route[] {
   return ([
-    ...flattenNav("house", (v) => verbLabel(v, lang)).map((r) => ({ label: r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
-    ...flattenNav("studio", (v) => verbLabel(v, lang)).map((r) => ({ label: "Studio · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
-    ...flattenNav("me", (v) => verbLabel(v, lang)).map((r) => ({ label: "Me · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    ...visibleRows("house", access, (v) => verbLabel(v, lang)).map((r) => ({ label: r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    ...visibleRows("studio", access, (v) => verbLabel(v, lang)).map((r) => ({ label: "Studio · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
+    ...visibleRows("me", access, (v) => verbLabel(v, lang)).map((r) => ({ label: "Me · " + r.label, href: r.href, hint: r.hint || "", gate: r.gate, verb: r.verb })),
     { label: "Home", href: "/", hint: "root landing", verb: "home" },
     { label: "Studio", href: "/studio", hint: "food studios portfolio group", gate: { room: "studio" }, verb: "studio" },
   ] as Route[]).filter((r, i, all) => all.findIndex((x) => x.href === r.href) === i);
 }
-const ROUTES: Route[] = routesFor("en");
 
 // Fuzzy scoring — cheap: token overlap + prefix boost. Not perfect but
 // enough for a ~90-row palette.
@@ -189,7 +190,7 @@ export default function CommandK({ initialProfile }: { initialProfile?: ServerPr
   const [lang, setLangState] = useState<Lang>("en");
   useEffect(() => { setLangState(getLang()); }, [open]);
   const allowedRoutes = useMemo(
-    () => itemsForHouse((lang === "en" ? ROUTES : routesFor(lang)).filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
+    () => itemsForHouse(routesFor(lang, access).filter((r) => canSeeRoute(r.gate || {}, access)), houseSlug),
     [access, houseSlug, lang],
   );
   const allowedNew = useMemo(

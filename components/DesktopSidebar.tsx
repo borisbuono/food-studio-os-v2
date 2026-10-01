@@ -14,7 +14,9 @@ import {
   EntityType, type Scope,
 } from "@/lib/scope";
 import { houseNameForSlug, HOUSE_ROOM_LABEL, houseSlugForEntity } from "@/lib/houses";
-import { treeForPath, verbsFor, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { treeForPath, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { visibleVerbs } from "@/lib/nav/visible";
+import { useNavAccess } from "@/lib/nav/useNavAccess";
 import { verbLabel } from "@/lib/nav/labels";
 import { getLang, t, type Lang } from "@/lib/i18n";
 import { readRecent, touchRecent, orderByRecent, type RecentMap } from "@/lib/nav/recent";
@@ -108,9 +110,12 @@ export default function DesktopSidebar({ initialEntity, initialProfile }: { init
   const scopeType: EntityType = urlScopeType ?? entityTypeFor(entity);
   const studioScope = scopeType === "studio" || scopeType === "holding_company";
   const tree = treeForPath(pathname, studioScope);
-  const verbs = verbsFor(tree);
   // "{house}" hrefs resolve against the house in scope and vanish without one.
   const houseSlug = scope && scope.level !== "studio" ? scope.houseSlug : null;
+  // Role-trimmed (2026-10-02): one function (lib/nav/visible.ts) for the rail,
+  // the dock and ⌘K. Legacy cookie-scoped paths fall back to the fs_entity id.
+  const { access } = useNavAccess(houseSlug, houseSlug ? null : (/^[0-9a-f-]{36}$/i.test(String(entity)) ? String(entity) : null));
+  const verbs = useMemo(() => visibleVerbs(tree, access), [tree, access]);
 
   // Meta inbox waiting count (2026-09-23) — the number under Reach.
   // Read through RLS (social_inbox_waiting is security_invoker), keyed on the

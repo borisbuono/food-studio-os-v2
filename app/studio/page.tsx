@@ -78,9 +78,14 @@ export default async function StudioPage() {
 
   // Studio is reserved for owner OR multi-role. A single-role non-owner who
   // navigates here directly gets bounced to their room.
+  // Straight to the house (2026-10-02) — /boh /foh /office are retired; the
+  // old target cost a second hop through lib/routing/retired.ts.
   if (!ctx.isOwner && !ctx.isMulti && ctx.memberships.length === 1) {
     const m = ctx.memberships[0];
-    if (m.room !== "studio") redirect(`/${m.room === "kitchen" ? "boh" : m.room === "dining" ? "foh" : "office"}`);
+    if (m.room !== "studio") {
+      const slug = ctx.entities.find((e) => e.id === m.entity_id)?.slug;
+      redirect(slug ? `/h/${slug}` : "/");
+    }
   }
 
   // Tenant filter (2026-09-21): the Studio lists ctx.entities — the houses

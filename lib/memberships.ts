@@ -68,6 +68,8 @@ export type ActiveMembership = {
   role: string;
   area: string | null;
   room: Room;
+  // memberships.can_receive (2026-10-02) — Supplies verb for a cook/foh who receives deliveries.
+  can_receive?: boolean;
 };
 
 export type MyMembershipContext = {
@@ -179,7 +181,7 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
 
   const { data: mRows } = await sb
     .from("memberships")
-    .select("entity_id, role, area, status, is_default")
+    .select("entity_id, role, area, status, is_default, can_receive")
     .in("person_id", personIds)
     .eq("status", "active");
   const raw = mRows || [];
@@ -206,6 +208,7 @@ export async function getMyMembershipContext(): Promise<MyMembershipContext> {
       role: r.role,
       area: r.area || null,
       room: roleAreaToRoom(r.role, r.area),
+      can_receive: !!r.can_receive,
     };
   });
 

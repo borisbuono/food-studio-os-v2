@@ -53,7 +53,8 @@ export const HOUSE_VERBS: NavVerb[] = [
     // Slice 4 (2026-09-26): Service = bookings · pass · prep · floor · guests
     // · events (moved from Close) · calendar · wall screen. Reviews moved to Comms.
     key: "serve", label: "Service", href: "/execute/bookings", hint: "who is coming, what is on the pass",
-    gate: { room: "dining" },
+    // No gate: every member of the house has a Service (cook path 2026-10-02 —
+    // a cook sees Service · Menu · Team; the leaves keep their room gates).
     leaves: [
       { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep metrics", gate: { room: "kitchen" } },
       { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today templates", gate: { room: "kitchen" } },
@@ -70,7 +71,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     // Slice 2 (2026-09-26): one recipe list, one recipe page (edit + costing
     // as tabs), one costing screen. Wine / bar / lexicon are leaves.
     key: "cook", label: "Menu", href: `${H}/menu/recipes`, hint: "the recipes and the menu",
-    gate: { room: "kitchen" },
+    // No gate: every member reads the menu. Costing stays office-only (leaf gate).
     leaves: [
       { href: `${H}/menu/costing`,          label: "Costing",        hint: "margin food cost menu engineering repricing price", gate: { room: "office" } },
       { href: "/develop/recipes/import",    label: "Import recipe",  hint: "paste url import", gate: { room: "kitchen" } },
@@ -85,9 +86,11 @@ export const HOUSE_VERBS: NavVerb[] = [
     // Slice 3 (2026-09-26): Supplies = orders · receiving (tab) · scans (link
     // to the capture funnel's screen) · inventory · suppliers · HACCP temps.
     key: "buy", label: "Supplies", href: "/execute/orders", hint: "what came in, what to order",
-    gate: { room: "kitchen" },
+    // Supplies = office, or a cook/foh whose membership has can_receive=true
+    // (Boris's flag, 2026-10-02). lib/access/tenantScope.ts → access.supplies.
+    gate: { feature: "supplies" },
     leaves: [
-      { href: "/execute/orders?tab=receiving", label: "Receiving",    hint: "log a delivery", gate: { room: "kitchen" } },
+      { href: "/execute/orders?tab=receiving", label: "Receiving",    hint: "log a delivery", gate: { feature: "supplies" } },
       { href: "/administrate/finance/scans", label: "Scans",          hint: "invoices albaranes holded scan inbox paper", gate: { room: "office" } },
       { href: "/execute/inventory",         label: "Inventory",      hint: "stock count", gate: { room: "kitchen" } },
       { href: "/administrate/suppliers",    label: "Suppliers",      hint: "vendors", gate: { room: "office" } },
@@ -116,7 +119,8 @@ export const HOUSE_VERBS: NavVerb[] = [
     // invite as tabs. Hiring = the Sep-21 SOP layer (first-shift / first-week
     // are steps on the person page). Academy has one door.
     key: "people", label: "Team", href: `${H}/team`, hint: "who is here, who is coming",
-    gate: { room: "office" },
+    // No gate: a cook opens Team for the clock station and the academy; Rota ·
+    // Hiring · Invite leaves stay office-only.
     leaves: [
       { href: `${H}/team?tab=rota`,         label: "Rota",           hint: "shifts schedule labour", gate: { room: "office" } },
       { href: `${H}/office/hiring`,         label: "Hiring",         hint: "hr funnel candidates openings", gate: { room: "office", feature: "hiring" } },

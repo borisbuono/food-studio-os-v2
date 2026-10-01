@@ -19,7 +19,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveHouseHref } from "@/lib/scope";
-import { treeForPath, verbsFor, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { treeForPath, activeVerb, LEAVES_VISIBLE, type NavVerb } from "@/lib/nav";
+import { visibleVerbs } from "@/lib/nav/visible";
+import { useNavAccess } from "@/lib/nav/useNavAccess";
 import { verbLabel } from "@/lib/nav/labels";
 import { getLang, t, type Lang } from "@/lib/i18n";
 import { readRecent, touchRecent, orderByRecent, type RecentMap } from "@/lib/nav/recent";
@@ -29,7 +31,10 @@ type Props = { pathname: string; houseSlug: string | null; studioScope: boolean;
 export default function Dock({ pathname, houseSlug, studioScope, enabled }: Props) {
   const router = useRouter();
   const tree = treeForPath(pathname, studioScope);
-  const verbs = verbsFor(tree);
+  // Role-trimmed (2026-10-02): the same canSeeRoute gates ⌘K uses — a cook
+  // sees Service · Menu · Team (+ Supplies when can_receive); managers six.
+  const { access } = useNavAccess(houseSlug);
+  const verbs = useMemo(() => visibleVerbs(tree, access), [tree, access]);
   const active = useMemo(() => activeVerb(verbs, pathname, houseSlug), [verbs, pathname, houseSlug]);
 
   // Open when the person asked (grip) or when standing inside a verb; the

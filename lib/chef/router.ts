@@ -10,6 +10,7 @@
 // business table — only chef_turns for the log.
 
 import { readFoodCost } from "@/lib/chef/foodCost";
+import { canSeeCost } from "@/lib/access/costVisibility";
 import { readRotaToday, readOvertimePending, readLabourWeek, readRotaOptimise } from "@/lib/chef/rota";
 import { readCleaningToday, findCleaningItem, findRunToSign, tickAction, cleaningHref } from "@/lib/chef/cleaning";
 import { attachConfirmTokens } from "@/lib/chef/confirm";
@@ -60,6 +61,8 @@ const T = {
     which_house_say: "¿Para qué casa?",
     not_sure: "No te he entendido. ¿Qué quieres hacer?",
     not_sure_say: "¿Puedes repetirlo?",
+    cost_managers: "Los costes de las recetas los ven los encargados. Pídeselo a tu jefe de cocina.",
+    cost_managers_say: "Eso lo ve el encargado.",
     not_phase1: "Aprobar y editar desde Chef llegan en la fase 2. Ábrelo desde la página.",
     not_phase1_say: "Eso aún no, ábrelo desde la página.",
     open: "Abrir",
@@ -100,6 +103,8 @@ const T = {
     which_house: "Which house? Pick one in the switcher.",
     which_house_say: "Which house?",
     not_sure: "I didn't catch that. What do you want to do?",
+    cost_managers: "Recipe costs are for managers. Ask your head chef.",
+    cost_managers_say: "That one is for the manager.",
     not_sure_say: "Can you say that again?",
     not_phase1: "Approve and edit from Chef arrive in phase 2. Open it from the page.",
     not_phase1_say: "Not yet, open it from the page.",
@@ -182,10 +187,14 @@ function pageHref(word: string, house: string | null): string | null {
   if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/today?tab=calendar";
   if (/inbox|comentario|mensaje|bandeja|reach|alcance|redes|social|comms|comunicaci/.test(w)) return h ? h + "/comms" : "/";
-  if (/limpieza|cleaning|haccp|appcc|registro de limpieza/.test(w)) return h ? h + "/service/cleaning" + (/registro|register/.test(w) ? "/register" : "") : "/";
+  if (/limpieza|cleaning|haccp|appcc|registro de limpieza/.test(w)) return h ? (/registro|register/.test(w) ? h + "/service/cleaning/register" : h + "/service/cleaning") : "/";
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
   if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
+  // cook path (2026-10-02): "fichar / clock in / punch" → the clock kiosk; "hoy / mi día / today / my shifts" → /me/today.
+  // Before the labour rule, which still catches "fichaje" (the overtime queue) for managers.
+  if (/\bfichar\b|\bficha\b|\bfichaje\b.*\b(entrar|salir)|clock ?(in|out)?\b|\bpunch\b|reloj/.test(w)) return h ? h + "/clock" : "/me/today";
+  if (/^(hoy|mi d[ií]a|today|my day|mis turnos|my shifts|mi semana|my week|mi agenda)$/.test(w)) return /semana|week/.test(w) ? "/me/today?tab=calendar" : "/me/today";
   // rota S4 (2026-10-01): "cuadrante / turnos / rota" → Rota tab; "horas extra / overtime / labour / nómina" → Labour tab (the queue)
   if (/horas? extra|overtime|labou?r|n[oó]mina|fichaje|cola de horas/.test(w)) return h ? h + "/team?tab=labour" : "/studio/people";
   if (/cuadrante|turnos?|rota\b|horario del equipo|schedule/.test(w)) return h ? h + "/team?tab=rota" : "/studio/people";
@@ -646,7 +655,19 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         // Slice C: one card — cost, price, margin %, top 3 ingredients — from
         // lib/chef/foodCost.ts (the maths behind GET /api/recipes/food-cost).
         const q = String(args.q || message).trim();
-        const fcScope = { entity_id: entityId || scope.entity.id, entity_name: label || "", restaurant_id: scope.restaurant_id, house: houseSlug };
+        // Costs are manager+ only while lib/access/costVisibility.ts says so
+        // (cook path 2026-10-02, QUESTION 3 pending Boris) — one flag, same as
+        // the Costing tab and the Menu › Costing leaf.
+        const fcEntity = entityId || scope.entity.id;
+        let fcManager = false;
+        if (input.uid && fcEntity) {
+          const { data: mgr } = await supabaseServer().rpc("fn_is_entity_manager", { uid: input.uid, ent: fcEntity });
+          fcManager = mgr === true;
+        }
+        if (!canSeeCost(fcManager)) {
+          return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "costing", q, scope: chefScope }, confidence: conf, say: tl.cost_managers_say, card: { title: tl.cost_managers_say, lines: [tl.cost_managers], kind: "read", entity_label: label }, needs_confirm: false }, "clarify");
+        }
+        const fcScope = { entity_id: fcEntity, entity_name: label || "", restaurant_id: scope.restaurant_id, house: houseSlug };
         const r = await readFoodCost(supabaseServer(), q, fcScope, lang);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "costing", q, scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, r.found ? "card" : "clarify");
       }
