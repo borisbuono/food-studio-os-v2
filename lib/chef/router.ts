@@ -10,7 +10,7 @@
 // business table — only chef_turns for the log.
 
 import { readFoodCost } from "@/lib/chef/foodCost";
-import { readRotaToday, readOvertimePending, readLabourWeek } from "@/lib/chef/rota";
+import { readRotaToday, readOvertimePending, readLabourWeek, readRotaOptimise } from "@/lib/chef/rota";
 import { attachConfirmTokens } from "@/lib/chef/confirm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
@@ -216,6 +216,11 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
   if (m === "#margin_open") return { intent: "navigate", confidence: 1, language, args: { to: "margin" } };
   if (m === "#overtime_open") return { intent: "query overtime_pending", confidence: 1, language, args: {} };
+  // rota S8 (ruling C): where can hours come out this week → the proposal's lines
+  if (/^(?:d[oó]nde|donde) (?:puedo |podemos |se puede(?:n)? )?(?:quitar|recortar|ahorrar|bajar) (?:horas|turnos|personal|gente)(?: esta semana| la semana que viene)?\??$/.test(m)
+    || /^(?:where|how) can (?:i|we) (?:cut|save|take out|trim|drop) (?:hours|shifts|staff|labou?r)(?: this week| next week)?\??$/.test(m)
+    || /^(?:cuadrante|rota) (?:m[aá]s barat[oa]|cheaper)\??$/.test(m) || /^(?:optimi[sz]a(?:r)?|optimi[sz]e) (?:el )?(?:cuadrante|rota|turnos|shifts)\??$/.test(m)
+    || /^(?:sobran|faltan) (?:horas|turnos|gente)(?: esta semana)?\??$/.test(m) || /^(?:suggest|propose) (?:a )?cheaper rota\??$/.test(m)) return { intent: "query rota_optimise", confidence: 0.95, language, args: {} };
   if (/^(?:qui[eé]n(?:es)? trabajan?|qui[eé]n est[aá]|qui[eé]n hay|who(?:'s| is) (?:on|working|in))(?: hoy| today)?(?: en (?:sala|cocina))?\??$/.test(m) || /^(?:cuadrante|turnos|rota)(?: de)?(?: hoy| today)?\??$/.test(m)) return { intent: "query rota_today", confidence: 0.96, language, args: {} };
   if (/^(?:horas? extras?|overtime)(?: pendientes?| pending| to approve| por aprobar| waiting)?\??$/.test(m) || /^(?:qu[eé] )?horas? extras? (?:hay|tengo)(?: pendientes?)?\??$/.test(m)) return { intent: "query overtime_pending", confidence: 0.96, language, args: {} };
   if (/^(?:coste|costo|gasto) de personal(?: (?:de )?esta semana| this week)?\??$/.test(m) || /^(?:labou?r|staff|wage|payroll) (?:cost|%|percent|this week)(?: this week)?\??$/.test(m) || /^(?:cu[aá]nto (?:llevo|llevamos|gasto|gastamos) (?:de|en) personal)(?: esta semana)?\??$/.test(m)) return { intent: "query labour_week", confidence: 0.95, language, args: {} };
@@ -259,6 +264,7 @@ Intents (exact strings) and their args:
 - "query rota_today"  {}                                       — who is working today / the rota for today ("quién trabaja hoy", "who's on tonight", "turnos de hoy")
 - "query overtime_pending" {}                                  — overtime waiting for approval ("horas extra pendientes", "any overtime to approve")
 - "query labour_week" {}                                       — labour / staff cost this week, labour % ("coste de personal esta semana", "labour cost this week")
+- "query rota_optimise" {}                                     — where hours can come out / are missing this week, per service ("dónde puedo quitar horas esta semana", "where can I cut hours", "cuadrante más barato", "optimiza el cuadrante")
 - "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
 - "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home, margin/margen (the costed menu)
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
@@ -634,6 +640,11 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
         const r = await readOvertimePending(supabaseServer(), rs, lang);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "labour", q: "overtime_pending", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      case "query rota_optimise": {
+        const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const r = await readRotaOptimise(supabaseServer(), rs, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "rota", q: "optimise", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
       }
       case "query labour_week": {
         const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };

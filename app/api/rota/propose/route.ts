@@ -6,11 +6,13 @@ export const dynamic = "force-dynamic";
 
 // Rota S3 — "Suggest cheaper rota" (the reverse of ruling 1).
 // GET  /api/rota/propose?entity=&week=          → latest open proposal for the week (if any) + forecast
-// POST /api/rota/propose { entity_id, week_start, action: "create" | "accept" | "decline", proposal_id?, shift_id?, lang? }
-//   create  → fn_rota_propose (SQL does the arithmetic) + a one-paragraph explanation (Haiku if a key is set, template otherwise)
-//   accept  → fn_rota_proposal_accept(…, true)  — cancels THAT shift only
-//   decline → fn_rota_proposal_accept(…, false)
-// Nothing is applied without the manager's tap on each change.
+// POST /api/rota/propose { entity_id, week_start, action: "create" | "accept" | "decline", proposal_id?, line_id?, new_shift_id?, lang? }
+//   create  → fn_rota_propose (SQL does the arithmetic, per service and area: remove | shorten | extend | add lines with € delta and the
+//             forecast-vs-band reason) + a one-paragraph explanation (Haiku if a key is set, template otherwise)
+//   accept  → fn_rota_proposal_accept(proposal, line_id, true, new_shift_id?) — applies THAT line only; an "add" line needs the shift the
+//             manager created (they pick who works it; the OS never does)
+//   decline → fn_rota_proposal_accept(proposal, line_id, false)
+// Nothing is applied without the manager's tap on each line (ruling C).
 
 export async function GET(req: Request) {
   const u = new URL(req.url);
@@ -47,9 +49,9 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, proposal: { ...p, explanation } });
   }
   if (action === "accept" || action === "decline") {
-    const proposal_id = String(body.proposal_id || ""), shift_id = String(body.shift_id || "");
-    if (!proposal_id || !shift_id) return Response.json({ ok: false, error: "proposal_id + shift_id required" }, { status: 400 });
-    const { data, error } = await sb.rpc("fn_rota_proposal_accept", { p_proposal: proposal_id, p_shift: shift_id, p_accept: action === "accept" });
+    const proposal_id = String(body.proposal_id || ""), line_id = String(body.line_id || "");
+    if (!proposal_id || !line_id) return Response.json({ ok: false, error: "proposal_id + line_id required" }, { status: 400 });
+    const { data, error } = await sb.rpc("fn_rota_proposal_accept", { p_proposal: proposal_id, p_line: line_id, p_accept: action === "accept", p_new_shift: body.new_shift_id ? String(body.new_shift_id) : null });
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
     return Response.json({ ok: true, proposal: Array.isArray(data) ? data[0] : data });
   }

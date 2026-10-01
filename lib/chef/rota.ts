@@ -87,3 +87,46 @@ export async function readLabourWeek(sb: SupabaseClient, s: RotaReadScope, lang:
   const say = title + (budget != null ? (es ? (labour > budget ? ", por encima del presupuesto" : ", dentro del presupuesto") : (labour > budget ? ", over budget" : ", within budget")) : "");
   return { say, card: { title, lines, kind: "read", entity_label: s.entity_name, href, primary: { label: es ? "Abrir personal" : "Open labour", kind: "navigate", href } } };
 }
+
+// rota S8 (ruling C): "dónde puedo quitar horas esta semana" → the proposal's
+// lines, per service. Reads the latest open proposal for the current week; a
+// manager with none gets one computed (a proposal is a suggestion, not a
+// change — nothing is applied here; Accept lives on the Rota tab).
+export async function readRotaOptimise(sb: SupabaseClient, s: RotaReadScope, lang: ChefLang): Promise<{ card: ChefCard; say: string }> {
+  const es = lang === "es";
+  const week = mondayOf(tzDate(s.tz));
+  const href = s.house ? `/h/${s.house}/team?tab=rota#proposal_open` : "/studio/people";
+  let { data: p } = await sb.from("rota_proposals").select("id, before_eur, after_eur, items, created_at, status").eq("entity_id", s.entity_id).eq("week_start", week).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const stale = !p || Date.now() - new Date((p as any).created_at).getTime() > 6 * 3600_000 || (p as any).status === "closed";
+  if (stale) {
+    const { data: np } = await sb.rpc("fn_rota_propose", { p_entity: s.entity_id, p_week_start: week });
+    if (np) p = Array.isArray(np) ? np[0] : np;
+  }
+  if (!p) {
+    const t = es ? "No puedo proponer: hace falta ser manager de la casa" : "Cannot propose: a manager of the house is needed";
+    return { say: t, card: { title: t, lines: [week], kind: "read", entity_label: s.entity_name, href } };
+  }
+  const items = ((p as any).items || []) as any[];
+  const open = items.filter((i) => i.status === "proposed");
+  const cuts = open.filter((i) => Number(i.eur_delta) < 0).sort((a, b) => Number(a.eur_delta) - Number(b.eur_delta));
+  const adds = open.filter((i) => Number(i.eur_delta) > 0);
+  const out = Math.abs(cuts.reduce((n, i) => n + Number(i.eur_delta), 0));
+  const inn = adds.reduce((n, i) => n + Number(i.eur_delta), 0);
+  const day = (iso: string) => new Date(iso + "T12:00:00Z").toLocaleDateString(es ? "es-ES" : "en-GB", { weekday: "short", timeZone: "UTC" });
+  const svc = (x: string) => (es ? (x === "lunch" ? "comida" : "cena") : x);
+  const what = (i: any) => i.action === "remove" ? (es ? `quitar 1 ${i.area.toUpperCase()} ${day(i.service_date)} ${svc(i.service)}` : `take 1 ${i.area.toUpperCase()} off ${day(i.service_date)} ${svc(i.service)}`)
+    : i.action === "shorten" ? (es ? `acortar ${i.name || "turno"} ${day(i.service_date)} a ${i.new_start}–${i.new_end}` : `shorten ${i.name || "a shift"} ${day(i.service_date)} to ${i.new_start}–${i.new_end}`)
+    : i.action === "extend" ? (es ? `alargar ${i.name || "turno"} ${day(i.service_date)} a ${i.new_start}–${i.new_end}` : `extend ${i.name || "a shift"} ${day(i.service_date)} to ${i.new_start}–${i.new_end}`)
+    : (es ? `añadir 1 ${i.area.toUpperCase()} ${day(i.service_date)} ${svc(i.service)}` : `add 1 ${i.area.toUpperCase()} ${day(i.service_date)} ${svc(i.service)}`);
+  if (!open.length) {
+    const t = es ? "El cuadrante ya cuadra con la previsión" : "The rota already matches the forecast";
+    return { say: t, card: { title: t, lines: [es ? "Nada que quitar ni añadir por servicio" : "Nothing to take out or add, service by service"], kind: "read", entity_label: s.entity_name, href, primary: { label: es ? "Abrir cuadrante" : "Open rota", kind: "navigate", href } } };
+  }
+  const title = es ? `${cuts.length ? `−${eur(out)} en ${cuts.length} servicio${cuts.length === 1 ? "" : "s"}` : "Nada que quitar"}${adds.length ? ` · faltan horas en ${adds.length} (+${eur(inn)})` : ""}`
+                   : `${cuts.length ? `−${eur(out)} across ${cuts.length} service${cuts.length === 1 ? "" : "s"}` : "Nothing to take out"}${adds.length ? ` · ${adds.length} short (+${eur(inn)})` : ""}`;
+  const lines = [...cuts.slice(0, 3).map((i) => `${what(i)} (−${eur(Math.abs(Number(i.eur_delta)))})`), ...adds.slice(0, Math.max(0, 4 - Math.min(3, cuts.length))).map((i) => `${what(i)} (+${eur(Number(i.eur_delta))})`)];
+  const say = cuts.length
+    ? (es ? `Puedes quitar ${eur(out)}: ${what(cuts[0])}${cuts.length > 1 ? ` y ${cuts.length - 1} más` : ""}. Lo aceptas línea a línea en el cuadrante.` : `You can take out ${eur(out)}: ${what(cuts[0])}${cuts.length > 1 ? ` and ${cuts.length - 1} more` : ""}. Accept it line by line on the rota.`)
+    : (es ? `Nada que quitar; faltan horas en ${adds.length} servicios.` : `Nothing to take out; ${adds.length} services are short.`);
+  return { say, card: { title, lines, kind: "read", entity_label: s.entity_name, href, primary: { label: es ? "Ver y aceptar" : "See and accept", kind: "navigate", href } } };
+}

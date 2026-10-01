@@ -6,18 +6,22 @@
 
 const MODEL = process.env.FS_ROTA_EXPLAIN_MODEL || "claude-haiku-4-5-20251001";
 
-type Item = { name: string | null; service_date: string; area: string; start: string; end: string; saving_eur: number; reason: string; status: string };
+type Item = { action?: string; service?: string; name?: string | null; service_date: string; area: string; start?: string; end?: string; saving_eur?: number; eur_delta?: number; minutes?: number; reason: string; status: string };
 type Warn = { service_date: string; area: string; have: number; need: number; covers: number };
 
 export function templateExplanation(p: { before_eur: number; after_eur: number; items: Item[]; warnings: Warn[] }, lang: "es" | "en"): string {
   const open = p.items.filter((i) => i.status === "proposed");
-  const saving = Math.round((p.before_eur - p.after_eur) * 100) / 100;
+  const cuts = open.filter((i) => Number(i.eur_delta ?? -(i.saving_eur || 0)) < 0);
+  const adds = open.filter((i) => Number(i.eur_delta ?? 0) > 0);
+  const out = Math.abs(cuts.reduce((n, i) => n + Number(i.eur_delta ?? -(i.saving_eur || 0)), 0));
+  const inn = adds.reduce((n, i) => n + Number(i.eur_delta || 0), 0);
+  const net = Math.round((p.after_eur - p.before_eur) * 100) / 100;
   if (lang === "es") {
-    if (!open.length) return p.warnings.length ? `Sin ahorro propuesto. ${p.warnings.length} día(s) por debajo del mínimo de personal.` : "El plan ya está en el mínimo para la previsión. Nada que quitar.";
-    return `${open.length} turno(s) sobran para la previsión: −${saving.toFixed(0)} € sobre ${p.before_eur.toFixed(0)} €. Cada cambio se acepta por separado.${p.warnings.length ? ` Ojo: ${p.warnings.length} día(s) quedan por debajo del mínimo.` : ""}`;
+    if (!open.length) return "El plan ya cuadra con la previsión por servicio. Nada que mover.";
+    return `${cuts.length ? `${cuts.length} servicio(s) con horas de sobra (−${out.toFixed(0)} €)` : ""}${cuts.length && adds.length ? " · " : ""}${adds.length ? `${adds.length} servicio(s) cortos (+${inn.toFixed(0)} €)` : ""}. Neto ${net > 0 ? "+" : ""}${net.toFixed(0)} € sobre ${p.before_eur.toFixed(0)} €. Cada línea se acepta por separado; quién cubre una hora nueva lo eliges tú.`;
   }
-  if (!open.length) return p.warnings.length ? `No saving proposed. ${p.warnings.length} day(s) sit below the staffing minimum.` : "The plan is already at the minimum for the forecast. Nothing to take out.";
-  return `${open.length} shift(s) exceed the forecast need: −${saving.toFixed(0)} € on ${p.before_eur.toFixed(0)} €. Each change is accepted on its own.${p.warnings.length ? ` Note: ${p.warnings.length} day(s) are below the minimum.` : ""}`;
+  if (!open.length) return "The plan already matches the forecast, service by service. Nothing to move.";
+  return `${cuts.length ? `${cuts.length} service(s) with hours to take out (−${out.toFixed(0)} €)` : ""}${cuts.length && adds.length ? " · " : ""}${adds.length ? `${adds.length} service(s) short (+${inn.toFixed(0)} €)` : ""}. Net ${net > 0 ? "+" : ""}${net.toFixed(0)} € on ${p.before_eur.toFixed(0)} €. Each line is accepted on its own; who covers a new hour is your call.`;
 }
 
 export async function explainProposal(p: { before_eur: number; after_eur: number; items: Item[]; warnings: Warn[] }, lang: "es" | "en"): Promise<string> {
@@ -27,10 +31,10 @@ export async function explainProposal(p: { before_eur: number; after_eur: number
   try {
     const facts = {
       before_eur: p.before_eur, after_eur: p.after_eur,
-      changes: p.items.filter((i) => i.status === "proposed").map((i) => ({ day: i.service_date, area: i.area, hours: i.start + "-" + i.end, saving_eur: i.saving_eur, why: i.reason })),
+      changes: p.items.filter((i) => i.status === "proposed").slice(0, 40).map((i) => ({ action: i.action, day: i.service_date, service: i.service, area: i.area, hours: (i.start || "") + "-" + (i.end || ""), eur_delta: i.eur_delta ?? -(i.saving_eur || 0), why: i.reason })),
       under_minimum: p.warnings,
     };
-    const prompt = `You write ONE short paragraph (max 60 words, ${lang === "es" ? "Spanish" : "English"}, plain, no bullet points, no names of people) for a restaurant manager, explaining this rota suggestion. Use ONLY these numbers; do not invent any. Say it is a suggestion they accept per change.\n${JSON.stringify(facts)}`;
+    const prompt = `You write ONE short paragraph (max 60 words, ${lang === "es" ? "Spanish" : "English"}, plain, no bullet points, no names of people) for a restaurant manager, explaining this rota suggestion: where hours come out and where hours are missing, per service. Use ONLY these numbers; do not invent any. Say it is a suggestion they accept line by line.\n${JSON.stringify(facts)}`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
     const r = await fetch("https://api.anthropic.com/v1/messages", {

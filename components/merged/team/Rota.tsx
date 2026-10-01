@@ -51,6 +51,8 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
     finally { setLoading(false); }
   }, [entityId, weekStart]);
   useEffect(() => { load(); }, [load]);
+  // Chef "dónde puedo quitar horas" lands here with #proposal_open (rota S8)
+  useEffect(() => { if (typeof window !== "undefined" && window.location.hash === "#proposal_open") setProposing(true); }, []);
 
   const post = useCallback(async (url: string, body: any, key: string) => {
     setBusy(key); setErr(null);
@@ -144,7 +146,7 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
         {week?.status === "published" && planned === 0 ? <p className="mt-3 font-mono text-[11px] text-clay">Published {week.published_at ? new Date(week.published_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} · {published} shifts live on the calendar</p> : null}
       </section>
 
-      {proposing && canWrite ? <RotaProposal entityId={entityId} weekStart={weekStart} currency={currency} onChanged={load} onClose={() => setProposing(false)} /> : null}
+      {proposing && canWrite ? <RotaProposal entityId={entityId} weekStart={weekStart} currency={currency} people={data?.people || []} onChanged={load} onClose={() => setProposing(false)} /> : null}
 
       {err ? <p className="mt-3 rounded-md border border-tomato/40 bg-tomato/5 px-3 py-2 text-[12px] text-tomato">{err}</p> : null}
 
