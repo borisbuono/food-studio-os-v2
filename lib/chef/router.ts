@@ -174,6 +174,8 @@ function toLines(s: string, max = 4, width = 140): string[] {
 function pageHref(word: string, house: string | null): string | null {
   const h = house ? "/h/" + house : null;
   const w = word.toLowerCase();
+  // margin page first: "margen", "margin", "escandallo", "costing", "food cost" (menu-first loop, 2026-10-01)
+  if (/margen|margin|escandallo|costing|costeo|food ?cost/.test(w)) return h ? h + "/menu/costing" : "/studio/money/menu-margin";
   if (/receta|recipe|cocinar|\bcook\b|carta|menu|men[uú]/.test(w)) return h ? h + "/menu/recipes" : "/studio/recipes/review";
   if (/reserva|booking|servi[rc]|\bserve\b|\bservice\b|sala|dining|comedor|pase|\bpass\b/.test(w)) return "/execute/bookings";
   if (/calendar|agenda/.test(w)) return h ? h + "/calendar" : "/me/today?tab=calendar";
@@ -208,6 +210,7 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   if (!m || m.length > 160) return null;
   // Internal continuation tokens the client sends from card buttons.
   if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
+  if (m === "#margin_open") return { intent: "navigate", confidence: 1, language, args: { to: "margin" } };
   if (m === "#approve_next") return { intent: "approve", confidence: 1, language, args: { target: "reply", count: 1, next: true } };
   if (/^(?:siguiente|next|otro|otra|el siguiente|la siguiente)(?:\s+(?:comentario|comment|respuesta|reply))?$/.test(m)) return { intent: "inbox_open", confidence: 0.95, language, args: {} };
   if (/^(?:abre|abrir|open|mira|lee|léeme|read)\s+(?:la |el |the |my |mi )?(?:bandeja|inbox|comentarios|comments)(?:\s+(?:uno a uno|one by one|one at a time))?$/.test(m)) return { intent: "inbox_open", confidence: 0.96, language, args: {} };
@@ -246,7 +249,7 @@ Intents (exact strings) and their args:
 - "query calendar"  {}                                       — what's on today
 - "query inbox"     {}                                       — waiting comments / messages
 - "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
-- "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home
+- "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home, margin/margen (the costed menu)
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
 - "create prep"     {name, quantity?, unit?, station?}       — add an item to the prep list
 - "create team"     {title}                                  — a task / to-do for someone (not a prep item)

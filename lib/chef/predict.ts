@@ -14,7 +14,7 @@ import { codeForEntityId } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
 
 export type ChefChip = { key: string; label: string; utterance: string };
-export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost";
+export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin";
 
 type Candidate = ChefChip & { key: ChipKey; score: number };
 
@@ -70,7 +70,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
   const code = codeForEntityId(entityId);
   const now = Date.now();
 
-  const [inbox, prep, bookings, captures, echo, calendar, foodCost] = await Promise.all([
+  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin] = await Promise.all([
     // inbox: rows waiting for a reply
     safe(async (): Promise<Candidate[]> => {
       const { data } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", entityId).maybeSingle();
@@ -158,9 +158,20 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
       if (!name) return [];
       return [{ key: "food_cost", label: clip(es ? "Food cost: " + name : "Food cost: " + name), utterance: es ? "cuánto me cuesta " + name : "food cost on " + name, score: 60 }];
     }, []),
+    // margin (menu-first loop, 2026-10-01): dishes on the current menu whose
+    // food cost runs over their target (30 % unless the item says otherwise).
+    // Reads the costing run's own columns — nothing is recomputed here.
+    safe(async (): Promise<Candidate[]> => {
+      if (!rid) return [];
+      const { data } = await sb.from("menu_items").select("price, food_cost_percent_actual, target_food_cost_percent")
+        .eq("restaurant_id", rid).eq("is_active", true).not("food_cost_percent_actual", "is", null).gt("price", 0);
+      const over = ((data || []) as any[]).filter((r) => Number(r.food_cost_percent_actual) > Number(r.target_food_cost_percent ?? 30)).length;
+      if (!(over > 0)) return [];
+      return [{ key: "margin", label: clip(es ? over + (over === 1 ? " plato" : " platos") + " sobre el 30 %" : over + (over === 1 ? " dish" : " dishes") + " over 30 % food cost"), utterance: "#margin_open", score: 48 + Math.min(over, 10) }];
+    }, []),
   ]);
 
-  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost].sort((a, b) => b.score - a.score);
+  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin].sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   const seenUtt = new Set<string>();
   const out: ChefChip[] = [];

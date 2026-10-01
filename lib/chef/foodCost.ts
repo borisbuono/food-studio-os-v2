@@ -35,7 +35,7 @@ export type FoodCostResult = {
   nearest?: string[];
 };
 
-type Candidate = { id: string; name: string; source: "menu_item" | "recipe"; recipe_id: string | null; price: number | null; cost: number | null; target: number | null };
+type Candidate = { id: string; name: string; source: "menu_item" | "recipe"; recipe_id: string | null; price: number | null; cost: number | null; target: number | null; confidence?: string | null };
 
 const S = {
   es: {
@@ -46,6 +46,7 @@ const S = {
     margin: (m: number) => "Margen bruto: " + eur(m),
     no_cost: (priced: number, total: number) => total ? "Coste sin calcular — " + priced + " de " + total + " ingredientes con precio" : "Coste sin calcular — sin escandallo",
     no_price: "Sin precio de carta",
+    estimate: "Coste estimado — precios por confirmar en Carta · Costing",
     top: (xs: Array<{ name: string; cost: number }>) => "Top: " + xs.map((x) => x.name + " " + eur(x.cost)).join(" · "),
     say_ok: (n: string, f: number, t: number, over: boolean) => n + " va al " + f.toFixed(1) + " por ciento de food cost, objetivo " + t.toFixed(0) + (over ? ". Por encima, merece revisión." : ". En rango."),
     say_cost_only: (n: string, c: number) => n + " cuesta " + eur(c) + " la ración; falta el precio de carta.",
@@ -64,6 +65,7 @@ const S = {
     margin: (m: number) => "Gross margin: " + eur(m),
     no_cost: (priced: number, total: number) => total ? "Cost not computed — " + priced + " of " + total + " ingredients priced" : "Cost not computed — no costing yet",
     no_price: "No menu price",
+    estimate: "Estimated cost — prices to confirm on Menu · Costing",
     top: (xs: Array<{ name: string; cost: number }>) => "Top: " + xs.map((x) => x.name + " " + eur(x.cost)).join(" · "),
     say_ok: (n: string, f: number, t: number, over: boolean) => n + " runs at " + f.toFixed(1) + " percent food cost against a " + t.toFixed(0) + " target" + (over ? ". Over — worth a look." : ". In range."),
     say_cost_only: (n: string, c: number) => n + " costs " + eur(c) + " a serving; there is no menu price yet.",
@@ -108,9 +110,10 @@ export function nameScore(query: string, name: string): number {
 async function candidates(sb: SupabaseClient, scope: FoodCostScope): Promise<Candidate[]> {
   const out: Candidate[] = [];
   if (scope.restaurant_id) {
-    const { data } = await sb.from("menu_items").select("id, name, price, cost, computed_cost, recipe_id, target_food_cost_percent, is_active")
+    // computed_cost is what the costing run writes (menu-first loop, 2026-10-01); the hand-typed `cost` is the fallback
+    const { data } = await sb.from("menu_items").select("id, name, price, cost, computed_cost, recipe_id, target_food_cost_percent, is_active, cost_confidence")
       .eq("restaurant_id", scope.restaurant_id).or("is_active.is.null,is_active.eq.true").limit(600);
-    for (const r of (data || []) as any[]) out.push({ id: r.id, name: r.name, source: "menu_item", recipe_id: r.recipe_id || null, price: num(r.price), cost: num(r.cost) ?? num(r.computed_cost), target: num(r.target_food_cost_percent) });
+    for (const r of (data || []) as any[]) out.push({ id: r.id, name: r.name, source: "menu_item", recipe_id: r.recipe_id || null, price: num(r.price), cost: num(r.computed_cost) ?? num(r.cost), target: num(r.target_food_cost_percent), confidence: r.cost_confidence ?? null });
   }
   const cols = "id, name, sell_price_eur, menu_price, cost_per_serving_eur, cost_per_portion_eur, linked_menu_item_id";
   const { data: own } = await sb.from("recipes").select(cols).eq("entity_id", scope.entity_id).eq("is_active", true).eq("is_archived", false).limit(1500);
@@ -186,8 +189,14 @@ export async function readFoodCost(sb: SupabaseClient, q: string, scope: FoodCos
   if (costPerServing != null) lines.push(s.cost(round2(costPerServing))); else lines.push(s.no_cost(linesPriced, linesTotal));
   if (price != null) lines.push(s.price(price)); else lines.push(s.no_price);
   if (fcp != null && price != null && costPerServing != null) { lines.push(s.pct(round1(fcp), target)); lines.push(s.margin(round2(price - costPerServing))); }
+  // An estimate is never shown as a clean number (Foundation §6.1): the
+  // confidence line takes the ingredients' slot when the cost is provisional.
+  const conf = menuItem?.confidence ?? null;
+  const isEstimate = costPerServing != null && conf != null && conf !== "real";
+  if (isEstimate && lines.length < 4) lines.push(s.estimate);
+  else if (isEstimate) lines[3] = s.estimate;
   if (top.length && lines.length < 4) lines.push(s.top(top));
-  else if (top.length) lines[3] = s.top(top); // margin line gives way to the ingredients when all four are taken
+  else if (top.length && !isEstimate) lines[3] = s.top(top); // margin line gives way to the ingredients when all four are taken
 
   const say = fcp != null ? s.say_ok(name, round1(fcp), target, over)
     : costPerServing != null ? s.say_cost_only(name, round2(costPerServing))
