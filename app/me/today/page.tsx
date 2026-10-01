@@ -5,6 +5,7 @@ import { addDaysYmd, zonedParts, zonedToUtc } from "@/lib/calendar";
 import TodayAgenda, { type TodayTodo } from "@/components/calendar/TodayAgenda";
 import Calendar from "./Calendar";
 import TabNav, { pickTab } from "@/components/nav/TabNav";
+import Swaps from "@/components/merged/team/Swaps";
 
 const TABS = [{ key: "today", label: "Today" }, { key: "calendar", label: "My week" }];
 
@@ -41,6 +42,8 @@ export default async function TodayPage({ searchParams }: { searchParams?: { tab
     <main className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-4">{tabs}</div>
       <TodayAgenda tz={tz} todayYmd={today} events={events} todos={todos} entityNames={mine.names} />
+      {/* rota S6: offer one of my published shifts / take a colleague's — the manager ticks */}
+      <Swaps view="me" />
     </main>
   );
 }

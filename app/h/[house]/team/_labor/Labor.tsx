@@ -7,6 +7,7 @@ import { entityTimezone, todayInTz, paidMinutes, nextDay, zonedWallClockToUtc, e
 import RateManager from "./RateManager";
 import ExportButton from "./ExportButton";
 import OvertimeQueue from "./OvertimeQueue";
+import Swaps from "@/components/merged/team/Swaps";
 
 export const dynamic = "force-dynamic";
 
@@ -182,6 +183,7 @@ export default async function LaborPage({ params }: { params: { house: string } 
       {/* Ruling 3 (2026-10-01): the overtime queue is the first thing on this tab —
           every minute outside an agreed shift waits here for a tick. */}
       <OvertimeQueue entityId={entity_id} tz={tz} currency={house.currency_code} />
+      <Swaps entityId={entity_id} view="manager" />
 
       {/* Live floor */}
       <section className="mt-8">

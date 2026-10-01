@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RotaShift, RotaPerson, RotaWeekRow, RotaCost, RotaSettings } from "@/lib/rota/server";
 import RotaProposal from "./RotaProposal";
+import Swaps from "./Swaps";
 
 // The Rota tab — /h/<slug>/team?tab=rota (rota S1, Boris's rulings 2026-10-01).
 //
@@ -201,6 +202,8 @@ export default function Rota({ entityId, houseSlug, currency = "EUR" }: { entity
           );
         })}
       </div>
+      {/* rota S6: swaps waiting for the tick (same shape as the Overtime queue) */}
+      <Swaps entityId={entityId} view="manager" />
       <p className="mt-6 font-sans text-[12px] text-clay">Pay is the agreed shift, not the clock. Clock-in is free; minutes beyond the shift land in the Labour tab's overtime queue for a tick.</p>
     </main>
   );
