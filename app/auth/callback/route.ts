@@ -64,6 +64,44 @@ export async function GET(request: NextRequest) {
   // Best-effort: sync profile from any pending team-member invite.
   try { await supabase.rpc("sync_my_profile_from_invite"); } catch {}
 
+  // Language (2026-10-02, cook path). Order: the language the manager chose on
+  // the invite (team_members.language for this email while status='invited' — explicit, wins)
+  // → an fs_lang cookie already on this device → Accept-Language → ES for
+  // members of the Ibiza houses (BM / Taller), EN otherwise. Written on the
+  // response, like fs_entity below; nothing to do if nothing resolves.
+  let fsLang: string | null = null;
+  let fsLangFromInvite = false;
+  try {
+    const { data: userRes0 } = await supabase.auth.getUser();
+    const email0 = (userRes0?.user?.email || "").toLowerCase();
+    if (email0) {
+      const { data: tmLang } = await supabase
+        .from("team_members")
+        .select("language, invited_at")
+        .ilike("email", email0)
+        .eq("status", "invited")          // only a not-yet-accepted invite overrides the device's choice
+        .not("language", "is", null)
+        .order("invited_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+      const l = (tmLang && tmLang[0] && (tmLang[0] as any).language) || null;
+      if (l === "es" || l === "en" || l === "nl") { fsLang = l; fsLangFromInvite = true; }
+    }
+  } catch { /* fall through */ }
+  const existingLang = request.cookies.get("fs_lang")?.value;
+  if (!fsLang && (existingLang === "es" || existingLang === "en" || existingLang === "nl")) fsLang = existingLang;
+  if (!fsLang) {
+    const al = (headers().get("accept-language") || "").toLowerCase();
+    if (/^(es|ca|gl|eu)\b/.test(al) || /,\s*es\b/.test(al.split(";")[0] || "")) fsLang = "es";
+    else if (/^nl\b/.test(al)) fsLang = "nl";
+    else if (/^en\b/.test(al)) fsLang = "en";
+  }
+  const setLang = (res: NextResponse, pinnedMember: boolean) => {
+    const v = fsLang || (pinnedMember ? "es" : "en");
+    if (fsLangFromInvite || existingLang !== v) {
+      res.cookies.set({ ...cookieAttrs, name: "fs_lang", value: v, path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    }
+  };
+
   // First-run tour concept was removed 2026-08-23 — the redirect to /welcome
   // caused a sign-in loop because /welcome doesn't detect signed-in state and
   // profiles.first_run_done_at was NULL for every user (nothing sets it). If a
@@ -111,6 +149,7 @@ export async function GET(request: NextRequest) {
         if ((isOwner || isMulti) && landingEntity) {
           // Rewrite the response as a redirect to /studio and set fs_entity=holdings.
           const studio = NextResponse.redirect(new URL("/studio", origin));
+          setLang(studio, onPinned);
           // Copy every cookie the auth SDK wrote onto our original response.
           for (const c of response.cookies.getAll()) {
             studio.cookies.set(c);
@@ -154,6 +193,11 @@ export async function GET(request: NextRequest) {
             sameSite: "lax",
           });
         }
+        setLang(response, onPinned);
+      } else {
+        // No roster row yet (an invitee on the way to /invite/accept): the
+        // invite's language still applies — it was looked up by email above.
+        setLang(response, false);
       }
     }
   } catch { /* fall through to the default `next` redirect */ }

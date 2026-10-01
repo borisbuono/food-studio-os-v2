@@ -6,10 +6,15 @@ import InviteTeammate from "@/components/InviteTeammate";
 export const dynamic = "force-dynamic";
 
 // Folded into /h/<slug>/team (slim OS slice 4) — was /administrate/team.
-export default async function Team() {
-  
-  const supabase = supabaseServer();const venues = (await supabase.from("restaurants").select("id,name")).data || [];
+export default async function Team({ houseId, houseName }: { houseId?: string; houseName?: string } = {}) {
+  const supabase = supabaseServer();
+  const venues = (await supabase.from("restaurants").select("id,name,entity_id")).data || [];
   const vname = new Map(venues.map((v: any) => [v.id, v.name]));
+  // The invite card works on HOUSES (entities): this house when rendered under
+  // /h/<slug>/team, else every house that has a restaurant row (cookie-scoped legacy path).
+  const houses: { id: string; name: string }[] = houseId
+    ? [{ id: houseId, name: houseName || "" }]
+    : (venues as any[]).filter((v) => v.entity_id).map((v) => ({ id: v.entity_id as string, name: v.name as string }));
   const members = (await supabase.from("team_members").select("name,email,default_role,default_restaurant_id,status,first_login_at,invited_at").order("name")).data || [];
   const profiles = (await supabase.from("profiles").select("id,name,role,restaurant_id,color").order("name")).data || [];
   const shifts = await supabase.from("shifts").select("*", { count: "exact", head: true });
@@ -38,11 +43,11 @@ export default async function Team() {
         </p>
       ) : null}
 
-      <InviteTeammate venues={venues} />
+      <InviteTeammate venues={houses} />
 
       <div className="mt-4 flex flex-wrap gap-3">
         <Link href="/administrate/team/onboard/new" className="rounded-xl bg-[color:var(--accent)] px-5 py-2.5 font-sans text-[14px] font-medium text-[#F7F7F4]">+ Onboard a new hire</Link>
-        <Link href="/administrate/team/invite" className="rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">Quick invite</Link>
+        <Link href={houseId ? "?tab=invite" : "/administrate/team/invite"} className="rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink transition hover:border-black/30">Quick invite</Link>
         <Link href="/administrate/team/onboarding" className="rounded-xl border border-black/15 px-4 py-2 font-sans text-[14px] text-ink-soft transition hover:border-black/30">Onboarding pipeline →</Link>
       </div>
 

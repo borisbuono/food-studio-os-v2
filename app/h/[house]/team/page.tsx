@@ -39,7 +39,7 @@ export default async function TeamPage({ params, searchParams }: { params: { hou
         <TabNav base={base} tabs={TABS} active={tab} className="mt-5" />
       </div>
       <div className="[&>main]:pt-4">
-        {tab === "rota" ? <Rota entityId={house.id} houseSlug={params.house} currency={house.currency_code} /> : tab === "labour" ? <Labor params={{ house: params.house }} /> : tab === "invite" ? <Invite /> : <Team />}
+        {tab === "rota" ? <Rota entityId={house.id} houseSlug={params.house} currency={house.currency_code} /> : tab === "labour" ? <Labor params={{ house: params.house }} /> : tab === "invite" ? <Invite houseId={house.id} /> : <Team houseId={house.id} houseName={house.name} />}
       </div>
     </div>
   );

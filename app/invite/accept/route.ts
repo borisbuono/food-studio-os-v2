@@ -57,10 +57,18 @@ export async function GET(req: NextRequest) {
   if (status === "expired") return page("Invite expired", "This invite is older than 30 days. Ask whoever invited you to send a fresh one.", 410);
   if (status !== "ok")      return page("Couldn't join", "We couldn't add you to the house. Try again, or ask the owner to re-send the invite.", 500);
 
-  const dest = r?.slug ? `/h/${r.slug}` : "/";
+  const slug = r?.house_slug || r?.slug;
+  const dest = slug ? `/h/${slug}` : "/";
   const res = NextResponse.redirect(new URL(dest, url.origin));
-  if (r?.entity_id) {
-    res.cookies.set({ name: "fs_entity", value: String(r.entity_id), path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  const entityId = r?.house_id || r?.entity_id;
+  if (entityId) {
+    res.cookies.set({ name: "fs_entity", value: String(entityId), path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  }
+  // The invite's language is the person's first screen (2026-10-02): a Spanish
+  // cook must not land in English and hunt for Account › Language.
+  const lang = r?.lang === "es" || r?.lang === "en" || r?.lang === "nl" ? String(r.lang) : null;
+  if (lang) {
+    res.cookies.set({ name: "fs_lang", value: lang, path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
   }
   return res;
 }

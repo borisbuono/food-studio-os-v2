@@ -82,9 +82,11 @@ export async function writeOnboardingState(patch: Partial<OnboardingState>): Pro
 
 // Role vocab for step 4 — matches lib/team/onboarding.ts roles but tightened
 // to the five the wizard offers.
-export type InviteRole = "owner" | "manager" | "chef" | "waiter" | "office";
+// cook | foh (2026-10-02): the Team › Invite sheet's roles — a line cook and a
+// floor person. The wizard keeps its five; the API accepts all seven.
+export type InviteRole = "owner" | "manager" | "chef" | "waiter" | "office" | "cook" | "foh";
 
-export const INVITE_ROLES: InviteRole[] = ["owner", "manager", "chef", "waiter", "office"];
+export const INVITE_ROLES: InviteRole[] = ["owner", "manager", "chef", "waiter", "office", "cook", "foh"];
 
 export const INVITE_ROLE_LABEL: Record<InviteRole, string> = {
   owner: "Owner",
@@ -92,6 +94,8 @@ export const INVITE_ROLE_LABEL: Record<InviteRole, string> = {
   chef: "Chef",
   waiter: "Waiter",
   office: "Office",
+  cook: "Cook",
+  foh: "Front of house",
 };
 
 // role → team_members.area, so the memberships row lands in the right room.
@@ -101,4 +105,6 @@ export const INVITE_ROLE_AREA: Record<InviteRole, "boh" | "foh" | "admin"> = {
   chef: "boh",
   waiter: "foh",
   office: "admin",
+  cook: "boh",
+  foh: "foh",
 };
