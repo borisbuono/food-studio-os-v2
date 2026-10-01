@@ -57,6 +57,7 @@ export const HOUSE_VERBS: NavVerb[] = [
     leaves: [
       { href: "/execute/pass",              label: "Pass board",     hint: "service pass mep metrics", gate: { room: "kitchen" } },
       { href: `${H}/kitchen/prep`,          label: "Prep list",      hint: "mise en place today templates", gate: { room: "kitchen" } },
+      { href: `${H}/service/cleaning`,      label: "Cleaning",       hint: "limpieza cleaning haccp appcc checklist sign-off register" },
       { href: "/execute/floor",             label: "Floor",          hint: "floor plan tables", gate: { room: "dining", feature: "foh" } },
       { href: "/grow/relationships",        label: "Guests",         hint: "crm guests relationships", gate: { room: "dining", feature: "foh" } },
       { href: "/administrate/events",       label: "Events",         hint: "private dining catering", gate: { room: "office" } },
