@@ -14,7 +14,7 @@ import { codeForEntityId } from "@/lib/assistant/orchestrator";
 import { loadEvents } from "@/lib/calendar.server";
 
 export type ChefChip = { key: string; label: string; utterance: string };
-export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin";
+export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime";
 
 type Candidate = ChefChip & { key: ChipKey; score: number };
 
@@ -70,7 +70,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
   const code = codeForEntityId(entityId);
   const now = Date.now();
 
-  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin] = await Promise.all([
+  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin, overtime] = await Promise.all([
     // inbox: rows waiting for a reply
     safe(async (): Promise<Candidate[]> => {
       const { data } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", entityId).maybeSingle();
@@ -169,9 +169,17 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
       if (!(over > 0)) return [];
       return [{ key: "margin", label: clip(es ? over + (over === 1 ? " plato" : " platos") + " sobre el 30 %" : over + (over === 1 ? " dish" : " dishes") + " over 30 % food cost"), utterance: "#margin_open", score: 48 + Math.min(over, 10) }];
     }, []),
+    // overtime (rota S4, 2026-10-01): exceptions waiting for the manager's tick.
+    // RLS: a non-manager only sees their own rows, so the chip is honest per user.
+    safe(async (): Promise<Candidate[]> => {
+      const { count } = await sb.from("shift_settlements").select("id", { count: "exact", head: true }).eq("entity_id", entityId).or("overtime_status.eq.pending,undertime_status.eq.pending");
+      const n = Number(count || 0);
+      if (!(n > 0)) return [];
+      return [{ key: "overtime", label: clip(es ? n + (n === 1 ? " hora extra" : " horas extra") + " por aprobar" : n + " overtime to approve"), utterance: "#overtime_open", score: 46 + Math.min(n, 10) + (hour >= 9 && hour <= 12 ? 10 : 0) }];
+    }, []),
   ]);
 
-  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin].sort((a, b) => b.score - a.score);
+  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin, ...overtime].sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   const seenUtt = new Set<string>();
   const out: ChefChip[] = [];

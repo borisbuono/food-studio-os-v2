@@ -10,6 +10,7 @@
 // business table — only chef_turns for the log.
 
 import { readFoodCost } from "@/lib/chef/foodCost";
+import { readRotaToday, readOvertimePending, readLabourWeek } from "@/lib/chef/rota";
 import { attachConfirmTokens } from "@/lib/chef/confirm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { orchestrator, codeForEntityId, type AssistantEntityScope } from "@/lib/assistant/orchestrator";
@@ -183,6 +184,9 @@ function pageHref(word: string, house: string | null): string | null {
   if (/prep|mise/.test(w)) return h ? h + "/kitchen/prep" : "/";
   if (/caja|eod|cierre|cerrar|\bclose\b|dinero|money/.test(w)) return h ? h + "/money" : "/studio/money";
   if (/finanzas|finance|conciliaci|reconcil/.test(w)) return /concil/.test(w) ? "/administrate/finance/reconciliation" : h ? h + "/money?tab=finance" : "/studio/money";
+  // rota S4 (2026-10-01): "cuadrante / turnos / rota" → Rota tab; "horas extra / overtime / labour / nómina" → Labour tab (the queue)
+  if (/horas? extra|overtime|labou?r|n[oó]mina|fichaje|cola de horas/.test(w)) return h ? h + "/team?tab=labour" : "/studio/people";
+  if (/cuadrante|turnos?|rota\b|horario del equipo|schedule/.test(w)) return h ? h + "/team?tab=rota" : "/studio/people";
   if (/equipo|team|gente|people|personal|plantilla/.test(w)) return h ? h + "/team" : "/studio/people";
   if (/pedido|order|compra|\bbuy\b|suppl|suministro|proveedor|supplier/.test(w)) return /proveedor|supplier/.test(w) ? "/administrate/suppliers" : "/execute/orders";
   if (/oficina|office/.test(w)) return h ? h + "/money" : "/studio/money";
@@ -211,6 +215,10 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   // Internal continuation tokens the client sends from card buttons.
   if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
   if (m === "#margin_open") return { intent: "navigate", confidence: 1, language, args: { to: "margin" } };
+  if (m === "#overtime_open") return { intent: "query overtime_pending", confidence: 1, language, args: {} };
+  if (/^(?:qui[eé]n(?:es)? trabajan?|qui[eé]n est[aá]|qui[eé]n hay|who(?:'s| is) (?:on|working|in))(?: hoy| today)?(?: en (?:sala|cocina))?\??$/.test(m) || /^(?:cuadrante|turnos|rota)(?: de)?(?: hoy| today)?\??$/.test(m)) return { intent: "query rota_today", confidence: 0.96, language, args: {} };
+  if (/^(?:horas? extras?|overtime)(?: pendientes?| pending| to approve| por aprobar| waiting)?\??$/.test(m) || /^(?:qu[eé] )?horas? extras? (?:hay|tengo)(?: pendientes?)?\??$/.test(m)) return { intent: "query overtime_pending", confidence: 0.96, language, args: {} };
+  if (/^(?:coste|costo|gasto) de personal(?: (?:de )?esta semana| this week)?\??$/.test(m) || /^(?:labou?r|staff|wage|payroll) (?:cost|%|percent|this week)(?: this week)?\??$/.test(m) || /^(?:cu[aá]nto (?:llevo|llevamos|gasto|gastamos) (?:de|en) personal)(?: esta semana)?\??$/.test(m)) return { intent: "query labour_week", confidence: 0.95, language, args: {} };
   if (m === "#approve_next") return { intent: "approve", confidence: 1, language, args: { target: "reply", count: 1, next: true } };
   if (/^(?:siguiente|next|otro|otra|el siguiente|la siguiente)(?:\s+(?:comentario|comment|respuesta|reply))?$/.test(m)) return { intent: "inbox_open", confidence: 0.95, language, args: {} };
   if (/^(?:abre|abrir|open|mira|lee|léeme|read)\s+(?:la |el |the |my |mi )?(?:bandeja|inbox|comentarios|comments)(?:\s+(?:uno a uno|one by one|one at a time))?$/.test(m)) return { intent: "inbox_open", confidence: 0.96, language, args: {} };
@@ -248,6 +256,9 @@ Intents (exact strings) and their args:
 - "query prep"      {}                                       — today's prep list / mise en place
 - "query calendar"  {}                                       — what's on today
 - "query inbox"     {}                                       — waiting comments / messages
+- "query rota_today"  {}                                       — who is working today / the rota for today ("quién trabaja hoy", "who's on tonight", "turnos de hoy")
+- "query overtime_pending" {}                                  — overtime waiting for approval ("horas extra pendientes", "any overtime to approve")
+- "query labour_week" {}                                       — labour / staff cost this week, labour % ("coste de personal esta semana", "labour cost this week")
 - "query food_cost" {q: dish name}                          — food cost, cost per serving, margin or price/cost of ONE dish ("what's my food cost on the lamb", "cuánto me cuesta el brownie", "margin on the sea bass", "escandallo del romesco")
 - "navigate"        {to: page word}                          — open/go to a page. The six House screens are Service/Servicio (bookings), Menu/Carta (recipes), Supplies/Compras (orders), Money/Caja (eod/cierre), Team/Equipo, Comms/Comunicación (inbox); the old words serve/cook/buy/close/people/reach still work; also calendar, prep, finance, suppliers, office, kitchen, dining, studio, home, margin/margen (the costed menu)
 - "capture"         {type: "auto"|"delivery_note"|"invoice"|"wine"} — photograph a delivery note / invoice / bottle
@@ -613,6 +624,21 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const fcScope = { entity_id: entityId || scope.entity.id, entity_name: label || "", restaurant_id: scope.restaurant_id, house: houseSlug };
         const r = await readFoodCost(supabaseServer(), q, fcScope, lang);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "costing", q, scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, r.found ? "card" : "clarify");
+      }
+      case "query rota_today": {
+        const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const r = await readRotaToday(supabaseServer(), rs, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "rota", q: "today", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      case "query overtime_pending": {
+        const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const r = await readOvertimePending(supabaseServer(), rs, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "labour", q: "overtime_pending", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
+      }
+      case "query labour_week": {
+        const rs = { entity_id: entityId || scope.entity.id, entity_name: label || "", house: houseSlug, tz: scope.entity.timezone };
+        const r = await readLabourWeek(supabaseServer(), rs, lang);
+        return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "labour", q: "week", scope: chefScope }, confidence: conf, say: r.say, card: r.card, needs_confirm: false }, "card");
       }
       case "query inbox": {
         const r = await readInbox(rctx);

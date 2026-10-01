@@ -4,6 +4,7 @@ import { getHouseBySlug } from "@/lib/houses.server";
 import Engineering from "@/components/merged/menu/Engineering";
 import Repricing from "@/components/merged/menu/Repricing";
 import Margin from "@/components/merged/menu/Margin";
+import LabourStrip from "@/components/merged/menu/LabourStrip";
 import TabNav, { pickTab, MergedShell } from "@/components/nav/TabNav";
 import { verbWord } from "@/lib/nav/labels";
 import { serverLang } from "@/lib/i18nServer";
@@ -30,6 +31,8 @@ export default async function MenuCostingPage({ params, searchParams }: { params
   const base = `/h/${params.house}/menu/costing`;
   return (
     <MergedShell eyebrow={verbWord("cook", serverLang())} title="Costing" wide tabs={<TabNav base={base} tabs={TABS} active={tab} />}>
+      {/* rota S4 (2026-10-01): labour % sits beside food cost % — the margin page carries both */}
+      <LabourStrip house={house} />
       {tab === "repricing" ? <Repricing /> : tab === "engineering" ? <Engineering houseSlug={params.house} /> : <Margin entityId={house.id} houseSlug={params.house} />}
     </MergedShell>
   );
