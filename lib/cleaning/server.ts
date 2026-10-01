@@ -31,7 +31,7 @@ export async function loadRuns(sb: SupabaseClient, entityId: string, from: strin
   const rs = (runs || []) as any[];
   if (!rs.length) return [];
   const ids = rs.map((r) => r.id);
-  const { data: items, error: e2 } = await sb.from("cleaning_run_items").select("*").in("run_id", ids).order("sort_order", { ascending: true });
+  const { data: items, error: e2 } = await sb.from("cleaning_run_items").select("*").in("run_id", ids).order("sort_order", { ascending: true }).order("created_at", { ascending: true });
   if (e2) throw new Error(e2.message);
   const byRun = new Map<string, CleaningRunItem[]>();
   for (const it of (items || []) as any[]) (byRun.get(it.run_id) || byRun.set(it.run_id, []).get(it.run_id))!.push(it as CleaningRunItem);
