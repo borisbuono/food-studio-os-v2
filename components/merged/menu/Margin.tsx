@@ -67,8 +67,9 @@ export default function Margin({ entityId, houseSlug }: { entityId: string; hous
   }, [entityId, reload]);
 
   // A match is a QUESTION when the OS set it with less than full confidence and no human has tapped yet.
-  const isQuestion = (i: MenuLoopItem) => i.recipe_match_method !== "none" && (!i.recipe_id || ((i.recipe_match_score ?? 0) < 0.8 && i.recipe_match_method !== "human" && i.recipe_match_method !== "shell"));
-  const dishes = useMemo(() => items.filter((i) => i.recipe_match_method !== "none"), [items]);
+  const isQuestion = (i: MenuLoopItem) => i.recipe_match_method !== "none" && i.category !== "set_menu" && (!i.recipe_id || ((i.recipe_match_score ?? 0) < 0.8 && i.recipe_match_method !== "human" && i.recipe_match_method !== "shell"));
+  const isDish = (i: MenuLoopItem) => i.recipe_match_method !== "none" || i.category === "set_menu";
+  const dishes = useMemo(() => items.filter(isDish), [items]);
   const stats = useMemo(() => {
     const s = { dishes: dishes.length, bound: 0, real: 0, estimate: 0, unbound: 0, worst: 0, questions: 0 };
     for (const i of dishes) {
@@ -139,7 +140,7 @@ export default function Margin({ entityId, houseSlug }: { entityId: string; hous
                 </div>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em]">
-                <Badge conf={i.cost_confidence} bound={!!i.recipe_id} />
+                <Badge conf={i.cost_confidence} bound={!!i.recipe_id || i.category === "set_menu"} />
                 {i.recipe_name ? <span className="text-ink-soft normal-case tracking-normal font-sans text-[12px]">→ {i.recipe_name}{i.recipe_quantities_estimated ? " · quantities estimated" : ""}{i.recipe_needs_review ? " · awaiting review" : ""}</span> : null}
                 {i.recipe_id && !q ? (
                   <button onClick={() => setOpen(open === i.id ? null : i.id)} className="text-clay hover:text-ink">change</button>
@@ -176,9 +177,11 @@ export default function Margin({ entityId, houseSlug }: { entityId: string; hous
         })}
       </ul>
 
-      {items.some((i) => i.recipe_match_method === "none") ? (
+      <PricesToConfirm entityId={entityId} onChanged={reload} />
+
+      {items.some((i) => i.recipe_match_method === "none" && i.category !== "set_menu") ? (
         <p className="mt-8 border-t border-line pt-4 font-sans text-[12px] text-ink-soft">
-          {items.filter((i) => i.recipe_match_method === "none").length} lines on the menu are bought as sold (wine, coffee, extras) and carry no recipe — their cost is the purchase price, read on the Supplies screen.
+          {items.filter((i) => i.recipe_match_method === "none" && i.category !== "set_menu").length} lines on the menu are bought as sold (wine, coffee, extras) and carry no recipe — their cost is the purchase price, read on the Supplies screen.
         </p>
       ) : null}
     </main>
@@ -190,4 +193,69 @@ function Badge({ conf, bound }: { conf: string | null; bound: boolean }) {
   if (conf === "real") return <span className="rounded-sm border border-basil/60 px-1.5 py-0.5 text-basil">real</span>;
   if (conf === "estimate" || conf === "partial") return <span className="rounded-sm border border-[#B27A08]/60 px-1.5 py-0.5 text-[#B27A08]">estimate</span>;
   return <span className="rounded-sm border border-line px-1.5 py-0.5 text-clay">not costed</span>;
+}
+
+// The provisional prices the costing leans on, most-used first. One tap keeps
+// the estimate as a confirmed price; a typed number replaces it. Either way
+// the menu is re-costed in the same request. This is the one thing the
+// operator owes the loop (Foundation §7.3) — and it is one tap per line.
+type PriceRow = { id: string; canonical_name: string; unit: string; price_eur: number; source: string; needs_confirm: boolean; uses: number; note: string | null; price_asof: string | null };
+
+function PricesToConfirm({ entityId, onChanged }: { entityId: string; onChanged: () => void }) {
+  const [rows, setRows] = useState<PriceRow[]>([]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/menu/prices?entity=${entityId}&only=confirm`, { cache: "no-store" });
+      const j = await r.json();
+      if (j?.ok) setRows(j.prices || []);
+    } catch { /* the list is a convenience; the page still works without it */ }
+  }, [entityId]);
+  useEffect(() => { load(); }, [load]);
+
+  const confirm = useCallback(async (id: string, price?: string) => {
+    setBusy(id); setErr(null);
+    try {
+      const body: any = {};
+      if (price != null && price.trim() !== "") body.price_eur = Number(price.replace(",", "."));
+      const r = await fetch(`/api/menu/prices/${id}/confirm`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.error || "confirm failed");
+      setEdit((e) => { const n = { ...e }; delete n[id]; return n; });
+      await load(); onChanged();
+    } catch (e: any) { setErr(String(e?.message || e)); }
+    finally { setBusy(null); }
+  }, [load, onChanged]);
+
+  if (!rows.length) return null;
+  const shown = open ? rows : rows.slice(0, 8);
+  return (
+    <section className="mt-10 border-t border-line pt-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.28em] text-clay">Prices to confirm · {rows.length}</p>
+          <p className="mt-1 font-sans text-[13px] text-ink-soft">Estimates the costing is leaning on until an invoice line or your tick replaces them. Tap to keep, or type the real price.</p>
+        </div>
+        {rows.length > 8 ? <button onClick={() => setOpen((v) => !v)} className="font-mono text-[11px] uppercase tracking-wide text-clay hover:text-ink">{open ? "fewer" : "all"}</button> : null}
+      </div>
+      {err ? <p className="mt-2 text-[12px] text-tomato">{err}</p> : null}
+      <ul className="mt-3 divide-y divide-line-soft">
+        {shown.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-3 py-2">
+            <span className="min-w-[10rem] flex-1 font-serif text-[15px] text-ink">{p.canonical_name} <span className="font-mono text-[10px] uppercase text-clay">{p.uses ? `· ${p.uses} lines` : ""}</span></span>
+            <span className="font-mono text-[12px] tabular-nums text-[#B27A08]">{eur(p.price_eur)} / {p.unit}</span>
+            <input inputMode="decimal" placeholder="real price" value={edit[p.id] ?? ""} onChange={(e) => setEdit((x) => ({ ...x, [p.id]: e.target.value }))}
+              className="w-24 rounded-md border border-line px-2 py-1 font-mono text-[12px] tabular-nums" />
+            <button disabled={busy === p.id} onClick={() => confirm(p.id, edit[p.id])} className="rounded-md border border-ink px-3 py-1 font-mono text-[11px] uppercase tracking-wide text-ink hover:bg-ink hover:text-white disabled:opacity-50">
+              {edit[p.id]?.trim() ? "Set" : "Keep"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
