@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 export type EmailMeta = {
   category: string | null; confidence: number | null; enquiry_fields: Record<string, unknown> | null; needs_you_due: string | null;
   hours_to_answer: number | null; outcome: string | null; message_count: number; first_received_at: string | null;
+  sender_note?: string | null;   // E6: the one line we know about the sender
 };
 export type InboxItem = {
   kind: "comment" | "dm" | "email";
@@ -110,7 +111,7 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...p } : x)));
   }
 
-  async function act(it: InboxItem, action: "approve" | "skip" | "restore" | "hide" | "redraft" | "recategorise" | "outcome", extra: Record<string, unknown> = {}) {
+  async function act(it: InboxItem, action: "approve" | "skip" | "restore" | "hide" | "redraft" | "recategorise" | "outcome" | "note", extra: Record<string, unknown> = {}) {
     const key = `${it.kind}:${it.id}`;
     setBusy((b) => ({ ...b, [key]: action }));
     try {
@@ -122,6 +123,8 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
       if (action === "recategorise") {
         if (j.ok) { patch(it.id, { status: j.routed?.startsWith("noise") ? "noise" : j.routed?.startsWith("captured") ? "archived" : j.routed?.startsWith("flagged") ? "flagged" : "classified", flagged: !!j.routed?.startsWith("flagged"), email: it.email ? { ...it.email, category: j.category } : it.email, error: null }); setToast(`Re-sorted as ${j.category}: ${j.routed}`); }
         else { setToast(j.error ?? "failed"); }
+      } else if (action === "note") {
+        if (j.ok) { patch(it.id, { email: it.email ? { ...it.email, sender_note: j.note ?? null } : it.email }); setToast(j.note ? "Note saved — the next draft reads it" : "Note cleared"); } else setToast(j.error ?? "failed");
       } else if (action === "outcome") {
         if (j.ok) { patch(it.id, { email: it.email ? { ...it.email, outcome: j.outcome } : it.email }); setToast(`Noted: ${j.outcome}`); } else setToast(j.error ?? "failed");
       } else if (action === "redraft") {
@@ -303,6 +306,13 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
                     <option value="">Outcome…</option>
                     <option value="won">Won</option><option value="lost">Lost</option><option value="no_answer">No answer</option><option value="not_sales">Not sales</option>
                   </select>
+                ) : null}
+                {it.kind === "email" ? (
+                  <button type="button" disabled={!!b} className="text-clay underline-offset-2 hover:underline"
+                    title={it.email?.sender_note ?? "One line about this sender; the drafter reads it before the next reply"}
+                    onClick={() => { const v = window.prompt("One line about this sender (the drafter reads it next time). Empty clears.", it.email?.sender_note ?? ""); if (v !== null) act(it, "note", { note: v }); }}>
+                    {it.email?.sender_note ? `Note: ${it.email.sender_note.length > 40 ? it.email.sender_note.slice(0, 39) + "…" : it.email.sender_note}` : "Note on sender…"}
+                  </button>
                 ) : null}
               </div>
             </li>

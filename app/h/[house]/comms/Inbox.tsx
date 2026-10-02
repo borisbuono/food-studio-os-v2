@@ -26,7 +26,7 @@ export default async function InboxPage({ params }: { params: { house: string } 
   if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/inbox`);
 
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const [accountsRes, commentsRes, dmsRes, savedRes, pullRes, emailRes, mailboxesRes] = await Promise.all([
+  const [accountsRes, commentsRes, dmsRes, savedRes, pullRes, emailRes, mailboxesRes, notesRes] = await Promise.all([
     sb.from("social_accounts_resolved").select("account_id, kind, handle, status").eq("entity_id", entity_id).eq("provider", "meta"),
     sb.from("social_comments")
       .select("id, account_id, platform, remote_comment_id, parent_remote_id, author_handle, author_name, text, lang, created_at_remote, status, flagged, flag_reason, draft_reply, draft_lang, reply_text, replied_at, error, media_permalink, media_thumbnail_url, media_caption")
@@ -45,6 +45,8 @@ export default async function InboxPage({ params }: { params: { house: string } 
       .in("status", ["classified", "drafted", "approved", "replied", "skipped", "flagged", "failed"])
       .order("last_received_at", { ascending: false }).limit(200),
     sb.from("email_accounts").select("id, address, status").eq("entity_id", entity_id).is("revoked_at", null),
+    // E6: the one line we know about each sender (clients of this house + shared suppliers)
+    sb.from("email_counterparties").select("address, notes, side").or(`entity_id.eq.${entity_id},entity_id.is.null`).limit(500),
   ]);
 
   const accounts: AccountChip[] = (accountsRes.data ?? []).map((a: any) => ({
@@ -94,6 +96,8 @@ export default async function InboxPage({ params }: { params: { house: string } 
   // Email threads: the card is the thread — who, subject, what the OS read
   // from it, the suggested reply. Flagged (fiscal/legal) shows under "For Boris".
   const mailboxById = new Map(((mailboxesRes.data ?? []) as any[]).map((m) => [m.id, m]));
+  const noteByAddress = new Map<string, string>();
+  for (const n of ((notesRes as any)?.data ?? []) as any[]) if (n.address && n.notes && !noteByAddress.has(n.address)) noteByAddress.set(String(n.address).toLowerCase(), String(n.notes));
   for (const t of (emailRes.data ?? []) as any[]) {
     items.push({
       kind: "email", id: t.id, account_id: t.account_id, platform: "email",
@@ -103,7 +107,7 @@ export default async function InboxPage({ params }: { params: { house: string } 
       lang: t.draft_lang ?? null, at: t.last_received_at, status: t.status, flagged: !!t.flagged, flag_reason: t.flag_reason,
       draft: t.reply_text ?? t.draft_reply ?? "", draft_lang: t.draft_lang, replied_at: t.replied_at, error: t.error,
       media: null, is_reply: false, history: null,
-      email: { category: t.category, confidence: t.confidence, enquiry_fields: t.enquiry_fields, needs_you_due: t.needs_you_due, hours_to_answer: t.hours_to_answer, outcome: t.outcome, message_count: t.message_count, first_received_at: t.first_received_at },
+      email: { category: t.category, confidence: t.confidence, enquiry_fields: t.enquiry_fields, needs_you_due: t.needs_you_due, hours_to_answer: t.hours_to_answer, outcome: t.outcome, message_count: t.message_count, first_received_at: t.first_received_at, sender_note: noteByAddress.get(String(t.from_address ?? "").toLowerCase()) ?? null },
     });
   }
   items.sort((a, b) => new Date(b.at ?? 0).getTime() - new Date(a.at ?? 0).getTime());

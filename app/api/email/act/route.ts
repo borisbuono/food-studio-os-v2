@@ -20,6 +20,7 @@ export const maxDuration = 60;
 //   { action: "redraft",      id }                      Haiku again (also for 'other', on request)
 //   { action: "recategorise", id, category }            "wrong pile" → re-route + observe()
 //   { action: "outcome",      id, outcome }             won | lost | no_answer | not_sales → observe()
+//   { action: "note",         id, note }                E6 — the one line on the sender (clients.notes; "" clears). The drafter reads it next time.
 //   { action: "approve",      id, text, dry_run? }      E4 — the tick. Mints + consumes a page_tick
 //                                                        confirm token for {approve_email, thread, text},
 //                                                        then the edge function email-reply re-checks that
@@ -79,6 +80,20 @@ export async function POST(req: NextRequest) {
     // E5: the funnel row follows the outcome
     try { await advanceLead(svc, id, outcome as any); } catch { /* optional */ }
     return NextResponse.json({ ok: true, outcome });
+  }
+
+  if (action === "note") {
+    // E6: one line on the counterparty. Through the caller's RLS client — a
+    // manager of this house writes a clients row for this house; nothing else.
+    const note = String(p.note ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
+    const address = String(r.from_address || "").toLowerCase();
+    if (!address) return NextResponse.json({ ok: false, error: "no sender address on thread" }, { status: 422 });
+    const { data: existing } = await sb.from("clients").select("id").eq("entity_id", r.entity_id).ilike("email", address).maybeSingle();
+    const w = existing?.id
+      ? await sb.from("clients").update({ notes: note || null, name: r.from_name || undefined }).eq("id", existing.id).select("id").maybeSingle()
+      : await sb.from("clients").insert({ entity_id: r.entity_id, email: address, name: r.from_name || null, kind: r.category === "enquiry" ? "guest" : "other", notes: note || null, created_by: u.user.id }).select("id").maybeSingle();
+    if (w.error) return NextResponse.json({ ok: false, error: w.error.message }, { status: 403 });
+    return NextResponse.json({ ok: true, note: note || null, client_id: (w.data as any)?.id ?? null });
   }
 
   if (action === "approve") {

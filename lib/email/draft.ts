@@ -114,14 +114,16 @@ export async function draftThread(db: SupabaseClient, threadId: string, opts: { 
     db.from("social_saved_replies").select("key, title, lang, body").eq("entity_id", ent.id).eq("active", true).order("sort"),
     db.from("brand_kits").select("ethos").eq("entity_id", ent.id).maybeSingle(),
     db.from("restaurants").select("public_slug").eq("entity_id", ent.id).maybeSingle(),
-    // E6: one-line counterparty note (table may not exist yet → null)
-    db.from("email_counterparties").select("name, kind, notes").eq("entity_id", ent.id).eq("address", String(thread.from_address || "").toLowerCase()).maybeSingle().then((r: any) => r, () => ({ data: null })),
+    // E6: the one line we know about the sender — a client of this house, or a
+    // supplier (shared across houses, entity_id null). First match wins.
+    db.from("email_counterparties").select("name, kind, notes, side, entity_id").eq("address", String(thread.from_address || "").toLowerCase())
+      .or(`entity_id.eq.${ent.id},entity_id.is.null`).order("entity_id", { ascending: false, nullsFirst: false }).limit(1).maybeSingle().then((r: any) => r, () => ({ data: null })),
   ]);
   const meta = ((ent as any).metadata || {}) as Record<string, unknown>;
   const pricing = typeof meta.pricing_rules === "string" ? String(meta.pricing_rules).slice(0, 2000) : null;
   const signature = typeof meta.email_signature === "string" ? String(meta.email_signature).slice(0, 300) : null;
   const proposal = thread.category === "enquiry" ? proposalLink((rest as any)?.public_slug || null, thread.enquiry_fields as EnquiryFields | null, threadId) : null;
-  const cpNote = cp && (cp as any).notes ? `${(cp as any).name ? (cp as any).name + " · " : ""}${(cp as any).kind ? (cp as any).kind + " · " : ""}${(cp as any).notes}` : null;
+  const cpNote = cp && (cp as any).notes ? `${(cp as any).name ? (cp as any).name + " · " : ""}${(cp as any).kind ? (cp as any).kind + " · " : ""}${String((cp as any).notes).replace(/\s+/g, " ").trim().slice(0, 300)}` : null;
 
   const system = buildEmailSystemPrompt({
     slug: ent.slug, name: ent.name, category: thread.category, voice: (voice ?? []) as any, saved: (saved ?? []) as any,
