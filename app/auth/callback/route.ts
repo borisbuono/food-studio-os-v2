@@ -44,15 +44,16 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookieOptions: cookieOpts,
+      // getAll/setAll (S5, 2026-10-02): the only non-deprecated adapter in
+      // @supabase/ssr ≥0.4, and the one that clears stale chunks (the bare
+      // sb-fs-auth that once shadowed the valid .0/.1 pair — 2026-08-20) in the
+      // same setAll call. Read what the browser sent; write on the RESPONSE.
       cookies: {
-        // Read from the request-side cookies (what the browser sent).
-        get(name: string) { return request.cookies.get(name)?.value; },
-        // Write to the RESPONSE cookies (what the browser will receive).
-        set(name: string, value: string, options: any) {
-          response.cookies.set({ name, value, ...options, ...cookieAttrs });
-        },
-        remove(name: string, options: any) {
-          response.cookies.set({ name, value: "", ...options, ...cookieAttrs, maxAge: 0 });
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set({ name, value, ...options, ...cookieAttrs });
+          });
         },
       },
     }
