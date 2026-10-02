@@ -16,7 +16,7 @@ import { countOpenToday } from "@/lib/cleaning/server";
 import { canSeeCost } from "@/lib/access/costVisibility";
 
 export type ChefChip = { key: string; label: string; utterance: string };
-export type ChipKey = "inbox" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime" | "cleaning" | "cleaning_sign";
+export type ChipKey = "inbox" | "enquiries" | "prep" | "bookings" | "bookings_tomorrow" | "capture" | "calendar" | "yesterday" | "food_cost" | "margin" | "overtime" | "cleaning" | "cleaning_sign";
 
 type Candidate = ChefChip & { key: ChipKey; score: number };
 
@@ -81,13 +81,21 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
     return data === true;
   }, false);
 
-  const [inbox, prep, bookings, captures, echo, calendar, foodCost, margin, overtime, cleaning] = await Promise.all([
+  const [inbox, enquiries, prep, bookings, captures, echo, calendar, foodCost, margin, overtime, cleaning] = await Promise.all([
     // inbox: rows waiting for a reply
     safe(async (): Promise<Candidate[]> => {
       const { data } = await sb.from("social_inbox_waiting").select("waiting").eq("entity_id", entityId).maybeSingle();
       const waiting = Number((data as any)?.waiting || 0);
       if (!(waiting > 0)) return [];
       return [{ key: "inbox", label: clip(es ? waiting + " comentarios esperando" : waiting + " comments waiting"), utterance: "#inbox_open", score: 50 + Math.min(waiting, 20) }];
+    }, []),
+    // email E4 (2026-10-02): sales enquiries waiting for an answer — the clock is one of the four numbers.
+    safe(async (): Promise<Candidate[]> => {
+      const { count, error } = await sb.from("email_threads").select("id", { count: "exact", head: true })
+        .eq("entity_id", entityId).eq("category", "enquiry").in("status", ["classified", "drafted"]).eq("flagged", false);
+      const n = error ? 0 : Number(count || 0);
+      if (!(n > 0)) return [];
+      return [{ key: "enquiries", label: clip(es ? n + (n === 1 ? " consulta esperando" : " consultas esperando") : n + (n === 1 ? " enquiry waiting" : " enquiries waiting")), utterance: "#inbox_email", score: 56 + Math.min(n, 20) }];
     }, []),
 
     // prep: open mise items today, 10–18 h
@@ -207,7 +215,7 @@ export async function predictChips(sb: SupabaseClient, input: PredictInput): Pro
     }, []),
   ]);
 
-  const all = [...inbox, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin, ...overtime, ...cleaning].sort((a, b) => b.score - a.score);
+  const all = [...inbox, ...enquiries, ...prep, ...bookings, ...captures, ...echo, ...calendar, ...foodCost, ...margin, ...overtime, ...cleaning].sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
   const seenUtt = new Set<string>();
   const out: ChefChip[] = [];

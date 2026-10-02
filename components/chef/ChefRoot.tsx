@@ -90,7 +90,7 @@ export default function ChefRoot() {
   const [desktop, setDesktop] = useState(false);
   const [passMode, setPassMode] = useState(false); // /h/[house]/pass wall screen: body[data-chef-mode="pass"]
   // Phase 2
-  const [editReply, setEditReply] = useState<{ id: string; author: string; draft: string } | null>(null); // next utterance = the new reply
+  const [editReply, setEditReply] = useState<{ id: string; author: string; draft: string; channel?: "social" | "email" } | null>(null); // next utterance = the new reply
   const [voiceWindow, setVoiceWindow] = useState<"open" | "closed" | "missed" | null>(null); // closed-grammar yes/no window on a confirm
   const inboxSeen = useRef<string[]>([]);
   const batchRemaining = useRef(0);
@@ -290,7 +290,7 @@ export default function ChefRoot() {
     const c: CardT = res.card || { title: t("chef.done"), lines: [], kind: "write" };
     // resolution "done" is written by /api/chef/act (slice A) — no client PATCH.
     // Batch approve ("the first three"): the next item gets its OWN read-back.
-    if (action.type === "approve_reply" && batchRemaining.current > 0) {
+    if ((action.type === "approve_reply" || action.type === "approve_email") && batchRemaining.current > 0) {
       batchRemaining.current -= 1;
       const left = batchRemaining.current;
       showResult(c, { keep: true });
@@ -438,7 +438,9 @@ export default function ChefRoot() {
       let minted: any = null;
       try {
         const r = await fetch("/api/chef/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-          action: { type: "approve_reply", entity_id: entityId, kind: "comment", id: er.id, text: trimmed, author: er.author },
+          action: er.channel === "email"
+            ? { type: "approve_email", entity_id: entityId, id: er.id, text: trimmed, author: er.author }
+            : { type: "approve_reply", entity_id: entityId, kind: "comment", id: er.id, text: trimmed, author: er.author },
           language: lang, transcript: trimmed, route: pathname, source: voice ? "voice" : "typed",
         }) });
         minted = await r.json().catch(() => null);
@@ -451,7 +453,7 @@ export default function ChefRoot() {
       lastTurnId.current = minted.turn_id || lastTurnId.current;
       const turn: ChefTurn = {
         transcript: trimmed, language: lang,
-        intent: { kind: "approve", surface: "social", id: er.id, action: "send" }, confidence: 1,
+        intent: { kind: "approve", surface: er.channel === "email" ? "inbox" : "social", id: er.id, action: "send" }, confidence: 1,
         say: minted.readback, readback: minted.readback, needs_confirm: true, confirm_voice: true, turn_id: minted.turn_id || null,
         confirm_token: minted.confirm_token, action: minted.action,
         card: { title: (lang === "es" ? "Responder a " : "Reply to ") + er.author, lines: [trimmed], kind: "confirm" },
@@ -723,7 +725,7 @@ export default function ChefRoot() {
       return;
     }
     if (a.kind === "edit_reply") {
-      setEditReply({ id: a.id, author: a.author, draft: a.draft });
+      setEditReply({ id: a.id, author: a.author, draft: a.draft, channel: a.channel });
       clearTimers();
       setState("idle"); setCard(null); setPending(null);
       setTyping(true); setTyped(a.draft || "");

@@ -5,6 +5,8 @@ import { draftThread } from "@/lib/email/draft";
 import { recategorise, CATEGORIES, type Category } from "@/lib/email/classify";
 import { observe } from "@/lib/observations";
 import { requireManagerOf } from "@/lib/access/requireManager";
+import { mintAndConsumePageTick } from "@/lib/chef/confirm";
+import { approveEmailAction, sendEmailReply } from "@/lib/email/reply";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +19,15 @@ export const maxDuration = 60;
 //   { action: "redraft",      id }                      Haiku again (also for 'other', on request)
 //   { action: "recategorise", id, category }            "wrong pile" → re-route + observe()
 //   { action: "outcome",      id, outcome }             won | lost | no_answer | not_sales → observe()
-//   { action: "approve",      id, text }                E4 — the tick. Until E4 lands: 501.
+//   { action: "approve",      id, text, dry_run? }      E4 — the tick. Mints + consumes a page_tick
+//                                                        confirm token for {approve_email, thread, text},
+//                                                        then the edge function email-reply re-checks that
+//                                                        consumed token and sends as the mailbox. Nothing
+//                                                        in this route writes approved_by_boris or sends.
 //
 // Auth: the signed-in user. Every row write goes through the cookie-bound
 // client first (RLS: managed-entity members), the service path only after
-// that proved membership. No action here sends anything.
+// that proved membership.
 export async function POST(req: NextRequest) {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
@@ -32,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
   // RLS-visible (member) AND a manager of that house — before any service work.
-  const { data: row } = await sb.from("email_threads").select("id, status, entity_id, draft_reply, category, flagged").eq("id", id).maybeSingle();
+  const { data: row } = await sb.from("email_threads").select("id, status, entity_id, account_id, draft_reply, category, flagged, from_name, from_address").eq("id", id).maybeSingle();
   if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   const r = row as any;
   const gate = await requireManagerOf(sb, r.entity_id);
@@ -73,7 +79,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "approve") {
-    return NextResponse.json({ ok: false, error: "sending ships in E4 — nothing leaves the account yet" }, { status: 501 });
+    // The tick. One code path with Chef: a confirm token is minted AND consumed
+    // here (page_tick) for exactly {approve_email, this thread, this text}; the
+    // edge function refuses anything else with 403.
+    const text = String(p.text ?? r.draft_reply ?? "").trim();
+    if (!text) return NextResponse.json({ ok: false, error: "empty reply" }, { status: 422 });
+    if (r.status === "replied") return NextResponse.json({ ok: false, error: "already replied", status: "replied" }, { status: 409 });
+    // flagged threads have no draft; the text is what Boris typed in the box — his tick, his words.
+    if (!["classified", "drafted", "approved", "failed", "skipped", "flagged"].includes(r.status)) return NextResponse.json({ ok: false, error: `status ${r.status}` }, { status: 409 });
+    const act = approveEmailAction(String(r.entity_id), id, text, r.from_name || r.from_address || null);
+    const token = await mintAndConsumePageTick(sb, u.user.id, act);
+    if (!token) return NextResponse.json({ ok: false, error: "could not confirm (token)", status: r.status }, { status: 403 });
+    const res = await sendEmailReply(svc, { threadId: id, accountId: String(r.account_id), text, uid: u.user.id, confirmToken: token, action: act, via: "page_tick", dryRun: p.dry_run === true });
+    if (res.dry_run) return NextResponse.json({ ok: res.ok, dry_run: true, would_send: res.would_send, error: res.error, reason: res.reason }, { status: res.ok ? 200 : res.http });
+    if (!res.ok) return NextResponse.json({ ok: false, error: res.error, status: "failed", reason: res.reason }, { status: res.http });
+    return NextResponse.json({ ok: true, status: "replied", gmail_message_id: res.gmail_message_id, hours_to_answer: res.hours_to_answer });
   }
   return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });
 }

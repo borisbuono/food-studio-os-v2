@@ -38,7 +38,7 @@ export type ChefCardAction =
   | { label: string; kind: "capture_page"; capture_id: string }  // Phase 2: photograph another page of this capture
   | { label: string; kind: "confirm"; action: ChefAction; readback: string; voice_ok?: boolean; confirm_token?: string | null }  // Phase 2: opens the read-back gate, then acts. Slice A: server-minted one-shot token the act MUST carry
   | { label: string; kind: "turn"; message: string }      // Phase 2: runs another turn ("#inbox_next")
-  | { label: string; kind: "edit_reply"; id: string; author: string; draft: string }  // Phase 2: next utterance = the new reply text
+  | { label: string; kind: "edit_reply"; id: string; author: string; draft: string; channel?: "social" | "email" }  // Phase 2: next utterance = the new reply text (E4: channel email → approve_email)
   | { label: string; kind: "none" };                      // dismiss (e.g. "Looks right")
 
 export type ChefCard = {
@@ -64,6 +64,10 @@ export type ChefAction =
   // Phase 2
   | { type: "approve_reply"; entity_id: string; kind: "comment" | "dm"; id: string; text: string; author?: string }  // outbound: read-back + Yes (voice yes allowed)
   | { type: "skip_comment"; entity_id: string; id: string; author?: string }                                          // undoable (status back)
+  // email E4 (2026-10-02): the reply to an email thread. Outbound: read-back + Yes
+  // (voice yes allowed); the consumed token is re-checked by edge function email-reply.
+  | { type: "approve_email"; entity_id: string; id: string; text: string; author?: string }
+  | { type: "skip_email"; entity_id: string; id: string; author?: string }                                            // undoable (status back)
   | { type: "booking_update"; entity_id: string; id: string; patch: { service_time?: string; party_size?: number; service_date?: string; notes?: string }; label?: string }  // undoable
   | { type: "prep_update"; entity_id: string; id: string; patch: { quantity?: number | null; unit?: string | null; status?: string; name?: string }; label?: string }         // undoable
   // cleaning S4 (2026-10-02): tick goes through cleaning_tick() as the caller

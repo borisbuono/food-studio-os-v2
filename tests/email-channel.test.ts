@@ -6,6 +6,10 @@
  */
 import { parseAddress, parseAddressList, buildReplyMime, toBase64Url, encodeHeaderWord, GMAIL_SCOPES } from "../lib/email/gmail";
 import { ruleClassify, type ClassifyInput } from "../lib/email/rules";
+import { canonical, hashableAction } from "../lib/chef/canonical";
+import { actionHash, CONFIRM_REQUIRED } from "../lib/chef/confirm";
+import { approveEmailAction, replyTarget } from "../lib/email/reply";
+import { createHash } from "node:crypto";
 
 let fails = 0;
 function eq(name: string, got: unknown, want: unknown) {
@@ -51,6 +55,27 @@ eq("rule: enquiry text → null (model decides + extracts)", rc({ from_address: 
 eq("rule: plain human mail → null", rc({ from_address: "pepe@gmail.com", subject: "Hola", body: "Una pregunta sobre el horario de domingo." }), null);
 eq("rule: bare PDF, short body → supplier_doc (low confidence)", ruleClassify({ ...base, from_address: "a@b.com", body: "Adjunto.", attachments: [{ filename: "scan.pdf", mime: "application/pdf" }] })?.confidence ?? 0, 0.6);
 eq("rule: enquiry with PDF menu attached is NOT a supplier doc", rc({ from_address: "eva@agency.com", subject: "Wedding dinner 40 pax", body: "Hi! We are planning a wedding dinner for 40 people, budget around 150 per person. Menu ideas attached.", attachments: [{ filename: "ideas.pdf", mime: "application/pdf" }] }), null);
+
+
+// ---- E4 gate plumbing (pure). The SQL gate itself is probed live in a rolled-back
+// transaction (ship note); here: the action the token is minted against hashes
+// identically however the keys arrive, and the reply targets the last INBOUND.
+
+const T_ENTITY = "387f1045-0000-0000-0000-000000000000", T_THREAD = "11111111-2222-3333-4444-555555555555";
+const act = approveEmailAction(T_ENTITY, T_THREAD, "  Hola Harmke — sí, tenemos sitio.  ", "Harmke");
+eq("approve_email: canonical shape", act, { type: "approve_email", entity_id: T_ENTITY, id: T_THREAD, text: "Hola Harmke — sí, tenemos sitio.", author: "Harmke" });
+truthy("approve_email is in the outbound (token-required) class", CONFIRM_REQUIRED.has("approve_email"));
+const shuffled: any = { author: "Harmke", text: "Hola Harmke — sí, tenemos sitio.", id: T_THREAD, entity_id: T_ENTITY, type: "approve_email", confirm_token: "x", turn_id: "y" };
+eq("hash: key order + wire fields do not matter", actionHash(shuffled), actionHash(act as any));
+eq("hash: equals sha256(canonical(hashable))) — what the edge function recomputes", actionHash(act as any), createHash("sha256").update(canonical(hashableAction(act as any))).digest("hex"));
+truthy("hash: changing the text changes the hash", actionHash({ ...act, text: "otro texto" } as any) !== actionHash(act as any));
+truthy("hash: changing the thread changes the hash", actionHash({ ...act, id: "99999999-2222-3333-4444-555555555555" } as any) !== actionHash(act as any));
+eq("canonical: undefined dropped, nested sorted", canonical({ b: 1, a: { z: undefined, y: [2, { k: "v" }] } }), '{"a":{"y":[2,{"k":"v"}]},"b":1}');
+
+eq("reply target: last inbound sender, threaded", replyTarget({ from_address: "first@x.com" }, { from_address: "Reply@X.com", message_id_header: "<m2@x>", references_header: "<m1@x>" }),
+  { to: "reply@x.com", inReplyTo: "<m2@x>", references: "<m1@x> <m2@x>" });
+eq("reply target: no inbound row → thread sender, no threading headers", replyTarget({ from_address: "first@x.com" }, null), { to: "first@x.com", inReplyTo: null, references: null });
+eq("reply target: first reply in a thread → References = the one Message-ID", replyTarget({ from_address: null }, { from_address: "a@b.c", message_id_header: "<only@b.c>", references_header: null }), { to: "a@b.c", inReplyTo: "<only@b.c>", references: "<only@b.c>" });
 
 console.log(fails ? `\n${fails} FAILED` : "\nall passed");
 process.exit(fails ? 1 : 0);
