@@ -37,7 +37,7 @@ export default async function TodayPage({ searchParams }: { searchParams?: { tab
     sb.from("master_todos")
       .select("id, title, description, status, priority, due_at, entity_code")
       .eq("assignee_user_id", u.user.id)
-      .not("status", "in", "(completed,deferred)")
+      .not("status", "in", "(completed,deferred,noted)")
       .or(`due_at.is.null,due_at.lt.${endOfToday}`)
       .order("priority", { ascending: true })
       .limit(25),

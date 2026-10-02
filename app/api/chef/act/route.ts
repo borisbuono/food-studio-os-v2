@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { registerWrite } from "@/lib/register";
 import { codeForEntityId, resolveEntityScope } from "@/lib/assistant/orchestrator";
 import { ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 import { getMyMembershipContext } from "@/lib/memberships";
@@ -282,14 +283,13 @@ async function handle(req: Request) {
     case "todo_add": {
       const title = clip(action.title, 500);
       if (!title) return fail("title required");
-      // master_todos.status is CHECK-constrained; 'pending' is the open state.
-      const { data, error } = await sb.from("master_todos").insert({
-        entity_code: code, title, source: "from_conversation", status: "pending",
-        priority: 3, impact_score: 3, created_by_user_id: uid,
-        context: { source: "chef_v3", entity_id: scope.entity.id },
-      }).select("id").maybeSingle();
-      if (error || !data) return fail(error?.message || "insert failed", 500);
-      return done("master_todos", (data as any).id, card(t.todo, [title], label));
+      // S1 (2026-10-02): the register has ONE write path — register_write().
+      // A Chef todo is a commitment (kind 'commitment' → status pending); the
+      // RPC derives entity_id from the code and RLS refuses other houses.
+      // Any house: the RPC resolves BM/IFL/BBH codes AND slugs (register_write → entity_id_for_code).
+      const r = await registerWrite(sb, { entity_code: code || scope.entity.slug || scope.entity.name, kind: "commitment", body: title, due: null, source: "chef" });
+      if ("error" in r) return fail(r.error, r.status >= 500 ? 500 : r.status);
+      return done("master_todos", r.id, card(t.todo, [title], label));
     }
     case "run_agent": {
       const objective = clip(action.objective, 5000);

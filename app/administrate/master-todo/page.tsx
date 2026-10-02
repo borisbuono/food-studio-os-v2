@@ -19,7 +19,7 @@ export default async function MasterTodoPage() {
 
   // Read: same-entity + cross-entity (null entity_code).
   const [openRes, doneRes, profilesRes] = await Promise.all([
-    supabase.from("master_todos").select("*").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(200),
+    supabase.from("master_todos").select("*").not("status", "in", "(completed,deferred,noted)").order("impact_score", { ascending: false }).limit(200),
     supabase.from("master_todos").select("*").in("status", ["completed","deferred"]).order("updated_at", { ascending: false }).limit(30),
     supabase.from("profiles").select("id,name").limit(200),
   ]);

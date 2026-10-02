@@ -148,7 +148,7 @@ export default async function Page() {
     supabase.from("platform_billing_status").select("entity_code,platform,state,notes,failure_count_30d,last_failure_at").in("state", ["failing", "disabled"]),
     supabase.from("v_finance_anomalies_open").select("id,entity_code,kind,severity,description").gte("severity", 3),
     supabase.from("v_bank_matches_open").select("movement_id,entity_code,top_confidence").not("top_candidate_id", "is", null),
-    supabase.from("master_todos").select("id,title,impact_score,entity_code,due_at").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(30),
+    supabase.from("master_todos").select("id,title,impact_score,entity_code,due_at").not("status", "in", "(completed,deferred,noted)").order("impact_score", { ascending: false }).limit(30),
     supabase.from("files_inbox").select("suggested_entity,status").eq("status", "needs_triage").limit(500),
   ]);
 

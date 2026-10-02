@@ -1,10 +1,12 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { registerWrite, isRegisterKind, REGISTER_CLOSED_IN } from "@/lib/register";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET /api/master-todo?entity=IFL&view=mine|impact|source&status=&assignee=
 //   → list of master_todos, ranked by (status priority, impact_score desc)
+//   (status=open → everything that is still a task: not completed/deferred/noted)
 // POST /api/master-todo
 //   Body: { entity_code, title, description?, priority?, impact_score?,
 //           source?, assignee_user_id?, due_at?, related_atoms?, context? }
@@ -33,7 +35,8 @@ export async function GET(req: Request) {
 
   let q = sb.from("master_todos").select("*").limit(200);
   if (entity && entity !== "all") q = q.eq("entity_code", entity);
-  if (status) q = q.eq("status", status);
+  if (status === "open") q = q.not("status", "in", REGISTER_CLOSED_IN);
+  else if (status) q = q.eq("status", status);
   if (view === "mine") {
     if (!uid) return Response.json({ ok: true, todos: [] });
     q = q.eq("assignee_user_id", uid);
@@ -43,8 +46,9 @@ export async function GET(req: Request) {
 
   const todos = (data || []).slice().sort((a: any, b: any) => {
     // Open first, then by impact_score desc, then due date asc.
-    const openA = a.status === "completed" || a.status === "deferred" ? 1 : 0;
-    const openB = b.status === "completed" || b.status === "deferred" ? 1 : 0;
+    const closed = new Set(["completed", "deferred", "noted"]);
+    const openA = closed.has(a.status) ? 1 : 0;
+    const openB = closed.has(b.status) ? 1 : 0;
     if (openA !== openB) return openA - openB;
     if (view === "source") return String(a.source).localeCompare(String(b.source));
     if ((b.impact_score || 0) !== (a.impact_score || 0)) return (b.impact_score || 0) - (a.impact_score || 0);
@@ -77,21 +81,24 @@ export async function POST(req: Request) {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id || null;
 
-  const row: any = {
-    entity_code: body?.entity_code || null,
-    source,
-    title: title.slice(0, 500),
-    description: body?.description ? String(body.description).slice(0, 5000) : null,
+  // S1 (2026-10-02): ONE write path into the register. register_write()
+  // derives entity_id from the code and RLS refuses entities the caller is
+  // not a member of. kind defaults to 'commitment' (a todo); the extra
+  // fields this legacy form carries are patched onto the row afterwards.
+  const entity_code = String(body?.entity_code || "").trim();
+  if (!entity_code) return Response.json({ ok: false, error: "entity_code required" }, { status: 400 });
+  const kind = isRegisterKind(body?.kind) ? body.kind : "commitment";
+  const w = await registerWrite(sb, { entity_code, kind, body: title, due: body?.due_at || null, source });
+  if ("error" in w) return Response.json({ ok: false, error: w.error }, { status: w.status });
+  const patch: any = {
     priority: clamp(body?.priority, 1, 5, 3),
     impact_score: clamp(body?.impact_score, 1, 5, 3),
-    assignee_user_id: body?.assignee_user_id || null,
-    due_at: body?.due_at || null,
-    created_by_user_id: uid,
-    related_atoms: body?.related_atoms || {},
-    context: body?.context || {},
   };
-
-  const { data, error } = await sb.from("master_todos").insert(row).select("*").maybeSingle();
+  if (body?.description) patch.description = String(body.description).slice(0, 5000);
+  if (body?.assignee_user_id) patch.assignee_user_id = body.assignee_user_id;
+  if (body?.related_atoms) patch.related_atoms = body.related_atoms;
+  if (body?.context) patch.context = { ...(body.context || {}), via: "register_write" };
+  const { data, error } = await sb.from("master_todos").update(patch).eq("id", w.id).select("*").maybeSingle();
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
   return Response.json({ ok: true, todo: data });
 }
