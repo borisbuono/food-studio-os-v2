@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import TabNav, { pickTab } from "@/components/nav/TabNav";
 import Inbox from "./Inbox";
 import Saved from "./Saved";
+import Mailboxes from "./Mailboxes";
 import Reviews from "@/components/merged/comms/Reviews";
 import PostingCalendar from "@/app/grow/reach/calendar/page";
 import { verbWord } from "@/lib/nav/labels";
@@ -16,6 +17,7 @@ import { serverLang } from "@/lib/i18nServer";
 //   Reviews   what people wrote about us       (was /grow/reputation)
 //   Calendar  social_posts for THIS house      (the posting calendar, house-scoped)
 //   Saved     canned replies                   (was /h/<slug>/office/inbox/saved)
+//   Mail      connected mailboxes (email channel, 2026-10-02) — rows, two-tap connect
 // House-scoped by URL: a BM and a Taller comment never share a list. The
 // send gate is unchanged — approve still runs through meta-reply's
 // approved_by_boris; this screen adds no send path. The waiting count comes
@@ -27,9 +29,10 @@ const TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "calendar", label: "Calendar" },
   { key: "saved", label: "Saved replies" },
+  { key: "mail", label: "Mail" },
 ];
 
-export default async function CommsPage({ params, searchParams }: { params: { house: string }; searchParams?: { tab?: string } }) {
+export default async function CommsPage({ params, searchParams }: { params: { house: string }; searchParams?: { tab?: string; mail?: string } }) {
   const house = await getHouseBySlug(params.house);
   if (!house) redirect("/studio");
   const tab = pickTab(TABS, searchParams?.tab);
@@ -51,6 +54,7 @@ export default async function CommsPage({ params, searchParams }: { params: { ho
         {tab === "reviews" ? <Reviews />
           : tab === "calendar" ? <PostingCalendar house={params.house} embedded />
           : tab === "saved" ? <Saved params={{ house: params.house }} />
+          : tab === "mail" ? <Mailboxes params={{ house: params.house }} notice={searchParams?.mail ?? null} />
           : <Inbox params={{ house: params.house }} />}
       </div>
     </div>
