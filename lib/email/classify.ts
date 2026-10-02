@@ -25,6 +25,7 @@ import { ingestCapture } from "@/lib/capture/ingest";
 import { findInHolded, workingHoldedKey } from "@/lib/capture/holded";
 import type { EntityCode } from "@/lib/capture/pure";
 import { observe } from "@/lib/observations";
+import { draftThread, sweepDrafts } from "@/lib/email/draft";
 import { CATEGORIES, type Category, type ClassifyInput, type Verdict, type EnquiryFields, ruleClassify, CAPTURE_MIMES, SLUG_CODE, LABEL_CAPTURED, LABEL_NOISE, LABEL_NEEDS_YOU, domainOf } from "@/lib/email/rules";
 export { CATEGORIES, ruleClassify, type Category, type ClassifyInput, type Verdict, type EnquiryFields } from "@/lib/email/rules";
 
@@ -230,7 +231,12 @@ async function routeThread(svc: SupabaseClient, thread: ThreadRow, msg: MessageR
       return "card (supplier_doc, nothing captured)";
     }
     case "enquiry":
-    case "booking_change":
+    case "booking_change": {
+      await svc.from("email_threads").update({ status: "classified" }).eq("id", thread.id);
+      // E3: the card gets its suggested reply straight away (same invocation).
+      const d = await draftThread(svc, thread.id);
+      return d.ok ? `card + ${d.status}` : `card (draft failed: ${d.error})`;
+    }
     case "other":
     default: {
       await svc.from("email_threads").update({ status: "classified" }).eq("id", thread.id);
@@ -240,8 +246,8 @@ async function routeThread(svc: SupabaseClient, thread: ThreadRow, msg: MessageR
 }
 
 // ---------------------------------------------------------------- sweep (after each pull; trigger stragglers)
-export async function sweepNewThreads(svc: SupabaseClient, opts: { entityId?: string | null; limit?: number } = {}): Promise<{ classified: number; failed: number; by_category: Record<string, number> }> {
-  const out = { classified: 0, failed: 0, by_category: {} as Record<string, number> };
+export async function sweepNewThreads(svc: SupabaseClient, opts: { entityId?: string | null; limit?: number } = {}): Promise<{ classified: number; failed: number; by_category: Record<string, number>; drafts?: unknown }> {
+  const out = { classified: 0, failed: 0, by_category: {} as Record<string, number>, drafts: undefined as unknown };
   let q = svc.from("email_threads").select("id").eq("status", "new").order("last_received_at", { ascending: false }).limit(Math.min(opts.limit || 20, 40));
   if (opts.entityId) q = q.eq("entity_id", opts.entityId);
   const { data } = await q;
@@ -251,6 +257,8 @@ export async function sweepNewThreads(svc: SupabaseClient, opts: { entityId?: st
     out.classified++;
     if (r.category) out.by_category[r.category] = (out.by_category[r.category] || 0) + 1;
   }
+  // E3 stragglers: classified enquiries that lost their draft call
+  try { out.drafts = await sweepDrafts(svc, 10); } catch { /* best-effort */ }
   return out;
 }
 

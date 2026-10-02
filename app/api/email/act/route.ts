@@ -1,0 +1,79 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseService } from "@/lib/supabaseService";
+import { draftThread } from "@/lib/email/draft";
+import { recategorise, CATEGORIES, type Category } from "@/lib/email/classify";
+import { observe } from "@/lib/observations";
+import { requireManagerOf } from "@/lib/access/requireManager";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// POST /api/email/act — the taps on an email card.
+//
+//   { action: "skip",         id }
+//   { action: "restore",      id }                      un-skip
+//   { action: "redraft",      id }                      Haiku again (also for 'other', on request)
+//   { action: "recategorise", id, category }            "wrong pile" → re-route + observe()
+//   { action: "outcome",      id, outcome }             won | lost | no_answer | not_sales → observe()
+//   { action: "approve",      id, text }                E4 — the tick. Until E4 lands: 501.
+//
+// Auth: the signed-in user. Every row write goes through the cookie-bound
+// client first (RLS: managed-entity members), the service path only after
+// that proved membership. No action here sends anything.
+export async function POST(req: NextRequest) {
+  const sb = supabaseServer();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user?.id) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  let p: any;
+  try { p = await req.json(); } catch { return NextResponse.json({ ok: false, error: "bad json" }, { status: 400 }); }
+  const action = String(p.action || ""), id = String(p.id || "");
+  if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+
+  // RLS-visible (member) AND a manager of that house — before any service work.
+  const { data: row } = await sb.from("email_threads").select("id, status, entity_id, draft_reply, category, flagged").eq("id", id).maybeSingle();
+  if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const r = row as any;
+  const gate = await requireManagerOf(sb, r.entity_id);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
+
+  if (action === "skip" || action === "restore") {
+    const status = action === "skip" ? "skipped" : (r.draft_reply ? "drafted" : "classified");
+    const { error } = await sb.from("email_threads").update({ status }).eq("id", id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 403 });
+    return NextResponse.json({ ok: true, status });
+  }
+
+  const svc = supabaseService();
+  if (!svc) return NextResponse.json({ ok: false, error: "no service key" }, { status: 503 });
+
+  if (action === "redraft") {
+    if (!["classified", "drafted", "skipped", "failed"].includes(r.status) && !r.flagged) return NextResponse.json({ ok: false, error: `status ${r.status}` }, { status: 409 });
+    await sb.from("email_threads").update({ status: "classified", flagged: false, flag_reason: null }).eq("id", id);
+    const d = await draftThread(svc, id, { force: true });
+    return NextResponse.json(d, { status: d.ok ? 200 : 422 });
+  }
+
+  if (action === "recategorise") {
+    const category = String(p.category || "") as Category;
+    if (!CATEGORIES.includes(category)) return NextResponse.json({ ok: false, error: "unknown category" }, { status: 400 });
+    const res = await recategorise(svc, id, category, u.user.id);
+    return NextResponse.json(res, { status: res.ok ? 200 : 422 });
+  }
+
+  if (action === "outcome") {
+    const outcome = String(p.outcome || "");
+    if (!["won", "lost", "no_answer", "not_sales"].includes(outcome)) return NextResponse.json({ ok: false, error: "unknown outcome" }, { status: 400 });
+    const { error } = await sb.from("email_threads").update({ outcome }).eq("id", id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 403 });
+    // every enquiry outcome is an observation (brief: Observe)
+    try { await observe(svc, { entity_id: r.entity_id, source: "email_channel", domain: "comms", body: `Enquiry outcome: ${outcome} (thread ${id.slice(0, 8)}, category ${r.category || "?"})` }); } catch { /* best-effort */ }
+    return NextResponse.json({ ok: true, outcome });
+  }
+
+  if (action === "approve") {
+    return NextResponse.json({ ok: false, error: "sending ships in E4 — nothing leaves the account yet" }, { status: 501 });
+  }
+  return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });
+}

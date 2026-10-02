@@ -39,8 +39,13 @@ export default async function CommsPage({ params, searchParams }: { params: { ho
   const base = `/h/${params.house}/comms`;
   let waiting: number | null = null;
   try {
-    const { data } = await supabaseServer().from("social_inbox_waiting").select("waiting").eq("entity_id", house.id).maybeSingle();
-    waiting = (data as { waiting?: number } | null)?.waiting ?? null;
+    const sb = supabaseServer();
+    const [{ data: s }, { data: e }] = await Promise.all([
+      sb.from("social_inbox_waiting").select("waiting").eq("entity_id", house.id).maybeSingle(),
+      sb.from("email_inbox_waiting").select("waiting").eq("entity_id", house.id).maybeSingle(),
+    ]);
+    const n = ((s as { waiting?: number } | null)?.waiting ?? 0) + ((e as { waiting?: number } | null)?.waiting ?? 0);
+    waiting = n || null;
   } catch { waiting = null; }
   const tabs = TABS.map((t) => (t.key === "inbox" ? { ...t, count: waiting } : t));
   return (

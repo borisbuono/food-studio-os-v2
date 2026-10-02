@@ -26,7 +26,7 @@ export default async function InboxPage({ params }: { params: { house: string } 
   if (!u.user?.id) redirect(`/login?next=/h/${slug}/office/inbox`);
 
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const [accountsRes, commentsRes, dmsRes, savedRes, pullRes] = await Promise.all([
+  const [accountsRes, commentsRes, dmsRes, savedRes, pullRes, emailRes, mailboxesRes] = await Promise.all([
     sb.from("social_accounts_resolved").select("account_id, kind, handle, status").eq("entity_id", entity_id).eq("provider", "meta"),
     sb.from("social_comments")
       .select("id, account_id, platform, remote_comment_id, parent_remote_id, author_handle, author_name, text, lang, created_at_remote, status, flagged, flag_reason, draft_reply, draft_lang, reply_text, replied_at, error, media_permalink, media_thumbnail_url, media_caption")
@@ -38,6 +38,13 @@ export default async function InboxPage({ params }: { params: { house: string } 
       .order("sent_at", { ascending: false }).limit(400),
     sb.from("social_saved_replies").select("id, key, title, lang, body").eq("entity_id", entity_id).eq("active", true).order("sort"),
     sb.from("social_inbox_pulls").select("ran_at, ok").order("id", { ascending: false }).limit(1),
+    // Email channel (E3): one card per thread that needs a human or was handled.
+    sb.from("email_threads")
+      .select("id, account_id, subject, snippet, from_address, from_name, first_received_at, last_received_at, status, category, confidence, flagged, flag_reason, enquiry_fields, needs_you_due, draft_reply, draft_lang, reply_text, replied_at, hours_to_answer, outcome, error, message_count")
+      .eq("entity_id", entity_id).gte("last_received_at", since)
+      .in("status", ["classified", "drafted", "approved", "replied", "skipped", "flagged", "failed"])
+      .order("last_received_at", { ascending: false }).limit(200),
+    sb.from("email_accounts").select("id, address, status").eq("entity_id", entity_id).is("revoked_at", null),
   ]);
 
   const accounts: AccountChip[] = (accountsRes.data ?? []).map((a: any) => ({
@@ -84,18 +91,34 @@ export default async function InboxPage({ params }: { params: { house: string } 
       window_from: t?.last_inbound_at ?? m.sent_at,
     });
   }
+  // Email threads: the card is the thread — who, subject, what the OS read
+  // from it, the suggested reply. Flagged (fiscal/legal) shows under "For Boris".
+  const mailboxById = new Map(((mailboxesRes.data ?? []) as any[]).map((m) => [m.id, m]));
+  for (const t of (emailRes.data ?? []) as any[]) {
+    items.push({
+      kind: "email", id: t.id, account_id: t.account_id, platform: "email",
+      account_handle: mailboxById.get(t.account_id)?.address ?? null,
+      who: t.from_name ? `${t.from_name} <${t.from_address ?? ""}>` : (t.from_address ?? "someone"),
+      text: [t.subject ? `${t.subject}` : "(no subject)", t.snippet ?? ""].filter(Boolean).join("\n"),
+      lang: t.draft_lang ?? null, at: t.last_received_at, status: t.status, flagged: !!t.flagged, flag_reason: t.flag_reason,
+      draft: t.reply_text ?? t.draft_reply ?? "", draft_lang: t.draft_lang, replied_at: t.replied_at, error: t.error,
+      media: null, is_reply: false, history: null,
+      email: { category: t.category, confidence: t.confidence, enquiry_fields: t.enquiry_fields, needs_you_due: t.needs_you_due, hours_to_answer: t.hours_to_answer, outcome: t.outcome, message_count: t.message_count, first_received_at: t.first_received_at },
+    });
+  }
   items.sort((a, b) => new Date(b.at ?? 0).getTime() - new Date(a.at ?? 0).getTime());
 
   const saved: SavedReply[] = (savedRes.data ?? []) as any[];
   const lastPull = pullRes.data?.[0]?.ran_at ?? null;
-  const waiting = items.filter((i) => ["new", "drafted"].includes(i.status)).length;
+  const waiting = items.filter((i) => ["new", "drafted", "classified"].includes(i.status) && !i.flagged).length;
+  const mailboxes = ((mailboxesRes.data ?? []) as any[]).length;
 
   return (
     <main className="mx-auto max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/10 pb-3">
         <div>
           <h2 className="font-serif text-2xl">
-            Comments &amp; DMs
+            {mailboxes ? "Comments, DMs & email" : "Comments & DMs"}
             {waiting ? <span className="ml-2 rounded-full bg-black px-2 py-0.5 align-middle font-mono text-xs text-white">{waiting}</span> : null}
           </h2>
           <p className="mt-1 text-xs text-clay">
