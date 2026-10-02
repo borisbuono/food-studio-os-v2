@@ -3,6 +3,7 @@ import { validEmail, sanitizePhone } from "@/lib/guest/booking";
 import { signGuestToken } from "@/lib/guest/token";
 import { sendGuestEmail, confirmationEmailHtml } from "@/lib/guest/email";
 import { getGuestBrand } from "@/lib/guest/brand";
+import { guestRateLimited } from "@/lib/guest/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,8 @@ export async function POST(req: Request) {
   if (partySize < 1 || partySize > 40) return Response.json({ ok: false, error: "party size out of range" }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(svcDate)) return Response.json({ ok: false, error: "date format" }, { status: 400 });
   if (!/^\d{2}:\d{2}$/.test(svcTime)) return Response.json({ ok: false, error: "time format" }, { status: 400 });
+  // S4 (audit P1-2): 6 attempts per IP per venue per hour; the service-role writes below have no RLS backstop.
+  if (await guestRateLimited(sb, req, slug)) return Response.json({ ok: false, error: "too many attempts — try again in an hour" }, { status: 429 });
 
   const { data: r } = await sb.from("restaurants").select("id,name,public_slug").eq("public_slug", slug).maybeSingle();
   if (!r) return Response.json({ ok: false, error: "venue not found" }, { status: 404 });

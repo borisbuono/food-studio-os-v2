@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { applyClient } from "@/lib/hiring-apply";
 import { appOrigin } from "@/lib/email/invite";
 import { computeSlots, type BookingInfo, type Busy } from "@/lib/calendarBooking";
+import { requireAnyMembership } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user?.id) return Response.json({ ok: false, error: "unauthenticated" }, { status: 401 });
+  // S4: offer_interview_slots() is RLS-scoped (42501 → 403 below); the mail goes out via lib/email/invite
+  // on the service key, so a login with no team must not reach it.
+  const gate = await requireAnyMembership(sb);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
   const body = (await req.json().catch(() => ({}))) as any;
   const { data, error } = await sb.rpc("offer_interview_slots", {
     p_candidate: params.id, p_interviewer: body.interviewer || null,

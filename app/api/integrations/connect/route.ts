@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { encryptSecret } from "@/lib/integrations/vault";
 import { testGmailAccessToken } from "@/lib/assistant/channels/gmail";
 import { testWaBusinessAccessToken } from "@/lib/assistant/channels/whatsapp-business";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
@@ -103,6 +104,9 @@ export async function POST(req: Request) {
     const sb = supabaseServer();
     const { data: u } = await sb.auth.getUser();
     if (!u.user?.id) return Response.json({ ok: false, error: "sign in to connect an integration" }, { status: 401 });
+    // S4: credentials for an entity — manager of that entity only.
+    const gate = await requireManagerOf(sb, entity);
+    if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
     // 1) Test
     const t = await testKey(vendor, api_key.trim());

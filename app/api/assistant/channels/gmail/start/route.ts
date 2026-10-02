@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { gmailScopeString } from "@/lib/assistant/channels/gmail";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export async function GET(req: Request) {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user?.id) return Response.json({ ok: false, error: "sign in first" }, { status: 401 });
+  // S4: this channel's entity — the lib refreshes/reads Gmail on supabaseJob(); membership proven in the DB.
+  const gate = await requireEntityAccess(sb, entity);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   if (!clientId) {

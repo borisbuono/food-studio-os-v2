@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseFrestoXlsx } from "@/lib/integrations/pos/fresto";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireAnyMembership } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
+    // S4: parse-only today, but it imports the Fresto lib (service-backed); member-only.
+    const gate = await requireAnyMembership(supabaseServer());
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof Blob)) return NextResponse.json({ ok: false, error: "no file" }, { status: 400 });

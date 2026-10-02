@@ -96,3 +96,22 @@ export async function requireAnyMembership(sb: SupabaseClient): Promise<AccessGa
   if (n > 0) return { ok: true, uid, entity_id: null };
   return { ok: false, status: 403, error: "forbidden: no active membership" };
 }
+
+// Signed in AND an active member (any role) of `entity`. The gate for
+// interactive routes that reach a service-role client on a member's behalf
+// (S4, 2026-10-02): RLS is not the backstop once supabaseJob()/supabaseService()
+// is in hand, so the membership must be proven here first. Platform owner
+// passes for any entity. scripts/check_service_role_gate.mjs fails the build
+// when an interactive route imports a service client without one of these
+// require* gates.
+export async function requireEntityAccess(sb: SupabaseClient, entity: string | null | undefined): Promise<AccessGate> {
+  const uid = await currentUid(sb);
+  if (!uid) return { ok: false, status: 401, error: "unauthorized" };
+  const entity_id = await resolveEntityId(sb, entity);
+  if (!entity_id) return { ok: false, status: 400, error: "unknown entity" };
+  const { data: member } = await sb.rpc("fn_is_entity_member", { uid, ent: entity_id });
+  if (member === true) return { ok: true, uid, entity_id };
+  const { data: platform } = await sb.rpc("app_is_platform_owner");
+  if (platform === true) return { ok: true, uid, entity_id };
+  return { ok: false, status: 403, error: "forbidden: not a member of this entity" };
+}

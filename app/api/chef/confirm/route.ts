@@ -4,6 +4,7 @@ import { getMyMembershipContext } from "@/lib/memberships";
 import { mintConfirmToken, needsConfirmToken } from "@/lib/chef/confirm";
 import type { ChefAction, ChefLang } from "@/lib/chef/types";
 import { INBOX_TABLE } from "@/lib/social/inboxAct";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
   if (!scope) return Response.json({ ok: false, error: "unknown entity" }, { status: 404 });
   const mem = await getMyMembershipContext();
   if (!new Set((mem.memberships || []).map((m) => m.entity_id)).has(scope.entity.id)) return Response.json({ ok: false, error: "not a member" }, { status: 403 });
+  // S4: the send path (lib/social/inboxAct → meta-reply) runs on the service key; prove membership in the DB too.
+  const gate = await requireEntityAccess(sb, scope.entity.id);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   // The row must exist under RLS and not be sent already — the same checks
   // the send will make, done now so the read-back is honest.

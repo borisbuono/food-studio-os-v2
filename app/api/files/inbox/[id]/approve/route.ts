@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { inboxCategoryToLibraryCategory, type InboxCategory } from "@/lib/files/classifier";
+import { inboxCategoryToLibraryCategory, type InboxCategory } from "@/lib/files/classifier";import { requireManagerOf } from "@/lib/access/requireManager";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!entity) {
     return NextResponse.json({ ok: false, error: "entity is required — pick IFL / BM / BBH" }, { status: 400 });
   }
+  // S4: the classifier files through supabaseJob(); manager of the target entity only.
+  const gate = await requireManagerOf(sb, entity);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
   // Library category: either an override sent from the UI, or derive from
   // the suggested_category via inboxCategoryToLibraryCategory.

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scanAll } from "@/lib/finance/payment-gmail-scanner";
+import { cronAuthorized } from "@/lib/cron/heartbeat";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireAnyMembership } from "@/lib/access/requireManager";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,20 +23,14 @@ export const dynamic = "force-dynamic";
 // exposes a "Scan now" button that calls it on demand.
 export async function POST(req: NextRequest) {
   try {
-    // Cron authentication passthrough — the nightly cron forwards the same
-    // CRON_SECRET header so unauthenticated public POSTs stay locked out
-    // in production while local dev remains open.
-    const secret = process.env.CRON_SECRET;
-    if (secret) {
-      const auth = req.headers.get("authorization") || "";
-      const isCron = auth === "Bearer " + secret;
-      if (!isCron) {
-        // Fall back to the normal auth path — the operator hitting the
-        // "Scan now" button already goes through supabase.auth in-page,
-        // so we do NOT block them here. The route is safe to call from
-        // any authenticated session because the scanner reads Gmail via
-        // per-user OAuth refresh tokens that only the row-owner has.
-      }
+    // S4: cron lane = Bearer CRON_SECRET (fails closed); otherwise a signed-in
+    // member. The scanner reads Gmail with per-user refresh tokens but writes
+    // platform_billing_status through supabaseJob(), so a stranger with a
+    // login must not reach it.
+    const cron = await cronAuthorized(req);
+    if (!cron.ok) {
+      const gate = await requireAnyMembership(supabaseServer());
+      if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     }
 
     const body = await req.json().catch(() => ({} as any));

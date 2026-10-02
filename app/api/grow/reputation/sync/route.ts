@@ -6,6 +6,7 @@ import { tripAdvisorAdapter } from "@/lib/integrations/reviews/tripadvisor";
 import { theForkReviewsAdapter } from "@/lib/integrations/reviews/thefork";
 import type { ReviewsAdapter, EntityCode, ReviewRecord } from "@/lib/integrations/types";
 import { E_BM, E_TALLER, E_HOLDINGS } from "@/lib/entities";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ export async function POST(req: Request) {
   const sb = supabaseServer();
   const rid = serverRestaurantId();
   const entityCode = entityKeyToCode(serverEntity());
+  // S4: platform adapters pull with venue credentials — manager of the house only.
+  const gate = await requireManagerOf(sb, serverEntity());
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   // Optional body: { since_days?: number, platforms?: string[] }
   const body = await req.json().catch(() => ({} as any));

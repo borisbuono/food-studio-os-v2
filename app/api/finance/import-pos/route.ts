@@ -3,6 +3,7 @@ import { getPosAdapter } from "@/lib/integrations/registry";
 import { persistFrestoRowToPos } from "@/lib/integrations/pos/fresto";
 import { supabaseServer } from "@/lib/supabaseServer";
 import type { EntityCode } from "@/lib/integrations/types";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest) {
     const entity = (form.get("entity") as string || "IFL").toUpperCase() as EntityCode;
     const restaurant_id = (form.get("restaurant_id") as string) || "";
     if (!(file instanceof Blob)) return NextResponse.json({ ok: false, error: "no file" }, { status: 400 });
+    // S4: persistFrestoRowToPos() runs on supabaseJob(); manager of the venue only.
+    const gate = await requireManagerOf(supabaseServer(), entity);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
     const adapter = getPosAdapter(entity);
     if (!adapter.parseUpload) return NextResponse.json({ ok: false, error: `${adapter.name} adapter has no upload parser — fallback to CSV import` }, { status: 400 });

@@ -1,5 +1,6 @@
 import { guestServiceClient } from "@/lib/guest/serviceClient";
 import { validEmail, sanitizePhone } from "@/lib/guest/booking";
+import { guestRateLimited } from "@/lib/guest/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,8 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "name, email and description are required" }, { status: 400 });
   }
   if (!validEmail(email)) return Response.json({ ok: false, error: "email looks off" }, { status: 400 });
+  // S4: 6 enquiries per IP per venue per hour; the service-role write below has no RLS backstop.
+  if (await guestRateLimited(sb, req, slug)) return Response.json({ ok: true, queued: true });
 
   const { data: r } = await sb.from("restaurants").select("id,name").eq("public_slug", slug).maybeSingle();
   if (!r) return Response.json({ ok: false, error: "venue not found" }, { status: 404 });

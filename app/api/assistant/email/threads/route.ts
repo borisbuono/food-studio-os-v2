@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getThread } from "@/lib/assistant/channels/gmail";
 import type { AssistantChannelRow } from "@/types/db";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,10 @@ export async function GET(req: Request) {
     .eq("id", channelId).eq("user_id", u.user.id).is("revoked_at", null).maybeSingle();
   if (!channel) return Response.json({ ok: false, error: "channel not found" }, { status: 404 });
   if (channel.channel_type !== "gmail") return Response.json({ ok: false, error: "only Gmail channels supported" }, { status: 400 });
+  const entity = String((channel.settings as any)?.entity_code || "IFL");
+  // S4: this channel's entity — the lib refreshes/reads Gmail on supabaseJob(); membership proven in the DB.
+  const gate = await requireEntityAccess(sb, entity);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   try {
     const thread = await getThread(channel as AssistantChannelRow, threadId);
