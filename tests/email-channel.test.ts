@@ -10,6 +10,8 @@ import { canonical, hashableAction } from "../lib/chef/canonical";
 import { actionHash, CONFIRM_REQUIRED } from "../lib/chef/confirm";
 import { approveEmailAction, replyTarget } from "../lib/email/reply";
 import { createHash } from "node:crypto";
+import { emailRef, enquirySummary, EMAIL_LEAD_SOURCE } from "../lib/email/funnel";
+import { proposalLink } from "../lib/email/draft";
 
 let fails = 0;
 function eq(name: string, got: unknown, want: unknown) {
@@ -76,6 +78,18 @@ eq("reply target: last inbound sender, threaded", replyTarget({ from_address: "f
   { to: "reply@x.com", inReplyTo: "<m2@x>", references: "<m1@x> <m2@x>" });
 eq("reply target: no inbound row → thread sender, no threading headers", replyTarget({ from_address: "first@x.com" }, null), { to: "first@x.com", inReplyTo: null, references: null });
 eq("reply target: first reply in a thread → References = the one Message-ID", replyTarget({ from_address: null }, { from_address: "a@b.c", message_id_header: "<only@b.c>", references_header: null }), { to: "a@b.c", inReplyTo: "<only@b.c>", references: "<only@b.c>" });
+
+// ---- E5 funnel plumbing (pure): the enquiry → lead summary never invents a figure,
+// and the proposal link's ref is the key the capture endpoint completes the lead by.
+eq("funnel: ref = thread id prefix", emailRef("11111111-2222-3333-4444-555555555555"), "email:11111111");
+eq("funnel: source constant matches the capture endpoint allow-list", EMAIL_LEAD_SOURCE, "inbound-email");
+eq("funnel: summary carries only what was read, budget marked as theirs",
+  enquirySummary({ date: "2026-11-14", pax: 14, budget_pp: 150, venue_case: "provider", food_shape: "sharing", language: "en" }, "Dinner 14 pax", "Hi, we…"),
+  "date 2026-11-14 · 14 pax · budget ~150 €/pp (their words) · their venue · sharing\nSubject: Dinner 14 pax\nHi, we…");
+eq("funnel: empty fields → subject only, nothing invented", enquirySummary(null, "Hola", null), "Subject: Hola");
+const link = proposalLink("ibiza-food-lab", { date: "2026-11-14", pax: 14, budget_pp: null, venue_case: "ours", food_shape: null, language: "es" }, "11111111-2222-3333-4444-555555555555");
+truthy("proposal link: page + prefill + ref, nulls omitted", !!link && /\/m\/ibiza-food-lab\/proposal\?date=2026-11-14&pax=14&venue=ours&lang=es&ref=11111111$/.test(link));
+truthy("proposal link: never a price in the URL", !/price|€|eur/i.test(link || ""));
 
 console.log(fails ? `\n${fails} FAILED` : "\nall passed");
 process.exit(fails ? 1 : 0);

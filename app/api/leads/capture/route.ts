@@ -152,6 +152,26 @@ export async function POST(req: Request) {
   };
 
   try {
+    // E5 (2026-10-02): the proposal page reached from an email draft carries
+    // utm_content 'email:<thread ref>'. The enquiry already opened that lead
+    // (lib/email/funnel.ts) — complete it instead of opening a second one.
+    // Same silent contract: the response never says which branch ran.
+    const ref = row.source === "inbound-email" && /^email:[0-9a-f]{8}$/i.test(String(row.utm_content || "")) ? String(row.utm_content).toLowerCase() : null;
+    if (ref) {
+      const { data: have } = await sb.from("leads").select("id, state, state_history, message").eq("source", "inbound-email").eq("utm_content", ref).maybeSingle();
+      if (have?.id) {
+        const hist = Array.isArray((have as any).state_history) ? (have as any).state_history : [];
+        const nextState = (have as any).state === "new" ? "qualified" : (have as any).state;
+        await sb.from("leads").update({
+          email: row.email ?? undefined, phone: row.phone ?? undefined, name: row.name ?? undefined,
+          party_size: row.party_size ?? undefined, requested_date: row.requested_date ?? undefined,
+          message: [String((have as any).message || ""), "— proposal form —", row.message || ""].filter(Boolean).join("\n").slice(0, 4000),
+          landing_url: row.landing_url, utm_medium: row.utm_medium, state: nextState,
+          state_history: [...hist, { at: new Date().toISOString(), state: nextState, by: "capture", source: "proposal_form" }],
+        }).eq("id", have.id);
+        return ok();
+      }
+    }
     await sb.from("leads").insert(row);
   } catch {
     // Never leak the DB error shape to an anon client.

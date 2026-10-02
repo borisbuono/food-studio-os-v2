@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChefAction } from "@/lib/chef/types";
 import { accessTokenFor, loadAccount, markAccountError } from "@/lib/email/accounts";
+import { advanceLead } from "@/lib/email/funnel";
 
 export type ApproveEmailAction = Extract<ChefAction, { type: "approve_email" }>;
 
@@ -65,6 +66,8 @@ export async function sendEmailReply(svc: SupabaseClient, o: {
   }
   const r = await callEmailReply({ id: o.threadId, text: o.text, confirm_token: o.confirmToken, user_id: o.uid, action: o.action, via: o.via, dry_run: !!o.dryRun });
   const ok = r.http === 200 && r.body?.ok !== false;
+  // E5: a sent reply moves the funnel row to 'contacted' (Chef and page alike)
+  if (ok && !o.dryRun) { try { await advanceLead(svc, o.threadId, "replied"); } catch { /* optional */ } }
   if (o.dryRun) return { ok, status: ok ? "replied" : "error", error: ok ? null : (r.body?.detail || r.body?.error || `email-reply ${r.http}`), http: r.http, dry_run: true, would_send: r.body?.would_send ?? null, reason: r.body?.reason ?? null };
   return {
     ok, status: ok ? "replied" : "failed",

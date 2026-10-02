@@ -26,6 +26,7 @@ import { findInHolded, workingHoldedKey } from "@/lib/capture/holded";
 import type { EntityCode } from "@/lib/capture/pure";
 import { observe } from "@/lib/observations";
 import { draftThread, sweepDrafts } from "@/lib/email/draft";
+import { ensureLeadForThread } from "@/lib/email/funnel";
 import { CATEGORIES, type Category, type ClassifyInput, type Verdict, type EnquiryFields, ruleClassify, CAPTURE_MIMES, SLUG_CODE, LABEL_CAPTURED, LABEL_NOISE, LABEL_NEEDS_YOU, domainOf } from "@/lib/email/rules";
 export { CATEGORIES, ruleClassify, type Category, type ClassifyInput, type Verdict, type EnquiryFields } from "@/lib/email/rules";
 
@@ -233,9 +234,12 @@ async function routeThread(svc: SupabaseClient, thread: ThreadRow, msg: MessageR
     case "enquiry":
     case "booking_change": {
       await svc.from("email_threads").update({ status: "classified" }).eq("id", thread.id);
+      // E5: an enquiry opens a lead in the proposal funnel (idempotent, no price).
+      let leadNote = "";
+      if (v.category === "enquiry") { try { const l = await ensureLeadForThread(svc, thread.id); leadNote = l.created ? " + lead" : l.lead_id ? " (lead linked)" : ""; } catch { /* funnel is optional */ } }
       // E3: the card gets its suggested reply straight away (same invocation).
       const d = await draftThread(svc, thread.id);
-      return d.ok ? `card + ${d.status}` : `card (draft failed: ${d.error})`;
+      return (d.ok ? `card + ${d.status}` : `card (draft failed: ${d.error})`) + leadNote;
     }
     case "other":
     default: {

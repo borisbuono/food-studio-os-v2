@@ -7,6 +7,7 @@ import { observe } from "@/lib/observations";
 import { requireManagerOf } from "@/lib/access/requireManager";
 import { mintAndConsumePageTick } from "@/lib/chef/confirm";
 import { approveEmailAction, sendEmailReply } from "@/lib/email/reply";
+import { advanceLead } from "@/lib/email/funnel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 403 });
     // every enquiry outcome is an observation (brief: Observe)
     try { await observe(svc, { entity_id: r.entity_id, source: "email_channel", domain: "comms", body: `Enquiry outcome: ${outcome} (thread ${id.slice(0, 8)}, category ${r.category || "?"})` }); } catch { /* best-effort */ }
+    // E5: the funnel row follows the outcome
+    try { await advanceLead(svc, id, outcome as any); } catch { /* optional */ }
     return NextResponse.json({ ok: true, outcome });
   }
 
