@@ -58,6 +58,11 @@ export function OnboardShell({
       </div>
 
       <div className="mt-10">{children}</div>
+      <p className="mt-16 font-mono text-[10px] uppercase tracking-wide text-clay">
+        <a className="underline" href="/legal/privacy?lang=en" target="_blank" rel="noopener">Privacy notice</a>
+        {" · "}
+        <a className="underline" href="/legal/privacy?lang=es" target="_blank" rel="noopener">Protección de datos</a>
+      </p>
     </main>
   );
 }

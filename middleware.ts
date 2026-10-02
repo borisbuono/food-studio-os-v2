@@ -61,6 +61,8 @@ const PUBLIC_PAGE_PREFIXES = [
   // Public booking page (Cal.com model) — visitors and interview candidates
   // pick a slot with no account. Posts to /api/public/book/<slug>.
   "/book/",
+  // Privacy notice (S6, 2026-10-02) — linked from every public form.
+  "/legal/",
 ];
 
 const PUBLIC_PAGE_EXACT = new Set<string>([

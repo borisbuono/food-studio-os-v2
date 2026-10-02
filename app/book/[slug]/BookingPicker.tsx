@@ -118,6 +118,11 @@ export default function BookingPicker({ slug, info, intent, candidate, token, la
             <button disabled={busy} className="w-full rounded py-3 text-sm text-white" style={{ background: accent }}>
               {busy ? "…" : t.confirm}
             </button>
+            <p className="text-center text-[11px] text-clay">
+              <a className="underline" href={`/legal/privacy?lang=${lang}`} target="_blank" rel="noopener">
+                {lang === "es" ? "Cómo tratamos tus datos" : "How we handle your data"}
+              </a>
+            </p>
           </form>
         ) : (
           <section className="mt-8">

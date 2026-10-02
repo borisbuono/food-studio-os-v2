@@ -84,6 +84,11 @@ export default function PrivateForm({ slug, restaurantId, brand }: { slug: strin
       >
         {busy ? "Sending…" : "Send enquiry"}
       </button>
+      <p className="text-center font-sans text-[11px]" style={{ color: brand.clay }}>
+        <a className="underline" href={`/legal/privacy?house=${encodeURIComponent(slug)}&lang=en`} target="_blank" rel="noopener">How we handle your data</a>
+        {" · "}
+        <a className="underline" href={`/legal/privacy?house=${encodeURIComponent(slug)}&lang=es`} target="_blank" rel="noopener">Protección de datos</a>
+      </p>
     </form>
   );
 }
