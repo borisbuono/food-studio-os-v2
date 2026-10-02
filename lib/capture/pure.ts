@@ -404,6 +404,11 @@ export const BLOCKING_FLAGS = [
   "entity_guessed", "third_party_addressee", "conflicting_copies", "duplicate",
   "totals_dont_reconcile", "no_supplier_cif", "no_doc_number", "vat_rate_category_mismatch",
   "tax_regime_needs_accountant", "no_customer_details", "date_implausible",
+  // email channel: the mailbox forwards to Holded's scanner (admin@…), so the
+  // document books itself there — the OS row is for lines + matching only
+  "holded_scanner_copy",
+  // email channel: a purchase with the same doc number / total already sits in Holded
+  "in_holded_already",
 ] as const;
 
 // A document date in the future or older than 18 months is a misread until a

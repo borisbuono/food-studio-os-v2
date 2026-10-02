@@ -99,8 +99,10 @@ export async function pullAccount(svc: SupabaseClient, account: EmailAccount, al
         participants: Array.from(parts),
         first_received_at: direction === "in" ? m.date : null, last_received_at: direction === "in" ? m.date : null,
         message_count: 0, labels: m.labelIds,
-        // a thread whose only message is ours (we wrote first) has nothing to answer
-        status: direction === "in" ? "new" : "archived",
+        // Inserted 'archived' and flipped to 'new' BELOW, once the message row
+        // exists — the classify trigger fires on the flip, so it never races
+        // the message insert. A thread whose only message is ours stays archived.
+        status: "archived",
       }).select("id").single();
       if (error || !tn) { counts.errors++; continue; }
       threadId = (tn as any).id; counts.threads_new++;
@@ -114,6 +116,7 @@ export async function pullAccount(svc: SupabaseClient, account: EmailAccount, al
       from_address: m.from.address, from_name: m.from.name, to_addresses: m.to, cc_addresses: m.cc,
       subject: m.subject, snippet: m.snippet, body_text: m.body_text, received_at: m.date, labels: m.labelIds,
       message_id_header: m.message_id_header, in_reply_to: m.in_reply_to, references_header: m.references,
+      headers: { list_unsubscribe: m.list_unsubscribe, precedence: m.precedence, auto_submitted: m.auto_submitted },
       attachments: m.attachments.map((a) => ({ filename: a.filename, mime: a.mime, size: a.size, attachment_id: a.attachment_id })),
     }, { onConflict: "gmail_message_id", ignoreDuplicates: true }).select("id").maybeSingle();
     if (me) { counts.errors++; continue; }
@@ -149,8 +152,9 @@ export async function pullAccount(svc: SupabaseClient, account: EmailAccount, al
       patch.last_received_at = m.date; patch.last_message_id = messageRowId; patch.snippet = m.snippet;
       if (!t0?.first_received_at) patch.first_received_at = m.date;
       if (!t0?.from_address) { patch.from_address = m.from.address; patch.from_name = m.from.name; }
-      // a new inbound message on a thread we had answered / archived re-opens it
-      if (t0 && ["replied", "archived", "skipped"].includes(String(t0.status))) patch.status = "new";
+      // first inbound on a fresh thread, or a new inbound on one we had
+      // answered / archived / skipped → (re)open: the flip to 'new' asks the classifier
+      if (!t0 || ["replied", "archived", "skipped", "noise"].includes(String(t0.status))) patch.status = "new";
     }
     for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
     await svc.from("email_threads").update(patch).eq("id", threadId);
