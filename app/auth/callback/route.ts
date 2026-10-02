@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { authCookieOptions } from "@/lib/authCookies";
+import { resolvePersonIds } from "@/lib/memberships";
 import { E_HOLDINGS, isPrimaryEntity, RESTAURANT_TO_ENTITY } from "@/lib/entities";
 
 // Server-side OAuth / magic-link callback — standard Supabase Next.js
@@ -123,13 +124,9 @@ export async function GET(request: NextRequest) {
       // Cheap join: auth.uid → team_members.id → memberships. Same shape as
       // lib/memberships.ts, inlined here so we don't spin the whole context
       // builder in a callback that is on the hot login path.
-      const { data: tmRows } = await supabase
-        .from("team_members")
-        .select("id, status")
-        .eq("auth_user_id", uid);
-      const personIds = (tmRows || [])
-        .filter((r: any) => r.status !== "archived")
-        .map((r: any) => r.id as string);
+      // S3 (2026-10-02): through the one resolver, so a second login for an
+      // existing person (boris@ibzfoodstudio.com) lands like the first.
+      const personIds = await resolvePersonIds(supabase as any, uid);
       if (personIds.length) {
         const { data: mRows } = await supabase
           .from("memberships")

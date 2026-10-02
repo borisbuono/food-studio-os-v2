@@ -8,6 +8,7 @@ import {
 } from "./entities";
 import { cache } from "react";
 import { supabaseServer } from "./supabaseServer";
+import { resolvePersonIds } from "@/lib/memberships";
 
 // The venue the current view is scoped to. Priority:
 //  1. fs_entity cookie (explicit user choice, set by the switcher)
@@ -124,10 +125,9 @@ export const resolveVenueScope = cache(async (): Promise<VenueScope> => {
   const uid = u?.user?.id;
   if (!uid) return pinnedScope(E_HOLDINGS);
 
-  // A user can own several team_members rows (Boris has two) — never
-  // .maybeSingle() here.
-  const { data: tms } = await sb.from("team_members").select("id").eq("auth_user_id", uid);
-  const personIds = (tms || []).map((t: any) => t.id as string);
+  // A user can own several team_members rows, and a person can hold several
+  // logins (S3 2026-10-02) — resolvePersonIds is the one place that rule lives.
+  const personIds = await resolvePersonIds(sb, uid);
   const { data: mems } = personIds.length
     ? await sb.from("memberships").select("entity_id,is_default").in("person_id", personIds).eq("status", "active")
     : { data: [] as any[] };

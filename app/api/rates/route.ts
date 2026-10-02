@@ -96,7 +96,7 @@ export async function POST(req: Request) {
 
   // Rota (2026-10-01): rates are read per PERSON (team_members.id) so a
   // teammate without a login can still carry one. Carry the person_id here.
-  const { data: tmRow } = await sb.from("team_members").select("id").eq("auth_user_id", user_id).limit(1).maybeSingle();
+  const { data: tmRow } = await sb.from("team_members").select("id").eq("auth_user_id", user_id).order("created_at").limit(1).maybeSingle();
 
   const { data: inserted, error } = await sb
     .from("labor_hourly_rates")

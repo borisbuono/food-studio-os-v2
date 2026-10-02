@@ -15,6 +15,7 @@ import { cache } from "react";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 import { houseNameForSlug, type House } from "@/lib/houses";
+import { resolvePersonIds } from "@/lib/memberships";
 
 // Per-request cached DB lookup. React `cache()` memoises per render pass,
 // so a page that calls this in the body AND in generateMetadata shares one
@@ -89,13 +90,9 @@ export const getMyHouses = cache(async (user_id: string): Promise<House[]> => {
   // row would have shown one lineage's houses and hidden the other's. Collect
   // every person_id and union their memberships (same pattern as
   // lib/memberships.ts). Found 2026-09-21 after the onboarding stress test.
-  const { data: people } = await sb
-    .from("team_members")
-    .select("id, status")
-    .eq("auth_user_id", user_id);
-  const personIds = (people || [])
-    .filter((r: any) => r.status !== "archived")
-    .map((r: any) => r.id as string);
+  // S3 (2026-10-02): one resolver — a login may be a second address of an
+  // existing person (person_auth_link); resolvePersonIds is the one place.
+  const personIds = await resolvePersonIds(sb, user_id);
   if (!personIds.length) return [];
   const { data: m } = await sb
     .from("memberships")

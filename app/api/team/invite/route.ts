@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 // POST /api/team/invite
 //
 // Body: { entity_id: uuid, email: string, role: InviteRole,
-//         name?, phone?, language?: 'es'|'en' }
+//         name?, phone?, language?: 'es'|'en', person_id?: uuid }
+//
+// person_id (S3, 2026-10-02): the roster row this invite is FOR. The seeded
+// roster carries placeholder addresses (name+bm@ibzfoodstudio.com) that no real
+// Gmail will ever match, so inviting an existing teammate by their real address
+// used to create a second person. With person_id, accept_pending_invite() binds
+// the real login to THAT row (no duplicate on Team or the clock kiosk).
 //
 // Effects:
 //   1. Verify the invoking user has an active membership on `entity_id`
@@ -34,6 +40,7 @@ type Body = {
   name?: string;
   phone?: string | null;
   language?: string;
+  person_id?: string | null;
 };
 
 export async function POST(req: Request) {
@@ -45,6 +52,7 @@ export async function POST(req: Request) {
   const phone     = String(body.phone || "").trim().slice(0, 40) || null;
   const language  = body.language === "es" || body.language === "en" ? body.language : null;
   const area      = (INVITE_ROLE_AREA as Record<string, string>)[role] || "admin";
+  const person_id = String(body.person_id || "").trim() || null;
 
   if (!entity_id) return Response.json({ ok: false, error: "entity_id required" }, { status: 400 });
   if (!email || !/@/.test(email)) return Response.json({ ok: false, error: "valid email required" }, { status: 400 });
@@ -71,6 +79,26 @@ export async function POST(req: Request) {
     }
   }
 
+  // The invite is FOR an existing roster row: it must be on this house (or on
+  // its roster through a membership) and not already somebody else's login.
+  // RLS scopes the read to people the inviter may see.
+  let forPerson: { id: string; name: string | null } | null = null;
+  if (person_id) {
+    const { data: tm } = await sb
+      .from("team_members")
+      .select("id, name, status, auth_user_id, operator_entity_id")
+      .eq("id", person_id)
+      .maybeSingle();
+    const t: any = tm;
+    if (!t || t.status === "removed") return Response.json({ ok: false, error: "person not found on this roster" }, { status: 404 });
+    if (t.operator_entity_id && t.operator_entity_id !== entity_id) {
+      const { data: m } = await sb.from("memberships").select("id").eq("person_id", person_id).eq("entity_id", entity_id).limit(1);
+      if (!m || !m.length) return Response.json({ ok: false, error: "person is not on this house" }, { status: 400 });
+    }
+    if (t.auth_user_id) return Response.json({ ok: false, error: "this person already has a login — re-send the accept link instead" }, { status: 409 });
+    forPerson = { id: t.id, name: t.name || null };
+  }
+
   const token = randomToken();
   const { data: inserted, error } = await sb
     .from("pending_invites")
@@ -80,10 +108,11 @@ export async function POST(req: Request) {
       role,
       token,
       invited_by: uid,
-      name: name || null,
+      name: name || forPerson?.name || null,
       phone,
       language,
       area,
+      person_id: forPerson?.id ?? null,
     })
     .select("id, token, expires_at")
     .single();
@@ -94,7 +123,9 @@ export async function POST(req: Request) {
   // office → manager. Skipped when a row with this email already exists on
   // this house (re-invite) — the RPC will claim it on acceptance.
   let roster = false;
-  try {
+  if (forPerson) {
+    roster = true; // the row exists; accept binds the login to it
+  } else try {
     const { data: existing } = await sb
       .from("team_members")
       .select("id")

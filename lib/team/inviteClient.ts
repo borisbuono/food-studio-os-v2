@@ -33,6 +33,9 @@ export type InviteArgs = {
   phone?: string | null;
   role: SheetRole;
   language: "es" | "en";
+  // S3 (2026-10-02): the roster row this invite is FOR — binds the real login to
+  // an existing teammate (seeded name+bm@… rows) instead of creating a second person.
+  person_id?: string | null;
 };
 
 export type InviteResult =
@@ -51,6 +54,7 @@ export async function inviteTeammate(a: InviteArgs): Promise<InviteResult> {
       phone: (a.phone || "").trim() || null,
       role: a.role,
       language: a.language,
+      person_id: a.person_id || null,
     }),
   });
   const j: any = await res.json().catch(() => ({}));
