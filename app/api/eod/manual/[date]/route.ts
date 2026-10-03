@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { resolvePersonIds } from "@/lib/memberships";
 import { ENTITY_TO_RESTAURANT, isPrimaryEntity, EntityKey } from "@/lib/entities";
 
 export const runtime = "nodejs";
@@ -46,11 +47,7 @@ async function resolveRestaurantId(sb: ReturnType<typeof supabaseServer>, entity
 // Manager+ gate: any active membership on this entity whose role is in
 // MANAGER_PLUS, OR any owner membership across the org (owners see all).
 async function isManagerPlus(sb: ReturnType<typeof supabaseServer>, userId: string, entityId: string): Promise<boolean> {
-  const { data: tmRows } = await sb
-    .from("team_members").select("id, status").eq("auth_user_id", userId);
-  const personIds = (tmRows || [])
-    .filter((r: any) => r.status !== "archived")
-    .map((r: any) => r.id as string);
+  const personIds = await resolvePersonIds(sb, userId);
   if (!personIds.length) return false;
 
   const { data: mems } = await sb

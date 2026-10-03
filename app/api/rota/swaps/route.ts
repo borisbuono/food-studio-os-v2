@@ -1,4 +1,5 @@
 import { isManager, requireUser } from "@/lib/rota/server";
+import { resolvePersonIds } from "@/lib/memberships";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +23,7 @@ export async function GET(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
 
   // who am I (person ids) and which houses
-  const { data: me } = await sb.from("team_members").select("id").eq("auth_user_id", uid);
-  const myIds = (me || []).map((t: any) => t.id as string);
+  const myIds = await resolvePersonIds(sb, uid);
   let entities: string[] = entity ? [entity] : [];
   if (!entity && myIds.length) {
     const { data: ms } = await sb.from("memberships").select("entity_id").in("person_id", myIds).eq("status", "active");
