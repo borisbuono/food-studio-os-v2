@@ -43,7 +43,8 @@ const T = {
     privacyAddress: "Domicilio social",
     privacyContact: "Solicitudes de datos",
     privacyRetention: "Plazo de conservación",
-    retentionValue: "12 meses desde el envío (luego borramos, salvo que te contratemos).",
+    retentionValue: "6 meses desde el envío (luego anonimizamos la ficha y borramos el CV, salvo que te contratemos).",
+    privacyLink: "Aviso de privacidad completo",
     consent: "He leído lo anterior y acepto que tratéis mis datos para esta candidatura.",
     next: "Siguiente", back: "Atrás", send: "Enviar candidatura", sending: "Enviando…",
     need: "Rellena nombre, email y teléfono.", needCv: "Sube tu CV o cuéntanos tu experiencia en el campo de texto.", needConsent: "Marca la casilla para poder enviarla.",
@@ -87,7 +88,8 @@ const T = {
     privacyAddress: "Registered address",
     privacyContact: "Data requests",
     privacyRetention: "Retention",
-    retentionValue: "12 months from submission (then deleted, unless we hire you).",
+    retentionValue: "6 months from submission (then the record is anonymised and the CV deleted, unless we hire you).",
+    privacyLink: "Full privacy notice",
     consent: "I've read the above and agree to you processing my details for this application.",
     next: "Next", back: "Back", send: "Send application", sending: "Sending…",
     need: "Fill in name, email and phone.", needCv: "Upload your CV or tell us about your experience in the text box.", needConsent: "Tick the box to send it.",
@@ -419,6 +421,12 @@ export default function ApplyForm(props: {
                 <dt className="opacity-60">{t.privacyContact}</dt><dd><a className="underline" href={`mailto:${contact}`}>{contact}</a></dd>
                 <dt className="opacity-60">{t.privacyRetention}</dt><dd>{t.retentionValue}</dd>
               </dl>
+            ) : null}
+            <p className="mt-2 text-sm">
+              <a className="underline" href={`/legal/privacy?house=${encodeURIComponent(slug)}&lang=${lang}`} target="_blank" rel="noopener">{t.privacyLink}</a>
+            </p>
+            {legalReady ? (
+              null
             ) : (
               <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
                 <p>

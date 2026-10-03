@@ -283,9 +283,12 @@ export function firstName(full: string): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
+// Retention promise on the apply form (S6, 2026-10-02): 6 months, then the
+// record is anonymised by fn_retention_candidates unless the person was hired.
+// Must match RETENTION.candidatesMonths in lib/legal/privacyNotice.ts.
 export function retainUntil(from = new Date()): string {
   const d = new Date(from);
-  d.setFullYear(d.getFullYear() + 1);
+  d.setMonth(d.getMonth() + 6);
   return d.toISOString().slice(0, 10);
 }
 
