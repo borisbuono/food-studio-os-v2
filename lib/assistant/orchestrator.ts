@@ -319,7 +319,7 @@ export class AssistantOrchestrator {
         .order("accepted_at", { ascending: false })
         .limit(10) : Promise.resolve({ data: [] } as any),
       // PA integration Sprint 1 — pull top-impact open master_todos.
-      codedEntity ? sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred)").order("impact_score", { ascending: false }).limit(20) : Promise.resolve({ data: [] } as any),
+      codedEntity ? sb.from("master_todos").select("title,impact_score,source,due_at,entity_code").not("status", "in", "(completed,deferred,noted)").order("impact_score", { ascending: false }).limit(20) : Promise.resolve({ data: [] } as any),
       userId ? sb.from("pa_schedule_state").select("morning_brief_time,evening_debrief_time,daily_academy_time,whatsapp_triage_hourly").eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null } as any),
       // Pillars #3 — Academy progress bundle for the current pillar / module.
       // We read the module from page_context.active_pillar; if we don't know

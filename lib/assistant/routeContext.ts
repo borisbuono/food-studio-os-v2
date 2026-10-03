@@ -339,12 +339,12 @@ const HANDLERS: Array<{
           queries: [{ table: "master_todos", filter: "entity_code scope (this tenant has no master_todos pipeline)", count: 0 }],
         };
       }
-      const openEntity = await sb.from("master_todos").select("id", { count: "exact", head: true }).not("status", "in", "(completed,deferred)").eq("entity_code", code);
+      const openEntity = await sb.from("master_todos").select("id", { count: "exact", head: true }).not("status", "in", "(completed,deferred,noted)").eq("entity_code", code);
       return {
         title: "Master to-do",
         reads: ["master_todos"],
         queries: [
-          { table: "master_todos", filter: "status NOT IN (completed,deferred), entity_code=" + code, count: openEntity.count ?? 0 },
+          { table: "master_todos", filter: "status NOT IN (completed,deferred,noted), entity_code=" + code, count: openEntity.count ?? 0 },
         ],
       };
     },
