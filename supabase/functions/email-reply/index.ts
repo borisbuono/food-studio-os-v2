@@ -135,8 +135,11 @@ Deno.serve(async (req) => {
   let access = row.access_token;
   const exp = row.token_expires_at ? Date.parse(row.token_expires_at) : 0;
   if (!access || exp < Date.now() + 60_000) {
-    // The Google client secret lives in Vercel (E1 decision). If it is also here, refresh; else ask the OS to.
-    const cid = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID'), csec = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
+    // The Google client is PER HOUSE since 2026-10-03 (oauth_clients row, secret in Vault, read via the
+    // service-role RPC). Env pair only as the legacy fallback. If neither, the OS refreshes before calling.
+    const { data: oc } = await db.rpc('fn_oauth_client_for', { p_entity_id: thread.entity_id, p_provider: 'google' });
+    const ocRow = (Array.isArray(oc) ? oc[0] : oc) as { client_id?: string; client_secret?: string } | undefined;
+    const cid = ocRow?.client_id || Deno.env.get('GOOGLE_OAUTH_CLIENT_ID'), csec = ocRow?.client_secret || Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
     if (!cid || !csec) return fail(id, 503, 'token_expired: access token needs a refresh — the OS refreshes before calling; try Send again', { code: 'token_expired' });
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },

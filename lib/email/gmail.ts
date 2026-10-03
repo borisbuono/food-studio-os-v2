@@ -1,7 +1,9 @@
 // lib/email/gmail.ts — the ONE place the OS speaks to the Gmail REST API
 // (Vercel side). Pure HTTP; no googleapis SDK. Server-only.
 //
-//   refreshAccessToken   refresh_token → access_token (client creds from env)
+//   refreshAccessToken   refresh_token → access_token (client = the house's
+//                         oauth_clients row via lib/google/oauthClient; env pair
+//                         only as the legacy fallback)
 //   listMessages          q / labelIds, paginated
 //   listHistory           history.list since historyId (incremental pull)
 //   getMessage            full message, parsed into a flat shape
@@ -36,9 +38,9 @@ export class GmailError extends Error {
   constructor(status: number, message: string, reason: string | null = null) { super(scrubToken(message)); this.status = status; this.reason = reason; }
 }
 
-export async function refreshAccessToken(refresh_token: string): Promise<{ access_token: string; expires_at: string; scope: string | null }> {
-  const id = process.env.GOOGLE_OAUTH_CLIENT_ID, secret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  if (!id || !secret) throw new GmailError(500, "GOOGLE_OAUTH_CLIENT_ID / _SECRET not configured");
+export async function refreshAccessToken(refresh_token: string, client?: { client_id: string; client_secret: string } | null): Promise<{ access_token: string; expires_at: string; scope: string | null }> {
+  const id = client?.client_id || process.env.GOOGLE_OAUTH_CLIENT_ID, secret = client?.client_secret || process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!id || !secret) throw new GmailError(503, "no Google client for this house — set it on Comms › Mail", "client_not_set");
   const r = await fetch(TOKEN_URL, {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: id, client_secret: secret, refresh_token, grant_type: "refresh_token" }),

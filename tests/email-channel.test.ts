@@ -12,6 +12,7 @@ import { approveEmailAction, replyTarget } from "../lib/email/reply";
 import { createHash } from "node:crypto";
 import { emailRef, enquirySummary, EMAIL_LEAD_SOURCE } from "../lib/email/funnel";
 import { proposalLink } from "../lib/email/draft";
+import { pickGoogleClient, sameClient, googleConsentParams, looksLikeGoogleClientId, clientIdPrefix } from "../lib/google/oauthClient";
 
 let fails = 0;
 function eq(name: string, got: unknown, want: unknown) {
@@ -90,6 +91,32 @@ eq("funnel: empty fields → subject only, nothing invented", enquirySummary(nul
 const link = proposalLink("ibiza-food-lab", { date: "2026-11-14", pax: 14, budget_pp: null, venue_case: "ours", food_shape: null, language: "es" }, "11111111-2222-3333-4444-555555555555");
 truthy("proposal link: page + prefill + ref, nulls omitted", !!link && /\/m\/ibiza-food-lab\/proposal\?date=2026-11-14&pax=14&venue=ours&lang=es&ref=11111111$/.test(link));
 truthy("proposal link: never a price in the URL", !/price|€|eur/i.test(link || ""));
+
+// ---- Google client per entity (2026-10-03, pure). The row beats env; env only where allowed;
+// the connect path never falls back to env; hd rides along only when the row has a hosted domain.
+const ENV = { id: "854371957756-env.apps.googleusercontent.com", secret: "env-secret" };
+const BM_ROW = { client_id: "886533093988-bm.apps.googleusercontent.com", client_secret: "bm-secret", hosted_domain: "bistro-mondo.com", status: "active" };
+eq("client: entity row wins over env", pickGoogleClient(BM_ROW, ENV, { allowEnv: true })?.source, "entity");
+eq("client: entity row carries its hosted domain", pickGoogleClient(BM_ROW, ENV, { allowEnv: true })?.hosted_domain, "bistro-mondo.com");
+eq("client: no row + allowEnv → env (refresh of a pre-2026-10-03 mailbox, calendar)", pickGoogleClient(null, ENV, { allowEnv: true })?.source, "env");
+eq("client: no row + connect path (allowEnv false) → null, never the sign-in client", pickGoogleClient(null, ENV, { allowEnv: false }), null);
+eq("client: disabled row + connect path → null", pickGoogleClient({ ...BM_ROW, status: "disabled" }, ENV, { allowEnv: false }), null);
+eq("client: disabled row + allowEnv → env (legacy fallback only)", pickGoogleClient({ ...BM_ROW, status: "disabled" }, ENV, { allowEnv: true })?.source, "env");
+eq("client: row without a secret in Vault is not usable", pickGoogleClient({ ...BM_ROW, client_secret: null }, { id: null, secret: null }, { allowEnv: true }), null);
+eq("client: env pair incomplete → null", pickGoogleClient(null, { id: ENV.id, secret: null }, { allowEnv: true }), null);
+eq("same client: legacy mailbox (null minted) trusts the current client", sameClient(null, BM_ROW), true);
+eq("same client: minted by this client", sameClient(BM_ROW.client_id, BM_ROW), true);
+eq("same client: house client replaced since → reconnect", sameClient("111-old.apps.googleusercontent.com", BM_ROW), false);
+const cp = googleConsentParams({ client: BM_ROW, redirectUri: "https://www.foodstudio.ai/api/email/callback", scopes: GMAIL_SCOPES, state: "s1" });
+eq("consent: hd set from the row's hosted domain", cp.get("hd"), "bistro-mondo.com");
+eq("consent: client_id is the house's", cp.get("client_id"), BM_ROW.client_id);
+eq("consent: offline + consent prompt kept (refresh token needed)", [cp.get("access_type"), cp.get("prompt")], ["offline", "consent select_account"]);
+eq("consent: redirect is /api/email/callback", cp.get("redirect_uri"), "https://www.foodstudio.ai/api/email/callback");
+eq("consent: no hd when the row has none", googleConsentParams({ client: { client_id: "x", hosted_domain: null }, redirectUri: "u", scopes: [], state: "s" }).has("hd"), false);
+eq("paste check: real-shaped id accepted", looksLikeGoogleClientId("313770957352-8glilt2p34e9881pcla46d5qlnusdj1v.apps.googleusercontent.com"), true);
+eq("paste check: secret pasted into the id box is refused", looksLikeGoogleClientId("GOCSPX-abcdefghijklmnop"), false);
+eq("paste check: bare number refused", looksLikeGoogleClientId("313770957352"), false);
+eq("ui: id prefix never the whole id", clientIdPrefix("313770957352-8glilt2p34e9881pcla46d5qlnusdj1v.apps.googleusercontent.com"), "313770957352-8glil…");
 
 console.log(fails ? `\n${fails} FAILED` : "\nall passed");
 process.exit(fails ? 1 : 0);
