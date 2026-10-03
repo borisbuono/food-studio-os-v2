@@ -32,7 +32,7 @@ client components ──▶ lib/supabaseBrowser.ts (createBrowserClient) ──�
 - SSR renders the signed-in user: `/h/<slug>`, `/studio`, `/me/today` all read `supabaseServer().auth.getUser()`;
   `/api/me` returns the profile from the same client. No Guest flash: the chrome is server-rendered with the user.
 
-## The open decision — HttpOnly
+## HttpOnly — decided 2026-10-03: not yet, CSP instead
 
 The cookies are **not** HttpOnly, on purpose (`authCookieOptions.httpOnly: false`). Reason: 46 client
 components query Supabase directly through `supabaseBrowser` under RLS, and `createBrowserClient` reads the
@@ -42,13 +42,76 @@ What HttpOnly would buy: an XSS payload could not read the token. What it costs:
 components (Chef drawer, rota board, clock kiosk, capture station, inbox …) would have to go through route
 handlers instead of RLS-scoped browser queries — a multi-day refactor, not a slice.
 
-What protects us today without HttpOnly: a strict CSP is **not** in place (follow-up), RLS limits what a stolen
-token can read to that person's houses, tokens rotate (1 h access / refresh on use), and there is no
-third-party script on the authenticated pages.
+**Boris ruled (a) on 2026-10-03: add the CSP now, do the refactor when the next big UI pass touches those
+components anyway.** So the position is: the token is readable by script by design, and the CSP below is
+what stops a script that reads it from doing anything with it. RLS still caps what a stolen token can see to
+that person's houses, and tokens rotate (1 h access, refresh on use).
 
-Boris's call: (a) leave as is and add a CSP; or (b) schedule the refactor (browser client → server actions)
-as its own lane after the email and security lanes. Recommendation: (a) now, (b) when the next big UI pass
-touches those components anyway.
+The refactor is not cancelled, it is queued. When it happens, `httpOnly: true` goes in `lib/authCookies.ts`
+and this section gets rewritten.
+
+## The CSP (S5a, 2026-10-03)
+
+`lib/security/csp.mjs` builds it; `next.config.mjs` decides which paths get which. Two headers go out on
+every response.
+
+**Enforced.** Shaped by one fact, verified on 2026-10-03: the browser in this app only ever talks to
+itself and to Supabase. Every third-party call — Anthropic, Holded, Google, Fresto, Resend, Wix, TheFork,
+Apideck — is made server-side from a route handler (`grep 'fetch("https://' app components` returns
+nothing). So the three ways a stolen token could leave the browser are all closed and closing them breaks
+nothing:
+
+| Directive | Value | Why |
+|---|---|---|
+| `connect-src` | `'self'` + the Supabase origin (https + wss) | the exfiltration route that matters |
+| `form-action` | `'self'` | an injected form cannot post the session out; Google OAuth is a navigation, not a form post, so sign-in is unaffected |
+| `img-src` | `'self' data: blob:` + Supabase | no third-party host to beacon to. `blob:` for capture thumbnails and the Receiving / WinePrices previews |
+| `object-src` | `'none'` | plugins |
+| `base-uri` | `'self'` | stops a rewritten base tag re-pointing relative URLs |
+| `frame-src` | `'none'` | the app renders no iframes |
+| `style-src` / `font-src` | `'self' 'unsafe-inline'` + `fonts.googleapis.com` / `fonts.gstatic.com` | Google Fonts: `@import` in `app/globals.css`, plus a `<link>` on `/apply/<house>` for the per-house brand fonts |
+| `media-src` | `'self' blob:` | the Chef drawer plays `/api/chef/say` audio from an object URL |
+| `script-src` | `'self' 'unsafe-inline'` (+ `'unsafe-eval'` outside production, or `next dev` blocks itself) | **the remaining gap** — see below |
+
+**Report-Only.** The same policy with `'unsafe-inline'` removed from `script-src` and `style-src`. Nothing is
+blocked by it; the violations post to `/api/csp-report`, which logs one line each to the Vercel runtime log
+and stores nothing. That log is the evidence for the nonce pass: Next 14 injects its bootstrap and
+flight-data scripts inline and nothing hands them a nonce yet, so enforcing `script-src 'self'` today would
+white-screen the OS. When the reports show what a nonce has to cover, the middleware sets one and
+`strictScripts` becomes the enforced policy — one line, with evidence instead of a guess.
+
+Deliberately **not** a table: a public endpoint that writes rows is a free way for anyone to fill the
+database, and nothing acts on an individual report. Same shape as the observation log — cheap to write,
+read only at synthesis.
+
+**`frame-ancestors 'none'` is per-path, not global.** The authenticated app, `/welcome` and `/login` get it
+(framing a login page is the textbook clickjack). The guest-facing pages do not: `/m/<slug>/*`, `/book/*`,
+`/apply/*`, `/leads/capture`, `/legal/*`, `/recipes/<slug>`. Those are linked from bistro-mondo.com and
+ibzfoodstudio.com and **may be embedded there** — nobody has checked the Wix sites, and breaking a live
+booking or job-application embed mid-season to close a theoretical hole is the wrong trade.
+
+→ **Open, one fact needed:** what actually embeds those pages. Then `'none'` becomes `frame-ancestors` with
+that list and the exception disappears. Until someone looks at the Wix sites, leaving them frameable is the
+reversible choice.
+
+The two rules have non-overlapping sources, so no path ever receives two CSP headers.
+`scripts/test_csp_headers.sh` asserts that against a real build — phase 1 reads the policy out of
+`next.config.mjs`, phase 2 boots the built app and checks the headers as a browser would receive them,
+because a `path-to-regexp` source that looks right and matches nothing is the failure mode worth guarding.
+
+**Also shipped in the same header block:** `Strict-Transport-Security` (one year, subdomains, *not*
+`preload` — that is a one-way door and needs Boris's tick, not a builder's), `X-Content-Type-Options:
+nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` that keeps camera
+and microphone (the capture station photographs albaranes, the Chef drawer takes voice) and switches off
+geolocation, payment, USB and Bluetooth.
+
+### Adding a third-party endpoint later
+
+If a feature ever needs the browser to call something new, the answer is almost always **call it
+server-side from a route handler** — that keeps the policy tight and the API key off the client. If it
+genuinely must be a browser call, add the origin to `connect-src` in `lib/security/csp.mjs`, and expect
+`scripts/test_csp_headers.sh` to fail until you have also updated the assertion that says `connect-src` is
+self + Supabase only. The failing test is the point: widening it should be a decision, not a diff.
 
 ## Verify (Boris, on the S5 preview, 3 min)
 
@@ -57,3 +120,7 @@ touches those components anyway.
 3. Dev tools → Application → Cookies: `sb-fs-auth.0`, `sb-fs-auth.1`, no bare `sb-fs-auth`; `fs_entity`, `fs_lang`.
 4. Console: no React #418 / #423 hydration errors on `/h/bm`, `/studio`, `/me/today`.
 5. Leave the tab for >1 h, click around: still signed in (middleware refreshed).
+6. **CSP (added 2026-10-03).** With the console open, walk `/studio`, `/h/bm`, `/me/today`, the Chef drawer
+   (make it speak), `/capture` (take one photo) and `/h/bm/comms`: no red `Refused to …` lines. Yellow
+   `[Report Only]` lines are expected and are the point — they are the inline scripts the nonce pass has to
+   cover. Then `/m/bistrot-mondo/proposal` and `/apply/bm` on a phone: the brand fonts still load.
