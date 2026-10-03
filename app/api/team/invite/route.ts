@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { INVITE_ROLES, INVITE_ROLE_AREA } from "@/lib/onboarding";
 import { sendInviteEmail } from "@/lib/email/invite";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,8 +60,10 @@ export async function POST(req: Request) {
   // (fn_is_entity_manager — the same gate the rota and rates use), or the
   // person who onboarded the entity (the wizard runs before any roster row
   // exists). A cook cannot invite.
-  const { data: mgr } = await sb.rpc("fn_is_entity_manager", { uid, ent: entity_id });
-  if (mgr !== true) {
+  // (S4: requireManagerOf = fn_is_entity_manager or platform owner — the shared gate; the
+  //  invite mail goes out through lib/email/invite on the service key.)
+  const gate = await requireManagerOf(sb, entity_id);
+  if (!gate.ok) {
     const { data: ent } = await sb
       .from("entities")
       .select("onboarded_by")

@@ -4,7 +4,8 @@ import { supabaseService } from "@/lib/supabaseService";
 import { draftItem, type DraftKind } from "@/lib/social/inboxDraft";
 import { approveAndSend, callMetaReply } from "@/lib/social/inboxAct";
 import { mintAndConsumePageTick } from "@/lib/chef/confirm";
-import type { ChefAction } from "@/lib/chef/types";
+import type { ChefAction } from "@/lib/chef/types";import { requireEntityAccess } from "@/lib/access/requireManager";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest) {
   // RLS-visible? (also proves membership before we touch the service path)
   const { data: row } = await sb.from(table).select("id, status, draft_reply, entity_id").eq("id", id).maybeSingle();
   if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  // S4: redraft / hide / approve reach the service key — membership of the row's entity, proven in the DB.
+  const gate = await requireEntityAccess(sb, (row as any).entity_id);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
 
   if (action === "approve") {

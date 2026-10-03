@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { persistAuthForChannel, testGmailAccessToken } from "@/lib/assistant/channels/gmail";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ export async function GET(req: Request) {
   if (!match) return htmlBack("Auth state expired. Please start the connection from Assistant Settings again.", "/administrate/settings/assistant");
   const entity = (match.payload?.entity || "IFL") as "IFL" | "BM" | "BBH";
   const returnTo = String(match.payload?.return || "/administrate/settings/assistant");
+  // S4: the channel is stored for `entity` through supabaseJob(); the user must be a member of it.
+  const gate = await requireEntityAccess(sb, entity);
+  if (!gate.ok) return htmlBack("You are not a member of that house.", returnTo);
   const redirectUri = String(match.payload?.redirect_uri || (url.origin + "/api/assistant/channels/gmail/callback"));
 
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;

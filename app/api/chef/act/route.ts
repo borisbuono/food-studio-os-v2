@@ -9,6 +9,7 @@ import { materialiseNotes } from "@/lib/chef/paInbox";
 import { consumeConfirmToken, needsConfirmToken, writeTurnResolution, type ConfirmVia } from "@/lib/chef/confirm";
 import { observe } from "@/lib/observations";
 import { supabaseService } from "@/lib/supabaseService";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -160,6 +161,12 @@ async function handle(req: Request) {
     // when SUPABASE_SERVICE_ROLE_KEY is not set on Vercel — the definer RPC
     // observation_chef_undo() does the same under the same token check.
     if ((row as any).table_name === "observations") {
+      // S4: the row must be visible to the caller under RLS and the caller a
+      // member of its entity before the service role touches it.
+      const { data: obs } = await sb.from("observations").select("id, entity_id").eq("id", (row as any).row_id).maybeSingle();
+      if (!obs) return fail(t.nothing_deleted, 403);
+      const g = await requireEntityAccess(sb, (obs as any).entity_id);
+      if (!g.ok) return fail(g.error, g.status);
       const svc = supabaseService();
       let removed = false;
       if (svc) {

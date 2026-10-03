@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/check_service_role_gate.mjs && next build",
+    "lint:service-gate": "node scripts/check_service_role_gate.mjs",
     "start": "next start",
     "lint": "next lint"
   },

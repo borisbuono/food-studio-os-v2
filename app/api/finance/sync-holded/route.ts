@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getAccountingAdapter } from "@/lib/integrations/registry";
 import type { EntityCode } from "@/lib/integrations/types";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
   try {
     const { entity } = await req.json();
     if (!entity || !["IFL","BM","BBH"].includes(entity)) return NextResponse.json({ ok: false, error: "entity required" }, { status: 400 });
+    // S4: pulls the entity's Holded purchases — manager only.
+    const gate = await requireManagerOf(supabaseServer(), entity);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     const adapter = getAccountingAdapter(entity as EntityCode);
     const purchases = await adapter.listUnapprovedPurchases(entity as EntityCode);
     if (!purchases.length) return NextResponse.json({ ok: true, fetched: 0, inserted: 0, adapter: adapter.name });

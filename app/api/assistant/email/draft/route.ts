@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { draftReply } from "@/lib/assistant/triage/email";
 import type { AssistantChannelRow } from "@/types/db";
 import type { EntityCode } from "@/lib/assistant/orchestrator";
+import { requireEntityAccess } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   if (channel.channel_type !== "gmail") return Response.json({ ok: false, error: "draft only supports Gmail channels" }, { status: 400 });
 
   const entity = ((channel.settings as any)?.entity_code || "IFL") as EntityCode;
+  // S4: this channel's entity — the lib refreshes/reads Gmail on supabaseJob(); membership proven in the DB.
+  const gate = await requireEntityAccess(sb, entity);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   try {
     const draft = await draftReply(channel as AssistantChannelRow, {

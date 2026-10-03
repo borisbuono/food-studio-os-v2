@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseService } from "@/lib/supabaseService";
 import { recomputeRecipes, refreshMenuMargin } from "@/lib/recipes/recompute";
-import { ENTITY_SHORT, type EntityKey } from "@/lib/entities";
+import { ENTITY_SHORT, type EntityKey } from "@/lib/entities";import { cronAuthorized } from "@/lib/cron/heartbeat";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,9 +23,9 @@ export const maxDuration = 300;
 // user (runs under their session).
 
 async function pickClient(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") || "";
-  if (secret && auth === `Bearer ${secret}`) {
+  // S4: the cron lane goes through the one fail-closed check (lib/cron/heartbeat).
+  const cron = await cronAuthorized(req);
+  if (cron.ok) {
     const svc = supabaseService();
     if (!svc) return { error: "SUPABASE_SERVICE_ROLE_KEY not set — cron cannot read recipes past RLS" as const };
     return { sb: svc, via: "cron" as const };

@@ -3,7 +3,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { serverEntity } from "@/lib/serverVenue";
 import { E_BM, E_HOLDINGS, E_TALLER, E_UTOPIA } from "@/lib/entities";
 import { ingestCapture } from "@/lib/capture/ingest";
-import type { EntityCode } from "@/lib/capture/pure";
+import type { EntityCode } from "@/lib/capture/pure";import { requireAnyMembership } from "@/lib/access/requireManager";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
     const sb = supabaseServer();
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    // S4: ingestCapture() files through supabaseJob(); a login with no team must not reach it.
+    const gate = await requireAnyMembership(sb);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof Blob)) return NextResponse.json({ ok: false, error: "no file" }, { status: 400 });

@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { getAccountingAdapter } from "@/lib/integrations/registry";
 import { eodLinesForEntity } from "@/lib/integrations/accounting/holded";
 import type { EntityCode } from "@/lib/integrations/types";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireManagerOf } from "@/lib/access/requireManager";
 
 export const runtime = "nodejs";
 
@@ -14,6 +16,9 @@ export async function POST(req: NextRequest) {
     if (!entity || !["IFL", "BM", "BBH"].includes(entity)) return NextResponse.json({ ok: false, error: "entity required" }, { status: 400 });
     const date = body.date as string;
     if (!date) return NextResponse.json({ ok: false, error: "date required" }, { status: 400 });
+    // S4: posts to the accounting adapter for the named entity — manager only.
+    const gate = await requireManagerOf(supabaseServer(), entity);
+    if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
     const totals = { food: +(body.food || 0), wine: +(body.wine || 0), bar: +(body.bar || 0), softdrinks: +(body.softdrinks || 0), tips: +(body.tips || 0) };
     const sum = totals.food + totals.wine + totals.bar + totals.softdrinks + totals.tips;
     if (sum <= 0) return NextResponse.json({ ok: false, error: "no totals" }, { status: 400 });

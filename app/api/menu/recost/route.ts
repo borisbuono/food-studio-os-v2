@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { supabaseService } from "@/lib/supabaseService";
-import { fillProvisional } from "@/lib/menu/provisional";
+import { fillProvisional } from "@/lib/menu/provisional";import { requireEntityAccess } from "@/lib/access/requireManager";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +25,9 @@ export async function POST(req: Request) {
   const sb = supabaseServer();
   const { data: u } = await sb.auth.getUser();
   if (!u.user) return Response.json({ ok: false, error: "not authenticated" }, { status: 401 });
-  // membership check through RLS: a non-member sees no restaurant for this entity
-  const { data: rest } = await sb.from("restaurants").select("id").eq("entity_id", entity_id).limit(1).maybeSingle();
-  if (!rest) return Response.json({ ok: false, error: "not your house" }, { status: 403 });
+  // S4: membership proven in the DB before fillProvisional() reads every line on the service key.
+  const gate = await requireEntityAccess(sb, entity_id);
+  if (!gate.ok) return Response.json({ ok: false, error: gate.error }, { status: gate.status });
 
   const first = await sb.rpc("fn_recost_entity", { p_entity: entity_id, p_scope: "menu" });
   if (first.error) return Response.json({ ok: false, error: first.error.message }, { status: 500 });
