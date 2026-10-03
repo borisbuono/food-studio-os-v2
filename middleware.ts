@@ -107,6 +107,10 @@ const PUBLIC_API_PREFIXES = [
   // CRON_SECRET bearer. The route itself rejects anything without the
   // secret or a signed-in session.
   "/api/recipes/compute-all-entities",
+  // CSP violation sink (S5a, 2026-10-03). The browser posts the report with no
+  // cookie, so it cannot be behind the auth wall. It accepts nothing, stores
+  // nothing and always answers 204 — see app/api/csp-report/route.ts.
+  "/api/csp-report",
 ];
 
 const PUBLIC_STATIC_EXACT = new Set<string>([

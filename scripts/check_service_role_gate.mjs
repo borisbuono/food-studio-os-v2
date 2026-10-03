@@ -21,8 +21,14 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
+// fileURLToPath, not new URL(...).pathname: a percent-encoded path is not a
+// filesystem path. Boris's working copy lives under "Food Studio os", so the
+// raw pathname arrives as ".../Food%20Studio%20os/..." and every readdirSync
+// in this file threw ENOENT — `npm run build` could not run there at all.
+// Found 2026-10-03; scripts/verify_nav.mjs had it right already.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APP = join(ROOT, "app");
 const LIB = join(ROOT, "lib");
 

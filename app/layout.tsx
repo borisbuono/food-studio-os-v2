@@ -3,7 +3,6 @@ import AppChrome from "@/components/AppChrome";
 import type { Metadata, Viewport } from "next";
 import ChefRoot from "@/components/chef/ChefRoot";
 import NewHireAssistantNudge from "@/components/NewHireAssistantNudge";
-import SessionMigrator from "@/components/SessionMigrator";
 import RouteGuard from "@/components/RouteGuard";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import CommandK from "@/components/CommandK";
@@ -84,7 +83,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <RouteGuard>{children}</RouteGuard>
           <FlowStrip />
         </AppChrome>
-        <SessionMigrator />
         <KeyboardShortcuts />
         {/* CommandK is gated on `initialProfile` — on public routes (/welcome,
             /login, /auth/*) or for unauth visitors it renders nothing, so

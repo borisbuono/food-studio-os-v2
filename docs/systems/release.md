@@ -38,8 +38,15 @@ Every PR must have, in the PR body:
 1. `npx tsc --noEmit --skipLibCheck` — 0 errors.
 2. `TMPDIR=/tmp node scripts/verify_nav.mjs` — `dead: 0`, `retired-still-present: 0`.
 3. `sh scripts/test_nav_roles.sh` and `sh scripts/test_service_role_gate.sh` — all PASS (the second one is the S4 lint: an interactive route that imports a service-role client without an access check fails here).
+   And `sh scripts/test_csp_headers.sh` — the security headers. Phase 2 needs a `.next` build, so run it after `npm run build`; it boots the built app and asserts the headers a browser would actually receive.
 4. Vercel preview deployment `READY` (link it).
-5. If a migration touches RLS: the three-user probe (Boris / second-tenant owner / signed-in stranger) run **inside a rolled-back transaction**, with the per-table counts pasted, and the permissive-policy audit returning 0 rows:
+5. If a migration touches RLS: the three-user probe (Boris / second-tenant owner / signed-in stranger) run **inside a rolled-back transaction**, with the per-table counts pasted, and the permissive-policy audit showing **nothing beyond the known baseline** — corrected 2026-10-03, this used to read "returning 0 rows", which the query below never does and which builders were reading as "nothing beyond the baseline". The baseline, unchanged since S1:
+
+   - 5 reference tables readable by any login: `assistant_billing_tiers`, `chart_of_accounts`, `holiday_calendar`, `restaurants`, `social_providers`
+   - 4 anon reads by design: `academy_lessons`, `commercials` (active), `menu_items` (published), `restaurants`
+   - everything else returned is a `service_role` row, which bypasses RLS anyway
+
+   A row outside that list is the finding. Paste the diff against the baseline, not the raw output.
 
    ```sql
    select tablename, policyname, cmd, roles from pg_policies
@@ -79,4 +86,8 @@ When the org moves to Pro: create a `staging` branch, point the Preview env (`NE
 Branch protection cannot be set by the builder's fine-grained PAT (the API returns 403). Boris does it once in GitHub:
 Settings → Branches → Add branch ruleset (or classic rule) → target `main` → tick **Require a pull request before merging** (0 approvals is fine — the point is the PR, not the review), **Block force pushes**, **Restrict deletions**; no bypass list.
 
-Note: on a personal GitHub Free plan, branch protection is only available on **public** repositories; a private repo needs GitHub Pro. The repo is public today. The S0 ship note lays out the trade-off.
+Note: on a personal GitHub Free plan, branch protection is only available on **public** repositories; a private repo needs GitHub Pro. The S0 ship note lays out the trade-off.
+
+**The repo is public as of 2026-10-03** — confirmed unauthenticated (`GET /repos/borisbuono/food-studio-os-v2` returns 200, `visibility: public`, 0 forks, 0 stars, 0 watchers). History was scanned the same day for committed credentials and is **clean**: no `GOCSPX-`, `sk-ant-`, `ghp_`, `github_pat_`, `sb_secret_`, no service-role JWT, no committed `.env` (only `.env.example`, which holds a placeholder anon key and the Supabase URL, neither secret). So what is exposed is the schema, the RLS policy design, the secret-gate layout and the business model — not keys.
+
+**Boris's ruling, 2026-10-03: never public.** So the order is: GitHub Pro → private → then the ruleset above, because going private on Free would silently drop branch protection and `main` would be unprotected with nobody noticing. Both steps or neither.
