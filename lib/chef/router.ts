@@ -23,7 +23,7 @@ import {
   CONFIDENCE_ACT, CONFIDENCE_READ_ONLY, isWriteIntent,
   type ChefAction, type ChefCard, type ChefClientState, type ChefIntent, type ChefLang, type ChefTurn,
 } from "@/lib/chef/types";
-import { listWaiting, itemCard, emptyCard, whoCard } from "@/lib/chef/inbox";
+import { listWaiting, itemCard, emptyCard, whoCard, countEnquiriesWaiting, type InboxChannel } from "@/lib/chef/inbox";
 
 export type ChefTurnInput = {
   message: string;
@@ -225,6 +225,17 @@ function preRoute(message: string, language: ChefLang): Classified | null {
   if (!m || m.length > 160) return null;
   // Internal continuation tokens the client sends from card buttons.
   if (m === "#inbox_next" || m === "#inbox_open") return { intent: "inbox_open", confidence: 1, language, args: {} };
+  // email E4 (2026-10-02): the enquiries chip, and "answer the Harmke email" → one card → read-back → yes
+  if (m === "#inbox_email") return { intent: "inbox_open", confidence: 1, language, args: { channel: "email" } };
+  const ae = m.match(/^(?:answer|reply to|send|responde(?: a)?|contesta(?: a)?|env[ií]a)\s+(?:the |el |la |al |a )?(?:email|e-mail|correo|mail)(?: (?:from|de|of|to|a))?\s+(?:de |from |of )?(.{2,60}?)\s*$/)
+    || m.match(/^(?:answer|reply to|responde(?: a)?|contesta(?: a)?)\s+(?:the |el |la |al |a )?(.{2,60}?)(?:'s)?\s+(?:email|e-mail|correo|mail)\s*$/);
+  if (ae) {
+    const who = ae[1].trim();
+    if (/^(?:the|el|la|los|las|this|that|ese|esa|este|esta|next|siguiente|first|primero|primer)$/.test(who)) return { intent: "inbox_open", confidence: 0.95, language, args: { channel: "email" } };
+    return { intent: "approve", confidence: 0.94, language, args: { target: "reply", who, channel: "email" } };
+  }
+  if (/^(?:abre|abrir|open|lee|léeme|read|mira)\s+(?:los |the |my |mis |el |la )?(?:emails?|e-mails?|correos?|mails?|consultas?|enquiries|inquiries)(?:\s+(?:esperando|waiting|pendientes?|uno a uno|one by one))?\??$/.test(m)
+    || /^(?:emails?|correos?|consultas?|enquiries)(?:\s+(?:esperando|waiting|pendientes?))?\??$/.test(m)) return { intent: "inbox_open", confidence: 0.95, language, args: { channel: "email" } };
   if (m === "#margin_open") return { intent: "navigate", confidence: 1, language, args: { to: "margin" } };
   if (m === "#overtime_open") return { intent: "query overtime_pending", confidence: 1, language, args: {} };
   // cleaning S4 (2026-10-02): what's open, tick one line by label, sign a list
@@ -297,8 +308,8 @@ Intents (exact strings) and their args:
 - "remember"        {text, domain?: "finance"|"purchasing"|"comms"|"legal"|"hiring"|"menu"|"web"|"other", subject?: supplier/counterparty/document named} — note something odd (goes to the observation log; not a task)
 - "feedback"        {text, feedback_kind: "love"|"idea"|"bug"|"confusing"} — something is wrong / an idea about the OS
 - "run_agent"       {agent_type: "research"|"build"|"write"|"pa", objective} — delegate work to an agent
-- "inbox_open"      {}                                       — walk the waiting comments one at a time ("abre la bandeja", "siguiente", "read me the comments")
-- "approve"         {target: "reply", who?: author name/handle, count?: integer} — send/approve a drafted reply: "send the reply to Marta", "approve the first three comments", "aprueba la respuesta a @luis"
+- "inbox_open"      {channel?: "email"}                      — walk the waiting comments / emails one at a time ("abre la bandeja", "siguiente", "read me the comments", "lee los emails" → channel "email")
+- "approve"         {target: "reply", who?: author/sender name, count?: integer, channel?: "email"} — send/approve a drafted reply: "send the reply to Marta", "approve the first three comments", "aprueba la respuesta a @luis"; an EMAIL reply: "answer the Harmke email", "responde al correo de Pepe" → channel "email"
 - "update bookings" {who: guest name, time?: "HH:MM" 24h, party_size?: integer, date?: "today"|"tomorrow"|"YYYY-MM-DD"} — move/change a booking ("mueve la mesa de García a las nueve" → time "21:00": restaurant hours, a bare small number in the evening is PM unless morning is stated)
 - "update prep"     {name: item, quantity?: number, unit?: string, status?: "done"|"todo"} — change a prep quantity or mark it done ("cambia la cebolla a 3 kg", "el caldo está hecho", "mark the stock done")
 - "query ask"       {q}                                      — any other question about the venue or the OS
@@ -333,6 +344,8 @@ Examples:
 "envía la respuesta a Marta" → {"intent":"approve","confidence":0.92,"language":"es","args":{"target":"reply","who":"Marta"}}
 "approve the first three comments" → {"intent":"approve","confidence":0.9,"language":"en","args":{"target":"reply","count":3}}
 "lee los comentarios" → {"intent":"inbox_open","confidence":0.9,"language":"es","args":{}}
+"contesta el email de Harmke" → {"intent":"approve","confidence":0.92,"language":"es","args":{"target":"reply","who":"Harmke","channel":"email"}}
+"any enquiries waiting" → {"intent":"inbox_open","confidence":0.88,"language":"en","args":{"channel":"email"}}
 "mueve la mesa de García a las nueve" → {"intent":"update bookings","confidence":0.9,"language":"es","args":{"who":"García","time":"21:00"}}
 "la reserva de Smith son seis ahora" → {"intent":"update bookings","confidence":0.85,"language":"es","args":{"who":"Smith","party_size":6}}
 "cambia la cebolla a 3 kilos" → {"intent":"update prep","confidence":0.9,"language":"es","args":{"name":"cebolla","quantity":3,"unit":"kg"}}
@@ -502,10 +515,14 @@ async function readInbox(ctx: ReadCtx): Promise<{ card: ChefCard; say: string }>
       .in("status", ["new", "drafted"]).order("created_at_remote", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
   ]);
   const waiting = Number((w as any)?.waiting || 0);
-  if (!waiting) return { say: t.none_waiting, card: { title: t.none_waiting, lines: [], kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
-  const lines = [t.waiting(waiting)];
+  // email E4: the enquiry count rides on the same answer
+  const enquiries = await countEnquiriesWaiting(sb, ctx.scope.entity.id);
+  if (!waiting && !enquiries) return { say: t.none_waiting, card: { title: t.none_waiting, lines: [], kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
+  const emailLine = enquiries ? (ctx.lang === "es" ? enquiries + (enquiries === 1 ? " consulta por email esperando" : " consultas por email esperando") : enquiries + (enquiries === 1 ? " email enquiry waiting" : " email enquiries waiting")) : null;
+  const title = waiting ? t.waiting(waiting) : (emailLine as string);
+  const lines = waiting && emailLine ? [emailLine] : [];
   if (top) lines.push(clip(((top as any).author_handle || (top as any).author_name || (top as any).platform || "") + ": " + ((top as any).text || ""), 100));
-  return { say: t.waiting(waiting), card: { title: t.waiting(waiting), lines, kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
+  return { say: title, card: { title, lines, kind: "read", entity_label: ctx.scope.entity.name, href, primary: { label: t.open, kind: "navigate", href } } };
 }
 
 // Free-form question → the existing orchestrator chat path, unchanged, so
@@ -841,7 +858,8 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
       }
       case "inbox_open": {
         const seen = input.clientState?.inbox_seen || [];
-        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen });
+        const channel: InboxChannel = args.channel === "email" ? "email" : "all";
+        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen, channel, house: houseSlug });
         const href = pageHref("inbox", houseSlug) || "/";
         const piece = items.length ? itemCard(items[0], entityId, lang, label, Math.max(0, total - seen.length - 1), "walk") : emptyCard(lang, label, href);
         return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "walk", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
@@ -852,15 +870,16 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const who = args.who ? clip(String(args.who), 60) : "";
         const count = Math.max(1, Math.min(10, Number(args.count) || 1));
         const seen = args.next ? (input.clientState?.inbox_seen || []) : [];
-        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen, who: who || undefined });
+        const channel: InboxChannel = args.channel === "email" ? "email" : "all";
+        const { items, total } = await listWaiting(supabaseServer(), entityId, { exclude: seen, who: who || undefined, channel, house: houseSlug });
         const href = pageHref("inbox", houseSlug) || "/";
         if (!items.length) {
-          const piece = who ? whoCard(lang, who, 0, label) : emptyCard(lang, label, href);
+          const piece = who ? whoCard(lang, who, 0, label, channel) : emptyCard(lang, label, href);
           return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "approve", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "card");
         }
         const withDraft = items.filter((i) => i.draft && !i.flagged);
         if (who && withDraft.length > 1 && !args.next) {
-          const piece = whoCard(lang, who, withDraft.length, label);
+          const piece = whoCard(lang, who, withDraft.length, label, channel);
           return finish({ transcript: message, language: lang, intent: { kind: "query", surface: "inbox", q: "approve", scope: chefScope }, confidence: conf, say: piece.say, card: piece.card, needs_confirm: false }, "clarify");
         }
         const first = withDraft[0] || items[0];
@@ -868,7 +887,7 @@ export async function runChefTurn(input: ChefTurnInput): Promise<ChefTurn> {
         const piece = itemCard(first, entityId, lang, label, Math.max(0, total - seen.length - 1), first.draft && !first.flagged ? "approve" : "walk");
         return finish({
           transcript: message, language: lang,
-          intent: { kind: "approve", surface: "social", id: first.id, action: "send" }, confidence: conf,
+          intent: { kind: "approve", surface: first.kind === "email" ? "inbox" : "social", id: first.id, action: "send" }, confidence: conf,
           say: count > 1 && !args.next ? tl.approve_batch_say(Math.min(count, withDraft.length)) : piece.say,
           card: piece.card, needs_confirm: piece.needs_confirm, readback: piece.readback, action: piece.action,
           confirm_voice: true, batch_remaining: remaining,

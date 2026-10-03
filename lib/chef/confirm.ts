@@ -18,30 +18,22 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChefAction, ChefTurn } from "@/lib/chef/types";
+import { canonical, hashableAction } from "@/lib/chef/canonical";
 
 // Action types that leave the account (outbound / agent). These REQUIRE a
 // consumed token. Undoable writes (prep, todo, remember, feedback, updates)
 // stay on the Undo path.
-export const CONFIRM_REQUIRED: ReadonlySet<ChefAction["type"]> = new Set<ChefAction["type"]>(["run_agent", "approve_reply"]);
+export const CONFIRM_REQUIRED: ReadonlySet<ChefAction["type"]> = new Set<ChefAction["type"]>(["run_agent", "approve_reply", "approve_email"]);
 
 export function needsConfirmToken(action: ChefAction | null | undefined): boolean {
   return !!action && CONFIRM_REQUIRED.has(action.type);
 }
 
-// Canonical JSON: sorted keys, undefined dropped — so the object the router
-// built and the object the browser posts back hash identically.
-function canonical(v: unknown): string {
-  if (v === null || typeof v !== "object") return JSON.stringify(v === undefined ? null : v);
-  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
-  const o = v as Record<string, unknown>;
-  const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
-  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") + "}";
-}
-
+// Canonical JSON lives in lib/chef/canonical.ts (shared byte-for-byte with
+// the email-reply edge function, which re-hashes the action it is handed).
 export function actionHash(action: ChefAction): string {
   // confirm_token / turn_id ride alongside the action on the wire; never part of the hash.
-  const { confirm_token: _c, turn_id: _t, ...rest } = action as any;
-  return createHash("sha256").update(canonical(rest)).digest("hex");
+  return createHash("sha256").update(canonical(hashableAction(action as any))).digest("hex");
 }
 
 export const CONFIRM_TTL_MINUTES = 10;

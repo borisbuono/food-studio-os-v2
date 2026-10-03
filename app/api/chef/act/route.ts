@@ -5,6 +5,7 @@ import { ENTITY_TO_RESTAURANT, type EntityKey } from "@/lib/entities";
 import { getMyMembershipContext } from "@/lib/memberships";
 import type { ChefAction, ChefActResult, ChefCard, ChefLang } from "@/lib/chef/types";
 import { approveAndSend } from "@/lib/social/inboxAct";
+import { sendEmailReply } from "@/lib/email/reply";
 import { materialiseNotes } from "@/lib/chef/paInbox";
 import { consumeConfirmToken, needsConfirmToken, writeTurnResolution, type ConfirmVia } from "@/lib/chef/confirm";
 import { observe } from "@/lib/observations";
@@ -56,7 +57,7 @@ const T = {
   },
 } as const;
 
-const UNDO_TABLES = new Set(["observations", "assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments", "cleaning_run_items"]);
+const UNDO_TABLES = new Set(["observations", "assistant_memory", "feedback", "prep_lists", "master_todos", "agent_charters", "invoice_inbox", "bookings", "social_comments", "cleaning_run_items", "email_threads"]);
 const AGENT_TAG: Record<string, string> = { research: "RESEARCH", build: "OS", write: "MARKETING", pa: "PA" };
 
 function madridToday() {
@@ -361,6 +362,30 @@ async function handle(req: Request) {
       const who = action.author || "";
       const res: ChefActResult = { ok: true, card: { ...card(t.sent(who), [clip(action.text, 140)], label, "write"), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } }, undo_token: null };
       return Response.json(res);
+    }
+    // email E4 (2026-10-02): the reply to an email thread. Outbound. The token
+    // for THIS {thread, text} was consumed above; the edge function email-reply
+    // re-checks that consumed row in SQL (email_reply_claim — the only writer of
+    // approved_by_boris) and sends as the connected mailbox. Nothing here sends.
+    case "approve_email": {
+      const svc = supabaseService();
+      if (!svc) return fail("no service key", 503);
+      const { data: th } = await sb.from("email_threads").select("id, account_id, entity_id, status").eq("id", String(action.id || "")).maybeSingle();
+      if (!th) return fail(t.not_found, 404);
+      if ((th as any).entity_id !== scope.entity.id) return fail(t.not_member, 403);
+      if ((th as any).status === "replied") return fail(lang === "es" ? "Ya respondido" : "Already replied", 409);
+      const r = await sendEmailReply(svc, { threadId: String(action.id), accountId: String((th as any).account_id), text: String(action.text || ""), uid, confirmToken: String(confirmToken), action: { type: "approve_email", entity_id: action.entity_id, id: String(action.id), text: String(action.text || ""), ...(action.author ? { author: action.author } : {}) }, via: via === "voice" ? "voice" : "tap" });
+      if (!r.ok) return fail(r.error || t.send_failed, r.http === 200 ? 502 : r.http);
+      const who = action.author || "";
+      const hours = r.hours_to_answer != null ? (lang === "es" ? "Respondido en " + Number(r.hours_to_answer).toFixed(1) + " h" : "Answered in " + Number(r.hours_to_answer).toFixed(1) + " h") : null;
+      const res: ChefActResult = { ok: true, card: { ...card(t.sent(who), [clip(action.text, 140), ...(hours ? [hours] : [])], label, "write"), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } }, undo_token: null };
+      return Response.json(res);
+    }
+    case "skip_email": {
+      const r = await patchRow("email_threads", String(action.id || ""), { status: "skipped" }, { entity_id: scope.entity.id });
+      if (!r.ok) return fail(r.error, r.status);
+      const c: ChefCard = { ...card(t.skipped(action.author || ""), [], label), primary: { label: lang === "es" ? "Siguiente" : "Next", kind: "turn", message: "#inbox_next" } };
+      return doneUpdate("email_threads", String(action.id), r.before, c);
     }
     case "skip_comment": {
       const r = await patchRow("social_comments", String(action.id || ""), { status: "skipped" }, { entity_id: scope.entity.id });

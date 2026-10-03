@@ -95,7 +95,13 @@ export async function ingestCapture(args: {
   mediaType: string;
   filename?: string | null;
   sessionCode: EntityCode;       // only used when the paper can't tell us
-  source?: "paper_photo" | "manual_upload";
+  source?: "paper_photo" | "manual_upload" | "email_forward";
+  // Email channel (E2, 2026-10-02): the poller files a supplier PDF with the
+  // service client and no session. The manager gate is replaced by the fact
+  // that a manager connected the mailbox (uid = email_accounts.connected_by);
+  // `extraFlags` lets the caller mark scanner-fed copies (holded_scanner_copy)
+  // so the push stays blocked. Interactive callers never set `system`.
+  system?: { connected_by: string | null; extraFlags?: string[] };
   // Re-file an already captured document with the current rules, from what was
   // read the first time: no second read of the paper, no second upload.
   reuse?: { extracted: Extracted; storagePath: string; sha: string; replace: { table: "invoice_inbox" | "albarans"; id: string } };
@@ -130,8 +136,12 @@ export async function ingestCapture(args: {
   else if (verdict.kind === "third_party") { flags.push("third_party_addressee"); status = "rejected"; }
   else { flags.push("entity_guessed"); status = "needs_triage"; }
 
-  const gate = await requireManagerOf(sb, entity);
-  if (!gate.ok) return { ok: false, status: gate.status, error: `${gate.error} (document is addressed to ${entity})` };
+  if (args.system) {
+    flags.push(...(args.system.extraFlags || []));
+  } else {
+    const gate = await requireManagerOf(sb, entity);
+    if (!gate.ok) return { ok: false, status: gate.status, error: `${gate.error} (document is addressed to ${entity})` };
+  }
 
   // 3) Type, VAT bands, totals, lines.
   let docType = docTypeFromWord(x.doc_word, x.model_type);

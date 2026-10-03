@@ -95,6 +95,14 @@ const PUBLIC_API_PREFIXES = [
   // meta-inbox-pull with the Vault-minted x-inbox-secret; the route checks
   // it through social_inbox_secret_ok(). Writes drafts only, never sends.
   "/api/inbox/draft",
+  // Email channel (Comms, 2026-10-02): Google lands on the callback without
+  // our cookie on some browsers (the route re-checks the session itself);
+  // the poller + classifier are called by pg_cron / the insert trigger with
+  // the Vault-minted x-inbox-secret, checked back via email_inbox_secret_ok().
+  // None of these can send: email-reply is the only path out.
+  "/api/email/callback",
+  "/api/email/pull",
+  "/api/email/classify",
   // Nightly recipe-cost refresh, called by /api/cron/pos-nightly with the
   // CRON_SECRET bearer. The route itself rejects anything without the
   // secret or a signed-in session.

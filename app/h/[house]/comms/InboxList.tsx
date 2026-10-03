@@ -10,11 +10,16 @@ import { useRouter } from "next/navigation";
 // Send = POST /api/inbox/act {approve} → writes approved_by_boris → meta-reply.
 // Skip / Hide / Redraft are the small buttons underneath.
 
+export type EmailMeta = {
+  category: string | null; confidence: number | null; enquiry_fields: Record<string, unknown> | null; needs_you_due: string | null;
+  hours_to_answer: number | null; outcome: string | null; message_count: number; first_received_at: string | null;
+  sender_note?: string | null;   // E6: the one line we know about the sender
+};
 export type InboxItem = {
-  kind: "comment" | "dm";
+  kind: "comment" | "dm" | "email";
   id: string;
   account_id: string;
-  platform: "instagram" | "facebook";
+  platform: "instagram" | "facebook" | "email";
   account_handle: string | null;
   who: string;
   text: string;
@@ -31,7 +36,22 @@ export type InboxItem = {
   is_reply: boolean;
   history: Array<{ dir: "in" | "out"; text: string; at: string }> | null;
   window_from?: string | null;
+  email?: EmailMeta;
 };
+const EMAIL_CATEGORIES: Array<{ key: string; label: string }> = [
+  { key: "enquiry", label: "Enquiry" }, { key: "booking_change", label: "Booking change" }, { key: "supplier_doc", label: "Supplier document" },
+  { key: "fiscal_legal", label: "Fiscal / legal" }, { key: "newsletter_noise", label: "Noise" }, { key: "other", label: "Other" },
+];
+function fieldsLine(f: Record<string, unknown> | null | undefined): string {
+  if (!f) return "";
+  const parts: string[] = [];
+  if (f.date) parts.push(String(f.date));
+  if (f.pax) parts.push(`${f.pax} pax`);
+  if (f.budget_pp) parts.push(`~${f.budget_pp} €/pp`);
+  if (f.venue_case) parts.push(f.venue_case === "ours" ? "at ours" : f.venue_case === "provider" ? "their venue" : "needs a venue");
+  if (f.food_shape) parts.push(String(f.food_shape));
+  return parts.join(" · ");
+}
 export type AccountChip = { id: string; handle: string; platform: "instagram" | "facebook"; active: boolean };
 export type SavedReply = { id: string; key: string; title: string; lang: string; body: string };
 
@@ -56,7 +76,7 @@ function ago(iso: string | null): string {
 
 function matches(it: InboxItem, f: Filter): boolean {
   switch (f) {
-    case "waiting": return ["new", "drafted", "approved"].includes(it.status) && !it.flagged;
+    case "waiting": return ["new", "drafted", "approved", "classified"].includes(it.status) && !it.flagged;
     case "flagged": return it.flagged && !["replied", "skipped", "hidden"].includes(it.status);
     case "sent": return it.status === "replied" || it.status === "hidden";
     case "skipped": return it.status === "skipped";
@@ -72,12 +92,14 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
   const [items, setItems] = useState<InboxItem[]>(initial);
   const [filter, setFilter] = useState<Filter>("waiting");
   const [account, setAccount] = useState<string | "all">("all");
+  const [channel, setChannel] = useState<"all" | "social" | "email">("all");
+  const hasEmail = useMemo(() => initial.some((i) => i.kind === "email"), [initial]);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
 
   const shown = useMemo(
-    () => items.filter((i) => matches(i, filter) && (account === "all" || i.account_id === account)),
-    [items, filter, account],
+    () => items.filter((i) => matches(i, filter) && (account === "all" || i.account_id === account) && (channel === "all" || (channel === "email") === (i.kind === "email"))),
+    [items, filter, account, channel],
   );
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { waiting: 0, flagged: 0, sent: 0, skipped: 0, failed: 0, all: items.length };
@@ -89,16 +111,23 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...p } : x)));
   }
 
-  async function act(it: InboxItem, action: "approve" | "skip" | "restore" | "hide" | "redraft") {
+  async function act(it: InboxItem, action: "approve" | "skip" | "restore" | "hide" | "redraft" | "recategorise" | "outcome" | "note", extra: Record<string, unknown> = {}) {
     const key = `${it.kind}:${it.id}`;
     setBusy((b) => ({ ...b, [key]: action }));
     try {
-      const r = await fetch("/api/inbox/act", {
+      const r = await fetch(it.kind === "email" ? "/api/email/act" : "/api/inbox/act", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, kind: it.kind, id: it.id, text: it.draft }),
+        body: JSON.stringify({ action, kind: it.kind, id: it.id, text: it.draft, ...extra }),
       });
       const j = await r.json().catch(() => ({}));
-      if (action === "redraft") {
+      if (action === "recategorise") {
+        if (j.ok) { patch(it.id, { status: j.routed?.startsWith("noise") ? "noise" : j.routed?.startsWith("captured") ? "archived" : j.routed?.startsWith("flagged") ? "flagged" : "classified", flagged: !!j.routed?.startsWith("flagged"), email: it.email ? { ...it.email, category: j.category } : it.email, error: null }); setToast(`Re-sorted as ${j.category}: ${j.routed}`); }
+        else { setToast(j.error ?? "failed"); }
+      } else if (action === "note") {
+        if (j.ok) { patch(it.id, { email: it.email ? { ...it.email, sender_note: j.note ?? null } : it.email }); setToast(j.note ? "Note saved — the next draft reads it" : "Note cleared"); } else setToast(j.error ?? "failed");
+      } else if (action === "outcome") {
+        if (j.ok) { patch(it.id, { email: it.email ? { ...it.email, outcome: j.outcome } : it.email }); setToast(`Noted: ${j.outcome}`); } else setToast(j.error ?? "failed");
+      } else if (action === "redraft") {
         if (j.ok) patch(it.id, { status: j.status === "flagged" ? "drafted" : "drafted", flagged: j.status === "flagged", flag_reason: j.flag_reason ?? null, draft: j.reply ?? "", draft_lang: j.lang ?? null, error: null });
         else { patch(it.id, { error: j.error ?? "redraft failed" }); setToast(j.error ?? "redraft failed"); }
       } else if (j.ok) {
@@ -128,6 +157,16 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
           </button>
         ))}
       </div>
+      {hasEmail ? (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {(["all", "social", "email"] as const).map((c) => (
+            <button key={c} onClick={() => setChannel(c)}
+              className={"rounded-full border px-3 py-1 text-[11px] " + (channel === c ? "border-black bg-black text-white" : "border-black/15 text-ink-soft")}>
+              {c === "all" ? "all channels" : c === "social" ? "IG · FB" : "Email"}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {accounts.length > 1 ? (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <button onClick={() => setAccount("all")}
@@ -145,7 +184,7 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
 
       {shown.length === 0 ? (
         <p className="mt-10 text-center text-sm text-clay">
-          {filter === "waiting" ? "Nothing waiting. The poll runs every 10 minutes." : "Nothing here."}
+          {filter === "waiting" ? "Nothing waiting. The polls run every 10 minutes." : "Nothing here."}
         </p>
       ) : null}
 
@@ -163,7 +202,9 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
                   <p className="truncate text-sm font-medium">
                     {it.who}
                     <span className="ml-2 font-mono text-[10px] uppercase text-clay">
-                      {it.kind === "dm" ? "DM" : it.platform === "instagram" ? "IG" : "FB"}{it.is_reply ? " · reply" : ""}
+                      {it.kind === "email" ? "Email" : it.kind === "dm" ? "DM" : it.platform === "instagram" ? "IG" : "FB"}{it.is_reply ? " · reply" : ""}
+                      {it.kind === "email" && it.email?.category ? ` · ${EMAIL_CATEGORIES.find((c) => c.key === it.email?.category)?.label ?? it.email.category}` : ""}
+                      {it.kind === "email" && it.email?.confidence != null && it.email.confidence < 0.7 ? " · unsure" : ""}
                     </span>
                   </p>
                   <p className="font-mono text-[10px] text-clay">
@@ -179,6 +220,16 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
                   </a>
                 ) : null}
               </div>
+
+              {/* email: what the OS read from it */}
+              {it.kind === "email" && it.email ? (
+                <p className="mt-1 font-mono text-[10px] text-clay">
+                  {fieldsLine(it.email.enquiry_fields)}
+                  {it.email.needs_you_due ? `deadline ${it.email.needs_you_due}` : ""}
+                  {it.email.message_count > 1 ? `${fieldsLine(it.email.enquiry_fields) || it.email.needs_you_due ? " · " : ""}${it.email.message_count} messages` : ""}
+                  {it.status === "replied" && it.email.hours_to_answer != null ? ` · answered in ${it.email.hours_to_answer} h` : ""}
+                </p>
+              ) : null}
 
               {/* what they wrote (DMs: short history, theirs last) */}
               {it.kind === "dm" && it.history && it.history.length > 1 ? (
@@ -242,6 +293,27 @@ export default function InboxList({ slug, items: initial, accounts, saved }: {
                 {!done && it.kind === "comment" ? <button onClick={() => act(it, "hide")} disabled={!!b} className="text-clay underline-offset-2 hover:underline">Hide</button> : null}
                 {!done ? <button onClick={() => act(it, "redraft")} disabled={!!b} className="text-clay underline-offset-2 hover:underline">{b === "redraft" ? "Drafting…" : "Redraft"}</button> : null}
                 {it.status === "skipped" ? <button onClick={() => act(it, "restore")} disabled={!!b} className="text-clay underline-offset-2 hover:underline">Back to waiting</button> : null}
+                {it.kind === "email" && !["replied"].includes(it.status) ? (
+                  <select className="rounded border border-black/15 bg-paper px-1 py-0.5 text-[11px] text-clay" value="" disabled={!!b}
+                    onChange={(e) => { if (e.target.value) act(it, "recategorise", { category: e.target.value }); }}>
+                    <option value="">Wrong pile…</option>
+                    {EMAIL_CATEGORIES.filter((c) => c.key !== it.email?.category).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                ) : null}
+                {it.kind === "email" && it.email?.category === "enquiry" && ["replied", "skipped"].includes(it.status) ? (
+                  <select className="rounded border border-black/15 bg-paper px-1 py-0.5 text-[11px] text-clay" value={it.email.outcome ?? ""} disabled={!!b}
+                    onChange={(e) => { if (e.target.value) act(it, "outcome", { outcome: e.target.value }); }}>
+                    <option value="">Outcome…</option>
+                    <option value="won">Won</option><option value="lost">Lost</option><option value="no_answer">No answer</option><option value="not_sales">Not sales</option>
+                  </select>
+                ) : null}
+                {it.kind === "email" ? (
+                  <button type="button" disabled={!!b} className="text-clay underline-offset-2 hover:underline"
+                    title={it.email?.sender_note ?? "One line about this sender; the drafter reads it before the next reply"}
+                    onClick={() => { const v = window.prompt("One line about this sender (the drafter reads it next time). Empty clears.", it.email?.sender_note ?? ""); if (v !== null) act(it, "note", { note: v }); }}>
+                    {it.email?.sender_note ? `Note: ${it.email.sender_note.length > 40 ? it.email.sender_note.slice(0, 39) + "…" : it.email.sender_note}` : "Note on sender…"}
+                  </button>
+                ) : null}
               </div>
             </li>
           );

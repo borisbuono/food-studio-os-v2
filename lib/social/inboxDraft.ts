@@ -45,7 +45,7 @@ function stripJson(txt: string): any | null {
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-async function callClaude(system: string, user: string, max_tokens = 600): Promise<string> {
+export async function callClaude(system: string, user: string, max_tokens = 600): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY not set");
   const r = await fetch("https://api.anthropic.com/v1/messages", {
