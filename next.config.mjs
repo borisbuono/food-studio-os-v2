@@ -16,9 +16,15 @@ const commonHeaders = [
   { key: "Reporting-Endpoints", value: 'csp="/api/csp-report"' },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // One year, subdomains included. Not `preload` — that is a one-way door and
-  // needs Boris's tick, not a builder's.
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // No Strict-Transport-Security here on purpose. Vercel already sends it at the
+  // edge — verified 2026-10-03: `max-age=63072000` on www.foodstudio.ai, and
+  // `max-age=63072000; includeSubDomains; preload` on the *.vercel.app preview
+  // hosts. Setting our own would send a second, WEAKER header (one year) and a
+  // browser takes the first it sees, so the app would be downgrading Vercel's.
+  // Adding `includeSubDomains` + `preload` to the custom domain is a real
+  // decision — it forces HTTPS on every present and future foodstudio.ai
+  // subdomain and preload cannot be undone quickly — so it belongs to Boris and
+  // to the Vercel domain settings, not to a header in this file.
   // camera + microphone stay on: the capture station photographs albaranes and
   // the Chef drawer takes voice. Everything else off.
   {

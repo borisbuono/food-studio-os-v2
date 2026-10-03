@@ -76,7 +76,11 @@ check() { # path, expect-frame-ancestors (yes|no)
   [ "$COUNT" = "1" ] || fail "$1 returned $COUNT enforced CSP headers, expected exactly 1"
   grep -qi '^content-security-policy-report-only:' "$HDR/h" || fail "$1 has no Report-Only header"
   grep -qi '^x-content-type-options: nosniff' "$HDR/h" || fail "$1 missing nosniff"
-  grep -qi '^strict-transport-security:' "$HDR/h" || fail "$1 missing HSTS"
+  # HSTS is deliberately NOT set by the app — Vercel sends it at the edge and
+  # ours would be the weaker of the two. See the note in next.config.mjs.
+  if grep -qi '^strict-transport-security:' "$HDR/h"; then fail "$1 sets HSTS in the app; Vercel already does at the edge, and ours would be the weaker of the two"; fi
+  grep -qi '^referrer-policy: strict-origin-when-cross-origin' "$HDR/h" || fail "$1 missing Referrer-Policy"
+  grep -qi '^permissions-policy:' "$HDR/h" || fail "$1 missing Permissions-Policy"
   if grep -i '^content-security-policy:' "$HDR/h" | grep -q "frame-ancestors"; then HAS=yes; else HAS=no; fi
   [ "$HAS" = "$2" ] || fail "$1 frame-ancestors=$HAS, expected $2"
   echo "PASS  $1 — 1 CSP, report-only present, frame-ancestors=$HAS"

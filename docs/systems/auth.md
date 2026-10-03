@@ -99,11 +99,20 @@ The two rules have non-overlapping sources, so no path ever receives two CSP hea
 `next.config.mjs`, phase 2 boots the built app and checks the headers as a browser would receive them,
 because a `path-to-regexp` source that looks right and matches nothing is the failure mode worth guarding.
 
-**Also shipped in the same header block:** `Strict-Transport-Security` (one year, subdomains, *not*
-`preload` — that is a one-way door and needs Boris's tick, not a builder's), `X-Content-Type-Options:
-nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` that keeps camera
-and microphone (the capture station photographs albaranes, the Chef drawer takes voice) and switches off
-geolocation, payment, USB and Bluetooth.
+**Also shipped in the same header block:** `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin`, and a `Permissions-Policy` that keeps camera and microphone (the capture
+station photographs albaranes, the Chef drawer takes voice) and switches off geolocation, payment, USB and
+Bluetooth.
+
+**HSTS is Vercel's, not ours.** Verified 2026-10-03 against the live edge: `max-age=63072000` on
+www.foodstudio.ai, and `max-age=63072000; includeSubDomains; preload` on the `*.vercel.app` preview hosts.
+An app-level header would be a second, *weaker* one (a year), and a browser takes the first it sees — so
+setting it here would downgrade what Vercel already does. `scripts/test_csp_headers.sh` fails if the app
+ever starts sending it.
+
+→ **Open, Boris's call, in Vercel's domain settings and not in this repo:** whether www.foodstudio.ai gets
+`includeSubDomains` and `preload`. It forces HTTPS on every present and future foodstudio.ai subdomain, and
+preload is slow to undo. Needs a list of the subdomains first.
 
 ### Adding a third-party endpoint later
 
