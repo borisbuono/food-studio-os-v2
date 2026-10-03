@@ -4,6 +4,7 @@ import { supabaseService } from "@/lib/supabaseService";
 import { requireManagerOf } from "@/lib/access/requireManager";
 import { emailRedirectUri } from "@/lib/email/gmail";
 import { pullAll } from "@/lib/email/pull";
+import { googleClientFor } from "@/lib/google/oauthClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,10 +39,13 @@ export async function GET(req: NextRequest) {
   const gate = await requireManagerOf(sb, (st as any).entity_id);
   if (!gate.ok) return gate.status === 401 ? NextResponse.redirect(`${url.origin}/login?next=${encodeURIComponent(back)}`, 302) : bounce(back, "forbidden");
 
+  // the same per-house client the connect route sent them to Google with
+  const client = await googleClientFor(svc, gate.entity_id!, { allowEnv: false }).catch(() => null);
+  if (!client) return bounce(back, "client_not_set");
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      code, client_id: process.env.GOOGLE_OAUTH_CLIENT_ID || "", client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
+      code, client_id: client.client_id, client_secret: client.client_secret,
       redirect_uri: emailRedirectUri(url.origin), grant_type: "authorization_code",
     }),
   });
@@ -67,6 +71,8 @@ export async function GET(req: NextRequest) {
     p_connected_by: gate.uid,
   });
   if (error || !accountId) return bounce(back, "save_failed");
+  // remember which client minted these tokens — refresh must use the same one
+  await svc.from("email_accounts").update({ oauth_client_id: client.client_id }).eq("id", String(accountId));
 
   // first pull now (best-effort; the 10-min poll continues)
   try { await pullAll(svc, "connect", { accountId: String(accountId) }); } catch { /* shown on the row */ }

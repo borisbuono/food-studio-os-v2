@@ -20,7 +20,8 @@ function ago(iso: string | null): string {
 const NOTICE: Record<string, string> = {
   state_mismatch: "That connect link had expired. Try again.",
   no_refresh_token: "Google did not hand over a long-lived token — remove the OS from the account's connected apps and connect again.",
-  not_configured: "Google sign-in is not configured on the server yet (GOOGLE_OAUTH_CLIENT_ID).",
+  not_configured: "Google sign-in is not configured on the server yet.",
+  client_not_set: "Google client not set for this house. Paste it below, then Connect.",
   no_service_key: "Server is missing its service key — nothing can be stored yet.",
   save_failed: "Connected to Google but the mailbox could not be saved.",
   forbidden: "Only a manager of this house can connect a mailbox.",
@@ -121,7 +122,7 @@ export default function MailboxList({ slug, rows: initial, canManage, configured
               Connect a mailbox
             </a>
           ) : (
-            <span className="rounded-md border border-black/15 px-4 py-3 text-sm text-ink-soft">Connect a mailbox — not configured yet</span>
+            <span className="rounded-md border border-black/15 px-4 py-3 text-sm text-ink-soft">Connect a mailbox — Google client not set for this house</span>
           )}
           {rows.length ? (
             <button onClick={pullNow} disabled={busy === "pull"} className="rounded-md border border-black/15 px-4 py-3 text-sm">
